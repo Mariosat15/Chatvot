@@ -154,6 +154,8 @@ interface GameMasterConfig {
   /** Whether the GM sees external referrals' email and last name. Absent = masked. */
   showExternalReferralDetails?: boolean;
   canCreateFreePrivateCompetitions?: boolean;
+  /** When true, players are sent to support chat instead of buying (unless unlocked for them). */
+  contactUsOnly?: boolean;
 }
 
 interface MarketplaceItem {
@@ -2210,6 +2212,48 @@ export default function MarketplaceSection() {
                         })
                       }
                     />
+
+                    {/* Contact-us-only switch: players are sent to support chat instead of buying */}
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-5 mt-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <Label className="text-white font-semibold">
+                            Contact us (no direct purchase)
+                          </Label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Players see a Contact us button that opens a support chat instead of
+                            buying. Unlock it for a specific Game Master from Manage Game Masters →
+                            Enable GM package.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          aria-pressed={editingItem.gameMasterConfig?.contactUsOnly === true}
+                          onClick={() =>
+                            setEditingItem({
+                              ...editingItem,
+                              gameMasterConfig: {
+                                ...editingItem.gameMasterConfig!,
+                                contactUsOnly: !(editingItem.gameMasterConfig?.contactUsOnly === true),
+                              },
+                            })
+                          }
+                          className={`relative inline-flex h-7 w-14 flex-shrink-0 items-center rounded-full transition-colors ${
+                            editingItem.gameMasterConfig?.contactUsOnly === true
+                              ? "bg-yellow-500"
+                              : "bg-gray-600"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${
+                              editingItem.gameMasterConfig?.contactUsOnly === true
+                                ? "translate-x-8"
+                                : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
 
                     {/* Challenge Earnings Section */}
                     <div className="border-t border-gray-700 pt-6 mt-6">

@@ -10,6 +10,7 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import mongoose from "mongoose";
+import { withUsername } from "@/lib/utils/admin-user-label";
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
         {
           $or: [{ id: { $in: userIds } }, { _id: { $in: objectIds } }],
         },
-        { projection: { _id: 1, id: 1, name: 1, email: 1 } },
+        { projection: { _id: 1, id: 1, name: 1, username: 1, email: 1 } },
       )
       .toArray();
 
@@ -87,12 +88,13 @@ export async function GET(request: NextRequest) {
     // First add from users collection - map by both id and _id.toString()
     for (const u of users) {
       const idStr = u.id || u._id?.toString();
+      const label = withUsername(u.name, u.username) || undefined;
       if (idStr) {
-        userMap.set(idStr, { name: u.name, email: u.email });
+        userMap.set(idStr, { name: label, email: u.email });
       }
       // Also set by _id string if different from id
       if (u._id && u._id.toString() !== u.id) {
-        userMap.set(u._id.toString(), { name: u.name, email: u.email });
+        userMap.set(u._id.toString(), { name: label, email: u.email });
       }
     }
 

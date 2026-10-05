@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import AuthFeaturePillsEditor from "@/components/admin/branding/AuthFeaturePillsEditor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -1023,6 +1024,8 @@ export default function ImagesSection() {
           </Button>
         </div>
       </div>
+
+      <AuthFeaturePillsEditor />
     </div>
   );
 }

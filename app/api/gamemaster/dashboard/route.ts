@@ -7,6 +7,8 @@ import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-mod
 import { MAX_PAGE_LIMIT } from "@/lib/services/gamemaster/referral-report-filter";
 import { toGameMasterReferralView } from "@/lib/services/gamemaster/gm-referral-view";
 import { readReferralConsentStates } from "@/lib/services/gamemaster/gm-referral-consent.service";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 import Competition from "@/database/models/trading/competition.model";
 import { gmContestKind } from "@/lib/utils/gm-contest-kind";
 import {
@@ -170,9 +172,16 @@ export async function GET() {
         )
       : null;
     const referralRows = referralReport?.rows ?? [];
-    const consent = await readReferralConsentStates(referralRows.map((row) => row.referralId));
+    const [consent, referredAccounts] = await Promise.all([
+      readReferralConsentStates(referralRows.map((row) => row.referralId)),
+      getUsersByIds(referralRows.map((row) => row.userId)),
+    ]);
     const referredUsers = referralRows.map((row) =>
-      toGameMasterReferralView(row, { showExternalDetails, consentState: consent.get(row.referralId) }),
+      toGameMasterReferralView(row, {
+        showExternalDetails,
+        consentState: consent.get(row.referralId),
+        publicName: referredAccounts.get(row.userId)?.publicName,
+      }),
     );
 
     // ── Competitions ────────────────────────────────────────────────
@@ -209,12 +218,20 @@ export async function GET() {
       .lean()
       .then(async (earnings) => {
         const kinds = await contestKindsForEarnings(earnings);
+        // Reason: the earning stores the real name for the admin; the Game Master sees it only
+        // when their package shows external referral details, otherwise the username.
+        const earners = showExternalDetails
+          ? null
+          : await getUsersByIds(earnings.map((e) => String(e.referredUserId ?? "")).filter(Boolean));
         return earnings.map((e) => ({
           id: String(e._id),
           kind: kindForEarning(e, kinds),
           sourceType: e.sourceType || "competition",
           sourceName: e.sourceName || "Unknown",
-          referredUserName: e.referredUserName || "Unknown",
+          referredUserName: earners
+            ? (earners.get(String(e.referredUserId))?.publicName ??
+              resolvePublicName({ id: String(e.referredUserId ?? "") }))
+            : e.referredUserName || "Unknown",
           entryFeeAmount: e.entryFeeAmount || 0,
           netEarning: e.netEarning || 0,
           status: e.status || "pending",

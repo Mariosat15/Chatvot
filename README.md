@@ -82,6 +82,12 @@
 - **Real-time presence** — See who's online and available
 - **Same trading rules** — Uses competition trading engine
 
+### 🪪 Public Usernames
+- **Required at sign-up** — unique (case-insensitive), 3-20 characters
+- **Privacy by default** — other players see only usernames; real names are visible to admins and to Game Masters whose package enables external referral details
+- **Changeable from Profile → Settings** — old stored copies of the name are rewritten automatically
+- **One-off backfill** — `npx tsx tools/users/backfill-public-names.ts` (report-only until `--apply`)
+
 ### 💼 Credit Wallet System
 - **Virtual currency** — Users deposit real money to receive credits
 - **Multiple payment methods** — Stripe integration ready

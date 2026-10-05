@@ -9,6 +9,11 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
+import {
+  GM_CONTACT_US_ERROR_CODE,
+  GM_CONTACT_US_MESSAGE,
+  mustContactUsToBuy,
+} from "@/lib/services/gamemaster/contact-us-package";
 
 /**
  * POST /api/marketplace/purchase
@@ -40,7 +45,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the item
-    const item = await MarketplaceItem.findById(itemId).session(mongoSession);
+    const item = await MarketplaceItem.findById(itemId)
+      .select("+contactUsUnlockedUserIds")
+      .session(mongoSession);
     if (!item) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
@@ -54,6 +61,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Item is not available for purchase" },
         { status: 400 },
+      );
+    }
+
+    // Reason: the marketplace swaps Buy for "Contact us" on these packages, but the button is
+    // only a hint - this is the gate. Checked before any wallet read, so a refusal cannot
+    // leave a debit behind.
+    if (mustContactUsToBuy(item, userId)) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        {
+          success: false,
+          error: GM_CONTACT_US_MESSAGE,
+          errorCode: GM_CONTACT_US_ERROR_CODE,
+        },
+        { status: 403 },
       );
     }
 

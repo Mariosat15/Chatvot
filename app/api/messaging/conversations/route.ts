@@ -4,12 +4,14 @@ import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
 import MessagingService from "@/lib/services/messaging/messaging.service";
+import { getPublicName } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 
 /**
  * Helper to build query filter for user
  */
 function buildUserQuery(userId: string) {
-  const queries: any[] = [{ id: userId }];
+  const queries: Record<string, unknown>[] = [{ id: userId }];
 
   if (ObjectId.isValid(userId)) {
     queries.push({ _id: new ObjectId(userId) });
@@ -62,7 +64,7 @@ export async function GET(request: NextRequest) {
         lastMessage: conv.lastMessage,
         unreadCount: typeof conv.unreadCounts?.get === "function"
           ? conv.unreadCounts.get(session.user.id) || 0
-          : (conv.unreadCounts as any)?.[session.user.id] || 0,
+          : (conv.unreadCounts as unknown as Record<string, number> | undefined)?.[session.user.id] || 0,
         isAIHandled: conv.isAIHandled,
         assignedEmployeeName: conv.assignedEmployeeName,
         createdAt: conv.createdAt,
@@ -152,15 +154,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const participantName =
-      participantUser.name || participantUser.email?.split("@")[0] || "User";
+    // Reason: a direct conversation is between two players, so each sees the other's
+    // username only.
+    const participantName = resolvePublicName({
+      username: participantUser.username,
+      id: participantId,
+    });
     const participantAvatar =
       participantUser.profileImage || participantUser.image;
 
     const conversation = await MessagingService.findOrCreateDirectConversation(
       {
         id: session.user.id,
-        name: session.user.name || session.user.email?.split("@")[0] || "User",
+        name: await getPublicName(session.user.id),
         avatar: session.user.image ?? undefined,
       },
       {
@@ -179,14 +185,14 @@ export async function POST(request: NextRequest) {
         lastMessage: conversation.lastMessage,
         unreadCount: typeof conversation.unreadCounts?.get === "function"
           ? conversation.unreadCounts.get(session.user.id) || 0
-          : (conversation.unreadCounts as any)?.[session.user.id] || 0,
+          : (conversation.unreadCounts as unknown as Record<string, number> | undefined)?.[session.user.id] || 0,
         createdAt: conversation.createdAt,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating conversation:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to create conversation" },
+      { error: (error instanceof Error && error.message) || "Failed to create conversation" },
       { status: 500 },
     );
   }

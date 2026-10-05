@@ -19,11 +19,37 @@ import { parseSignupInterest } from "@/lib/utils/signup-interest";
 import { parsePhoneInput } from "@/lib/utils/phone";
 import { assertPhoneAvailable } from "@/lib/services/phone-uniqueness.service";
 import { recordReferralClaim } from "@/lib/services/gamemaster/referral-claim.service";
+import {
+  checkUsernameAvailability,
+  ensureUsernameIndex,
+} from "@/lib/services/username.service";
+import { validateUsername } from "@/lib/utils/username";
+import type { Db } from "mongodb";
+
+/** Undoes a sign-up whose profile could not be saved (only ever a username race). */
+async function removeJustCreatedAccount(
+  db: Db,
+  userId: string,
+  userQueries: Record<string, unknown>[],
+): Promise<void> {
+  const ownerIds: unknown[] = [userId];
+  if (ObjectId.isValid(userId)) ownerIds.push(new ObjectId(userId));
+  try {
+    await Promise.all([
+      db.collection("account").deleteMany({ userId: { $in: ownerIds } }),
+      db.collection("session").deleteMany({ userId: { $in: ownerIds } }),
+      db.collection("user").deleteOne({ $or: userQueries }),
+    ]);
+  } catch (cleanupError) {
+    console.error("❌ Could not remove account after username race:", cleanupError);
+  }
+}
 
 export const signUpWithEmail = async ({
   email,
   password,
   fullName,
+  username,
   country,
   address,
   city,
@@ -157,6 +183,27 @@ export const signUpWithEmail = async ({
       };
     }
 
+    // Reason: a username is mandatory and unique (owner, 5 Oct 2026) - it is the only
+    // identity other players see. Checked before the account exists so a taken name never
+    // leaves an orphan user; the unique index below still decides a race between two
+    // simultaneous sign-ups for the same name.
+    const usernameCheck = await checkUsernameAvailability(username);
+    if (!usernameCheck.available) {
+      return {
+        success: false,
+        error: usernameCheck.error,
+        code: "USERNAME_UNAVAILABLE",
+      };
+    }
+    const chosenUsername = validateUsername(username);
+    if (!chosenUsername.ok) {
+      return {
+        success: false,
+        error: chosenUsername.error,
+        code: "USERNAME_UNAVAILABLE",
+      };
+    }
+
     const response = await auth.api.signUpEmail({
       body: { email, password, name: fullName },
     });
@@ -199,6 +246,8 @@ export const signUpWithEmail = async ({
           // SMS-verified". SMS slots in later without migrating existing rows —
           // existing accounts keep these fields absent.
           phoneVerified: false,
+          username: chosenUsername.value,
+          usernameLower: chosenUsername.key,
           role, // All signups are traders - admin role assigned via admin panel only
           emailVerified: false, // Must verify email before login
           updatedAt: new Date(),
@@ -208,12 +257,29 @@ export const signUpWithEmail = async ({
           profileFields.signupInterestAt = new Date();
         }
 
-        const updateResult = await db.collection("user").updateOne(
-          { $or: queries },
-          {
-            $set: profileFields,
-          },
-        );
+        await ensureUsernameIndex(db as unknown as Db);
+        let updateResult;
+        try {
+          updateResult = await db.collection("user").updateOne(
+            { $or: queries },
+            {
+              $set: profileFields,
+            },
+          );
+        } catch (profileError) {
+          // Reason: someone else took this username between the availability check and
+          // now. The account was just created and nobody has used it, so remove it rather
+          // than leave a player who cannot be shown to anyone.
+          if ((profileError as { code?: number })?.code === 11000) {
+            await removeJustCreatedAccount(db as unknown as Db, userId, queries);
+            return {
+              success: false,
+              error: "That username is already taken",
+              code: "USERNAME_UNAVAILABLE",
+            };
+          }
+          throw profileError;
+        }
 
         console.log(
           `📝 Sign-up: Update result - matched: ${updateResult.matchedCount}, modified: ${updateResult.modifiedCount}`,

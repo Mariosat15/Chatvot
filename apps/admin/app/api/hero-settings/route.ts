@@ -5,6 +5,7 @@ import HeroSettings, {
   defaultThemePresets,
 } from "@/database/models/hero-settings.model";
 import { auditLogService } from "@/lib/services/audit-log.service";
+import { validateAuthFeaturePills } from "@/lib/constants/auth-feature-pills";
 
 // GET - Fetch hero settings
 export async function GET() {
@@ -76,10 +77,27 @@ export async function PUT(request: NextRequest) {
     delete updateFields.createdAt;
     delete updateFields.updatedAt;
 
+    // Reason: null resets the sign-in pills to the shipped defaults; anything
+    // else must validate, or a bad row would save and then vanish on read.
+    if ("authPageFeaturePills" in updateFields) {
+      if (updateFields.authPageFeaturePills === null) {
+        updateFields.authPageFeaturePills = undefined;
+      } else {
+        const pills = validateAuthFeaturePills(
+          updateFields.authPageFeaturePills,
+        );
+        if (!pills.ok) {
+          return NextResponse.json({ error: pills.error }, { status: 400 });
+        }
+        updateFields.authPageFeaturePills = pills.value;
+      }
+    }
+
     // Track what changed
     const changes: string[] = [];
     for (const key of Object.keys(updateFields)) {
       if (
+        // eslint-disable-next-line security/detect-object-injection -- key comes from Object.keys of the same object, read-only diff for the audit log
         JSON.stringify(settings.get(key)) !== JSON.stringify(updateFields[key])
       ) {
         changes.push(key);

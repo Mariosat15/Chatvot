@@ -2,16 +2,8 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { Gamepad2, Trophy, Swords, BarChart3, Gift } from "lucide-react";
 import { useAuthBranding } from "@/components/auth/AuthBrandingContext";
-
-export const AUTH_SIGN_IN_PILLS = [
-  { label: "AI Markets Simulation", icon: BarChart3 },
-  { label: "Skill Games & Puzzles", icon: Gamepad2 },
-  { label: "Competitions & Tournaments", icon: Swords },
-  { label: "Live Leaderboards", icon: Trophy },
-  { label: "Exciting Rewards", icon: Gift },
-] as const;
+import { AUTH_PILL_ICONS } from "@/lib/constants/auth-feature-pills";
 
 type Props = {
   variant: "sign-in" | "sign-up";
@@ -23,7 +15,7 @@ type Props = {
  * Prefetches the opposite page's background so Sign In ↔ Sign Up feels instant.
  */
 export default function DesktopAuthShell({ variant, children }: Props) {
-  const { logo, signInImage, signUpImage } = useAuthBranding();
+  const { logo, signInImage, signUpImage, featurePills } = useAuthBranding();
   const isSignUp = variant === "sign-up";
   const background = isSignUp ? signUpImage : signInImage;
   const prefetchSrc = isSignUp ? signInImage : signUpImage;
@@ -77,17 +69,22 @@ export default function DesktopAuthShell({ variant, children }: Props) {
           </div>
         </div>
 
-        {!isSignUp && (
+        {!isSignUp && featurePills.length > 0 && (
           <ul className="mx-auto mt-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-2 pb-2 sm:gap-3">
-            {AUTH_SIGN_IN_PILLS.map(({ label, icon: Icon }) => (
-              <li
-                key={label}
-                className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-[#081428]/80 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-50 sm:text-[11px]"
-              >
-                <Icon className="h-3.5 w-3.5 text-cyan-300" aria-hidden />
-                {label}
-              </li>
-            ))}
+            {featurePills.map(({ label, icon }, index) => {
+              const Icon = AUTH_PILL_ICONS.get(icon);
+              return (
+                <li
+                  key={`${index}-${label}`}
+                  className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-[#081428]/80 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-50 sm:text-[11px]"
+                >
+                  {Icon && (
+                    <Icon className="h-3.5 w-3.5 text-cyan-300" aria-hidden />
+                  )}
+                  {label}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

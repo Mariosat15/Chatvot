@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { sanitizeHtml } from "@/lib/utils/html-sanitizer";
 import { notifyGmSubscriptionChanged } from "@/lib/events/gm-subscription";
+import { contactUsChatHref } from "@/lib/services/gamemaster/contact-us-package";
 import {
   TrendingUp,
   Star,
@@ -44,6 +45,7 @@ import {
   LayoutGrid,
   List,
   Trophy,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -83,6 +85,8 @@ interface MarketplaceItem {
   // when the subscription is past its endDate.
   gameMasterSubscriptionStatus?: "active" | "expired";
   gameMasterRenewalPrice?: number;
+  // True when this player must contact us to get this package (server-decided).
+  gameMasterContactUs?: boolean;
   gameMasterConfig?: {
     subscriptionDurationDays: number;
     referralFeePercentage: number;
@@ -322,6 +326,13 @@ export default function MarketplaceContent() {
         return;
       }
       router.push("/profile?tab=arsenal");
+      return;
+    }
+
+    // Reason: a "Contact us" package is not sold here - the player is taken to the support
+    // chat until an admin enables it for them. The purchase route refuses it regardless.
+    if (item.gameMasterContactUs) {
+      router.push(contactUsChatHref(item.name));
       return;
     }
 
@@ -1221,6 +1232,8 @@ function ItemCard({
             <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
           ) : item.owned ? (
             <><Check className="h-3 w-3" />Owned</>
+          ) : item.gameMasterContactUs ? (
+            <><MessageCircle className="h-3 w-3" />Contact us</>
           ) : (
             <><ShoppingCart className="h-3 w-3" />Get</>
           )}
@@ -1534,6 +1547,8 @@ function CosmeticCard({
             <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent" />
           ) : item.owned ? (
             <><Check className="h-3 w-3" />Owned</>
+          ) : item.gameMasterContactUs ? (
+            <><MessageCircle className="h-3 w-3" />Contact us</>
           ) : (
             <><ShoppingCart className="h-3 w-3" />Get</>
           )}
@@ -1745,6 +1760,8 @@ function GameMasterCard({
             <><RefreshCw className="h-3 w-3" />Renew</>
           ) : item.owned ? (
             <><Check className="h-3 w-3" />Active</>
+          ) : item.gameMasterContactUs ? (
+            <><MessageCircle className="h-3 w-3" />Contact us</>
           ) : (
             <><Crown className="h-3 w-3" />Get GM</>
           )}
@@ -1994,6 +2011,11 @@ function GameMasterCard({
               <>
                 <Check className="h-4 w-4" />
                 Active
+              </>
+            ) : item.gameMasterContactUs ? (
+              <>
+                <MessageCircle className="h-4 w-4" />
+                Contact us
               </>
             ) : (
               <>
@@ -2368,6 +2390,11 @@ function ItemDetailModal({
                     <Check className="h-4 w-4" />
                     {isGameMaster ? "Already Active" : "Owned — Go to Arsenal"}
                     {!isGameMaster && <ArrowUpRight className="h-3.5 w-3.5" />}
+                  </>
+                ) : item.gameMasterContactUs ? (
+                  <>
+                    <MessageCircle className="h-4 w-4" />
+                    Contact us
                   </>
                 ) : (
                   <>

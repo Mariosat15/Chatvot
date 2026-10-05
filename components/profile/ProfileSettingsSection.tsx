@@ -49,6 +49,7 @@ import {
 import { isEUCountry } from "@/lib/utils/country-vat";
 import TwoFactorSection from "@/components/profile/TwoFactorSection";
 import ChallengeAvailabilitySection from "@/components/profile/ChallengeAvailabilitySection";
+import UsernameSection from "@/components/profile/UsernameSection";
 
 interface UserProfile {
   id: string;
@@ -1098,6 +1099,8 @@ export default function ProfileSettingsSection() {
           </div>
         </div>
       </div>
+
+      <UsernameSection />
 
       {/* Challenge Requests — mounted here rather than on the two profile page
           shells, so both of them get it from one edit. */}

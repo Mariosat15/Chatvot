@@ -10,6 +10,7 @@ import {
   type ReferredPlayersFilter,
 } from "@/lib/services/gamemaster/referral-report-filter";
 import { toGameMasterReferralView } from "@/lib/services/gamemaster/gm-referral-view";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
 import {
   readAwaitingClaims,
   readReferralConsentStates,
@@ -84,16 +85,21 @@ export async function GET(request: NextRequest) {
     const all = overall.summary.all;
     // Reason: "referred" and "assigned" stay separate (s5.6) - the waiting list is link
     // sign-ups not yet attached, and is never added to the assigned figures above.
-    const [consent, awaiting] = await Promise.all([
+    const [consent, awaiting, accounts] = await Promise.all([
       readReferralConsentStates(report.rows.map((row) => row.referralId)),
       readAwaitingClaims(userId),
+      getUsersByIds(report.rows.map((row) => row.userId)),
     ]);
 
     return NextResponse.json({
       success: true,
       data: {
         referrals: report.rows.map((row) =>
-          toGameMasterReferralView(row, { showExternalDetails, consentState: consent.get(row.referralId) }),
+          toGameMasterReferralView(row, {
+            showExternalDetails,
+            consentState: consent.get(row.referralId),
+            publicName: accounts.get(row.userId)?.publicName,
+          }),
         ),
         awaitingTerms: awaiting.rows,
         stats: {

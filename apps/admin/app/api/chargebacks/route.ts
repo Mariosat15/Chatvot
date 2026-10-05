@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { withUsername } from "@/lib/utils/admin-user-label";
 import { listChargebackQueue } from "../../../../../lib/services/security/chargeback-case.service";
 
 const ALLOWED_STATUSES = [
@@ -75,13 +76,13 @@ async function enrichWithUsers(items: any[]): Promise<any[]> {
       .collection("user")
       .find(
         { $or: orClauses },
-        { projection: { id: 1, name: 1, email: 1 } },
+        { projection: { id: 1, name: 1, username: 1, email: 1 } },
       )
       .toArray();
     const byKey = new Map<string, { name?: string; email?: string }>();
     for (const u of users) {
       const key = String(u.id || u._id || "");
-      byKey.set(key, { name: u.name, email: u.email });
+      byKey.set(key, { name: withUsername(u.name, u.username), email: u.email });
     }
     return items.map((i) => {
       const base = i.toObject ? i.toObject() : i;

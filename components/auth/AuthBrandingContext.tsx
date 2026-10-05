@@ -1,11 +1,14 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import type { AuthFeaturePill } from "@/lib/constants/auth-feature-pills";
 
 export type AuthBranding = {
   logo: string;
   signInImage: string;
   signUpImage: string;
+  // Icon slugs, not components: this value crosses from the server layout.
+  featurePills: AuthFeaturePill[];
 };
 
 const AuthBrandingContext = createContext<AuthBranding | null>(null);

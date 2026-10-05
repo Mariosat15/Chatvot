@@ -76,6 +76,7 @@ export type {
 } from "./contest-entry/types";
 
 import type { ContestEntryActor, ContestEntryResult } from "./contest-entry/types";
+import { resolvePublicName } from "@/lib/utils/username";
 
 const MAX_RETRIES = 5;
 const DUPLICATE_KEY = 11000;
@@ -319,7 +320,8 @@ export async function enterContest(
           buildParticipantSeat({
             competitionId,
             userId: actor.userId,
-            username: actor.username || actor.email,
+            // Reason: never fall back to the email - the seat name is public.
+            username: actor.username || resolvePublicName({ id: actor.userId }),
             email: actor.email,
             gameKey: competition.gameKey,
             gameType: competition.gameType,

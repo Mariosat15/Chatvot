@@ -13,6 +13,7 @@ import MobileAuthInput from "@/components/auth/mobile/MobileAuthInput";
 import MobileInterestSelector from "@/components/auth/mobile/MobileInterestSelector";
 import { PASSWORD_REQUIREMENTS } from "@/lib/constants/auth-password";
 import { useSignUpForm } from "@/hooks/useSignUpForm";
+import { usernameValidation } from "@/components/auth/username-validation";
 import type { SignupInterest } from "@/lib/utils/signup-interest";
 
 /** Dedicated mobile registration — one column, two steps. */
@@ -86,6 +87,21 @@ export default function MobileRegister() {
                 }}
                 autoComplete="name"
               />
+
+              <div>
+                <MobileAuthInput
+                  name="username"
+                  label="Username"
+                  placeholder="volt_trader"
+                  register={register}
+                  error={errors.username}
+                  validation={usernameValidation as never}
+                  autoComplete="username"
+                />
+                <p className="mt-1 text-xs text-cyan-100/55">
+                  Other players see only your username, never your full name.
+                </p>
+              </div>
 
               <MobileAuthInput
                 name="email"

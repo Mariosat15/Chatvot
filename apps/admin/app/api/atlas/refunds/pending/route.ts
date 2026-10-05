@@ -20,6 +20,7 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { withUsername } from "@/lib/utils/admin-user-label";
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
       return {
         _id: d._id.toString(),
         userId: d.userId,
-        userName: userInfo.name,
+        userName: withUsername(userInfo.name, (userInfo as { username?: string }).username),
         userInfo: {
           id: userInfo.id,
           name: userInfo.name,

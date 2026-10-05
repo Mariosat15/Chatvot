@@ -11,6 +11,7 @@
  */
 
 import UserReferral from "@/database/models/user-referral.model";
+import { getPublicName } from "@/lib/utils/user-lookup";
 import { findSubscriptionForUser, toFacts } from "./affiliation.service";
 import { isGameMasterJoinable, type AffiliationGameMasterFacts } from "./affiliation-rules";
 import { hasAcceptedAffiliateTerms } from "./private-contest-membership.service";
@@ -50,7 +51,7 @@ export async function getPrivateContestGate(input: {
     const facts = toFacts(subscription);
     const base: PrivateContestGate = {
       state: "unavailable",
-      gameMasterName: facts?.userName,
+      gameMasterName: facts && gmUserId ? await getPublicName(gmUserId) : undefined,
       gameMasterUserId: gmUserId || undefined,
     };
     if (!subscription || !facts) return base;
@@ -77,7 +78,7 @@ export async function getPrivateContestGate(input: {
     const subscriptionId = String((subscription as { _id: unknown })._id);
     if (rowState === "joinable") return { ...base, state: "joinable", subscriptionId };
     if (rowState === "locked") {
-      return { ...base, state: "locked", currentGameMasterName: activeGameMaster?.userName };
+      return { ...base, state: "locked", currentGameMasterName: activeGameMasterId ? await getPublicName(activeGameMasterId) : undefined };
     }
     // Reason (R121): `your_gm` DOES reach here now - membership needs accepted terms, so a row
     // to this Game Master with none (an admin move, a legacy link) is not admitted. Pressing

@@ -6,6 +6,10 @@ import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subs
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { seedMarketplaceItems } from "@/lib/services/marketplace-seed.service";
+import {
+  isContactUsPackage,
+  mustContactUsToBuy,
+} from "@/lib/services/gamemaster/contact-us-package";
 
 // Short TTL so admin price changes propagate quickly (5 seconds)
 const MARKETPLACE_CACHE_TTL_MS = 5 * 1000;
@@ -73,7 +77,9 @@ export async function GET(request: NextRequest) {
       query.$or = [
         { name: { $regex: escapedSearch, $options: "i" } },
         { shortDescription: { $regex: escapedSearch, $options: "i" } },
-        { tags: { $in: [new RegExp(escapedSearch, "i")] } },
+        // Reason: escapedSearch has every regex metacharacter escaped above.
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      { tags: { $in: [new RegExp(escapedSearch, "i")] } },
       ];
     }
 
@@ -100,6 +106,7 @@ export async function GET(request: NextRequest) {
     const items = await MarketplaceItem.find(query)
       .sort({ isFeatured: -1, totalPurchases: -1, createdAt: -1 })
       .limit(100)
+      .select("+contactUsUnlockedUserIds")
       .lean();
 
     let userPurchases: string[] = [];
@@ -154,7 +161,13 @@ export async function GET(request: NextRequest) {
     const itemsWithOwnership = items.map((item) => {
       const itemId = item._id.toString();
       const owned = userPurchases.includes(itemId);
-      const enriched: Record<string, unknown> = { ...item, owned };
+      // Reason: the unlock list is other players' ids. It is read only to answer this
+      // player's question and never sent back.
+      const { contactUsUnlockedUserIds: _unlocked, ...publicItem } = item;
+      const enriched: Record<string, unknown> = { ...publicItem, owned };
+      if (isContactUsPackage(item)) {
+        enriched.gameMasterContactUs = mustContactUsToBuy(item, userId);
+      }
       if (
         item.category === "gamemaster" &&
         gmSubscription?.packageId === itemId

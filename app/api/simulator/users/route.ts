@@ -149,10 +149,15 @@ async function createBatchUsersDirect(
   // Build user documents matching better-auth's schema
   const userDocs = users.map((u) => {
     const id = crypto.randomUUID();
+    // Reason: other players only ever see a username, so simulator accounts carry one.
+    // Derived from the random id, so a batch cannot collide on the unique index.
+    const username = `sim_${id.replace(/-/g, "").slice(0, 14)}`;
     return {
       id,
       email: u.email,
       name: u.name,
+      username,
+      usernameLower: username.toLowerCase(),
       emailVerified: true,
       role: "trader",
       image: null,

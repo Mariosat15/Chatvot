@@ -14,6 +14,7 @@ import { buildChallengeParticipantSeat } from "@/lib/services/challenges/challen
 import { isUnclaimedOpenChallenge } from "@/lib/utils/open-challenge";
 import { randomBytes } from "crypto";
 import BlockedUser from "@/database/models/messaging/blocked-user.model";
+import { getPublicName } from "@/lib/utils/user-lookup";
 
 // POST - Accept a challenge
 export async function POST(
@@ -199,6 +200,7 @@ export async function POST(
     // transaction and rolls the claim back, so a player who is turned away for an empty
     // wallet has not silently consumed somebody else's opportunity.
     if (claimable) {
+      const claimerPublicName = await getPublicName(session.user.id);
       const claimed = await Challenge.findOneAndUpdate(
         {
           _id: challenge._id,
@@ -213,7 +215,8 @@ export async function POST(
         {
           $set: {
             challengedId: session.user.id,
-            challengedName: session.user.name || "Unknown",
+            // Reason: the creator reads this name - the username, never the real name.
+            challengedName: claimerPublicName,
             challengedEmail: session.user.email || "",
           },
         },

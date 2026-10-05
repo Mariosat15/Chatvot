@@ -3,6 +3,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import MessagingService from "@/lib/services/messaging/messaging.service";
 import { wsNotifier } from "@/lib/services/messaging/websocket-notifier";
+import { getPublicName } from "@/lib/utils/user-lookup";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/messages
@@ -19,7 +20,6 @@ export async function POST(
     }
 
     const currentUserId = session.user.id;
-    const currentUserName = session.user.name || "User";
     const { conversationId } = await params;
     const body = await request.json();
     const { content, messageType, attachments, replyTo } = body;
@@ -43,6 +43,13 @@ export async function POST(
         { status: 404 },
       );
     }
+
+    // Reason: in a chat with another player the sender is shown by username only; a
+    // support ticket is read by staff, who are entitled to the real name.
+    const currentUserName =
+      conversation.type === "user-to-support"
+        ? session.user.name || "User"
+        : await getPublicName(currentUserId);
 
     const { message, conversation: updatedConversation } =
       await MessagingService.sendMessage({
@@ -91,10 +98,10 @@ export async function POST(
         createdAt: message.createdAt,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error sending message:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to send message" },
+      { error: (error instanceof Error && error.message) || "Failed to send message" },
       { status: 500 },
     );
   }
@@ -106,8 +113,8 @@ export async function POST(
 async function processAIResponse(
   conversationId: string,
   userMessage: string,
-  userId: string,
-  userName: string,
+  _userId: string,
+  _userName: string,
 ) {
   try {
     const settings = await MessagingService.getSettings();

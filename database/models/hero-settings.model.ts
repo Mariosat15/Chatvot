@@ -402,6 +402,12 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     authPageDashboardImage: { type: String, default: "/assets/images/dashboard.png" },
     authPageSignInImage: { type: String, default: "" },
     authPageSignUpImage: { type: String, default: "" },
+    // Reason: default undefined, not Mongoose's automatic []. Unset means the
+    // shipped pills; a saved [] means the admin removed them all.
+    authPageFeaturePills: {
+      type: [{ _id: false, label: String, icon: String }],
+      default: undefined,
+    },
 
     // Advanced
     customCSS: { type: String, default: "" },

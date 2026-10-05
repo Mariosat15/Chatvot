@@ -8,6 +8,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import UserPresence from "@/database/models/user-presence.model";
 import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
 import { getUserById } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 import { nanoid } from "nanoid";
 import { trackTiming, errorResponse } from "@/lib/utils/api-utils";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
@@ -213,7 +214,7 @@ export async function POST(request: NextRequest) {
         );
       }
       challengerId = session.user.id;
-      challengerName = session.user.name || "Unknown";
+      challengerName = resolvePublicName({ id: session.user.id });
       challengerEmail = session.user.email || "";
     }
 
@@ -597,7 +598,8 @@ export async function POST(request: NextRequest) {
 
     // Use already fetched user data (no duplicate queries!)
     if (!isInSimulatorMode && challengerUser) {
-      challengerName = challengerUser.name || challengerName;
+      // Reason: both names are shown to the other player, so they are usernames.
+      challengerName = challengerUser.publicName || challengerName;
       challengerEmail = challengerUser.email || challengerEmail;
     }
 
@@ -615,7 +617,7 @@ export async function POST(request: NextRequest) {
       ? undefined
       : `simuser_${challengedId.slice(-6)}@test.simulator`;
     if (!isInSimulatorMode && challengedUser) {
-      challengedName = challengedUser.name || challengedName;
+      challengedName = challengedUser.publicName || challengedName;
       challengedEmail = challengedUser.email || challengedEmail;
     }
 

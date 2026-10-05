@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/better-auth/auth";
+import { getPublicName } from "@/lib/utils/user-lookup";
 import {
   launchChallengeRound,
   type ChallengeLaunchRefusal,
@@ -123,7 +124,7 @@ export async function POST(
       userId: session.user.id,
       // Reason: same rule as the competition route - the provider receives a display name
       // and nothing else identifying the player off-platform.
-      displayName: session.user.name || undefined,
+      displayName: await getPublicName(session.user.id),
     });
 
     if (!outcome.success) {

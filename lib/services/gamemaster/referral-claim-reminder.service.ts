@@ -12,7 +12,7 @@
 
 import { connectToDatabase } from "@/database/mongoose";
 import GmReferralClaim from "@/database/models/gamemaster/gm-referral-claim.model";
-import { getUserById } from "@/lib/utils/user-lookup";
+import { getPublicName, getUserById } from "@/lib/utils/user-lookup";
 import { notificationService } from "@/lib/services/notification.service";
 import { emailNotificationBridge } from "@/lib/services/email-notification-bridge";
 import { findSubscriptionForUser, toFacts } from "./affiliation.service";
@@ -90,7 +90,7 @@ export async function sendReferralClaimReminder(input: {
     const player = await getUserById(claim.userId);
     const playerEmail = player?.email || claim.userEmail || "";
     const playerName = player?.name || playerEmail.split("@")[0] || "";
-    const gameMasterName = gm.userName || "your Game Master";
+    const gameMasterName = await getPublicName(input.gameMasterUserId);
 
     await notificationService.send({
       userId: claim.userId,

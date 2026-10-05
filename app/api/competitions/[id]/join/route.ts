@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
+import { getPublicName } from "@/lib/utils/user-lookup";
 import {
   isSimulatorRequest,
   getSimulatorUserId,
@@ -114,7 +115,8 @@ export async function POST(
       actor = {
         userId: session.user.id,
         email: session.user.email || "",
-        username: session.user.name || session.user.email || "Unknown",
+        // Reason: shown to every other player - the username, never the real name or email.
+        username: await getPublicName(session.user.id),
         emailVerified:
           (session.user as { emailVerified?: boolean }).emailVerified === true,
         ip:

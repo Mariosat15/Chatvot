@@ -5,6 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { withUsername } from "@/lib/utils/admin-user-label";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
@@ -134,6 +135,7 @@ interface RecentWithdrawalRow {
 }
 interface RecentUserRow {
   name?: string;
+  username?: string;
   email?: string;
   createdAt: Date;
 }
@@ -505,7 +507,7 @@ export async function GET() {
         .find()
         .sort({ createdAt: -1 })
         .limit(5)
-        .project({ name: 1, email: 1, createdAt: 1 })
+        .project({ name: 1, username: 1, email: 1, createdAt: 1 })
         .toArray(),
 
       // Service status
@@ -568,7 +570,7 @@ export async function GET() {
     for (const user of recentUsers as unknown as RecentUserRow[]) {
       recentActivity.push({
         type: "user",
-        description: `New user: ${user.name || user.email}`,
+        description: `New user: ${withUsername(user.name, user.username) || user.email}`,
         timestamp: user.createdAt.toISOString(),
         status: "success",
       });

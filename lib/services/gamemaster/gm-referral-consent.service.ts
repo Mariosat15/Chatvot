@@ -15,6 +15,7 @@
 import GmTermsRequest from "@/database/models/gamemaster/gm-terms-request.model";
 import GmReferralClaim from "@/database/models/gamemaster/gm-referral-claim.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 import type { GmAwaitingClaimView, ReferralConsentState } from "./gm-referral-view";
 
 /** Enough for a screen; a Game Master with more unanswered sign-ups sees the newest. */
@@ -36,13 +37,6 @@ export async function readReferralConsentStates(
     });
   }
   return states;
-}
-
-/** A display name that is never an email: `getUsersByIds` falls back to the email. */
-function safeName(name: string | undefined): string | null {
-  if (typeof name !== "string") return null;
-  const trimmed = name.trim();
-  return trimmed && !trimmed.includes("@") ? trimmed : null;
 }
 
 /** Link sign-ups to this Game Master still waiting for, or refused by, the player. */
@@ -77,7 +71,9 @@ export async function readAwaitingClaims(gameMasterId: string): Promise<{
     return {
       claimId: String(claim._id),
       userId: claim.userId,
-      userName: safeName(users.get(claim.userId)?.name),
+      // Reason: an unassigned player has accepted nothing, so the Game Master sees the
+      // username every other player sees, never the real name.
+      userName: users.get(claim.userId)?.publicName ?? resolvePublicName({ id: claim.userId }),
       referredAt: claim.createdAt ? new Date(claim.createdAt).toISOString() : null,
       consent: isDeclined ? "declined" : "pending",
       declinedAt: isDeclined && claim.resolvedAt ? new Date(claim.resolvedAt).toISOString() : null,

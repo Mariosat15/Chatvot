@@ -106,6 +106,8 @@ export interface GameMasterData {
 export interface UserData {
   id: string;
   name: string;
+  /** Public handle; null on accounts that predate usernames. */
+  username?: string | null;
   email: string;
   role: UserRole;
   isAdmin: boolean;
@@ -404,6 +406,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
       result = result.filter(
         (user) =>
           user.name.toLowerCase().includes(query) ||
+          (user.username || "").toLowerCase().includes(query) ||
           user.email.toLowerCase().includes(query) ||
           user.id.toLowerCase().includes(query) ||
           (user.phone || "").toLowerCase().includes(query) ||
@@ -941,6 +944,11 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                                 </Badge>
                               )}
                             </div>
+                            {user.username ? (
+                              <p className="text-xs text-cyan-400 truncate font-mono">
+                                @{user.username}
+                              </p>
+                            ) : null}
                             <p className="text-xs text-gray-500 truncate">
                               {user.email}
                             </p>

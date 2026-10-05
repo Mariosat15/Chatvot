@@ -9,6 +9,7 @@ import {
   DEFAULT_AUTH_SIGN_IN_BG,
   DEFAULT_AUTH_SIGN_UP_BG,
 } from "@/lib/constants/auth-art";
+import { resolveAuthFeaturePills } from "@/lib/constants/auth-feature-pills";
 
 async function getAuthPageSettings() {
   try {
@@ -18,11 +19,16 @@ async function getAuthPageSettings() {
         .select({
           authPageSignInImage: 1,
           authPageSignUpImage: 1,
+          authPageFeaturePills: 1,
         })
         .lean(),
       WhiteLabel.findOne().select({ appLogo: 1 }).lean(),
     ])) as [
-      { authPageSignInImage?: string; authPageSignUpImage?: string } | null,
+      {
+        authPageSignInImage?: string;
+        authPageSignUpImage?: string;
+        authPageFeaturePills?: unknown;
+      } | null,
       { appLogo?: string } | null,
     ];
 
@@ -30,6 +36,7 @@ async function getAuthPageSettings() {
       signInImage: heroSettings?.authPageSignInImage || DEFAULT_AUTH_SIGN_IN_BG,
       signUpImage: heroSettings?.authPageSignUpImage || DEFAULT_AUTH_SIGN_UP_BG,
       logo: whiteLabel?.appLogo || "/assets/images/logo.png",
+      featurePills: resolveAuthFeaturePills(heroSettings?.authPageFeaturePills),
     };
   } catch (error) {
     console.error("Failed to load auth page settings:", error);
@@ -37,6 +44,7 @@ async function getAuthPageSettings() {
       signInImage: DEFAULT_AUTH_SIGN_IN_BG,
       signUpImage: DEFAULT_AUTH_SIGN_UP_BG,
       logo: "/assets/images/logo.png",
+      featurePills: resolveAuthFeaturePills(undefined),
     };
   }
 }

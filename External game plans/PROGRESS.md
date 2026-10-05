@@ -933,6 +933,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 5 October 2026 - GM "Contact us" packages with per-Game-Master unlock
+
+**Owner instruction:** a GM package can be set to "contact us" so players are sent to support chat instead of buying; from Manage Game Masters an admin can enable a chosen contact-us package for purchase by one specific Game Master. Built: `contactUsOnly` + top-level `contactUsUnlockedUserIds` on both `marketplace-item.model.ts` copies, mirrored rules in `lib/services/gamemaster/contact-us-package.ts`, purchase gate (403 `GM_CONTACT_US`, before the wallet read), Contact us button on all five marketplace buy sites, support-chat deep link in `MessagingClient`, admin toggle in `MarketplaceSection`, `apps/admin/app/api/gamemasters/[id]/package-unlocks` (section-guarded, audited) and `EnableGmPackageButton` on the GM detail view. 11 tests. Not committed, never verified by eye. Details: `19` s1.
+
 ### 5 October 2026 - Dedicated mobile auth + desktop polish
 
 **Owner instruction:** keep desktop Sign In / Registration look; build separate mobile layouts (not shrunk desktop); 2-step mobile register; center background art; faster Sign In ↔ Sign Up; hide scrollbar; remove Google/Apple for now; Terms/Privacy must link to real pages; preserve GM referral. Spec: `External game plans/redising login.md`.

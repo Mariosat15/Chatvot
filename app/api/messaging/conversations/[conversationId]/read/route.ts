@@ -3,6 +3,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import MessagingService from "@/lib/services/messaging/messaging.service";
 import { wsNotifier } from "@/lib/services/messaging/websocket-notifier";
+import { getPublicName } from "@/lib/utils/user-lookup";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/read
@@ -33,17 +34,19 @@ export async function POST(
       );
     }
 
+    // Reason: read receipts are shown to the other participant.
+    const readerName = await getPublicName(session.user.id);
     await MessagingService.markMessagesAsRead(
       conversationId,
       session.user.id,
-      session.user.name || "User",
+      readerName,
     );
 
     // Broadcast read receipt via WebSocket
     wsNotifier.notifyRead(
       conversationId,
       session.user.id,
-      session.user.name || "User",
+      readerName,
     );
 
     return NextResponse.json({ success: true });

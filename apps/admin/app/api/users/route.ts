@@ -21,7 +21,7 @@ import "@/database/models/marketplace/marketplace-item.model";
  * - userId: Get specific user by ID
  * - page: Page number (default 1)
  * - limit: Items per page (default 20, max 100, 0 = all)
- * - search: Search by name or email
+ * - search: Search by name, username or email
  * - sort: Sort field (default 'createdAt')
  * - order: Sort order 'asc' or 'desc' (default 'desc')
  */
@@ -95,6 +95,7 @@ export async function GET(request: NextRequest) {
         query.$or = [
           { name: { $regex: search, $options: "i" } },
           { email: { $regex: search, $options: "i" } },
+          { username: { $regex: search, $options: "i" } },
         ];
       }
 
@@ -456,6 +457,7 @@ export async function GET(request: NextRequest) {
       return {
         id: userId,
         name: user.name || "N/A",
+        username: user.username || null,
         email: user.email,
         role: effectiveRole, // Effective role considering GM subscription
         isAdmin: storedRole === "admin",

@@ -1231,3 +1231,62 @@ that is why emails showed white on the phone.
 
 Proven by __tests__/services/chartvolt-email-theme.test.ts (19 tests).
 Never verified by eye in a real mail client.
+
+## 44. Sign-in feature pills are editable in Branding (5 Oct 2026)
+
+The five pills under the login card (AI Markets Simulation, Skill Games &
+Puzzles, Competitions & Tournaments, Live Leaderboards, Exciting Rewards)
+were hard-coded. They are now Branding content:
+- Stored on HeroSettings.authPageFeaturePills (both model copies) as
+  { label, icon } rows, with NO default array. Unset = the shipped five;
+  a saved empty list = the admin removed them all, and the row is hidden.
+- Rules live in lib/constants/auth-feature-pills.ts (mirrored,
+  byte-identical test): 20 icons in a Map (so "__proto__" is not an
+  icon), max 8 pills, labels 1-40 chars. The save route refuses a bad
+  list with a 400 naming the row, rather than dropping it; null resets.
+- Admin: Branding > Images, new "Sign-in Feature Pills" card under Auth
+  Page Branding - live preview, icon picker, label, reorder, remove, add,
+  reset to defaults. It saves only its own field.
+- Player: (auth)/layout resolves the field and passes label + icon NAME
+  through AuthBrandingContext (a server layout cannot hand an icon
+  component to the browser); DesktopAuthShell maps the name to the icon.
+- Mobile sign-in shows no pills (unchanged design).
+- Deleted components/auth/AuthShell.tsx: imported nowhere, and it kept a
+  second hard-coded copy of the five pills.
+
+Proven by __tests__/auth/auth-feature-pills.test.ts (13 tests).
+Never verified by eye.
+
+## 45. Usernames: required, unique, and the only name players see (5 Oct 2026)
+
+Registration now asks for a username. Other players see only usernames;
+real names stay visible to admins and to Game Masters whose package has
+"show external referral details" enabled.
+- Stored on the Better Auth `user` document as `username` plus
+  `usernameLower`, with a unique partial index on `usernameLower`, so
+  `Alice` and `alice` cannot both exist and a race is decided by the
+  index (the loser gets "taken", never a duplicate).
+- Rules live in lib/utils/username.ts (mirrored, byte-identical test):
+  3-20 characters, starts with a letter, letters/digits/underscores,
+  reserved names (admin, support, chartvolt...) refused.
+- `resolvePublicName` is the one answer to "what do others see": the
+  username, or `Player_<last 6 of id>` for older accounts. It never falls
+  back to the real name.
+- Player screens (leaderboards, challenges, chat, friends, notifications,
+  profiles) show the public name. Game Master earnings, referrals and the
+  GM leaderboard show real names only when the package switch is on.
+- Profile > Settings has a Username card (PUT /api/user/username,
+  rate-limited to 5 changes an hour). A change rewrites stored copies of
+  the old name via `syncPublicNameCopies`.
+- Admin keeps real names for support and adds the handle beside them as
+  "Name (@handle)": users list + detail panel, live ops, chargebacks,
+  refunds, financial dashboard, badges/XP, fraud lookup, failed deposits,
+  assigned customers, new sign-ups. The users search matches usernames.
+  Staff audit-log names are untouched (they are the employee's own name).
+- Rows written before this change still hold real names until
+  `npx tsx tools/users/backfill-public-names.ts --apply` runs. It is
+  report-only without `--apply`, has NOT been run, and never invents a
+  username.
+
+Proven by __tests__/services/username-rules.test.ts (19 tests) and
+__tests__/admin/admin-user-label.test.ts (5 tests). Never verified by eye.

@@ -523,6 +523,7 @@ export interface IHeroSettings extends Document {
   authPageDashboardImage: string;
   authPageSignInImage: string;
   authPageSignUpImage: string;
+  authPageFeaturePills?: { label: string; icon: string }[];
 
   // Advanced
   customCSS: string;
@@ -1695,6 +1696,12 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     },
     authPageSignInImage: { type: String, default: "" },
     authPageSignUpImage: { type: String, default: "" },
+    // Reason: default undefined, not Mongoose's automatic []. Unset means the
+    // shipped pills; a saved [] means the admin removed them all.
+    authPageFeaturePills: {
+      type: [{ _id: false, label: String, icon: String }],
+      default: undefined,
+    },
 
     // Advanced
     customCSS: { type: String, default: "" },

@@ -14,6 +14,7 @@
 import type { ReferredPlayerRow } from "./referral-read-model";
 import type { ReferralKind } from "./referral-kind";
 import type { AffiliationSurface } from "../../../database/models/user-referral.model";
+import { resolvePublicName } from "../../utils/username";
 
 export interface GmReferralView {
   referralId: string;
@@ -127,6 +128,26 @@ export interface GmReferralViewOptions {
    * declined - which is what every row was before s5.5.
    */
   consentState?: ReferralConsentState;
+  /**
+   * The player's public name (username), resolved by the route. Shown instead of the real
+   * name unless `showExternalDetails` is on. Absent falls back to `Player_<id>`, never the name.
+   */
+  publicName?: string;
+}
+
+/**
+ * The name a Game Master sees. Reason (owner, Oct 2026): only a Game Master whose package
+ * enables `showExternalReferralDetails` sees real names - for own AND external referrals.
+ * Everyone else sees the username, like every other player does.
+ */
+export function gameMasterVisibleName(
+  row: Pick<ReferredPlayerRow, "userId" | "userName" | "kind">,
+  options: Pick<GmReferralViewOptions, "showExternalDetails" | "publicName">,
+): string | null {
+  if (options.showExternalDetails !== true) {
+    return options.publicName ?? resolvePublicName({ id: row.userId });
+  }
+  return row.userName;
 }
 
 /**
@@ -160,7 +181,7 @@ export function toGameMasterReferralView(
   return {
     referralId: row.referralId,
     userId: row.userId,
-    userName: masked ? maskLastName(row.userName) : row.userName,
+    userName: gameMasterVisibleName(row, options),
     userEmail: !visible ? null : masked ? MASKED_CONTACT : row.userEmail,
     contactHidden: !visible,
     contactMasked: visible && masked,
@@ -193,4 +214,4 @@ export const CONTACT_HIDDEN_NOTE =
 
 /** Shown wherever an external referral's details are masked by the package. */
 export const CONTACT_MASKED_NOTE =
-  "External referral - your package shows only the client id, first name and a masked email.";
+  "External referral - your package shows only the client id, username and a masked email.";

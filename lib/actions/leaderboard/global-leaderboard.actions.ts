@@ -220,7 +220,8 @@ export async function getGlobalLeaderboard(
       userStatsMap.set(user.id, {
         userId: user.id,
         email: user.email,
-        username: user.name || user.email.split("@")[0] || "Unknown",
+        // Reason: a public board shows the username, never the real name or an email prefix.
+        username: user.publicName,
         profileImage: user.profileImage,
         totalPnl: 0,
         totalCapital: 0,

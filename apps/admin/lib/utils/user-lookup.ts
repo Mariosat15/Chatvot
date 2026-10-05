@@ -1,9 +1,12 @@
+import type { Document, Filter } from "mongodb";
 import { connectToDatabase } from "@/database/mongoose";
 
 export interface UserInfo {
   id: string;
   email: string;
   name: string;
+  /** Public handle chosen at registration; absent on accounts that predate it. */
+  username?: string;
   profileImage?: string;
   bio?: string;
   role?: string; // 'trader', 'admin', 'backoffice'
@@ -44,7 +47,7 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
 
     // If still not found, try as string _id
     if (!user) {
-      user = await db.collection("user").findOne({ _id: userId as any });
+      user = await db.collection("user").findOne({ _id: userId } as unknown as Filter<Document>);
     }
 
     if (!user) {
@@ -55,6 +58,7 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
       id: user.id || user._id?.toString() || userId,
       email: user.email || "unknown",
       name: user.name || user.email || "Unknown User",
+      username: user.username || undefined,
       profileImage: user.profileImage || user.image, // Check both profileImage and image (better-auth)
       bio: user.bio,
       role: user.role || "trader",
@@ -134,6 +138,7 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         id,
         email,
         name: user.name || email.split("@")[0] || "Unknown User", // Name is for display only
+        username: user.username || undefined,
         profileImage: user.profileImage || user.image, // Check both profileImage and image (better-auth)
         bio: user.bio,
         role: "trader",
@@ -193,7 +198,7 @@ export async function getUsersByIds(
 
       // If still not found, try as string _id
       if (!user) {
-        user = await db.collection("user").findOne({ _id: originalId as any });
+        user = await db.collection("user").findOne({ _id: originalId } as unknown as Filter<Document>);
       }
 
       if (user) {
@@ -202,6 +207,7 @@ export async function getUsersByIds(
           id: user.id || user._id?.toString() || originalId,
           email: user.email || "unknown",
           name: user.name || user.email || "Unknown User",
+          username: user.username || undefined,
           profileImage: user.profileImage || user.image, // Check both profileImage and image (better-auth)
           bio: user.bio,
           role: user.role || "trader",

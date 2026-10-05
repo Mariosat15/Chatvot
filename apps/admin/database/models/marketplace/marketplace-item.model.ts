@@ -143,6 +143,7 @@ export interface IGameMasterConfig {
   allowedVisibility?: ("public" | "gm_private")[]; // Public / private / both - absent = public only
   canCreateFreePrivateCompetitions?: boolean; // GM-funded private contests - absent = no
   showExternalReferralDetails?: boolean; // External referrals' email + last name shown to the GM - absent = masked
+  contactUsOnly?: boolean; // "Contact us" package - players are sent to support chat instead of buying - absent = buyable
 }
 
 export interface IMarketplaceItem extends Document {
@@ -179,6 +180,7 @@ export interface IMarketplaceItem extends Document {
   indicatorType?: IndicatorType; // For indicator items
   strategyConfig?: IStrategyConfig; // For strategy items
   gameMasterConfig?: IGameMasterConfig; // For game master items
+  contactUsUnlockedUserIds?: string[]; // Players an admin enabled to buy a contact-us package (select: false)
   cosmeticType?: CosmeticType; // For cosmetic items (avatar, frame, etc.)
   imageUrl?: string; // Image URL for any item type
   iconName?: string; // Lucide icon name for non-cosmetic items
@@ -383,6 +385,19 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       // `resolveCanCreateFreePrivate`, and it is only meaningful when this tier already allows
       // `gm_private` visibility - a funded contest is always private.
       canCreateFreePrivateCompetitions: { type: Boolean },
+      // "Contact us" package: the marketplace sends players to the support chat instead of
+      // selling it. No default: absent reads as buyable (`isContactUsPackage`), so every
+      // existing package keeps its Buy button.
+      contactUsOnly: { type: Boolean },
+    },
+    // Players an administrator enabled, from Manage Game Masters, to buy this contact-us
+    // package. Kept at the item's top level rather than inside `gameMasterConfig` because the
+    // package editor `$set`s the whole config on save and would wipe it. `select: false`
+    // because it is a list of user ids and every player-facing read returns the item.
+    contactUsUnlockedUserIds: {
+      type: [String],
+      default: undefined,
+      select: false,
     },
     cosmeticType: {
       type: String,

@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { withUsername } from "@/lib/utils/admin-user-label";
 
 /**
  * GET /api/messaging/assigned-customers
  * Get customers assigned to the current employee
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Reason: Messaging inbox owns this list; section grant is the auth answer.
     const guard = await guardSection("messaging");
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
           }),
         },
       })
-      .project({ _id: 1, name: 1, email: 1, image: 1, createdAt: 1 })
+      .project({ _id: 1, name: 1, username: 1, email: 1, image: 1, createdAt: 1 })
       .toArray();
 
     // Map customer data with assignment info
@@ -91,7 +92,10 @@ export async function GET(request: NextRequest) {
       );
       return {
         id: customer._id.toString(),
-        name: customer.name || customer.email?.split("@")[0] || "Unknown",
+        name:
+          withUsername(customer.name, customer.username) ||
+          customer.email?.split("@")[0] ||
+          "Unknown",
         email: customer.email,
         avatar: customer.image,
         assignedAt: assignment?.assignedAt,

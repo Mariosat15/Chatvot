@@ -18,6 +18,8 @@ import UserReferral from "@/database/models/user-referral.model";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { rankGmMetrics, type GmLeaderboardMetrics } from "./gm-leaderboard-rules";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 
 export const GM_LEADERBOARD_CACHE_MS = 5 * 60 * 1000;
 export const ACTIVE_AFFILIATE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -160,13 +162,16 @@ async function compute(): Promise<GmLeaderboardSnapshot> {
   const active = new Map(activeCounts.map((r) => [String(r._id), r.n]));
   const contests = new Map(contestTotals.map((r) => [String(r._id), r]));
 
+  // Reason: this board is public, so a Game Master is shown by username like every player.
+  const users = await getUsersByIds(gms.map((g) => String(g.userId)));
+
   const unranked = gms.map((g) => {
     const id = String(g.userId);
     const c = contests.get(id);
     return {
       subscriptionId: String(g._id),
       gameMasterUserId: id,
-      gameMasterName: g.userName?.trim() || "Game Master",
+      gameMasterName: users.get(id)?.publicName ?? resolvePublicName({ id }),
       affiliates: affiliates.get(id) ?? 0,
       activeAffiliates: active.get(id) ?? 0,
       competitionsCreated: c?.created ?? 0,

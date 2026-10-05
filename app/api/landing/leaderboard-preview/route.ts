@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { resolvePublicName } from "@/lib/utils/username";
 import { getHiddenUserIds } from "@/lib/services/user-restriction.service";
 import { publicContestsFilter } from "@/lib/services/gamemaster/visible-contests";
 
@@ -142,9 +143,9 @@ export async function GET() {
 
         // Check privacy settings
         const isPrivate = user?.privacySettings?.hideFromLeaderboard;
-        const displayName = isPrivate
-          ? anonymizeName(winner.username || user?.name || "Trader")
-          : winner.username || user?.username || user?.name || "Trader";
+        // Reason: the public page shows the username, never the real name.
+        const publicName = resolvePublicName({ username: user?.username, id: winner._id });
+        const displayName = isPrivate ? anonymizeName(publicName) : publicName;
 
         return {
           rank: index + 1,

@@ -5,6 +5,7 @@ import UserBadge from "@/database/models/user-badge.model";
 import { BADGES } from "@/lib/constants/badges";
 import { ObjectId } from "mongodb";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import { withUsername } from "@/lib/utils/admin-user-label";
 
 /**
  * Build a query that matches user by various ID formats.
@@ -12,7 +13,7 @@ import { guardSection } from "@/lib/admin/section-route-guard";
  * UserLevel.userId may store either format.
  */
 function buildUserQuery(uid: string) {
-  const queries: any[] = [{ id: uid }];
+  const queries: Record<string, unknown>[] = [{ id: uid }];
   if (ObjectId.isValid(uid)) {
     queries.push({ _id: new ObjectId(uid) });
   }
@@ -137,7 +138,8 @@ export async function GET(request: NextRequest) {
     if (search) {
       // Reason: Escape user input to prevent ReDoS via crafted regex patterns
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(escaped, "i");
+      // eslint-disable-next-line security/detect-non-literal-regexp -- input escaped on the line above
+    const regex = new RegExp(escaped, "i");
       const matchedUsers = await db
         .collection("user")
         .find(
@@ -149,7 +151,7 @@ export async function GET(request: NextRequest) {
 
       // Collect BOTH id and _id formats so we match regardless of what UserLevel stores
       matchingUserIds = matchedUsers.flatMap(
-        (u: any) => {
+        (u) => {
           const ids: string[] = [];
           if (u.id) ids.push(u.id);
           if (u._id) ids.push(u._id.toString());
@@ -192,14 +194,17 @@ export async function GET(request: NextRequest) {
     const userDocs = userIdsInPage.length > 0
       ? await db
           .collection("user")
-          .find(buildBatchUserQuery(userIdsInPage), { projection: { id: 1, name: 1, email: 1, image: 1, _id: 1 } })
+          .find(buildBatchUserQuery(userIdsInPage), { projection: { id: 1, name: 1, username: 1, email: 1, image: 1, _id: 1 } })
           .toArray()
       : [];
 
     // Map users by BOTH id and _id.toString() so lookup works regardless of format
-    const userMap = new Map<string, any>();
+    const userMap = new Map<
+      string,
+      { id: string; name: string; email?: string; image: string | null }
+    >();
     for (const u of userDocs) {
-      const userData = { id: u.id || u._id?.toString(), name: u.name, email: u.email, image: u.image || null };
+      const userData = { id: u.id || u._id?.toString(), name: withUsername(u.name, u.username), email: u.email, image: u.image || null };
       // Map by 'id' field
       if (u.id) userMap.set(u.id, userData);
       // Map by '_id' as string (handles case where UserLevel.userId = _id.toString())

@@ -139,12 +139,18 @@ describe("maskLastName", () => {
 });
 
 describe("the view masks external referrals only", () => {
-  it("off: an external referral shows the id, the first name and a masked email", async () => {
+  // Reason: this test once asserted `Jane **********` - the first name with the surname
+  // masked. Since usernames shipped (Oct 2026) a Game Master without the switch sees the
+  // username like every other player, so no part of the real name reaches them.
+  it("off: an external referral shows the id, the username and a masked email", async () => {
     const row = await referral();
     const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
-    const view = toGameMasterReferralView(report.rows[0], { showExternalDetails: false });
+    const view = toGameMasterReferralView(report.rows[0], {
+      showExternalDetails: false,
+      publicName: "volt_jane",
+    });
     expect(view.userId).toBe(row.userId);
-    expect(view.userName).toBe(`Jane ${MASKED_CONTACT}`);
+    expect(view.userName).toBe("volt_jane");
     expect(view.userEmail).toBe(MASKED_CONTACT);
     expect(view.contactMasked).toBe(true);
     expect(view.contactHidden).toBe(false);
@@ -165,13 +171,38 @@ describe("the view masks external referrals only", () => {
     expect(toGameMasterReferralView(report.rows[0], { showExternalDetails: false }).userEmail).toBe(MASKED_CONTACT);
   });
 
-  it("an own referral is never masked by the switch", async () => {
+  // Reason: once "never masked" - an own referral showed the real name with the switch off.
+  // The owner's username rule covers own referrals too: the email stays (it is the GM's own
+  // contact), the NAME becomes the username.
+  it("an own referral keeps its email but shows the username while the switch is off", async () => {
+    const row = await referral({ source: "gm_referral_link" });
+    const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
+    const view = toGameMasterReferralView(report.rows[0], {
+      showExternalDetails: false,
+      publicName: "volt_jane",
+    });
+    expect(view.userName).toBe("volt_jane");
+    expect(view.userEmail).toBe(row.userEmail);
+    expect(view.contactMasked).toBe(false);
+  });
+
+  it("an absent username falls back to the Player_ handle, never the real name", async () => {
     const row = await referral({ source: "gm_referral_link" });
     const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
     const view = toGameMasterReferralView(report.rows[0], { showExternalDetails: false });
+    expect(view.userName).toMatch(/^Player_/);
+    expect(view.userName).not.toContain("Jane");
+    expect(row.userName).toBe("Jane Smith");
+  });
+
+  it("with the switch on, own and external referrals show the real name", async () => {
+    await referral({ source: "gm_referral_link" });
+    const report = await readReferredPlayers(db(), { gameMasterIds: [GM] }, PAGE, NOW);
+    const view = toGameMasterReferralView(report.rows[0], {
+      showExternalDetails: true,
+      publicName: "volt_jane",
+    });
     expect(view.userName).toBe("Jane Smith");
-    expect(view.userEmail).toBe(row.userEmail);
-    expect(view.contactMasked).toBe(false);
   });
 
   it("D6 still applies on top: no consent means no email even when on", async () => {
@@ -205,9 +236,22 @@ describe("a masked external row cannot be found by what the screen hides", () =>
     expect((await readReferredPlayers(db(), gmFilter("Jane Smith", true), PAGE, NOW)).total).toBe(0);
   });
 
-  it("by first name prefix: found", async () => {
+  // Reason: once "by first name prefix: found". The first name is no longer on the masked
+  // screen at all, so finding a row by it would reveal it; the username takes its place.
+  it("by first name prefix: not found masked", async () => {
     await referral();
-    expect((await readReferredPlayers(db(), gmFilter("Jan", true), PAGE, NOW)).total).toBe(1);
+    expect((await readReferredPlayers(db(), gmFilter("Jan", true), PAGE, NOW)).total).toBe(0);
+  });
+
+  it("by username prefix: found masked, case-insensitively", async () => {
+    const row = await referral();
+    await db().collection("user").insertOne({
+      _id: new mongoose.Types.ObjectId(row.userId),
+      id: row.userId,
+      username: "Volt_Jane",
+      usernameLower: "volt_jane",
+    });
+    expect((await readReferredPlayers(db(), gmFilter("VOLT_j", true), PAGE, NOW)).total).toBe(1);
   });
 
   it("a name holding an email cannot be searched while masked", async () => {
@@ -220,10 +264,12 @@ describe("a masked external row cannot be found by what the screen hides", () =>
     expect((await readReferredPlayers(db(), gmFilter(row.userId, true), PAGE, NOW)).total).toBe(1);
   });
 
-  it("an own referral is still searchable by email and last name while masking", async () => {
+  // Reason: once "by email and last name". The email is still on screen for an own referral
+  // so stays searchable; the real name is not, so it no longer is.
+  it("an own referral is still searchable by email but not by real name while masking", async () => {
     await referral({ source: "gm_referral_link", userEmail: "mine@x.test" });
     expect((await readReferredPlayers(db(), gmFilter("mine@x", true), PAGE, NOW)).total).toBe(1);
-    expect((await readReferredPlayers(db(), gmFilter("Smith", true), PAGE, NOW)).total).toBe(1);
+    expect((await readReferredPlayers(db(), gmFilter("Smith", true), PAGE, NOW)).total).toBe(0);
   });
 
   it("the admin report (no flags) still finds an external player by last name", async () => {

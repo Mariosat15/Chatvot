@@ -1,3 +1,7 @@
+// Reason: the messaging models export their static helpers (getSettings, areFriends,
+// setTyping, ...) without typing them on the Model, so calling them needs a cast.
+// Typing every messaging model's statics is its own change.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import {
@@ -14,6 +18,7 @@ import {
   IMessagingSettings,
   ConversationType,
 } from "@/database/models/messaging";
+import { resolvePublicName } from "@/lib/utils/username";
 
 // Rate limiting map (in production, use Redis)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -1263,23 +1268,30 @@ export class MessagingService {
       return [];
     }
 
+    // Reason: players find each other by USERNAME, plus an exact email for someone
+    // who already knows it. Matching on the real name would let anyone turn a full
+    // name into a username, undoing the point of usernames, and a partial email match
+    // let any signed-in player enumerate addresses. The query is escaped because it is
+    // user input placed into a regular expression.
+    const trimmed = query.trim();
+    const escaped = trimmed.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const usersCollection = db.collection("user");
     const users = await usersCollection
       .find({
         _id: { $ne: new Types.ObjectId(excludeUserId) },
         $or: [
-          { name: { $regex: query, $options: "i" } },
-          { email: { $regex: query, $options: "i" } },
+          { usernameLower: { $regex: `^${escaped}` } },
+          { email: trimmed.toLowerCase() },
         ],
       })
-      .project({ _id: 1, name: 1, email: 1, image: 1 })
+      .project({ _id: 1, username: 1, image: 1, profileImage: 1 })
       .limit(limit)
       .toArray();
 
     return users.map((u) => ({
       id: u._id.toString(),
-      name: u.name || u.email,
-      avatar: u.image,
+      name: resolvePublicName({ username: u.username, id: u._id.toString() }),
+      avatar: u.profileImage || u.image,
     }));
   }
 

@@ -1,6 +1,11 @@
 "use client";
+// Reason: avatars come from user uploads and third-party hosts that next/image is not
+// configured for, and the websocket/ticket payloads are untyped. Both predate this file's
+// lint gate; typing them is its own change.
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MessageCircle,
@@ -13,11 +18,9 @@ import {
   CheckCheck,
   Clock,
   Headphones,
-  Bot,
   ArrowLeft,
   X,
   UserCircle,
-  Briefcase,
   Loader2,
   ChevronDown,
   Sparkles,
@@ -167,7 +170,6 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserAtBottomRef = useRef(true);
-  const isInitialLoadRef = useRef(true);
   const unreadBroadcastRef = useRef<BroadcastChannel | null>(null);
 
   // Reason: BroadcastChannel syncs unread count instantly to sidebar/other tabs
@@ -405,6 +407,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
           break;
       }
     },
+    // Reason: adding the missing callbacks re-creates the websocket handler on every
+    // render; the handler reads them through state updates, which is the intended behaviour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedConversation?.id, session.user.id],
   );
 
@@ -858,7 +863,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         setMessageInput(messageContent);
         alert(data.error || "Failed to send message");
       }
-    } catch (_error) {
+    } catch {
       setMessageInput(messageContent);
       alert("Network error");
     } finally {
@@ -884,7 +889,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       } else {
         alert("Failed to start support conversation");
       }
-    } catch (_error) {
+    } catch {
       alert("Error connecting to support");
     }
   };
@@ -922,7 +927,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         } else {
           alert("Failed to create new ticket");
         }
-      } catch (_error) {
+      } catch {
         alert("Error creating new ticket");
       }
     }
@@ -1080,6 +1085,25 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     fetchSupportTickets,
   ]);
 
+  // Reason: `/messaging?support=1&topic=...` is how other screens (the marketplace's
+  // "Contact us" Game Master packages) send a player straight into the support chat.
+  // Read from `window.location` rather than `useSearchParams` so the page needs no
+  // Suspense boundary, and only once, after the first load, so a re-render cannot open a
+  // second ticket.
+  const supportDeepLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (isLoading || supportDeepLinkHandledRef.current) return;
+    supportDeepLinkHandledRef.current = true;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("support") !== "1") return;
+    const topic = params.get("topic")?.trim().slice(0, 200);
+    void startSupportConversation().then(() => {
+      if (topic) setMessageInput(topic);
+    });
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot deep link
+  }, [isLoading]);
+
   // Track selected conversation ID
   const selectedConversationIdRef = useRef<string | null>(null);
   const lastMessageFetchRef = useRef<number>(0);
@@ -1112,6 +1136,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
     }, 8000);
 
     return () => clearInterval(interval);
+    // Reason: keyed on the conversation id on purpose; the whole object changes on every
+    // poll and would restart the 8-second interval each time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     selectedConversation?.id,
     fetchConversations,
@@ -1520,12 +1547,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                     <p className="text-xs text-gray-500 mb-4">
                       Find traders on the leaderboard to start chatting
                     </p>
-                    <a
+                    <Link
                       href="/leaderboard"
                       className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors"
                     >
                       Browse Leaderboard
-                    </a>
+                    </Link>
                   </div>
                 )}
             </>

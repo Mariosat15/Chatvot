@@ -116,6 +116,7 @@ export async function GET(request: NextRequest) {
           const display = resolveLevelTitle(pageLevels.get(entry.userId), ladder);
           return {
             ...entry,
+            email: "",
             userTitle: display.title,
             userTitleIcon: display.icon,
             userTitleColor: display.color,
@@ -156,6 +157,7 @@ export async function GET(request: NextRequest) {
           const display = resolveLevelTitle(pageLevels.get(entry.userId), ladder);
           return {
             ...entry,
+            email: "",
             userTitle: display.title,
             userTitleIcon: display.icon,
             userTitleColor: display.color,
@@ -181,6 +183,7 @@ export async function GET(request: NextRequest) {
       const display = resolveLevelTitle(userLevels.get(entry.userId), ladder);
       return {
         ...entry,
+        email: "",
         userTitle: display.title,
         userTitleIcon: display.icon,
         userTitleColor: display.color,

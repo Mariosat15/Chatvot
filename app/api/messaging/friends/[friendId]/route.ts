@@ -5,6 +5,8 @@ import { connectToDatabase } from "@/database/mongoose";
 import { Friendship } from "@/database/models/messaging/friend.model";
 import { BlockedUser } from "@/database/models/messaging/blocked-user.model";
 import { createUserNotification } from "@/lib/services/notification.service";
+import { getPublicName } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 
 /**
  * DELETE /api/messaging/friends/[friendId]
@@ -21,7 +23,7 @@ export async function DELETE(
     }
 
     const currentUserId = session.user.id;
-    const currentUserName = session.user.name || "Unknown";
+    const currentUserName = await getPublicName(currentUserId);
     const { friendId } = await params;
     await connectToDatabase();
 
@@ -97,7 +99,7 @@ export async function POST(
     }
 
     const currentUserId = session.user.id;
-    const currentUserName = session.user.name || "Unknown";
+    const currentUserName = await getPublicName(currentUserId);
     const { friendId } = await params;
     const body = await request.json();
     const { action, reason } = body; // action: 'block' | 'unblock'
@@ -138,7 +140,7 @@ export async function POST(
           blockerUserId: currentUserId,
           blockerUserName: currentUserName,
           blockedUserId: friendId,
-          blockedUserName: targetUser?.name || "Unknown",
+          blockedUserName: resolvePublicName({ username: targetUser?.username, id: friendId }),
           reason,
         });
       }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { resolvePublicName } from "@/lib/utils/username";
 import {
   publicContestsFilter,
   withVisibleContests,
@@ -183,7 +184,7 @@ export async function GET() {
             let: { oderId: "$userId" },
             pipeline: [
               { $match: { $expr: { $eq: ["$id", "$$oderId"] } } },
-              { $project: { name: 1, username: 1 } },
+              { $project: { username: 1 } },
             ],
             as: "user",
           },
@@ -194,7 +195,7 @@ export async function GET() {
 
     for (const trade of bigTrades) {
       const displayName = anonymizeName(
-        trade.user?.username || trade.user?.name || "Trader",
+        resolvePublicName({ username: trade.user?.username, id: String(trade.userId) }),
       );
       const pnl = Math.round(trade.realizedPnl);
 

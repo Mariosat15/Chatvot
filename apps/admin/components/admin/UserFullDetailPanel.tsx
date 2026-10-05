@@ -1635,7 +1635,14 @@ export default function UserFullDetailPanel({
                     </Badge>
                   )}
                 </h1>
-                <p className="text-sm text-gray-400">{user.email}</p>
+                <p className="text-sm text-gray-400">
+                  {user.username ? (
+                    <span className="mr-2 font-mono text-cyan-400">
+                      @{user.username}
+                    </span>
+                  ) : null}
+                  {user.email}
+                </p>
               </div>
             </div>
           </div>
@@ -1953,6 +1960,14 @@ export default function UserFullDetailPanel({
                                 Full Name
                               </p>
                               <p className="text-white">{user.name || "N/A"}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">
+                                Username
+                              </p>
+                              <p className="text-white font-mono">
+                                {user.username ? `@${user.username}` : "Not set"}
+                              </p>
                             </div>
                             <div>
                               <p className="text-xs text-gray-400 mb-1">

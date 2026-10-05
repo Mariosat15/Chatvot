@@ -36,6 +36,12 @@ export interface ReferredPlayersFilter {
    */
   phoneUserIds?: string[];
   /**
+   * User ids whose `user.usernameLower` STARTS with the search string. Filled by
+   * `readReferredPlayers`. Reason: the username lives on the user document, not the referral
+   * row, and it is the one name every screen may show.
+   */
+  usernameUserIds?: string[];
+  /**
    * Set by the Game Master's own routes, never parsed from the query string. Reason: without
    * it a Game Master could learn a hidden email (D6) by searching for it and watching the row
    * appear - so the search matches an email only on rows whose terms were accepted.

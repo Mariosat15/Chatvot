@@ -8,12 +8,14 @@ import { wsNotifier } from "@/lib/services/messaging/websocket-notifier";
 import { BlockedUser } from "@/database/models/messaging/blocked-user.model";
 import { Friendship } from "@/database/models/messaging/friend.model";
 import { sendFriendRequestNotification } from "@/lib/services/notification.service";
+import { getPublicName } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 
 /**
  * Helper to build query filter for user
  */
 function buildUserQuery(userId: string) {
-  const queries: any[] = [{ id: userId }];
+  const queries: Record<string, unknown>[] = [{ id: userId }];
 
   if (ObjectId.isValid(userId)) {
     queries.push({ _id: new ObjectId(userId) });
@@ -27,7 +29,7 @@ function buildUserQuery(userId: string) {
  * GET /api/messaging/friends/requests
  * Get pending friend requests
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
@@ -77,7 +79,8 @@ export async function POST(request: NextRequest) {
     }
 
     const currentUserId = session.user.id;
-    const currentUserName = session.user.name || "Unknown";
+    // Reason: both names are stored on the request and shown to the other player.
+    const currentUserName = await getPublicName(currentUserId);
     const body = await request.json();
     const { toUserId, message } = body;
 
@@ -156,14 +159,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const targetUserName =
-      targetUser.name || targetUser.email?.split("@")[0] || "User";
+    const targetUserName = resolvePublicName({
+      username: targetUser.username,
+      id: toUserId,
+    });
     const targetUserAvatar = targetUser.profileImage || targetUser.image;
 
     const friendRequest = await MessagingService.sendFriendRequest(
       {
         id: currentUserId,
-        name: currentUserName || session.user.email?.split("@")[0] || "User",
+        name: currentUserName,
         avatar: session.user.image ?? undefined,
       },
       {
@@ -199,10 +204,10 @@ export async function POST(request: NextRequest) {
         createdAt: friendRequest.createdAt,
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error sending friend request:", error);
     return NextResponse.json(
-      { error: error.message || "Failed to send friend request" },
+      { error: (error instanceof Error && error.message) || "Failed to send friend request" },
       { status: 500 },
     );
   }

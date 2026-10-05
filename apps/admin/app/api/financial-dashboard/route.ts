@@ -12,10 +12,11 @@ import {
 import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { withUsername } from "@/lib/utils/admin-user-label";
 import mongoose from "mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Reason: FinancialDashboard owns this screen; section grant is the auth answer.
     // Hand-rolled jwtVerify only proved a token existed — never which grant.
@@ -417,7 +418,7 @@ export async function GET(request: NextRequest) {
           const uTx = userTxMap.get(w.userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0, adminAdjust: 0 };
           return {
             userId: w.userId,
-            userName: userInfo?.name || "Unknown",
+            userName: withUsername(userInfo?.name, userInfo?.username) || "Unknown",
             userEmail: userInfo?.email || "Unknown",
             creditBalance: w.creditBalance,
             totalDeposited: w.totalDeposited,
@@ -516,7 +517,7 @@ export async function GET(request: NextRequest) {
         },
         recentTransactions: await Promise.all(
           recentTransactions.slice(0, 20).map(async (t) => {
-            const userInfo =
+            const userInfo: { name: string; email: string; username?: string } | undefined =
               t.userId === "platform"
                 ? { name: "Platform", email: "system" }
                 : txUsersMap.get(t.userId);
@@ -560,7 +561,7 @@ export async function GET(request: NextRequest) {
             return {
               _id: t._id,
               userId: t.userId,
-              userName: userInfo?.name || "Unknown",
+              userName: withUsername(userInfo?.name, userInfo?.username) || "Unknown",
               userEmail: userInfo?.email || "Unknown",
               transactionType: t.transactionType,
               amount: t.amount,

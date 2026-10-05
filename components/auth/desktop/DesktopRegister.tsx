@@ -12,6 +12,7 @@ import DesktopAuthShell from "@/components/auth/desktop/DesktopAuthShell";
 import { PASSWORD_REQUIREMENTS } from "@/lib/constants/auth-password";
 import { SIGNUP_INTEREST_OPTIONS } from "@/lib/utils/signup-interest";
 import { useSignUpForm } from "@/hooks/useSignUpForm";
+import { usernameValidation } from "@/components/auth/username-validation";
 
 /** Desktop registration — two-column grid; mobile uses MobileRegister. */
 export default function DesktopRegister() {
@@ -66,6 +67,20 @@ export default function DesktopRegister() {
               error={errors.fullName}
               validation={{ required: "Full name is required", minLength: 2 }}
             />
+          </div>
+
+          <div className="sm:col-span-2">
+            <InputField
+              name="username"
+              label="Username"
+              placeholder="volt_trader"
+              register={register}
+              error={errors.username}
+              validation={usernameValidation}
+            />
+            <p className="mt-1 text-xs text-cyan-100/55">
+              Other players see only your username, never your full name.
+            </p>
           </div>
 
           <InputField

@@ -15,6 +15,7 @@ import UserGameStats, {
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { TRADING_GAME_TYPE } from "@/lib/games/types";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 import { getHiddenUserIds } from "@/lib/services/user-restriction.service";
 import { getGlobalLeaderboard } from "@/lib/actions/leaderboard/global-leaderboard.actions";
 
@@ -142,6 +143,8 @@ interface StatsRow {
   lastPlayedAt?: Date;
 }
 
+// Reason: every index below is a bounded loop counter over a local array, never a key from a request.
+/* eslint-disable security/detect-object-injection */
 function assignRanks(rows: StatsRow[]): { row: StatsRow; rank: number; isTied: boolean }[] {
   const ranked: { row: StatsRow; rank: number; isTied: boolean }[] = [];
   let i = 0;
@@ -158,6 +161,7 @@ function assignRanks(rows: StatsRow[]): { row: StatsRow; rank: number; isTied: b
   }
   return ranked;
 }
+/* eslint-enable security/detect-object-injection */
 
 export async function getGameLeaderboard(opts: {
   gameKey?: string;
@@ -196,10 +200,8 @@ export async function getGameLeaderboard(opts: {
   const entries: GameLeaderboardEntry[] = pageSlice.map(({ row, rank, isTied }) => {
     const user = users.get(row.userId);
     const email = user?.email ?? "";
-    const username =
-      user?.name ||
-      (email.includes("@") ? email.split("@")[0] : "") ||
-      "Player";
+    // Reason: a public board shows the username, never the real name or an email prefix.
+    const username = user?.publicName ?? resolvePublicName({ id: row.userId });
     const entry: GameLeaderboardEntry = {
       userId: row.userId,
       email,
@@ -300,7 +302,7 @@ export async function diffTop100WithLegacy(
   let sharedInOrder = 0;
   const len = Math.min(legacyTop.length, statsTop.length);
   for (let i = 0; i < len; i++) {
-    if (legacyTop[i] === statsTop[i]) sharedInOrder += 1;
+    if (legacyTop.at(i) === statsTop.at(i)) sharedInOrder += 1;
     else break;
   }
 
@@ -312,6 +314,6 @@ export async function diffTop100WithLegacy(
     sharedInOrder,
     identical:
       legacyTop.length === statsTop.length &&
-      legacyTop.every((id, i) => id === statsTop[i]),
+      legacyTop.every((id, i) => id === statsTop.at(i)),
   };
 }

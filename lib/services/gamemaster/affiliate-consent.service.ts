@@ -21,6 +21,7 @@
  */
 
 import { notificationService } from "@/lib/services/notification.service";
+import { getPublicName } from "@/lib/utils/user-lookup";
 import {
   acceptReferralClaim,
   declineReferralClaim,
@@ -51,11 +52,11 @@ export function isAffiliateConsentDecision(value: unknown): value is AffiliateCo
 export async function getAffiliateConsentPrompt(user: ClaimUser): Promise<AffiliateConsentPrompt> {
   const claim = await getReferralClaimPrompt(user);
   if (claim.show) {
-    return { show: true, kind: "claim", gameMasterId: claim.gameMasterId, gameMasterName: claim.gameMasterName };
+    return { show: true, kind: "claim", gameMasterId: claim.gameMasterId, gameMasterName: await getPublicName(claim.gameMasterId) };
   }
   const request = await getTermsRequestPrompt(user.id);
   if (request.show) {
-    return { show: true, kind: "request", gameMasterId: request.gameMasterId, gameMasterName: request.gameMasterName };
+    return { show: true, kind: "request", gameMasterId: request.gameMasterId, gameMasterName: await getPublicName(request.gameMasterId) };
   }
   return { show: false };
 }
@@ -75,7 +76,8 @@ async function notifyGameMasterOfClaimAnswer(
       userId: gameMasterId,
       templateId: "gm_terms_request_answered",
       variables: {
-        playerName: user.name || user.email.split("@")[0] || "Your referral",
+        // Reason: the Game Master is another player, so they see the username.
+        playerName: await getPublicName(user.id),
         answer: decision === "accept" ? "accepted" : "declined",
         outcomeLine:
           decision === "accept"

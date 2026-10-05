@@ -17,6 +17,7 @@ export type ExtendedSignUpFormData = SignUpFormData & {
 
 const STEP1_FIELDS = [
   "fullName",
+  "username",
   "email",
   "password",
   "confirmPassword",
@@ -47,6 +48,7 @@ export function useSignUpForm() {
   const form = useForm<ExtendedSignUpFormData>({
     defaultValues: {
       fullName: "",
+      username: "",
       email: "",
       password: "",
       confirmPassword: "",

@@ -24,7 +24,7 @@
 import { connectToDatabase } from "@/database/mongoose";
 import UserReferral from "@/database/models/user-referral.model";
 import GmTermsRequest from "@/database/models/gamemaster/gm-terms-request.model";
-import { getUserById } from "@/lib/utils/user-lookup";
+import { getPublicName, getUserById } from "@/lib/utils/user-lookup";
 import { notificationService } from "@/lib/services/notification.service";
 import { emailNotificationBridge } from "@/lib/services/email-notification-bridge";
 import { classifyReferral } from "./referral-kind";
@@ -124,7 +124,7 @@ export async function sendTermsRequest(input: {
     const player = await getUserById(referral.userId);
     const playerEmail = player?.email || referral.userEmail || "";
     const playerName = player?.name || playerEmail.split("@")[0] || "";
-    const gameMasterName = gm.userName || FALLBACK_GM_NAME;
+    const gameMasterName = await getPublicName(input.gameMasterUserId);
 
     // Reason: the decision above read a snapshot; THIS is the lock. The filter only matches a
     // request that still has a send left and was not declined, so two clicks at once send once.
@@ -245,7 +245,7 @@ export async function findOpenTermsTarget(userId: string): Promise<OpenTermsTarg
     referralId,
     userEmail: row.userEmail ?? "",
     gameMasterId: row.gameMasterId,
-    gameMasterName: gm.userName || FALLBACK_GM_NAME,
+    gameMasterName: await getPublicName(row.gameMasterId),
     requestId: null,
   };
 }
@@ -350,7 +350,9 @@ export async function answerTermsRequest(input: {
       userId: target.gameMasterId,
       templateId: "gm_terms_request_answered",
       variables: {
-        playerName,
+        // Reason: the Game Master is another player, so they see the username;
+        // the account-manager alert below is admin-only and keeps the real name.
+        playerName: await getPublicName(input.user.id),
         answer: status,
         outcomeLine:
           status === "accepted"

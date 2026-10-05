@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
+import { resolvePublicName } from "@/lib/utils/username";
 
 /**
  * Helper to find user by various ID formats
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
     const userImage = user.profileImage || user.image || null;
 
     return NextResponse.json({
-      username: user.name || "Trader",
+      username: resolvePublicName({ username: user.username, id: userId }),
       profileImage: userImage,
       bio: user.bio || null,
     });

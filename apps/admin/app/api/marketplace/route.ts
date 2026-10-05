@@ -13,6 +13,7 @@ import { parseAllowedVisibilityInput } from "@/lib/services/gamemaster/visibilit
 
 const EXTERNAL_DETAILS_ERROR = "showExternalReferralDetails must be true or false";
 const FREE_PRIVATE_ERROR = "canCreateFreePrivateCompetitions must be true or false";
+const CONTACT_US_ERROR = "contactUsOnly must be true or false";
 const FREE_PRIVATE_NEEDS_PRIVATE =
   "Free Private competitions need this package to allow Private competitions too.";
 
@@ -156,6 +157,11 @@ export async function POST(request: NextRequest) {
     if (!isOptionalBoolean(data.gameMasterConfig?.canCreateFreePrivateCompetitions)) {
       return NextResponse.json({ success: false, error: FREE_PRIVATE_ERROR }, { status: 400 });
     }
+    if (!isOptionalBoolean(data.gameMasterConfig?.contactUsOnly)) {
+      return NextResponse.json({ success: false, error: CONTACT_US_ERROR }, { status: 400 });
+    }
+    // Reason: a new package starts with nobody unlocked; the list is granted per Game Master.
+    delete data.contactUsUnlockedUserIds;
     if (
       freePrivateNeedsPrivate(
         data.gameMasterConfig?.canCreateFreePrivateCompetitions,
@@ -247,6 +253,12 @@ export async function PUT(request: NextRequest) {
     if (!isOptionalBoolean(updates.gameMasterConfig?.canCreateFreePrivateCompetitions)) {
       return NextResponse.json({ success: false, error: FREE_PRIVATE_ERROR }, { status: 400 });
     }
+    if (!isOptionalBoolean(updates.gameMasterConfig?.contactUsOnly)) {
+      return NextResponse.json({ success: false, error: CONTACT_US_ERROR }, { status: 400 });
+    }
+    // Reason: the per-Game-Master unlock list is written only by the Manage Game Masters screen;
+    // a package save from the editor must never replace it.
+    delete updates.contactUsUnlockedUserIds;
 
     // Get the item before update to compare gameMasterConfig changes
     const oldItem = await MarketplaceItem.findById(itemId).lean();

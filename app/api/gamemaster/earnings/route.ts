@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
+import { loadGameMasterPackageConfig } from "@/lib/services/gamemaster/package-config";
+import { resolveShowExternalReferralDetails } from "@/lib/services/gamemaster/subscription-limits";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
@@ -124,11 +129,32 @@ export async function GET(request: NextRequest) {
 
     const kinds = await contestKindsForEarnings(earnings);
 
+    // Reason: each earning stores the player's real name and email for the admin. A Game
+    // Master sees them only when their package shows external referral details; otherwise
+    // the username, like every other player, and no email.
+    const db = mongoose.connection.db;
+    const packageDb = db as unknown as Parameters<typeof loadGameMasterPackageConfig>[0];
+    const showExternalDetails = resolveShowExternalReferralDetails({
+      packageConfig: db ? await loadGameMasterPackageConfig(packageDb, subscription.packageId) : null,
+      cachedLimits: subscription.limits,
+    });
+    const earners = showExternalDetails
+      ? null
+      : await getUsersByIds(earnings.map((e) => String(e.referredUserId ?? "")).filter(Boolean));
+
     return NextResponse.json({
       success: true,
       data: {
         earnings: earnings.map((e) => ({
           ...e,
+          ...(earners
+            ? {
+                referredUserName:
+                  earners.get(String(e.referredUserId))?.publicName ??
+                  resolvePublicName({ id: String(e.referredUserId ?? "") }),
+                referredUserEmail: "",
+              }
+            : {}),
           kind: kindForEarning(e, kinds),
           gameKey: resolveEarningGameKey(
             (e as { gameKey?: string }).gameKey,

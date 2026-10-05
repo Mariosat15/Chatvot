@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
+import { getPublicName } from "@/lib/utils/user-lookup";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { contestGameLabel } from "@/lib/games";
@@ -411,7 +412,7 @@ export async function POST(request: NextRequest) {
       const providerResult = await createGameMasterProviderCompetition({
         body,
         userId,
-        gameMasterName: session.user.name || "Game Master",
+        gameMasterName: await getPublicName(session.user.id),
         maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
         visibility: visibilityVerdict.visibility,
         adminFilled: withDefaults.adminFilled,
@@ -622,7 +623,7 @@ export async function POST(request: NextRequest) {
       ],
       // Game Master fields
       gameMasterId: userId,
-      gameMasterName: session.user.name || "Game Master",
+      gameMasterName: await getPublicName(session.user.id),
       visibility: visibilityVerdict.visibility,
       createdBy: userId,
       // Competition rules (use provided or defaults)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import MessagingService from "@/lib/services/messaging/messaging.service";
+import { getPublicName } from "@/lib/utils/user-lookup";
 
 /**
  * GET /api/messaging/conversations/[conversationId]
@@ -45,7 +46,7 @@ export async function GET(
     });
 
     console.log("📩 [ConvAPI] Got messages:", messages.length);
-    messages.forEach((m: any, i: number) => {
+    messages.forEach((m: { senderType?: string; senderId?: string; content?: string }, i: number) => {
       console.log(
         `   ${i + 1}. ${m.senderType}/${m.senderId}: "${m.content?.slice(0, 30)}..."`,
       );
@@ -55,8 +56,17 @@ export async function GET(
     await MessagingService.markMessagesAsRead(
       conversationId,
       session.user.id,
-      session.user.name || "User",
+      await getPublicName(session.user.id),
     );
+
+    const ticketFields = conversation as unknown as {
+      isArchived?: boolean;
+      isResolved?: boolean;
+      archivedAt?: Date;
+      resolvedAt?: Date;
+      resolvedByName?: string;
+      ticketNumber?: string;
+    };
 
     return NextResponse.json({
       conversation: {
@@ -69,12 +79,12 @@ export async function GET(
         isAIHandled: conversation.isAIHandled,
         assignedEmployeeName: conversation.assignedEmployeeName,
         // Include archived/resolved fields
-        isArchived: (conversation as any).isArchived || false,
-        isResolved: (conversation as any).isResolved || false,
-        archivedAt: (conversation as any).archivedAt,
-        resolvedAt: (conversation as any).resolvedAt,
-        resolvedByName: (conversation as any).resolvedByName,
-        ticketNumber: (conversation as any).ticketNumber,
+        isArchived: ticketFields.isArchived || false,
+        isResolved: ticketFields.isResolved || false,
+        archivedAt: ticketFields.archivedAt,
+        resolvedAt: ticketFields.resolvedAt,
+        resolvedByName: ticketFields.resolvedByName,
+        ticketNumber: ticketFields.ticketNumber,
         metadata: conversation.metadata,
         createdAt: conversation.createdAt,
         lastActivityAt: conversation.lastActivityAt,

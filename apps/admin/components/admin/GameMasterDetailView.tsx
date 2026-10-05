@@ -24,6 +24,7 @@ import GmDetailReferralsTab, { type ReferralTabRow } from "./gamemaster/GmDetail
 import type { AdminAwaitingClaimRow } from "@/lib/admin/admin-terms-reminder-view";
 import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
 import ContestOpenButton from "./gamemaster/ContestOpenButton";
+import EnableGmPackageButton from "./gamemaster/EnableGmPackageButton";
 
 // ─── Interfaces ───────────────────────────────────────────────────────
 interface GMSubscription {
@@ -354,6 +355,7 @@ export default function GameMasterDetailView({
             <Calendar className="h-4 w-4" />
             Extend 30 Days
           </button>
+          <EnableGmPackageButton subscriptionId={gm.id} />
           <button
             onClick={() => onAction(gm.id, "revoke")}
             disabled={actionLoading}

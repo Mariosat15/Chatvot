@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { withUsername } from "@/lib/utils/admin-user-label";
 
 /**
  * POST /api/fraud/resolve-users
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
 
     const users = await userCollection
       .find({ $or: orConditions })
-      .project({ id: 1, _id: 1, name: 1, email: 1, createdAt: 1, image: 1, isDeactivated: 1 })
+      .project({ id: 1, _id: 1, name: 1, username: 1, email: 1, createdAt: 1, image: 1, isDeactivated: 1 })
       .toArray();
 
     // Build a map: userId -> user details
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       const resolvedId = String(user.id || user._id?.toString());
       const entry = {
         id: resolvedId,
-        name: String(user.name || "Unknown"),
+        name: withUsername(user.name, user.username) || "Unknown",
         email: String(user.email || "No email"),
         createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : "",
         image: user.image ? String(user.image) : undefined,

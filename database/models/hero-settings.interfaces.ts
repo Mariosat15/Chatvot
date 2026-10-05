@@ -581,6 +581,7 @@ export interface IHeroSettings extends Document {
   authPageDashboardImage: string;
   authPageSignInImage: string;
   authPageSignUpImage: string;
+  authPageFeaturePills?: { label: string; icon: string }[];
 
   // Advanced
   customCSS: string;

@@ -208,7 +208,8 @@ describe("the Game Master routes are scoped and redacted", () => {
     // array index to the options argument.
     // Reason (s5.6): the consent state now rides along too, keyed by the row's own referral id.
     expect(src).toMatch(
-      /\.map\(\(row\)\s*=>\s*toGameMasterReferralView\(row,\s*\{\s*showExternalDetails,\s*consentState:\s*consent\.get\(row\.referralId\)\s*\}\)/,
+      // Reason (Oct 2026): and the row's OWN username, looked up by its own userId.
+      /\.map\(\(row\)\s*=>\s*toGameMasterReferralView\(row,\s*\{\s*showExternalDetails,\s*consentState:\s*consent\.get\(row\.referralId\),\s*publicName:\s*\w+\.get\(row\.userId\)\?\.publicName,?\s*\}\)/,
     );
     expect(src).not.toMatch(/\.map\(toGameMasterReferralView\)/);
     expect(src).not.toMatch(/userEmail\s*:/);

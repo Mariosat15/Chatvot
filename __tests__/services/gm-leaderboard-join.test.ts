@@ -270,7 +270,11 @@ describe("Gamemaster leaderboard and Join GM", () => {
       expect(JSON.stringify(json)).not.toMatch(/999|totalEarnings|pendingEarnings|@gm\.test/);
       const state = new Map(json.rows.map((r: { gameMasterUserId: string; joinState: string }) => [r.gameMasterUserId, r.joinState]));
       expect(Object.fromEntries(state)).toEqual({ [GM_1]: "your_gm", [GM_2]: "locked" });
-      expect(json.viewer).toEqual({ affiliatedGameMasterName: "Master GMONE", locked: true });
+      // Reason: this once expected the stored real name "Master GMONE". The board is public,
+      // so since usernames (Oct 2026) a Game Master is shown by username; the seeded GM has
+      // none, so the Player_ fallback - never the real name.
+      expect(json.viewer).toEqual({ affiliatedGameMasterName: expect.stringMatching(/^Player_/), locked: true });
+      expect(JSON.stringify(json)).not.toContain("Master GMONE");
     });
   });
 

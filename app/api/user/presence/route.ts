@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import UserPresence from "@/database/models/user-presence.model";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+// Reason: presence rows are shown to other players (online lists, opponent picker).
+import { getPublicName } from "@/lib/utils/user-lookup";
 
 // ── Stale-cleanup throttle ─────────────────────────────────────────────
 // Before this fix, every heartbeat (POST) ran updateMany to mark stale
@@ -191,7 +193,7 @@ export async function POST(request: NextRequest) {
         $set: updateData,
         $setOnInsert: {
           userId: session.user.id,
-          username: session.user.name || "Unknown",
+          username: await getPublicName(session.user.id),
         },
       },
       { upsert: true, new: true },
@@ -267,7 +269,7 @@ export async function PUT(request: NextRequest) {
         $set: { acceptingChallenges },
         $setOnInsert: {
           userId: session.user.id,
-          username: session.user.name || "Unknown",
+          username: await getPublicName(session.user.id),
         },
       },
       { upsert: true, new: true },

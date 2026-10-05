@@ -3,6 +3,7 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/database/mongoose";
+import { withUsername } from "@/lib/utils/admin-user-label";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import UserPresence from "@/database/models/user-presence.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
@@ -37,6 +38,7 @@ interface UserLookupDoc {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- _id is ObjectId | string
   _id?: any;
   name?: string;
+  username?: string;
   email?: string;
   image?: string;
 }
@@ -80,12 +82,16 @@ async function loadUserLookup(userIds: string[]): Promise<UserLookupMap> {
     .collection<UserLookupDoc>("user")
     .find(
       { $or: orClauses },
-      { projection: { id: 1, _id: 1, name: 1, email: 1, image: 1 } },
+      { projection: { id: 1, _id: 1, name: 1, username: 1, email: 1, image: 1 } },
     )
     .toArray();
 
   for (const u of users) {
-    const info = { name: u.name, email: u.email, image: u.image };
+    const info = {
+      name: withUsername(u.name, u.username) || undefined,
+      email: u.email,
+      image: u.image,
+    };
     if (u.id) map.set(u.id, info);
     if (u._id !== undefined && u._id !== null) {
       map.set(String(u._id), info);

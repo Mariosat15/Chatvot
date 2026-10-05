@@ -1,11 +1,17 @@
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId, ReadPreference } from "mongodb";
 import { userCache } from "./cache";
+import { resolvePublicName } from "./username";
 
 export interface UserInfo {
   id: string;
   email: string;
+  /** The REAL name. Never show it to another player - use `publicName`. */
   name: string;
+  /** The chosen username, absent on accounts that predate usernames. */
+  username?: string;
+  /** What other players see: the username, or a stable id-derived fallback. */
+  publicName: string;
   profileImage?: string;
   bio?: string;
   role?: string; // 'trader', 'admin', 'backoffice'
@@ -21,6 +27,7 @@ const USER_PROJECTION = {
   _id: 1,
   email: 1,
   name: 1,
+  username: 1,
   profileImage: 1,
   image: 1, // better-auth uses 'image' field
   bio: 1,
@@ -98,6 +105,11 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
       id: user.id || user._id?.toString() || userId,
       email: user.email || "unknown",
       name: user.name || user.email || "Unknown User",
+      username: typeof user.username === "string" ? user.username : undefined,
+      publicName: resolvePublicName({
+        username: user.username,
+        id: user.id || user._id?.toString() || userId,
+      }),
       profileImage: user.profileImage || user.image, // Check both profileImage and image (better-auth)
       bio: user.bio,
       role: user.role || "trader",
@@ -115,6 +127,15 @@ export async function getUserById(userId: string): Promise<UserInfo | null> {
     console.error("Error fetching user:", error);
     return null;
   }
+}
+
+/**
+ * The name to store or show wherever ANOTHER player will read it. Use this, never
+ * `session.user.name`, which is the real name.
+ */
+export async function getPublicName(userId: string): Promise<string> {
+  const info = await getUserById(userId);
+  return info?.publicName ?? resolvePublicName({ id: userId });
 }
 
 /**
@@ -144,6 +165,7 @@ export async function getAllUsers(): Promise<UserInfo[]> {
             _id: 1,
             email: 1,
             name: 1,
+            username: 1,
             profileImage: 1,
             image: 1,
             role: 1,
@@ -181,6 +203,8 @@ export async function getAllUsers(): Promise<UserInfo[]> {
         id,
         email,
         name: user.name || email.split("@")[0] || "Unknown User",
+        username: typeof user.username === "string" ? user.username : undefined,
+        publicName: resolvePublicName({ username: user.username, id }),
         profileImage: user.profileImage || user.image,
         bio: user.bio,
         role: "trader",
@@ -225,6 +249,7 @@ export async function getUsersByIds(
       _id: 1,
       email: 1,
       name: 1,
+      username: 1,
       profileImage: 1,
       image: 1,
       bio: 1,
@@ -270,6 +295,8 @@ export async function getUsersByIds(
         id,
         email: user.email || "unknown",
         name: user.name || user.email || "Unknown User",
+        username: typeof user.username === "string" ? user.username : undefined,
+        publicName: resolvePublicName({ username: user.username, id }),
         profileImage: user.profileImage || user.image,
         bio: user.bio,
         role: user.role || "trader",

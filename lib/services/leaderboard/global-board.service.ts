@@ -295,8 +295,8 @@ export async function getGlobalBoard(opts: {
   const filtered = term
     ? all.filter(
         (e) =>
-          e.username.toLowerCase().includes(term) ||
-          e.email.toLowerCase().includes(term),
+          // Reason: never by email - a public search must not map an address to a username.
+          e.username.toLowerCase().includes(term),
       )
     : all;
 

@@ -6,6 +6,8 @@ declare global {
 
   type SignUpFormData = {
     fullName: string;
+    /** Public identity shown to other players; unique, case-insensitive. */
+    username: string;
     email: string;
     password: string;
     confirmPassword: string;

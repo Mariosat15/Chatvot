@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/better-auth/auth";
+import { getPublicName } from "@/lib/utils/user-lookup";
 import {
   endPracticeRound,
   launchPracticeRound,
@@ -77,7 +78,7 @@ export async function POST(
     const { slug } = await params;
     const outcome = await launchPracticeRound(slug, {
       userId: session.user.id,
-      displayName: session.user.name || undefined,
+      displayName: await getPublicName(session.user.id),
     });
 
     if (!outcome.success) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/better-auth/auth";
+import { getPublicName } from "@/lib/utils/user-lookup";
 import {
   launchContestRound,
   type LaunchRefusal,
@@ -196,7 +197,7 @@ export async function POST(
       // id from our side beyond the round's own opaque identifier, and never a wallet -
       // an external provider never touches money and is given no way to identify a
       // person off-platform.
-      displayName: session.user.name || undefined,
+      displayName: await getPublicName(session.user.id),
     });
 
     if (!outcome.success) {

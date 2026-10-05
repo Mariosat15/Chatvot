@@ -442,7 +442,11 @@ export const enterCompetition = async (competitionId: string) => {
     const result = await enterContest(competitionId, {
       userId: session.user.id,
       email: session.user.email || "",
-      username: session.user.name || session.user.email || "",
+      // Reason: the seat's name is read by every other player on the leaderboard, so it
+      // must be the public username and never the real name or email.
+      username: await (
+        await import("@/lib/utils/user-lookup")
+      ).getPublicName(session.user.id),
       emailVerified:
         (session.user as { emailVerified?: boolean }).emailVerified === true,
       ip,

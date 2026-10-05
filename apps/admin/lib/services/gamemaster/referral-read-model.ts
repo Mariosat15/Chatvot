@@ -89,6 +89,38 @@ async function withPhoneSearchIds(
   return { ...filter, phoneUserIds };
 }
 
+function rowIds(rows: Document[]): string[] {
+  return rows
+    .flatMap((row) => {
+      const ids: string[] = [];
+      if (typeof row.id === "string" && row.id) ids.push(row.id);
+      if (row._id != null) ids.push(String(row._id));
+      return ids;
+    })
+    .filter((id, i, arr) => arr.indexOf(id) === i);
+}
+
+/**
+ * Resolve the search into user ids by username PREFIX. Reason: a prefix on the lower-cased
+ * copy uses the unique index, and the username is the public name, so matching it reveals
+ * nothing the row does not already show.
+ */
+async function withUsernameSearchIds(
+  db: AggregatableDb,
+  filter: ReferredPlayersFilter,
+): Promise<ReferredPlayersFilter> {
+  const needle = filter.search?.trim().toLowerCase();
+  if (!needle) return filter;
+  const find = db.collection("user").find;
+  if (typeof find !== "function") return filter;
+  const rows = await find.call(db.collection("user"), {
+    usernameLower: { $regex: `^${escapeRegex(needle)}` },
+  }, { projection: { _id: 1, id: 1 }, limit: 200 }).toArray();
+  const usernameUserIds = rowIds(rows);
+  if (usernameUserIds.length === 0) return filter;
+  return { ...filter, usernameUserIds };
+}
+
 export interface ReferredPlayerRow {
   referralId: string;
   userId: string;
@@ -186,25 +218,21 @@ function searchMatch(filter: ReferredPlayersFilter, withConsent: boolean): Docum
   if (filter.phoneUserIds && filter.phoneUserIds.length > 0 && !filter.maskExternalContact) {
     openOr.push({ userId: { $in: filter.phoneUserIds } });
   }
+  const byUsername: Document[] =
+    filter.usernameUserIds && filter.usernameUserIds.length > 0
+      ? [{ userId: { $in: filter.usernameUserIds } }]
+      : [];
+  openOr.push(...byUsername);
   const open: Document = { $or: openOr };
   if (!(withConsent && filter.maskExternalContact)) return open;
-  // Reason: a masked external row must not be findable by what the screen hides, or typing a
-  // guessed email or surname confirms it by whether the row appears. Only the exact id, or the
-  // START of the name when the query has no whitespace (so it cannot reach the second word),
-  // and never a name holding an `@`, which `maskLastName` hides whole.
-  const masked: Document[] = [byId];
-  if (!/\s/.test(filter.search.trim())) {
-    masked.push({
-      $and: [
-        { userName: { $regex: `^${pattern}`, $options: "i" } },
-        { userName: { $not: /@/ } },
-      ],
-    });
-  }
+  // Reason: with the package switch off the Game Master sees only usernames (owner, Oct 2026),
+  // so no row may be findable by its real name - typing a guessed name would confirm it by
+  // whether the row appears. Own rows keep the consented-email match; external rows match only
+  // the exact id or the username.
   return {
     $or: [
-      { kind: { $ne: "external" }, ...open },
-      { kind: "external", $or: masked },
+      { kind: { $ne: "external" }, $or: [byId, byEmail, ...byUsername] },
+      { kind: "external", $or: [byId, ...byUsername] },
     ],
   };
 }
@@ -509,7 +537,7 @@ export async function readReferredPlayers(
   paging: ReferredPlayersPaging,
   now: Date = new Date(),
 ): Promise<ReferredPlayersReport> {
-  const enriched = await withPhoneSearchIds(db, filter);
+  const enriched = await withUsernameSearchIds(db, await withPhoneSearchIds(db, filter));
   const [facet] = await db
     .collection("userreferrals")
     .aggregate(buildReferredPlayersPipeline(enriched, paging, now), { allowDiskUse: true })

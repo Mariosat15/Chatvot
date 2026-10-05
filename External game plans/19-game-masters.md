@@ -74,6 +74,20 @@ so an admin editing a tier changes behaviour for existing subscribers immediatel
 Renewal is handled by `worker/jobs/gamemaster-renewal.job.ts`, scheduled daily in
 `worker/index.ts` line 443.
 
+**Contact-us packages (5 Oct 2026).** A GM package can be marked
+`gameMasterConfig.contactUsOnly` in the admin Marketplace editor. Players then see
+**Contact us** (opening support chat) instead of Buy, and
+`POST /api/marketplace/purchase` refuses it with `GM_CONTACT_US` **before any wallet
+read**. An operator unlocks one package for one Game Master from Manage Game Masters →
+detail → **Enable GM package**, which writes that player's `userId` into the top-level
+`contactUsUnlockedUserIds` (`select: false`, stripped from the player marketplace
+response). It is top-level rather than inside `gameMasterConfig` because the admin PUT
+replaces that object whole, so an ordinary package edit would wipe every unlock; both
+admin marketplace writers delete the field from the body for the same reason. Rules live
+in `lib/services/gamemaster/contact-us-package.ts` (mirrored, byte-identical test in
+`__tests__/services/gm-contact-us-package.test.ts`). The existing upgrade-only rule for
+an active subscriber still applies to an unlocked package.
+
 ---
 
 ## 2. What already works for provider games, unchanged
