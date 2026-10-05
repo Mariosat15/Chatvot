@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest) {
   try {
     const guard = await guardSection("profile");
     if (!guard.ok) return guard.response;
-    const auth = { adminId: guard.admin.id, isAuthenticated: true as const };
+    const auth = { adminId: guard.admin.id, email: guard.admin.email, isAuthenticated: true as const };
 
     const body = await request.json();
     const { currentPassword, newPassword, confirmPassword } = body;

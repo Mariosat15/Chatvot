@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- pre-existing untyped static model methods and lean rows throughout this file; typing them is a separate refactor */
 import mongoose from "mongoose";
 import crypto from "crypto";
 import {
@@ -567,17 +568,40 @@ class CustomerAssignmentService {
    */
   private async getEligibleEmployees(
     settings: IAssignmentSettings,
+    options: { excludeId?: string; anyRoleFallback?: boolean } = {},
   ): Promise<any[]> {
+    // Reason: `status: "active"` matched only a STORED value, and the schema default is
+    // not stored on accounts created before the field existed (the owner's among them),
+    // so they were never eligible. Anything not disabled or locked out can take customers.
     const query: any = {
-      status: "active",
+      status: { $ne: "disabled" },
+      isLockedOut: { $ne: true },
     };
-
-    // Filter by assignable roles if specified
-    if (settings.assignableRoles && settings.assignableRoles.length > 0) {
-      query.role = { $in: settings.assignableRoles };
+    if (options.excludeId) {
+      query._id = { $ne: options.excludeId };
     }
 
-    const employees = await Admin.find(query).lean();
+    let employees: any[] = [];
+    if (settings.assignableRoles && settings.assignableRoles.length > 0) {
+      employees = await Admin.find({
+        ...query,
+        role: { $in: settings.assignableRoles },
+      }).lean();
+    } else {
+      employees = await Admin.find(query).lean();
+    }
+
+    // Reason: when an employee is deleted, their customers must not be orphaned just
+    // because nobody holds an assignable role (default ["Backoffice"]) - hand them to
+    // whoever is still active instead.
+    if (employees.length === 0 && options.anyRoleFallback) {
+      employees = await Admin.find(query).lean();
+      if (employees.length > 0) {
+        console.warn(
+          `⚠️ [Reassign] No employee holds an assignable role (${settings.assignableRoles?.join(", ") || "none"}); using any active employee`,
+        );
+      }
+    }
 
     // Filter out employees who have reached max customers
     if (settings.maxCustomersPerEmployee > 0) {
@@ -625,6 +649,7 @@ class CustomerAssignmentService {
           {},
           { $inc: { lastAssignedIndex: 1 } },
         );
+        // eslint-disable-next-line security/detect-object-injection -- numeric index into an array, not a request-supplied key
         return employees[index];
 
       case "newest_employee":
@@ -691,11 +716,16 @@ class CustomerAssignmentService {
     for (const assignment of assignments) {
       try {
         // Get eligible employees (excluding deleted one)
-        const eligibleEmployees = (
-          await this.getEligibleEmployees(settings)
-        ).filter((emp) => emp._id.toString() !== deletedEmployeeId);
+        // Re-read per customer so least_customers sees the counts change and splits them.
+        const eligibleEmployees = await this.getEligibleEmployees(settings, {
+          excludeId: deletedEmployeeId,
+          anyRoleFallback: true,
+        });
 
         if (eligibleEmployees.length === 0) {
+          console.warn(
+            `⚠️ [Reassign] No active employee to take ${assignment.customerEmail}; left unassigned`,
+          );
           // No eligible employees - mark as unassigned
           assignment.isActive = false;
           await assignment.save();

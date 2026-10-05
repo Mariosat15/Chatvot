@@ -6,6 +6,7 @@ import { Admin } from "@/database/models/admin.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 import { auditLogService } from "@/lib/services/audit-log.service";
+import { isOriginalAdmin } from "@/lib/admin/employee-management-access";
 
 export async function PUT(request: NextRequest) {
   try {
@@ -22,8 +23,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Find admin by ID from auth
-    const admin = await Admin.findById(auth.adminId);
+    // Reason: this used an undeclared `auth`, so every save threw and returned 500 -
+    // the first-login "set your credentials" screen could never be completed.
+    const adminId = guard.admin.id;
+    const admin = await Admin.findById(adminId);
     if (!admin) {
       return NextResponse.json({ error: "Admin not found" }, { status: 404 });
     }
@@ -47,9 +50,9 @@ export async function PUT(request: NextRequest) {
 
     // Update password if provided
     if (newPassword) {
-      if (newPassword.length < 6) {
+      if (newPassword.length < 8) {
         return NextResponse.json(
-          { error: "Password must be at least 6 characters" },
+          { error: "Password must be at least 8 characters" },
           { status: 400 },
         );
       }
@@ -58,24 +61,31 @@ export async function PUT(request: NextRequest) {
 
     // Mark as not first login anymore
     admin.isFirstLogin = false;
+    if (newPassword) {
+      admin.mustChangePassword = false;
+      admin.tempPasswordExpiresAt = undefined;
+    }
 
     await admin.save();
 
     console.log("✅ Admin model updated in database");
 
-    // Also update WhiteLabel settings
-    let settings = await WhiteLabel.findOne();
-    if (!settings) {
-      settings = new WhiteLabel();
-    }
+    // Reason: WhiteLabel holds the OWNER's login only. An employee finishing first-login
+    // setup used to overwrite it with their own email and password.
+    if (await isOriginalAdmin(admin)) {
+      let settings = await WhiteLabel.findOne();
+      if (!settings) {
+        settings = new WhiteLabel();
+      }
 
-    settings.adminEmail = email.toLowerCase();
-    if (newPassword) {
-      settings.adminPassword = newPassword;
-    }
+      settings.adminEmail = email.toLowerCase();
+      if (newPassword) {
+        settings.adminPassword = newPassword;
+      }
 
-    await settings.save();
-    console.log("✅ WhiteLabel model updated in database");
+      await settings.save();
+      console.log("✅ WhiteLabel model updated in database");
+    }
 
     // Credentials are stored in MongoDB (Admin + WhiteLabel models) and shared across all servers.
     // No .env file write needed.
@@ -87,7 +97,7 @@ export async function PUT(request: NextRequest) {
     try {
       await auditLogService.logSettingsUpdated(
         {
-          id: auth.adminId || "admin",
+          id: adminId,
           email: admin.email,
           name: admin.email.split("@")[0],
           role: "admin",

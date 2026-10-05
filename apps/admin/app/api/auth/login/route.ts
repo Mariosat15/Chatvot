@@ -66,7 +66,10 @@ export async function POST(request: NextRequest) {
 
     await connectToDatabase();
 
-    const { email, password } = await request.json();
+    const body = await request.json();
+    // Reason: a pasted address often carries a trailing space, which matched no account.
+    const email = typeof body.email === "string" ? body.email.trim() : "";
+    const password = typeof body.password === "string" ? body.password : "";
 
     if (!email || !password) {
       return NextResponse.json(

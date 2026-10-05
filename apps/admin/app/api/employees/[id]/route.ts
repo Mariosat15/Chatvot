@@ -10,6 +10,7 @@ import {
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { adminEventsService } from "@/lib/services/admin-events.service";
 import { customerAssignmentService } from "@/lib/services/customer-assignment.service";
+import { clearLoginLockouts } from "@/lib/services/login-lockout-clear";
 import {
   canManageEmployees,
   EMPLOYEE_MANAGEMENT_DENIED,
@@ -574,6 +575,21 @@ export async function PATCH(
         employee.forceLogoutAt = undefined;
 
         await employee.save();
+
+        // Reason: failed sign-ins on the player site write their own AccountLockout,
+        // which this toggle never touched, so the email stayed locked after "unlock".
+        try {
+          await clearLoginLockouts(
+            employee.email,
+            auth.adminId!,
+            "Employee unlocked in Employee Management",
+          );
+        } catch (lockoutError) {
+          console.warn(
+            `⚠️ Could not clear login lockouts for ${employee.email}:`,
+            lockoutError,
+          );
+        }
 
         await auditLogService.log({
           admin: adminInfo,

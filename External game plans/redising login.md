@@ -1135,3 +1135,51 @@ Shipped after the mobile layouts:
   before a new password can be set (session-less verify).
 - Middleware allows `/forgot-password` and `/reset-password` without a
   session. Sessions are revoked on successful reset.
+
+==================================================
+41. FIX — RESET EMAIL WAS WELCOME COPY (5 Oct 2026)
+==================================================
+
+Symptom: forgot-password sent an email with subject
+"Welcome to ChartVolt - Start competing and win real prizes!".
+
+Cause: admin Email Templates GET created missing rows as
+`EmailTemplate.create({ templateType, name })`. The schema's field
+defaults are welcome-shaped, so `password_reset` was stored with the
+welcome subject/body. `sendPasswordResetEmail` then rendered that row.
+
+Fix: seed/repair through `getEmailTemplate` (type-specific defaults;
+auto-repair when subject still equals the welcome schema default).
+Admin list create uses the same helper. Redeploy required.
+==================================================
+42. EMPLOYEE LOGIN, UNLOCK AND DELETE-REASSIGN (5 Oct 2026)
+==================================================
+
+Report: new employee passwords (custom, auto-generated, reset) never let
+the employee log in; lock/unlock left them locked; deleting an employee
+left their customer unassigned.
+
+Passwords were NOT broken. Production logs show every password hashed and
+verified ("Password verification test: PASSED"). Every failed attempt was
+on the PLAYER site (chartvolt-web, Better Auth "User not found"). Employees
+sign in at the admin panel URL in the credentials email, never chartvolt.com.
+Proven by __tests__/admin/employee-password-login.test.ts (3 paths -> 200).
+
+Unlock: the five player-site failures wrote an AccountLockout row, which
+the Employee Management toggle never cleared. Unlock now also calls
+clearLoginLockouts() (apps/admin/lib/services/login-lockout-clear.ts,
+case-insensitive), shared with the Fraud unlock route.
+
+Delete-reassign: eligibility required role in assignableRoles (default
+["Backoffice"]) and a STORED status "active" (older accounts, the owner's
+included, store none). Now: not disabled and not locked out; on delete, if
+nobody holds an assignable role, any active employee is used. least_customers
+re-reads counts per customer, so several customers are split.
+Proven by __tests__/admin/employee-delete-and-unlock.test.ts (4 tests; the
+role test fails against the old service).
+
+Also fixed: admin login trims the email; /api/credentials (first-login
+"set your credentials") used an undeclared auth and always returned 500,
+and wrote any employee's login into WhiteLabel - now owner only, min 8;
+profile routes' auth.email / auth.isSuperAdmin were undefined.
+Not retroactive: customers already left unassigned stay unassigned.

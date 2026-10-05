@@ -2,19 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import { Admin } from "@/database/models/admin.model";
-import bcrypt from "bcryptjs";
 import { employeeNotificationService } from "@/lib/services/employee-notification.service";
 import { syncEmployeeProfile } from "@/lib/services/profile-sync.service";
+import { isOriginalAdmin } from "@/lib/admin/employee-management-access";
 
 /**
  * GET /api/employee/profile
  * Get the current employee's profile
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const guard = await guardSection("profile");
     if (!guard.ok) return guard.response;
-    const auth = { adminId: guard.admin.id, isAuthenticated: true as const };
+    const auth = { adminId: guard.admin.id, email: guard.admin.email, isAuthenticated: true as const };
 
     await connectToDatabase();
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         lastLogin: employee.lastLogin,
         lastActivity: employee.lastActivity,
         createdAt: employee.createdAt,
-        isSuperAdmin: auth.isSuperAdmin,
+        isSuperAdmin: await isOriginalAdmin(employee),
         mustChangePassword: employee.mustChangePassword || false,
       },
     });
@@ -68,7 +68,7 @@ export async function PUT(request: NextRequest) {
   try {
     const guard = await guardSection("profile");
     if (!guard.ok) return guard.response;
-    const auth = { adminId: guard.admin.id, isAuthenticated: true as const };
+    const auth = { adminId: guard.admin.id, email: guard.admin.email, isAuthenticated: true as const };
 
     const body = await request.json();
     const { name, phone, timezone, language, bio, department, title, avatar } =
@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
     await connectToDatabase();
 
     // Build update object with only provided fields
-    const updateFields: Record<string, any> = {};
+    const updateFields: Record<string, unknown> = {};
     const changedFields: string[] = [];
 
     if (name !== undefined && name.trim()) {
