@@ -322,6 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Login / registration look CODE-COMPLETE 5 Oct (eng)** — glass card on full-bleed art matching the owner mockup; Branding slots for sign-in and sign-up backgrounds; Google/Apple buttons are look-only. Tests: `auth-page-look.test.ts`. **Never verified by eye.**
+
 This plan has two tracks. **As of 30 September 2026**:
 
 - **Mobile Overview polish CODE-COMPLETE 3 Oct (eng)** — removed Upcoming competitions (Suggested already lists open contests; deleted `MobileUpcomingCompetitions.tsx`); carousels use `snap-proximity` + `scroll-smooth` + touch momentum; drawer scroll smoothed; `MobileDashboardBackBar` on non-overview tabs; sidebar Dashboard → `/dashboard?tab=overview` (with `isActive` stripping the query). Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
@@ -930,6 +932,15 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 5 October 2026 - Login and registration look (Google not wired)
+
+**Owner instruction:** restyle `/sign-in` and `/sign-up` to the two-panel mockup; use the city and arena pictures as backgrounds; add Branding uploads for those two pictures; change the look first; then say in at most three sentences whether Google/Apple login is possible.
+
+- **Look:** `AuthShell` is a full-bleed background + glass card. Sign-in uses the city/trader art; sign-up uses the arena collage. Existing fields, captcha, honeypot and interest radios stayed. Remember-me, forgot-password and the terms tick are UI-only. Google/Apple buttons toast "not enabled yet".
+- **Branding:** `authPageSignInImage` / `authPageSignUpImage` on both HeroSettings copies. Branding → Images has two upload cards (10MB). Empty stored paths fall back to `public/assets/auth/sign-in-bg.jpg` and `sign-up-bg.jpg`.
+- **Not built:** Better Auth `socialProviders`. Needs Google/Apple console apps, callback URLs, and env secrets before anyone can actually enter that way.
+- Tests: `__tests__/auth/auth-page-look.test.ts`. **Never verified by eye.**
 
 ### 5 October 2026 - Overview: drop Activity/Streaks View all; other view links are text
 

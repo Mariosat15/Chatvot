@@ -5,8 +5,9 @@ import { useForm } from "react-hook-form";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
-import FooterLink from "@/components/forms/FooterLink";
 import { signInWithEmail } from "@/lib/actions/auth.actions";
+import AuthSocialRow from "@/components/auth/AuthSocialRow";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { trackDeviceFingerprint } from "@/lib/services/device-fingerprint.service";
@@ -161,7 +162,12 @@ const SignIn = () => {
 
   return (
     <>
-      <h1 className="form-title">Welcome back</h1>
+      <div className="mb-5">
+        <h2 className="text-2xl font-bold text-white">Sign In</h2>
+        <p className="mt-1 text-sm text-cyan-100/70">
+          Access your account and continue trading, playing and competing.
+        </p>
+      </div>
 
       {/* Verification Status Banners */}
       {verificationStatus === "success" && (
@@ -227,7 +233,7 @@ const SignIn = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <InputField
           name="email"
           label="Email"
@@ -250,19 +256,46 @@ const SignIn = () => {
           validation={{ required: "Password is required", minLength: 8 }}
         />
 
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-cyan-100/80">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-cyan-400/40 accent-yellow-400"
+            />
+            Remember me
+          </label>
+          <button
+            type="button"
+            className="font-medium text-yellow-300 hover:text-yellow-200"
+            onClick={() =>
+              toast.info(
+                "Password reset is not available yet — contact support.",
+              )
+            }
+          >
+            Forgot password?
+          </button>
+        </div>
+
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="yellow-btn w-full mt-5"
+          className="yellow-btn mt-2 w-full"
         >
           {isSubmitting ? "Signing In" : "Sign In"}
         </Button>
 
-        <FooterLink
-          text="Don't have an account?"
-          linkText="Create an account"
-          href="/sign-up"
-        />
+        <AuthSocialRow />
+
+        <p className="pt-3 text-center text-sm text-cyan-100/70">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/sign-up"
+            className="font-semibold text-yellow-300 hover:text-yellow-200"
+          >
+            Create an account
+          </Link>
+        </p>
       </form>
     </>
   );

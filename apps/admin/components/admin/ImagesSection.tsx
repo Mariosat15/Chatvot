@@ -41,7 +41,14 @@ interface AuthPageSettings {
   authPageTestimonialRole: string;
   authPageTestimonialRating: number;
   authPageDashboardImage: string;
+  authPageSignInImage: string;
+  authPageSignUpImage: string;
 }
+
+type AuthImageField =
+  | "authPageDashboardImage"
+  | "authPageSignInImage"
+  | "authPageSignUpImage";
 
 // SEPARATE COMPONENT - defined outside to prevent remount issues
 function ImageUploadCard({
@@ -180,6 +187,8 @@ export default function ImagesSection() {
     authPageTestimonialRole: "",
     authPageTestimonialRating: 5,
     authPageDashboardImage: "",
+    authPageSignInImage: "",
+    authPageSignUpImage: "",
   });
   const [seoSettings, setSeoSettings] = useState<SeoSettings>({
     seoTitle: "",
@@ -240,6 +249,8 @@ export default function ImagesSection() {
           authPageTestimonialRole: settings.authPageTestimonialRole || "",
           authPageTestimonialRating: settings.authPageTestimonialRating || 5,
           authPageDashboardImage: settings.authPageDashboardImage || "",
+          authPageSignInImage: settings.authPageSignInImage || "",
+          authPageSignUpImage: settings.authPageSignUpImage || "",
         });
       }
     } catch (error) {
@@ -369,23 +380,30 @@ export default function ImagesSection() {
     }
   };
 
-  const handleAuthImageUpload = async (file: File) => {
+  const handleAuthImageUpload = async (field: AuthImageField, file: File) => {
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file");
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB");
+    const isBackground =
+      field === "authPageSignInImage" || field === "authPageSignUpImage";
+    const maxBytes = isBackground ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error(
+        isBackground
+          ? "Background image must be less than 10MB"
+          : "Image must be less than 5MB",
+      );
       return;
     }
 
-    setUploading((prev) => ({ ...prev, authPageDashboardImage: true }));
+    setUploading((prev) => ({ ...prev, [field]: true }));
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("field", "authPageDashboardImage");
+      formData.append("field", field);
 
       const response = await fetch("/api/images/upload", {
         method: "POST",
@@ -397,8 +415,9 @@ export default function ImagesSection() {
       if (response.ok) {
         setAuthSettings((prev) => ({
           ...prev,
-          authPageDashboardImage: data.path,
+          [field]: data.path,
         }));
+        setUploadedNames((prev) => ({ ...prev, [field]: file.name }));
         toast.success("Auth page image uploaded successfully");
       } else {
         toast.error(data.error || "Upload failed");
@@ -406,7 +425,7 @@ export default function ImagesSection() {
     } catch {
       toast.error("An error occurred during upload");
     } finally {
-      setUploading((prev) => ({ ...prev, authPageDashboardImage: false }));
+      setUploading((prev) => ({ ...prev, [field]: false }));
     }
   };
 
@@ -788,7 +807,7 @@ export default function ImagesSection() {
                 Auth Page Branding
               </h2>
               <p className="text-indigo-100 mt-1">
-                Customize the login & signup page testimonial and image
+                Customize the login & signup page backgrounds, testimonial and preview image
               </p>
             </div>
           </div>
@@ -925,7 +944,9 @@ export default function ImagesSection() {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) handleAuthImageUpload(file);
+                      if (file) {
+                        handleAuthImageUpload("authPageDashboardImage", file);
+                      }
                     }}
                   />
                   <label htmlFor="upload-authPageDashboardImage">
@@ -962,6 +983,34 @@ export default function ImagesSection() {
               </div>
             </div>
           </div>
+
+          <ImageUploadCard
+            title="Sign-in background"
+            description="Full-page artwork behind the login card. Leave empty to use the shipped city scene."
+            field="authPageSignInImage"
+            currentPath={authSettings.authPageSignInImage}
+            recommendations="Recommended: 1920x1080px JPEG or WebP, up to 10MB"
+            isUploading={!!uploading.authPageSignInImage}
+            onFileSelect={(file) =>
+              handleAuthImageUpload("authPageSignInImage", file)
+            }
+            lastUploadedName={uploadedNames.authPageSignInImage}
+            preview="landscape"
+          />
+
+          <ImageUploadCard
+            title="Sign-up background"
+            description="Full-page artwork behind the registration card. Leave empty to use the shipped arena scene."
+            field="authPageSignUpImage"
+            currentPath={authSettings.authPageSignUpImage}
+            recommendations="Recommended: 1920x1080px JPEG or WebP, up to 10MB"
+            isUploading={!!uploading.authPageSignUpImage}
+            onFileSelect={(file) =>
+              handleAuthImageUpload("authPageSignUpImage", file)
+            }
+            lastUploadedName={uploadedNames.authPageSignUpImage}
+            preview="landscape"
+          />
 
           {/* Save Auth Settings Button */}
           <Button

@@ -579,6 +579,8 @@ export interface IHeroSettings extends Document {
   authPageTestimonialRole: string;
   authPageTestimonialRating: number;
   authPageDashboardImage: string;
+  authPageSignInImage: string;
+  authPageSignUpImage: string;
 
   // Advanced
   customCSS: string;

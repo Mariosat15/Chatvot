@@ -39,10 +39,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
+    // Reason: full-bleed auth backgrounds are larger than logos. Only those
+    // two fields get 10MB; every other branding upload stays at 5MB.
+    const AUTH_BG_FIELDS = new Set([
+      "authPageSignInImage",
+      "authPageSignUpImage",
+    ]);
+    const maxBytes = AUTH_BG_FIELDS.has(field) ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+    const maxLabel = AUTH_BG_FIELDS.has(field) ? "10MB" : "5MB";
+    if (file.size > maxBytes) {
       return NextResponse.json(
-        { error: "File size must be less than 5MB" },
+        { error: `File size must be less than ${maxLabel}` },
         { status: 400 },
       );
     }

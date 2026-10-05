@@ -170,6 +170,16 @@
   .header-wrapper {
     @apply flex justify-between items-center px-6 py-4 text-gray-500;
   }
+  .auth-card .form-label {
+    @apply text-xs font-semibold uppercase tracking-wide text-cyan-100/80;
+  }
+  .auth-card .form-input {
+    @apply h-11 border-cyan-400/25 bg-[#06101e]/85 text-white placeholder:text-cyan-100/35 focus:!border-yellow-400;
+  }
+  .auth-card .country-select-trigger,
+  .auth-card .select-trigger {
+    @apply h-11 border-cyan-400/25 bg-[#06101e]/85 text-cyan-50 focus:!border-yellow-400;
+  }
   .auth-layout {
     @apply flex flex-col justify-between lg:flex-row h-screen bg-gray-900 relative overflow-hidden;
   }

@@ -521,6 +521,8 @@ export interface IHeroSettings extends Document {
   authPageTestimonialRole: string;
   authPageTestimonialRating: number;
   authPageDashboardImage: string;
+  authPageSignInImage: string;
+  authPageSignUpImage: string;
 
   // Advanced
   customCSS: string;
@@ -1691,6 +1693,8 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
       type: String,
       default: "/assets/images/dashboard.png",
     },
+    authPageSignInImage: { type: String, default: "" },
+    authPageSignUpImage: { type: String, default: "" },
 
     // Advanced
     customCSS: { type: String, default: "" },

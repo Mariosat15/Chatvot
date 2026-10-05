@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
 import { CountrySelectField } from "@/components/forms/CountrySelectField";
 import { PhoneInputField } from "@/components/forms/PhoneInputField";
-import FooterLink from "@/components/forms/FooterLink";
 import { signUpWithEmail } from "@/lib/actions/auth.actions";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
@@ -174,97 +174,150 @@ const SignUp = () => {
 
   return (
     <>
-      <h1 className="form-title">Sign Up</h1>
+      <div className="mb-5">
+        <h2 className="text-2xl font-bold text-white">Sign Up</h2>
+        <p className="mt-1 text-sm text-cyan-100/70">
+          Join thousands of traders and gamers competing on ChartVolt.
+        </p>
+      </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <InputField
-          name="fullName"
-          label="Full Name"
-          placeholder="John Doe"
-          register={register}
-          error={errors.fullName}
-          validation={{ required: "Full name is required", minLength: 2 }}
-        />
+      <form onSubmit={handleSubmit(onSubmit)} className="relative space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <InputField
+              name="fullName"
+              label="Full Name"
+              placeholder="John Doe"
+              register={register}
+              error={errors.fullName}
+              validation={{ required: "Full name is required", minLength: 2 }}
+            />
+          </div>
 
-        <InputField
-          name="email"
-          label="Email"
-          placeholder="contact@example.com"
-          register={register}
-          error={errors.email}
-          validation={{
-            required: "Email is required",
-            pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-            message: "Valid email address is required",
-          }}
-        />
-
-        <div className="space-y-2">
           <InputField
-            name="password"
-            label="Password"
-            placeholder="Enter a strong password"
-            type="password"
+            name="email"
+            label="Email"
+            placeholder="contact@example.com"
             register={register}
-            error={errors.password}
+            error={errors.email}
             validation={{
-              required: "Password is required",
-              // Directly test value instead of relying on potentially stale state
-              validate: (value: string) =>
-                PASSWORD_REQUIREMENTS.every((req) => req.test(value)) ||
-                "Password does not meet security requirements",
+              required: "Email is required",
+              pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+              message: "Valid email address is required",
             }}
-            onFocus={() => setShowRequirements(true)}
           />
 
-          {/* Password Requirements Checklist */}
-          {showRequirements && (
-            <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-400 mb-2">
-                Password must contain:
-              </p>
-              <ul className="space-y-1">
-                {PASSWORD_REQUIREMENTS.map((req) => (
-                  <li key={req.id} className="flex items-center gap-2 text-xs">
-                    {passwordStrength[req.id] ? (
-                      <Check className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <X className="h-3 w-3 text-red-500" />
-                    )}
-                    <span
-                      className={
-                        passwordStrength[req.id]
-                          ? "text-green-400"
-                          : "text-gray-400"
-                      }
-                    >
-                      {req.label}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="space-y-2">
+            <InputField
+              name="password"
+              label="Password"
+              placeholder="Enter a strong password"
+              type="password"
+              register={register}
+              error={errors.password}
+              validation={{
+                required: "Password is required",
+                validate: (value: string) =>
+                  PASSWORD_REQUIREMENTS.every((req) => req.test(value)) ||
+                  "Password does not meet security requirements",
+              }}
+              onFocus={() => setShowRequirements(true)}
+            />
+            {showRequirements && (
+              <div className="rounded-lg border border-cyan-400/20 bg-[#06101e]/80 p-3">
+                <p className="mb-2 text-xs text-cyan-100/70">
+                  Password must contain:
+                </p>
+                <ul className="space-y-1">
+                  {PASSWORD_REQUIREMENTS.map((req) => (
+                    <li key={req.id} className="flex items-center gap-2 text-xs">
+                      {passwordStrength[req.id] ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <X className="h-3 w-3 text-red-500" />
+                      )}
+                      <span
+                        className={
+                          passwordStrength[req.id]
+                            ? "text-green-400"
+                            : "text-cyan-100/60"
+                        }
+                      >
+                        {req.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <InputField
+            name="confirmPassword"
+            label="Confirm Password"
+            placeholder="Re-enter your password"
+            type="password"
+            register={register}
+            error={errors.confirmPassword}
+            validation={{
+              required: "Please confirm your password",
+              validate: (value: string) =>
+                value === password || "Passwords do not match",
+            }}
+          />
+
+          <PhoneInputField
+            control={control}
+            register={register}
+            setValue={setValue}
+            watch={watch}
+            countryError={errors.phoneCountry}
+            nationalError={errors.phoneNational}
+            required
+          />
+
+          <CountrySelectField
+            name="country"
+            label="Country"
+            control={
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              control as any
+            }
+            error={errors.country}
+            required
+          />
+
+          <InputField
+            name="address"
+            label="Address"
+            placeholder="123 Main Street"
+            register={register}
+            error={errors.address}
+            validation={{ required: "Address is required" }}
+          />
+
+          <InputField
+            name="city"
+            label="City"
+            placeholder="London"
+            register={register}
+            error={errors.city}
+            validation={{ required: "City is required" }}
+          />
+
+          <InputField
+            name="postalCode"
+            label="ZIP Code"
+            placeholder="SW1A 1AA"
+            register={register}
+            error={errors.postalCode}
+            validation={{ required: "Postal code is required" }}
+          />
         </div>
 
-        <InputField
-          name="confirmPassword"
-          label="Confirm Password"
-          placeholder="Re-enter your password"
-          type="password"
-          register={register}
-          error={errors.confirmPassword}
-          validation={{
-            required: "Please confirm your password",
-            validate: (value: string) =>
-              value === password || "Passwords do not match",
-          }}
-        />
-
-        {/* Honeypot field - invisible to users, visible to bots */}
         <div
           aria-hidden="true"
-          className="absolute -left-[9999px] -top-[9999px] opacity-0 pointer-events-none"
+          className="pointer-events-none absolute -left-[9999px] -top-[9999px] opacity-0"
           tabIndex={-1}
         >
           <label htmlFor="website">Website (leave blank)</label>
@@ -278,79 +331,21 @@ const SignUp = () => {
           />
         </div>
 
-        <CountrySelectField
-          name="country"
-          label="Country"
-          control={
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            control as any
-          }
-          error={errors.country}
-          required
-        />
-
-        <PhoneInputField
-          control={control}
-          register={register}
-          setValue={setValue}
-          watch={watch}
-          countryError={errors.phoneCountry}
-          nationalError={errors.phoneNational}
-          required
-        />
-
-        <InputField
-          name="address"
-          label="Address"
-          placeholder="123 Main Street"
-          register={register}
-          error={errors.address}
-          validation={{ required: "Address is required" }}
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <InputField
-            name="city"
-            label="City"
-            placeholder="London"
-            register={register}
-            error={errors.city}
-            validation={{ required: "City is required" }}
-          />
-
-          <InputField
-            name="postalCode"
-            label="Postal Code"
-            placeholder="SW1A 1AA"
-            register={register}
-            error={errors.postalCode}
-            validation={{ required: "Postal code is required" }}
-          />
-        </div>
-
-        {/*
-          Q16 — what they like. Informational only (stored for later product use).
-          Not a permission and not challenge willingness.
-        */}
         <fieldset className="space-y-2">
-          <legend className="text-sm font-medium text-gray-200">
+          <legend className="text-sm font-medium text-white">
             What are you most interested in?
           </legend>
-          <p className="text-xs text-gray-400">
-            Helps us show you the right competitions later. You can change your
-            mind anytime.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {SIGNUP_INTEREST_OPTIONS.map((opt) => (
               <label
                 key={opt.value}
-                className="flex cursor-pointer flex-col gap-0.5 rounded-lg border border-gray-700 bg-gray-800/40 px-3 py-2.5 has-[:checked]:border-yellow-500/60 has-[:checked]:bg-yellow-500/10"
+                className="flex cursor-pointer flex-col gap-0.5 rounded-xl border border-cyan-300/25 bg-[#06101e]/70 px-3 py-2.5 has-[:checked]:border-yellow-400/80 has-[:checked]:bg-yellow-400/10"
               >
                 <span className="flex items-center gap-2">
                   <input
                     type="radio"
                     value={opt.value}
-                    className="accent-yellow-500"
+                    className="accent-yellow-400"
                     {...register("signupInterest", {
                       required: "Please pick one",
                     })}
@@ -359,7 +354,7 @@ const SignUp = () => {
                     {opt.label}
                   </span>
                 </span>
-                <span className="pl-6 text-xs text-gray-400">{opt.hint}</span>
+                <span className="pl-6 text-xs text-cyan-100/60">{opt.hint}</span>
               </label>
             ))}
           </div>
@@ -370,7 +365,17 @@ const SignUp = () => {
           )}
         </fieldset>
 
-        {/* Bot-challenge (rendered only when enabled in admin Fraud Settings) */}
+        <label className="flex cursor-pointer items-start gap-2 text-xs text-cyan-100/75">
+          <input
+            type="checkbox"
+            required
+            className="mt-0.5 h-4 w-4 rounded accent-yellow-400"
+          />
+          <span>
+            I agree to the Terms of Service and Privacy Policy.
+          </span>
+        </label>
+
         <CaptchaWidget
           onToken={setCaptchaToken}
           onEnabledChange={setCaptchaEnabled}
@@ -379,16 +384,20 @@ const SignUp = () => {
         <Button
           type="submit"
           disabled={isSubmitting || (captchaEnabled && !captchaToken)}
-          className="yellow-btn w-full mt-5"
+          className="yellow-btn mt-2 w-full"
         >
           {isSubmitting ? "Creating Account" : "Create Account"}
         </Button>
 
-        <FooterLink
-          text="Already have an account?"
-          linkText="Sign in"
-          href="/sign-in"
-        />
+        <p className="pt-2 text-center text-sm text-cyan-100/70">
+          Already have an account?{" "}
+          <Link
+            href="/sign-in"
+            className="font-semibold text-yellow-300 hover:text-yellow-200"
+          >
+            Sign In
+          </Link>
+        </p>
       </form>
     </>
   );

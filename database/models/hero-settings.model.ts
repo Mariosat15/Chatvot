@@ -400,6 +400,8 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     authPageTestimonialRole: { type: String, default: "Retail Investor" },
     authPageTestimonialRating: { type: Number, default: 5, min: 0, max: 5 },
     authPageDashboardImage: { type: String, default: "/assets/images/dashboard.png" },
+    authPageSignInImage: { type: String, default: "" },
+    authPageSignUpImage: { type: String, default: "" },
 
     // Advanced
     customCSS: { type: String, default: "" },
