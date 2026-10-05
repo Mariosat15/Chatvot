@@ -18,7 +18,8 @@ export interface IEmailTemplate extends Document {
     | "margin_warning"
     | "challenge_received"
     | "notification_alert"
-    | "gm_terms_request";
+    | "gm_terms_request"
+    | "password_reset";
   name: string;
   subject: string;
   fromName: string;
@@ -80,6 +81,9 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>(
         // A dedicated template rather than `notification_alert`, because the owner
         // wanted it editable on its own under Email Templates.
         "gm_terms_request",
+        // Reason: forgot-password flow. Add-only enum — a missing value rejects
+        // the whole write, so never remove this once shipped.
+        "password_reset",
       ],
       required: true,
       unique: true,
@@ -467,6 +471,26 @@ function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
           "If you have already answered, there is nothing more to do.",
         ctaButtonText: "Review Terms",
         ctaButtonUrl: "{{actionUrl}}",
+        useAIPersonalization: false,
+      };
+
+    case "password_reset":
+      return {
+        name: "Password Reset",
+        subject: "Reset your {{platformName}} password",
+        headingText: "Reset your password",
+        introText:
+          "Hi {{name}}, we received a request to reset the password for your {{platformName}} account. Click the button below to choose a new password.",
+        featureListLabel: "Security tips",
+        featureItems: [
+          "This link expires in {{expiryHours}} hours",
+          "If you did not request a reset, you can ignore this email",
+          "Never share this link with anyone",
+        ],
+        closingText:
+          "If the button does not work, copy and paste this link into your browser: {{resetLink}}",
+        ctaButtonText: "Reset Password",
+        ctaButtonUrl: "{{resetLink}}",
         useAIPersonalization: false,
       };
 

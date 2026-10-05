@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 type AuthTermsAgreeProps = {
   checked: boolean;
@@ -17,13 +18,20 @@ export default function AuthTermsAgree({
   className = "",
 }: AuthTermsAgreeProps) {
   return (
-    <div className={className}>
-      <label className="flex cursor-pointer items-start gap-2 text-xs text-cyan-100/75 sm:text-sm">
+    <div
+      className={cn(
+        // Reason: cyan-100/75 was invisible on the dark mobile card; keep the
+        // body readable and the legal links high-contrast yellow.
+        "rounded-xl border border-cyan-400/25 bg-[#06101e]/70 px-3 py-3",
+        className,
+      )}
+    >
+      <label className="flex cursor-pointer items-start gap-3 text-[13px] leading-snug text-cyan-50 sm:text-sm">
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded accent-yellow-400"
+          className="mt-0.5 h-5 w-5 shrink-0 rounded border-cyan-300/60 accent-yellow-400"
         />
         <span>
           I agree to the{" "}
@@ -31,7 +39,7 @@ export default function AuthTermsAgree({
             href="/terms"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-yellow-300 underline-offset-2 hover:text-yellow-200 hover:underline"
+            className="font-semibold text-yellow-300 underline underline-offset-2 hover:text-yellow-200"
             onClick={(e) => e.stopPropagation()}
           >
             Terms of Service
@@ -41,7 +49,7 @@ export default function AuthTermsAgree({
             href="/privacy"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-yellow-300 underline-offset-2 hover:text-yellow-200 hover:underline"
+            className="font-semibold text-yellow-300 underline underline-offset-2 hover:text-yellow-200"
             onClick={(e) => e.stopPropagation()}
           >
             Privacy Policy
@@ -49,7 +57,7 @@ export default function AuthTermsAgree({
           .
         </span>
       </label>
-      {error ? <p className="mt-1 text-xs text-red-400">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-red-400">{error}</p> : null}
     </div>
   );
 }

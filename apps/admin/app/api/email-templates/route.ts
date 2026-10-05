@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       "margin_warning",
       "challenge_received",
       "gm_terms_request",
+      "password_reset",
     ];
 
     const existingTypes = new Set(templates.map((t) => t.templateType));
@@ -199,6 +200,14 @@ export async function POST(request: NextRequest) {
       );
       await sendTestNotificationEmail(templateType, testEmail);
       emailSent = true;
+    } else if (templateType === "password_reset") {
+      // Reason: main-app helper — same relative import pattern as
+      // email-notification-bridge above. Admin `@/` does not reach root lib.
+      const { sendTestPasswordResetEmail } = await import(
+        "../../../../../lib/nodemailer/send-password-reset"
+      );
+      await sendTestPasswordResetEmail(testEmail);
+      emailSent = true;
     }
 
     if (emailSent) {
@@ -256,6 +265,7 @@ function getDefaultName(type: string): string {
     margin_warning: "Margin Warning Alert",
     challenge_received: "Challenge Received",
     gm_terms_request: "Game Master Terms Request",
+    password_reset: "Password Reset",
   };
   return names[type] || "Email Template"; // eslint-disable-line security/detect-object-injection
 }

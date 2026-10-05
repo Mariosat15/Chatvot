@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import AuthVerificationBanners from "@/components/auth/AuthVerificationBanners";
 import MobileAuthShell from "@/components/auth/mobile/MobileAuthShell";
@@ -95,17 +94,12 @@ export default function MobileSignIn() {
               />
               Keep me signed in
             </label>
-            <button
-              type="button"
+            <Link
+              href="/forgot-password"
               className="font-medium text-yellow-300 hover:text-yellow-200"
-              onClick={() =>
-                toast.info(
-                  "Password reset is not available yet — contact support.",
-                )
-              }
             >
               Forgot password?
-            </button>
+            </Link>
           </div>
 
           <Button

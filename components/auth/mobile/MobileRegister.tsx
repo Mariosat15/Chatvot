@@ -186,7 +186,10 @@ export default function MobileRegister() {
                 />
               </div>
 
-              <div className="auth-card [&_.form-label]:text-[11px] [&_input]:min-h-14 [&_input]:rounded-xl [&_input]:text-[16px] [&_.country-select-trigger]:h-14 [&_.select-trigger]:h-14">
+              {/* Reason: match code trigger and national input to the same
+                  fixed 56px height — min-h alone let the number field grow
+                  taller than the dial-code button. */}
+              <div className="auth-card [&_.form-label]:text-[11px] [&_.form-input]:!h-14 [&_.form-input]:min-h-14 [&_.form-input]:rounded-xl [&_.form-input]:text-[16px] [&_.country-select-trigger]:!h-14 [&_.country-select-trigger]:min-h-14 [&_.country-select-trigger]:rounded-xl [&_.select-trigger]:!h-14">
                 <PhoneInputField
                   control={control}
                   register={register}
@@ -267,7 +270,6 @@ export default function MobileRegister() {
                   if (v) setTermsError(undefined);
                 }}
                 error={termsError}
-                className="text-[13px]"
               />
 
               <CaptchaWidget

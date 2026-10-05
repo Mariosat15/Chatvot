@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Swords,
   FileSignature,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,7 +86,8 @@ type TemplateType =
   | "competition_ended"
   | "margin_warning"
   | "challenge_received"
-  | "gm_terms_request";
+  | "gm_terms_request"
+  | "password_reset";
 
 const TEMPLATE_CONFIG: Record<
   TemplateType,
@@ -460,6 +462,37 @@ const TEMPLATE_CONFIG: Record<
       closingText: "If you have already answered, there is nothing more to do.",
       ctaButtonText: "Review Terms",
       ctaButtonUrl: "{{actionUrl}}",
+    },
+  },
+  password_reset: {
+    title: "Password Reset",
+    description: "Sent when a player requests a password reset from Sign In",
+    icon: KeyRound,
+    variables: [
+      "{{name}}",
+      "{{resetLink}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+      "{{expiryHours}}",
+      "{{companyAddress}}",
+    ],
+    defaults: {
+      templateType: "password_reset",
+      name: "Password Reset",
+      subject: "Reset your {{platformName}} password",
+      headingText: "Reset your password",
+      introText:
+        "Hi {{name}}, we received a request to reset the password for your {{platformName}} account. Click the button below to choose a new password.",
+      featureListLabel: "Security tips",
+      featureItems: [
+        "This link expires in {{expiryHours}} hours",
+        "If you did not request a reset, you can ignore this email",
+        "Never share this link with anyone",
+      ],
+      closingText:
+        "If the button does not work, copy and paste this link into your browser: {{resetLink}}",
+      ctaButtonText: "Reset Password",
+      ctaButtonUrl: "{{resetLink}}",
     },
   },
 };

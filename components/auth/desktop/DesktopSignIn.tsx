@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import InputField from "@/components/forms/InputField";
 import AuthVerificationBanners from "@/components/auth/AuthVerificationBanners";
@@ -75,17 +74,12 @@ export default function DesktopSignIn() {
             />
             Remember me
           </label>
-          <button
-            type="button"
+          <Link
+            href="/forgot-password"
             className="font-medium text-yellow-300 hover:text-yellow-200"
-            onClick={() =>
-              toast.info(
-                "Password reset is not available yet — contact support.",
-              )
-            }
           >
             Forgot password?
-          </button>
+          </Link>
         </div>
 
         <Button

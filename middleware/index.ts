@@ -19,6 +19,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|sign-in|sign-up|assets|uploads).*)",
+    // Reason: forgot/reset password and login 2FA must stay reachable without
+    // a session cookie — same carve-out as sign-in / sign-up.
+    "/((?!api|_next/static|_next/image|favicon.ico|sign-in|sign-up|forgot-password|reset-password|verify-2fa|assets|uploads).*)",
   ],
 };

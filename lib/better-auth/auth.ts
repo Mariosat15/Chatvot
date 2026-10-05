@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { nextCookies } from "better-auth/next-js";
 import { validateEnvironment } from "@/lib/utils/validate-env";
 import { sendTwoFactorOTP } from "@/lib/nodemailer/send-two-factor-otp";
+import { sendPasswordResetEmail } from "@/lib/nodemailer/send-password-reset";
 import bcrypt from "bcryptjs";
 
 let authInstance: ReturnType<typeof betterAuth> | null = null;
@@ -47,6 +48,10 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
           minPasswordLength: 8,
           maxPasswordLength: 128,
           autoSignIn: true,
+          // Reason: one hour matches the password_reset email copy default.
+          resetPasswordTokenExpiresIn: 3600,
+          // Reason: a stolen session must not survive a password reset.
+          revokeSessionsOnPasswordReset: true,
           // Use bcrypt to match API server's password hashing
           // API server uses bcryptjs with 12 rounds for non-blocking hashing
           password: {
@@ -56,6 +61,22 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
             verify: async ({ hash, password }) => {
               return await bcrypt.compare(password, hash);
             },
+          },
+          async sendResetPassword({ user, token }) {
+            // Reason: email OUR /reset-password page with the token. The
+            // better-auth callback URL needs a mounted HTTP handler we do
+            // not expose — the token alone is enough for auth.api.resetPassword.
+            const baseUrl =
+              process.env.NEXT_PUBLIC_BASE_URL ||
+              process.env.BETTER_AUTH_URL ||
+              "http://localhost:3000";
+            const resetLink = `${baseUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
+            await sendPasswordResetEmail({
+              email: user.email,
+              name: user.name,
+              resetLink,
+              expiryHours: 1,
+            });
           },
         },
         plugins: [

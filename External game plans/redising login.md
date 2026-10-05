@@ -1120,3 +1120,18 @@ Do not call the job complete until:
 ✓ Error states work
 ✓ Mobile backgrounds are high resolution
 ✓ It feels like a proper ChartVolt mobile app
+
+==================================================
+40. BUILT — FORGOT PASSWORD + MOBILE POLISH (5 Oct 2026)
+==================================================
+
+Shipped after the mobile layouts:
+
+- Mobile terms checkbox is high-contrast (readable on the dark card).
+- Phone national input and dial-code trigger share the same 56px height.
+- Forgot password is live: `/forgot-password` → email with
+  `password_reset` admin template → `/reset-password?token=…`.
+- If the account has 2FA enrolled, the reset page requires TOTP/backup
+  before a new password can be set (session-less verify).
+- Middleware allows `/forgot-password` and `/reset-password` without a
+  session. Sessions are revoked on successful reset.
