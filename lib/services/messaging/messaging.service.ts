@@ -289,9 +289,14 @@ export class MessagingService {
         );
 
         if (assignment?.employeeId) {
+          // Reason: status:"active" only matches a STORED value. Accounts created
+          // before the field existed have no status and were silently skipped, so
+          // the ticket kept a stale stamp (often Andy.A) while the badge showed
+          // the real manager.
           const employee = await db.collection("admins").findOne({
-            _id: new Types.ObjectId(assignment.employeeId),
-            status: "active",
+            _id: new Types.ObjectId(assignment.employeeId.toString()),
+            status: { $ne: "disabled" },
+            isLockedOut: { $ne: true },
           });
 
           if (employee) {
@@ -1025,15 +1030,44 @@ export class MessagingService {
 
     const db = mongoose.connection.db;
     if (db && userId) {
+      // Reason: do not require status:"active" — unset status is common on older
+      // admin rows and excluding them made every handoff fall through to whoever
+      // appeared first in Backoffice/Support (often Andy.A).
       const allActiveAdmins = await db
         .collection("admins")
-        .find({ status: "active" })
+        .find({
+          status: { $ne: "disabled" },
+          isLockedOut: { $ne: true },
+        })
         .toArray();
 
       const assignment = await db.collection("customer_assignments").findOne({
         customerId: userId,
         isActive: true,
       });
+
+      // Guarantee the assigned manager is in the handoff pool even if a future
+      // query filter would have dropped them.
+      if (assignment?.employeeId) {
+        const assignedId = assignment.employeeId.toString();
+        const already = allActiveAdmins.some(
+          (a) => a._id.toString() === assignedId,
+        );
+        if (!already) {
+          try {
+            const assignedDoc = await db.collection("admins").findOne({
+              _id: new Types.ObjectId(assignedId),
+              status: { $ne: "disabled" },
+              isLockedOut: { $ne: true },
+            });
+            if (assignedDoc) {
+              allActiveAdmins.push(assignedDoc);
+            }
+          } catch {
+            // Unparseable employeeId — leave the pool as-is; resolver falls back.
+          }
+        }
+      }
 
       assignedEmployee = resolveSupportHandoffEmployee({
         userId,

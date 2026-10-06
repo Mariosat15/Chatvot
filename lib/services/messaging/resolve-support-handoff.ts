@@ -52,8 +52,16 @@ function toEmployee(admin: HandoffAdmin): HandoffEmployee {
   };
 }
 
+function isEligibleAssignee(admin: HandoffAdmin | undefined): admin is HandoffAdmin {
+  // Reason: isAvailableForChat is a presence hint for the inbox, not permission to
+  // steal somebody else's client. Only a lock-out may skip the assigned manager.
+  return !!admin && admin.isLockedOut !== true;
+}
+
 function isChatAvailable(admin: HandoffAdmin | undefined): admin is HandoffAdmin {
-  return !!admin && admin.isLockedOut !== true && admin.isAvailableForChat !== false;
+  return (
+    isEligibleAssignee(admin) && admin.isAvailableForChat !== false
+  );
 }
 
 function pickFromRoles(
@@ -105,14 +113,16 @@ export function resolveSupportHandoffEmployee(params: {
 
   // Reason: admin Customer Assignment is what operators edit and what the
   // badge shows — escalate to that person, not a stamp left on an old ticket.
+  // Presence (isAvailableForChat) must NOT override this: GM "contact us" and
+  // ordinary handoffs both promise the assigned employee by name.
   if (assignmentEmployeeId) {
     const assigned = adminById.get(assignmentEmployeeId.toString());
-    if (isChatAvailable(assigned)) {
+    if (isEligibleAssignee(assigned)) {
       return toEmployee(assigned);
     }
 
-    // Assigned but unavailable — cover with an account manager first, never
-    // jump straight to the seed Full Admin just because they appear first.
+    // Assigned id missing from the admin list or locked out — cover with an
+    // account manager first, never jump straight to the seed Full Admin.
     const backup =
       pickFromRoles(activeAdmins, ACCOUNT_MANAGER_ROLES, assignmentEmployeeId) ||
       pickFromRoles(activeAdmins, FALLBACK_SUPPORT_ROLES, assignmentEmployeeId);

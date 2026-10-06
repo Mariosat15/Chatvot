@@ -322,8 +322,9 @@ project low risk.
 
 ## START HERE NEXT
 
+- **GM contact-us always named Andy.A CODE-COMPLETE 6 Oct (eng)** — escalate loaded only `status: "active"` admins, so assignees with an unset status were invisible and handoff fell through to the first Support/Backoffice (often Andy.A); `isAvailableForChat: false` also stole the client. Assigned manager now always wins unless locked out. Tests: `support-handoff.test.ts`. Never verified by eye.
 - **Full Admin assignment cleanup tool CODE-COMPLETE 6 Oct (eng)** — report-only `tools/users/report-full-admin-assignments.ts` lists active `customer_assignments` on Full Admin; `--apply` spreads them onto Backoffice / Support Agent by least_customers and retargets open support tickets (skips temporary redirects). Not run against production from eng (Atlas IP). Never verified by eye.
-- **AI support handoff vs customer assignment CODE-COMPLETE 6 Oct (eng)** — AI escalate preferred a stale ticket `assignedEmployeeId` over `customer_assignments`, and the unassigned fallback took the first Full Admin in the collection (often named Admin). Handoff now follows the admin assignment badge; temporary chat redirects still win; Full Admin is excluded from auto-assign. Tests: `support-handoff.test.ts`. Existing Admin rows: run the cleanup tool above (report first). Never verified by eye.
+- **AI support handoff vs customer assignment CODE-COMPLETE 6 Oct (eng)** — AI escalate preferred a stale ticket `assignedEmployeeId` over `customer_assignments`, and the unassigned fallback took the first Full Admin in the collection (often named Admin). Handoff now follows the admin assignment badge; temporary chat redirects still win; Full Admin is excluded from auto-assign. Tests: `support-handoff.test.ts`. Existing Admin rows: run the cleanup tool above (report first). **Amended same day** by the Andy.A row above — say which. Never verified by eye.
 - **Sticky Enter bar slogans CODE-COMPLETE 6 Oct (eng)** — the game-page sticky bar no longer says “Better traders / brighter tomorrow”; each visit picks one of 21 owner slogans from `sticky-enter-slogans.ts` (client `useEffect` so SSR does not hydrate-mismatch). Two-tone gold/accent split kept for multi-phrase lines. Tests: `game-page-layout.test.ts`, `sticky-enter-slogans.test.ts`. Never verified by eye.
 - **Game page Enter CTAs → competitions hub CODE-COMPLETE 6 Oct (eng)** — Enter Competition (hero), Enter Now (sidebar + sticky bar) all use `competitionBrowseHref` → `/competitions`. Sticky bar shows WhiteLabel **Brand Icon** (`favicon`), not the wide App Logo wordmark (that crop is why the mark looked like a blob). Slogan half superseded by the row above — **say which**. Tests: `game-page-layout.test.ts`. Never verified by eye.
 - **Volt Velocity hangar fullscreen overlap CODE-COMPLETE 6 Oct (eng)** — mute/pause/settings sat on the VANGUARD ship panel in fullscreen because large viewports scaled those buttons to 68px while hangar top padding stayed 88px. `--cv-hangar-top` clears the header row; hangar action buttons stay 48px. Mirrored into packed `client.html`. Tests: `practice-round-exit.test.ts`. **pull + `pm2 restart chartvolt-games`** (packed client fingerprint changes). Never verified by eye.
@@ -962,6 +963,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - GM contact-us handoff always named Andy.A (owner report)
+
+**Owner report:** choosing a GM "Contact us" package always told the player Andy.A would help, even when the customer was assigned to someone else.
+
+**Cause:** `escalateFromAI` (and the open-ticket sync) loaded admins with `status: "active"` only. Older employee rows often have no stored status, so the real assignee was missing from the handoff pool and resolution fell through to the first Backoffice/Support Agent. Separately, `isAvailableForChat: false` on the assignee also stole the client.
+
+**Shipped:** assignee wins unless locked out; admin queries use `status: { $ne: "disabled" }`; assigned employee is force-included in the pool. Flipped the unavailable-cover test; added a lock-out cover test.
+
+**Nothing was paid wrongly.** Tests: `support-handoff.test.ts`. Never verified by eye.
 
 ### 6 October 2026 - AI support handoff ignored the real account manager (owner report)
 

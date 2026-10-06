@@ -64,16 +64,35 @@ describe("resolveSupportHandoffEmployee", () => {
     expect(result?.name).not.toBe("Admin");
   });
 
-  it("covers an unavailable assigned manager with another Backoffice first", () => {
+  it("keeps the assigned manager even when marked unavailable for chat", () => {
+    // Reason: isAvailableForChat is presence, not ownership. GM contact-us and
+    // ordinary escalate both name the assigned employee — stealing the client
+    // for Andy.A (or anyone else) because the inbox showed offline is the bug.
     const busyA = admin("a1", "Backoffice", {
       name: "Agent A",
       isAvailableForChat: false,
+    });
+    const andy = admin("andy", "Support Agent", { name: "Andy.A" });
+    const result = resolveSupportHandoffEmployee({
+      userId: "u1",
+      conversation: { assignedEmployeeId: "andy" },
+      assignmentEmployeeId: "a1",
+      activeAdmins: [fullAdmin, busyA, andy, agentB],
+    });
+    expect(result?.id).toBe("a1");
+    expect(result?.name).toBe("Agent A");
+  });
+
+  it("covers a locked-out assigned manager with another Backoffice first", () => {
+    const lockedA = admin("a1", "Backoffice", {
+      name: "Agent A",
+      isLockedOut: true,
     });
     const result = resolveSupportHandoffEmployee({
       userId: "u1",
       conversation: null,
       assignmentEmployeeId: "a1",
-      activeAdmins: [fullAdmin, busyA, agentB],
+      activeAdmins: [fullAdmin, lockedA, agentB],
     });
     expect(result?.id).toBe("a2");
   });
