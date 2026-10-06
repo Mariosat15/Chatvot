@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Wallet Analytics data-agnostic CODE-COMPLETE 6 Oct (eng)** — `wallet-categories.ts` is the single catalog; charts/tiles/insights/spend resolve from it plus unknown numeric keys; desktop + mobile share the model. Tests: `wallet-analytics.test.ts` (17). **Never verified by eye.**
 - **Daily Credit Flow desktop-only CODE-COMPLETE 6 Oct (eng)** — removed from mobile; desktop uses composed area/line instead of bars. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Wallet Analytics chart polish CODE-COMPLETE 6 Oct (eng)** — Credit Breakdown → stacked area; Spending vs Earnings donut glow no longer clipped; mobile uses the same two panels. Tests: `wallet-analytics.test.ts` (14). **Never verified by eye.**
 - **Wallet Analytics Gift credits + spend buckets CODE-COMPLETE 6 Oct (eng)** — Bonuses → Gift credits (`admin_adjustment` / `manual_deposit_credit`); marketplace and GM spend/earn on Spending vs Earnings; mobile charts match desktop glow/axes; shared `useWalletAnalyticsModel`. Tests: `wallet-analytics.test.ts` (14). **Never verified by eye.**
@@ -943,6 +944,16 @@ Newest at the top.
 - Desktop `DailyCreditFlowPanel` is a `ComposedChart` (teal/rose area fills + cyan net line around zero).
 - Mobile no longer mounts `MobileDailyFlow`.
 - Tests flipped in `wallet-analytics.test.ts`. **Never verified by eye.**
+
+### 6 October 2026 - Wallet Analytics data-agnostic catalog
+
+**Owner report:** Wallet Analytics must stay data-agnostic — future buckets should appear on charts dynamically on desktop and mobile.
+
+- **`wallet-categories.ts`** is the single catalog (label, colour, flow, chart/summary/spend/insight flags).
+- **`resolveCategories`** appends unknown numeric keys from live rows so a new `charts.ts` bucket is never silent.
+- Model builds breakdown days, spend slices, insights, money in/out from the catalog; Credit Breakdown / Insights use `auto-fill` grids.
+- Desktop and mobile both pass `model.categories` into the shared breakdown panel.
+- Tests: `wallet-analytics.test.ts` (17). **Never verified by eye.**
 
 ### 6 October 2026 - Wallet Analytics chart polish: stacked area + donut glow
 

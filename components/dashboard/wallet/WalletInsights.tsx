@@ -3,58 +3,24 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatVolts } from "@/lib/utils/format-volts";
-import { WALLET_ART } from "@/lib/services/games/wallet-assets";
+import { WALLET_ART, walletArtForKey } from "@/lib/services/games/wallet-assets";
 import { Sparkline } from "./AnalyticsCard";
 import WalletNeonIcon from "./WalletNeonIcon";
-import { WALLET_CATEGORY } from "./wallet-tokens";
 
 export type InsightItem = {
-  key:
-    | "deposits"
-    | "withdrawals"
-    | "marketplace"
-    | "gmEarnings"
-    | "giftCredits"
-    | "prizes"
-    | "net";
+  key: string;
   label: string;
   value: number;
   deltaPct: number | null;
   spark: number[];
-};
-
-const ART: Record<InsightItem["key"], string> = {
-  deposits: WALLET_ART.deposits,
-  withdrawals: WALLET_ART.withdrawals,
-  marketplace: WALLET_ART.marketplace,
-  gmEarnings: WALLET_ART.gameEarnings,
-  giftCredits: WALLET_ART.giftCredits,
-  prizes: WALLET_ART.prizes,
-  net: WALLET_ART.netMovement,
-};
-
-const COLORS: Record<InsightItem["key"], string> = {
-  deposits: WALLET_CATEGORY.deposits,
-  withdrawals: WALLET_CATEGORY.withdrawals,
-  marketplace: WALLET_CATEGORY.marketplace,
-  gmEarnings: WALLET_CATEGORY.gmEarnings,
-  giftCredits: WALLET_CATEGORY.giftCredits,
-  prizes: WALLET_CATEGORY.prizes,
-  net: WALLET_CATEGORY.net,
-};
-
-const BORDERS: Record<InsightItem["key"], string> = {
-  deposits: "border-emerald-400/40",
-  withdrawals: "border-rose-400/40",
-  marketplace: "border-pink-400/40",
-  gmEarnings: "border-cyan-400/40",
-  giftCredits: "border-fuchsia-400/40",
-  prizes: "border-orange-400/40",
-  net: "border-emerald-400/40",
+  /** From the category catalog — keeps the strip data-agnostic. */
+  color: string;
 };
 
 /**
- * Wallet Insights — seven neon-tile cards (Overview icon language).
+ * Wallet Insights — neon tiles driven by the shared model / catalog.
+ * Reason: owner 6 Oct 2026 — tile count follows insight-flagged categories
+ * plus Net Movement; no hard-coded key union.
  */
 export default function WalletInsights({ items }: { items: InsightItem[] }) {
   return (
@@ -83,21 +49,24 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
+      <div
+        className="grid gap-2"
+        style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(7.5rem, 1fr))",
+        }}
+      >
         {items.map((item) => {
-          const color = COLORS[item.key];
+          const color = item.color;
           const up = (item.deltaPct ?? 0) >= 0;
           return (
             <div
               key={item.key}
-              className={cn(
-                "rounded-xl border bg-black/40 px-2.5 py-2.5 shadow-[0_0_12px_rgba(0,0,0,0.25)]",
-                BORDERS[item.key],
-              )}
+              className="rounded-xl border bg-black/40 px-2.5 py-2.5 shadow-[0_0_12px_rgba(0,0,0,0.25)]"
+              style={{ borderColor: `${color}66` }}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
                 <WalletNeonIcon
-                  src={ART[item.key]}
+                  src={walletArtForKey(item.key)}
                   size={24}
                   ringClass="ring-white/20"
                   bgClass="bg-transparent"

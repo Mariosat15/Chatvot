@@ -37,6 +37,7 @@ export default function DesktopWalletAnalytics({ overview, charts }: Props) {
         <CreditBreakdownPanel
           data={model.breakdownDays}
           totals={model.breakdownTotals}
+          categories={model.categories}
         />
       </div>
 

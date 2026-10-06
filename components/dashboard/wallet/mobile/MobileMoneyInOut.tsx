@@ -1,10 +1,16 @@
 "use client";
 
+import { useMemo } from "react";
 import Image from "next/image";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import type { BreakdownTotals } from "../CreditBreakdownPanel";
-import { WALLET_CATEGORY } from "../wallet-tokens";
+import {
+  presentKeysFromRows,
+  readFiniteNumber,
+  resolveCategories,
+  type ResolvedWalletCategory,
+} from "../wallet-categories";
 
 type BarRow = { label: string; value: number; color: string };
 
@@ -42,59 +48,44 @@ function CategoryBars({ rows, max }: { rows: BarRow[]; max: number }) {
 
 /**
  * Money In / Money Out — two summary cards with horizontal category bars.
+ * Reason: rows come from the catalog's flow flag so a new bucket lands here too.
  */
 export default function MobileMoneyInOut({
   totals,
   moneyIn,
   moneyOut,
+  categories: categoriesProp,
 }: {
   totals: BreakdownTotals;
   moneyIn: number;
   moneyOut: number;
+  categories?: ResolvedWalletCategory[];
 }) {
-  const inRows: BarRow[] = [
-    { label: "Deposits", value: totals.deposits, color: WALLET_CATEGORY.deposits },
-    { label: "Prizes", value: totals.prizes, color: WALLET_CATEGORY.prizes },
-    {
-      label: "GM Earnings",
-      value: totals.gmEarnings,
-      color: WALLET_CATEGORY.gmEarnings,
-    },
-    {
-      label: "Gift Credits",
-      value: totals.giftCredits,
-      color: WALLET_CATEGORY.giftCredits,
-    },
-    { label: "Refunds", value: totals.refunds, color: WALLET_CATEGORY.refunds },
-  ].filter((r) => r.value > 0);
+  const categories = useMemo(() => {
+    if (categoriesProp?.length) return categoriesProp;
+    return resolveCategories([
+      ...presentKeysFromRows([totals as Record<string, unknown>]),
+      ...Object.keys(totals),
+    ]);
+  }, [categoriesProp, totals]);
 
-  const outRows: BarRow[] = [
-    {
-      label: "Contest Entries",
-      value: totals.contestEntries,
-      color: WALLET_CATEGORY.contestEntries,
-    },
-    {
-      label: "Marketplace",
-      value: totals.marketplace,
-      color: WALLET_CATEGORY.marketplace,
-    },
-    {
-      label: "GM Spend",
-      value: totals.gmSpend,
-      color: WALLET_CATEGORY.gmSpend,
-    },
-    {
-      label: "Withdrawals",
-      value: totals.withdrawals,
-      color: WALLET_CATEGORY.withdrawals,
-    },
-    {
-      label: "Gift Credits Removed",
-      value: totals.giftCreditsOut,
-      color: WALLET_CATEGORY.giftCreditsOut,
-    },
-  ].filter((r) => r.value > 0);
+  const inRows: BarRow[] = categories
+    .filter((c) => c.flow === "in")
+    .map((c) => ({
+      label: c.label,
+      value: readFiniteNumber(totals, c.key),
+      color: c.color,
+    }))
+    .filter((r) => r.value > 0);
+
+  const outRows: BarRow[] = categories
+    .filter((c) => c.flow === "out")
+    .map((c) => ({
+      label: c.label,
+      value: readFiniteNumber(totals, c.key),
+      color: c.color,
+    }))
+    .filter((r) => r.value > 0);
 
   const inMax = Math.max(...inRows.map((r) => r.value), 0);
   const outMax = Math.max(...outRows.map((r) => r.value), 0);

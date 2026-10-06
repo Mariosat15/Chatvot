@@ -44,6 +44,28 @@ export const WALLET_ART = {
   netMovement: NEON_ICON("chart-growth-orange"),
 } as const;
 
+/** Art for a category / insight key — unknown keys fall back to insights. */
+export function walletArtForKey(key: string): string {
+  // Reason: Map lookup — object indexing trips detect-object-injection.
+  const map = new Map<string, string>([
+    ["deposits", WALLET_ART.deposits],
+    ["withdrawals", WALLET_ART.withdrawals],
+    ["marketplace", WALLET_ART.marketplace],
+    ["contestEntries", WALLET_ART.purchases],
+    ["purchases", WALLET_ART.purchases],
+    ["gmEarnings", WALLET_ART.gameEarnings],
+    ["gmSpend", WALLET_ART.gmSpend],
+    ["giftCredits", WALLET_ART.giftCredits],
+    ["giftCreditsOut", WALLET_ART.giftCredits],
+    ["bonuses", WALLET_ART.giftCredits],
+    ["prizes", WALLET_ART.prizes],
+    ["refunds", WALLET_ART.giftCredits],
+    ["other", WALLET_ART.insights],
+    ["net", WALLET_ART.netMovement],
+  ]);
+  return map.get(key) ?? WALLET_ART.insights;
+}
+
 /** Every wallet asset a test can assert exists on disk. */
 export function allWalletAssets(): string[] {
   return [

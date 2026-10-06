@@ -52,6 +52,7 @@ export default function MobileWallet({ overview, charts }: Props) {
       <CreditBreakdownPanel
         data={model.breakdownDays}
         totals={model.breakdownTotals}
+        categories={model.categories}
       />
       <SpendingVsEarnings slices={model.spendSlices} />
       {/* Reason: owner 6 Oct 2026 — Daily Credit Flow is desktop-only. */}

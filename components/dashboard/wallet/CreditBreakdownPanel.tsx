@@ -15,66 +15,18 @@ import { formatVolts } from "@/lib/utils/format-volts";
 import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { AnalyticsCard } from "./AnalyticsCard";
 import WalletNeonIcon from "./WalletNeonIcon";
-import { WALLET_CATEGORY } from "./wallet-tokens";
+import {
+  presentKeysFromRows,
+  readFiniteNumber,
+  resolveCategories,
+  type ResolvedWalletCategory,
+} from "./wallet-categories";
 
-export type BreakdownDay = {
-  date: string;
-  deposits: number;
-  contestEntries: number;
-  marketplace: number;
-  gmSpend: number;
-  gmEarnings: number;
-  giftCredits: number;
-  prizes: number;
-  withdrawals: number;
-  refunds: number;
-};
+/** One day of credit activity — keys come from the category catalog + live data. */
+export type BreakdownDay = { date: string } & Record<string, number>;
 
-export type BreakdownTotals = {
-  deposits: number;
-  contestEntries: number;
-  marketplace: number;
-  gmSpend: number;
-  gmEarnings: number;
-  giftCredits: number;
-  giftCreditsOut: number;
-  prizes: number;
-  withdrawals: number;
-  refunds: number;
-};
-
-const SERIES = [
-  { key: "deposits", label: "Deposits", color: WALLET_CATEGORY.deposits },
-  {
-    key: "contestEntries",
-    label: "Contest Entries",
-    color: WALLET_CATEGORY.contestEntries,
-  },
-  {
-    key: "marketplace",
-    label: "Marketplace",
-    color: WALLET_CATEGORY.marketplace,
-  },
-  { key: "gmSpend", label: "GM Spend", color: WALLET_CATEGORY.gmSpend },
-  {
-    key: "gmEarnings",
-    label: "GM Earnings",
-    color: WALLET_CATEGORY.gmEarnings,
-  },
-  {
-    key: "giftCredits",
-    label: "Gift Credits",
-    color: WALLET_CATEGORY.giftCredits,
-  },
-  { key: "prizes", label: "Prizes", color: WALLET_CATEGORY.prizes },
-  {
-    key: "withdrawals",
-    label: "Withdrawals",
-    color: WALLET_CATEGORY.withdrawals,
-  },
-] as const;
-
-type SeriesKey = (typeof SERIES)[number]["key"];
+/** Period (or all-time fallback) totals keyed by category UI key. */
+export type BreakdownTotals = Record<string, number>;
 
 function formatAxisDate(iso: string): string {
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
@@ -84,42 +36,55 @@ function formatAxisDate(iso: string): string {
 
 /**
  * Credit Breakdown — stacked area over the period + summary tiles.
- * Reason: owner 6 Oct 2026 — sparse multi-series bars were unreadable; area
- * shows category mix over time without hairline columns.
+ * Reason: owner 6 Oct 2026 — series and tiles resolve from wallet-categories
+ * plus any numeric keys on the data, so a new bucket appears without editing
+ * this panel (desktop and mobile share it).
  */
 export default function CreditBreakdownPanel({
   data,
   totals,
+  categories: categoriesProp,
 }: {
   data: BreakdownDay[];
   totals: BreakdownTotals;
+  /** Optional — when omitted, resolved from data + totals (agnostic fallback). */
+  categories?: ResolvedWalletCategory[];
 }) {
+  const categories = useMemo(() => {
+    if (categoriesProp?.length) return categoriesProp;
+    return resolveCategories([
+      ...presentKeysFromRows(data as Array<Record<string, unknown>>),
+      ...Object.keys(totals),
+    ]);
+  }, [categoriesProp, data, totals]);
+
   // Reason: hide empty series so the legend matches what the eye can see.
   const activeSeries = useMemo(
     () =>
-      SERIES.filter((s) =>
-        data.some((d) => (d[s.key as SeriesKey] || 0) > 0),
+      categories.filter(
+        (s) =>
+          s.chart && data.some((d) => readFiniteNumber(d, s.key) > 0),
       ),
-    [data],
+    [categories, data],
   );
 
-  const summary = [
-    { key: "deposits", label: "Total Deposits", value: totals.deposits },
-    {
-      key: "contestEntries",
-      label: "Contest Entries",
-      value: totals.contestEntries,
-    },
-    { key: "marketplace", label: "Marketplace", value: totals.marketplace },
-    { key: "gmSpend", label: "GM Spend", value: totals.gmSpend },
-    { key: "gmEarnings", label: "GM Earnings", value: totals.gmEarnings },
-    { key: "giftCredits", label: "Gift Credits", value: totals.giftCredits },
-    { key: "prizes", label: "Prizes Won", value: totals.prizes },
-    { key: "withdrawals", label: "Withdrawals", value: totals.withdrawals },
-  ].filter(
-    (row) =>
-      row.value > 0 ||
-      ["deposits", "prizes", "giftCredits"].includes(row.key),
+  const chartSeries = activeSeries.length
+    ? activeSeries
+    : categories.filter((s) => s.chart);
+
+  const summary = useMemo(
+    () =>
+      categories
+        .filter((c) => c.summary)
+        .map((c) => ({
+          key: c.key,
+          label: c.label,
+          value: readFiniteNumber(totals, c.key),
+          color: c.color,
+          always: c.alwaysShowInSummary,
+        }))
+        .filter((row) => row.value > 0 || row.always),
+    [categories, totals],
   );
 
   return (
@@ -149,7 +114,7 @@ export default function CreditBreakdownPanel({
               margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
             >
               <defs>
-                {SERIES.map((s) => (
+                {chartSeries.map((s) => (
                   <linearGradient
                     key={s.key}
                     id={`wallet-bd-${s.key}`}
@@ -210,11 +175,12 @@ export default function CreditBreakdownPanel({
                 ]}
               />
               <Legend
-                wrapperStyle={{ fontSize: 10, paddingTop: 4 }}
+                // Reason: 10px + tight line-height clipped labels like "GM Earnings".
+                wrapperStyle={{ fontSize: 11, paddingTop: 8, lineHeight: "18px" }}
                 iconType="circle"
                 iconSize={8}
               />
-              {(activeSeries.length ? activeSeries : SERIES).map((s) => (
+              {chartSeries.map((s) => (
                 <Area
                   key={s.key}
                   type="monotone"
@@ -234,29 +200,35 @@ export default function CreditBreakdownPanel({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {summary.map((row) => {
-          const color =
-            WALLET_CATEGORY[row.key as keyof typeof WALLET_CATEGORY] ??
-            "#94A3B8";
-          return (
-            <div
-              key={row.key}
-              className="flex items-center gap-2 rounded-lg border border-white/[0.06] bg-black/30 px-2.5 py-2"
-            >
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: color, boxShadow: `0 0 8px ${color}` }}
-              />
-              <div className="min-w-0">
-                <p className="truncate text-[10px] text-slate-400">{row.label}</p>
-                <p className="text-xs font-semibold tabular-nums text-white">
-                  {formatVolts(row.value)}
-                </p>
-              </div>
+      <div
+        className="grid gap-2.5 sm:gap-3"
+        // Reason: auto-fill keeps a balanced grid when a 7th/8th bucket appears.
+        style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(9.5rem, 1fr))",
+        }}
+      >
+        {summary.map((row) => (
+          <div
+            key={row.key}
+            className="flex min-h-[72px] items-center gap-2.5 rounded-xl border border-white/[0.08] bg-black/35 px-3 py-3 sm:min-h-[80px] sm:gap-3 sm:px-3.5 sm:py-3.5"
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full sm:h-3 sm:w-3"
+              style={{
+                background: row.color,
+                boxShadow: `0 0 10px ${row.color}`,
+              }}
+            />
+            <div className="min-w-0">
+              <p className="truncate text-[11px] text-slate-400 sm:text-xs">
+                {row.label}
+              </p>
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-white sm:text-base">
+                {formatVolts(row.value)}
+              </p>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </AnalyticsCard>
   );

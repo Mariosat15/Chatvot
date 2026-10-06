@@ -6,11 +6,17 @@ import type { KpiItem } from "./WalletKpiGrid";
 import type { BreakdownDay, BreakdownTotals } from "./CreditBreakdownPanel";
 import type { SpendingSlice } from "./SpendingVsEarnings";
 import type { InsightItem } from "./WalletInsights";
+import { sliceByRange, type WalletRange } from "./wallet-tokens";
 import {
-  WALLET_CATEGORY,
-  sliceByRange,
-  type WalletRange,
-} from "./wallet-tokens";
+  WALLET_CATEGORIES,
+  mapRawBreakdownRow,
+  presentKeysFromRows,
+  readAllTimeBucket,
+  readFiniteNumber,
+  resolveCategories,
+  sumCategory,
+  type ResolvedWalletCategory,
+} from "./wallet-categories";
 
 type Overview = ComprehensiveDashboardData["overview"];
 type Charts = ComprehensiveDashboardData["charts"];
@@ -27,23 +33,8 @@ function halfWindow<T>(rows: T[]): { prev: T[]; cur: T[] } {
   return { prev: rows.slice(0, mid), cur: rows.slice(mid) };
 }
 
-function sumField(rows: RawBreakdown[], pick: (r: RawBreakdown) => number): number {
-  return rows.reduce((s, r) => s + (pick(r) || 0), 0);
-}
-
 export function toBreakdownDay(r: RawBreakdown): BreakdownDay {
-  return {
-    date: r.date,
-    deposits: r.deposits || 0,
-    contestEntries: r.entries || 0,
-    marketplace: r.marketplace || 0,
-    gmSpend: r.gmSpend || 0,
-    gmEarnings: r.gmEarnings || 0,
-    giftCredits: r.giftCredits || 0,
-    prizes: r.wins || 0,
-    withdrawals: r.withdrawals || 0,
-    refunds: r.refunds || 0,
-  };
+  return mapRawBreakdownRow(r as Record<string, unknown>);
 }
 
 export function formatRangeLabel(history: { date: string }[]): string {
@@ -63,19 +54,46 @@ export function formatRangeLabel(history: { date: string }[]): string {
   return `${fmt(first)} – ${fmt(last)}`;
 }
 
-function periodSpend(r: RawBreakdown): number {
-  return (
-    (r.entries || 0) +
-    (r.marketplace || 0) +
-    (r.gmSpend || 0) +
-    (r.withdrawals || 0) +
-    (r.giftCreditsOut || 0)
-  );
+function daySpend(
+  day: Record<string, number | string>,
+  spendKeys: string[],
+): number {
+  let s = 0;
+  for (const k of spendKeys) {
+    s += readFiniteNumber(day as Record<string, unknown>, k);
+  }
+  return s;
+}
+
+function allTimeTotalsRecord(
+  totals: Charts["allTimeTotals"] | undefined,
+): Record<string, number> {
+  if (!totals) return {};
+  // Reason: Map writes — object indexing trips detect-object-injection.
+  const out = new Map<string, number>();
+  for (const def of WALLET_CATEGORIES) {
+    out.set(def.key, readAllTimeBucket(totals as Record<string, number>, def));
+  }
+  // Reason: surface any extra all-time fields charts.ts may add later.
+  for (const [k, v] of Object.entries(totals as Record<string, unknown>)) {
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    if (out.has(k)) continue;
+    const mapped = WALLET_CATEGORIES.find(
+      (c) => c.sourceKey === k || c.allTimeKey === k,
+    );
+    if (mapped) continue;
+    out.set(k, v);
+  }
+  return Object.fromEntries(out);
 }
 
 /**
  * Shared Wallet Analytics model — one period drives every panel.
  * Desktop and mobile layouts both consume this; neither owns the math.
+ *
+ * Reason: owner 6 Oct 2026 — categories come from wallet-categories.ts plus
+ * any numeric keys present on the data, so a new bucket renders without a
+ * per-screen edit.
  */
 export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
   const [range, setRange] = useState<WalletRange>("30d");
@@ -109,50 +127,41 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
     [breakdownRaw],
   );
 
+  const categories: ResolvedWalletCategory[] = useMemo(() => {
+    const keys = [
+      ...presentKeysFromRows(breakdownDays as Array<Record<string, unknown>>),
+      ...presentKeysFromRows(breakdownAll as Array<Record<string, unknown>>),
+      ...Object.keys(allTimeTotalsRecord(totals)),
+    ];
+    return resolveCategories(keys);
+  }, [breakdownDays, breakdownAll, totals]);
+
+  const spendKeys = useMemo(
+    () => categories.filter((c) => c.spendMetric).map((c) => c.key),
+    [categories],
+  );
+
   const breakdownTotals: BreakdownTotals = useMemo(() => {
-    const empty: BreakdownTotals = {
-      deposits: 0,
-      contestEntries: 0,
-      marketplace: 0,
-      gmSpend: 0,
-      gmEarnings: 0,
-      giftCredits: 0,
-      giftCreditsOut: 0,
-      prizes: 0,
-      withdrawals: 0,
-      refunds: 0,
-    };
-    for (const d of breakdownDays) {
-      empty.deposits += d.deposits;
-      empty.contestEntries += d.contestEntries;
-      empty.marketplace += d.marketplace;
-      empty.gmSpend += d.gmSpend;
-      empty.gmEarnings += d.gmEarnings;
-      empty.giftCredits += d.giftCredits;
-      empty.prizes += d.prizes;
-      empty.withdrawals += d.withdrawals;
-      empty.refunds += d.refunds;
-    }
-    for (const r of breakdownRaw) {
-      empty.giftCreditsOut += r.giftCreditsOut || 0;
-    }
-    // Reason: if the window is empty, fall back to all-time so tiles are not blank.
+    // Reason: Map writes — object indexing trips detect-object-injection.
+    const empty = new Map<string, number>();
+    for (const c of categories) empty.set(c.key, 0);
+
     if (breakdownDays.length === 0) {
-      return {
-        deposits: totals.deposits,
-        contestEntries: totals.entries,
-        marketplace: totals.marketplace,
-        gmSpend: totals.gmSpend,
-        gmEarnings: totals.gmEarnings,
-        giftCredits: totals.giftCredits,
-        giftCreditsOut: totals.giftCreditsOut,
-        prizes: totals.wins,
-        withdrawals: totals.withdrawals,
-        refunds: totals.refunds,
-      };
+      const allTime = allTimeTotalsRecord(totals);
+      for (const c of categories) {
+        empty.set(c.key, readFiniteNumber(allTime, c.key));
+      }
+      return Object.fromEntries(empty);
     }
-    return empty;
-  }, [breakdownDays, breakdownRaw, totals]);
+
+    for (const d of breakdownDays) {
+      for (const c of categories) {
+        const n = readFiniteNumber(d, c.key);
+        empty.set(c.key, (empty.get(c.key) ?? 0) + n);
+      }
+    }
+    return Object.fromEntries(empty);
+  }, [breakdownDays, categories, totals]);
 
   const rangeLabel = useMemo(() => formatRangeLabel(history), [history]);
 
@@ -174,13 +183,13 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
       history[history.length - 1]?.balance ??
       overview.creditBalance;
 
-    const { prev: bPrev, cur: bCur } = halfWindow(breakdownRaw);
-    const spendCur = sumField(bCur, periodSpend);
-    const spendPrev = sumField(bPrev, periodSpend);
-    const gmCur = sumField(bCur, (r) => r.gmEarnings);
-    const gmPrev = sumField(bPrev, (r) => r.gmEarnings);
-    const prizeCur = sumField(bCur, (r) => r.wins);
-    const prizePrev = sumField(bPrev, (r) => r.wins);
+    const { prev: bPrev, cur: bCur } = halfWindow(breakdownDays);
+    const spendCur = bCur.reduce((s, d) => s + daySpend(d, spendKeys), 0);
+    const spendPrev = bPrev.reduce((s, d) => s + daySpend(d, spendKeys), 0);
+    const gmCur = sumCategory(bCur, "gmEarnings");
+    const gmPrev = sumCategory(bPrev, "gmEarnings");
+    const prizeCur = sumCategory(bCur, "prizes");
+    const prizePrev = sumCategory(bPrev, "prizes");
 
     return [
       {
@@ -198,7 +207,7 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
         value: spendCur,
         deltaPct: pctChange(spendCur, spendPrev),
         accent: "magenta",
-        spark: breakdownRaw.map(periodSpend).slice(-14),
+        spark: breakdownDays.map((d) => daySpend(d, spendKeys)).slice(-14),
       },
       {
         key: "game",
@@ -206,7 +215,7 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
         value: gmCur,
         deltaPct: pctChange(gmCur, gmPrev),
         accent: "cyan",
-        spark: breakdownRaw.map((d) => d.gmEarnings).slice(-14),
+        spark: breakdownDays.map((d) => Number(d.gmEarnings) || 0).slice(-14),
       },
       {
         key: "prizes",
@@ -214,74 +223,21 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
         value: prizeCur,
         deltaPct: pctChange(prizeCur, prizePrev),
         accent: "orange",
-        spark: breakdownRaw.map((d) => d.wins).slice(-14),
+        spark: breakdownDays.map((d) => Number(d.prizes) || 0).slice(-14),
       },
     ];
-  }, [breakdownRaw, history, overview.creditBalance]);
+  }, [breakdownDays, history, overview.creditBalance, spendKeys]);
 
   const spendSlices: SpendingSlice[] = useMemo(() => {
-    const rows: SpendingSlice[] = [
-      {
-        key: "contestEntries",
-        label: "Contest Entries",
-        value: breakdownTotals.contestEntries,
-        color: WALLET_CATEGORY.contestEntries,
-      },
-      {
-        key: "marketplace",
-        label: "Marketplace",
-        value: breakdownTotals.marketplace,
-        color: WALLET_CATEGORY.marketplace,
-      },
-      {
-        key: "gmSpend",
-        label: "GM Spend",
-        value: breakdownTotals.gmSpend,
-        color: WALLET_CATEGORY.gmSpend,
-      },
-      {
-        key: "withdrawals",
-        label: "Withdrawals",
-        value: breakdownTotals.withdrawals,
-        color: WALLET_CATEGORY.withdrawals,
-      },
-      {
-        key: "giftCreditsOut",
-        label: "Gift Credits Removed",
-        value: breakdownTotals.giftCreditsOut,
-        color: WALLET_CATEGORY.giftCreditsOut,
-      },
-      {
-        key: "deposits",
-        label: "Deposits",
-        value: breakdownTotals.deposits,
-        color: WALLET_CATEGORY.deposits,
-      },
-      {
-        key: "prizes",
-        label: "Prizes Won",
-        value: breakdownTotals.prizes,
-        color: WALLET_CATEGORY.prizes,
-      },
-      {
-        key: "gmEarnings",
-        label: "GM Earnings",
-        value: breakdownTotals.gmEarnings,
-        color: WALLET_CATEGORY.gmEarnings,
-      },
-      {
-        key: "giftCredits",
-        label: "Gift Credits",
-        value: breakdownTotals.giftCredits,
-        color: WALLET_CATEGORY.giftCredits,
-      },
-      {
-        key: "refunds",
-        label: "Refunds",
-        value: breakdownTotals.refunds,
-        color: WALLET_CATEGORY.refunds,
-      },
-    ].filter((s) => s.value > 0);
+    const rows: SpendingSlice[] = categories
+      .filter((c) => c.spend)
+      .map((c) => ({
+        key: c.key,
+        label: c.label,
+        value: readFiniteNumber(breakdownTotals, c.key),
+        color: c.color,
+      }))
+      .filter((s) => s.value > 0);
 
     if (!rows.length) {
       return [
@@ -294,97 +250,55 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
       ];
     }
     return rows;
-  }, [breakdownTotals]);
+  }, [breakdownTotals, categories]);
 
   const insights: InsightItem[] = useMemo(() => {
-    const { prev, cur } = halfWindow(breakdownRaw);
-    const depositsCur = sumField(cur, (r) => r.deposits);
-    const depositsPrev = sumField(prev, (r) => r.deposits);
-    const withdrawCur = sumField(cur, (r) => r.withdrawals);
-    const withdrawPrev = sumField(prev, (r) => r.withdrawals);
-    const marketCur = sumField(cur, (r) => r.marketplace);
-    const marketPrev = sumField(prev, (r) => r.marketplace);
-    const gmCur = sumField(cur, (r) => r.gmEarnings);
-    const gmPrev = sumField(prev, (r) => r.gmEarnings);
-    const giftCur = sumField(cur, (r) => r.giftCredits);
-    const giftPrev = sumField(prev, (r) => r.giftCredits);
-    const prizeCur = sumField(cur, (r) => r.wins);
-    const prizePrev = sumField(prev, (r) => r.wins);
+    const { prev, cur } = halfWindow(breakdownDays);
+    const items: InsightItem[] = categories
+      .filter((c) => c.insight)
+      .map((c) => {
+        const valueCur = sumCategory(cur, c.key);
+        const valuePrev = sumCategory(prev, c.key);
+        return {
+          key: c.key,
+          label: c.label,
+          value: valueCur,
+          deltaPct: pctChange(valueCur, valuePrev),
+          spark: breakdownDays
+            .map((d) => readFiniteNumber(d, c.key))
+            .slice(-10),
+          color: c.color,
+        };
+      });
 
     const { prev: fPrev, cur: fCur } = halfWindow(flow);
     const netCur = fCur.reduce((s, d) => s + d.net, 0);
     const netPrev = fPrev.reduce((s, d) => s + d.net, 0);
+    items.push({
+      key: "net",
+      label: "Net Movement",
+      value: netCur,
+      deltaPct: pctChange(netCur, netPrev),
+      spark: flow.map((d) => d.net).slice(-10),
+      color: "#34D399",
+    });
 
-    return [
-      {
-        key: "deposits",
-        label: "Deposits",
-        value: depositsCur,
-        deltaPct: pctChange(depositsCur, depositsPrev),
-        spark: breakdownRaw.map((d) => d.deposits).slice(-10),
-      },
-      {
-        key: "withdrawals",
-        label: "Withdrawals",
-        value: withdrawCur,
-        deltaPct: pctChange(withdrawCur, withdrawPrev),
-        spark: breakdownRaw.map((d) => d.withdrawals).slice(-10),
-      },
-      {
-        key: "marketplace",
-        label: "Marketplace",
-        value: marketCur,
-        deltaPct: pctChange(marketCur, marketPrev),
-        spark: breakdownRaw.map((d) => d.marketplace).slice(-10),
-      },
-      {
-        key: "gmEarnings",
-        label: "GM Earnings",
-        value: gmCur,
-        deltaPct: pctChange(gmCur, gmPrev),
-        spark: breakdownRaw.map((d) => d.gmEarnings).slice(-10),
-      },
-      {
-        key: "giftCredits",
-        label: "Gift Credits",
-        value: giftCur,
-        deltaPct: pctChange(giftCur, giftPrev),
-        spark: breakdownRaw.map((d) => d.giftCredits).slice(-10),
-      },
-      {
-        key: "prizes",
-        label: "Prizes Won",
-        value: prizeCur,
-        deltaPct: pctChange(prizeCur, prizePrev),
-        spark: breakdownRaw.map((d) => d.wins).slice(-10),
-      },
-      {
-        key: "net",
-        label: "Net Movement",
-        value: netCur,
-        deltaPct: pctChange(netCur, netPrev),
-        spark: flow.map((d) => d.net).slice(-10),
-      },
-    ];
-  }, [breakdownRaw, flow]);
+    return items;
+  }, [breakdownDays, categories, flow]);
 
   const moneyIn = useMemo(
     () =>
-      breakdownTotals.deposits +
-      breakdownTotals.gmEarnings +
-      breakdownTotals.prizes +
-      breakdownTotals.giftCredits +
-      breakdownTotals.refunds,
-    [breakdownTotals],
+      categories
+        .filter((c) => c.flow === "in")
+        .reduce((s, c) => s + readFiniteNumber(breakdownTotals, c.key), 0),
+    [breakdownTotals, categories],
   );
   const moneyOut = useMemo(
     () =>
-      breakdownTotals.contestEntries +
-      breakdownTotals.marketplace +
-      breakdownTotals.gmSpend +
-      breakdownTotals.withdrawals +
-      breakdownTotals.giftCreditsOut,
-    [breakdownTotals],
+      categories
+        .filter((c) => c.flow === "out")
+        .reduce((s, c) => s + readFiniteNumber(breakdownTotals, c.key), 0),
+    [breakdownTotals, categories],
   );
 
   return {
@@ -396,6 +310,7 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
     breakdownDays,
     breakdownTotals,
     breakdownRaw,
+    categories,
     kpis,
     spendSlices,
     insights,

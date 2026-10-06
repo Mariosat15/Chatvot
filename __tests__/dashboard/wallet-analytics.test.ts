@@ -103,10 +103,13 @@ describe("Wallet Analytics page wiring", () => {
     expect(idx("<SpendingVsEarnings")).toBeLessThan(idx("<WalletInsights"));
   });
 
-  it("insights strip has seven cards including Prizes Won and links to /wallet", () => {
+  it("insights strip links to /wallet and renders catalog-driven items", () => {
     const insights = readCode("components/dashboard/wallet/WalletInsights.tsx");
     const model = readCode(
       "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
+    const catalog = readCode(
+      "components/dashboard/wallet/wallet-categories.ts",
     );
     expect(insights).toMatch(/View All Transactions/);
     const hrefIdx = insights.lastIndexOf(
@@ -116,25 +119,16 @@ describe("Wallet Analytics page wiring", () => {
     expect(insights.slice(hrefIdx, insights.indexOf("View All Transactions"))).toMatch(
       /href=["']\/wallet["']/,
     );
-    // Reason: labels live on the shared model; the strip only renders item.label.
-    expect(model).toMatch(/label:\s*"Deposits"/);
-    expect(model).toMatch(/label:\s*"Prizes Won"/);
+    // Reason: flipped 6 Oct 2026 (agnostic) — keys live in the catalog; the strip
+    // only renders item.label / item.color. Net Movement stays on the model.
+    expect(catalog).toMatch(/label:\s*"Deposits"/);
+    expect(catalog).toMatch(/label:\s*"Prizes Won"/);
+    expect(catalog).toMatch(/label:\s*"Gift Credits"/);
+    expect(catalog).not.toMatch(/label:\s*"Bonuses"/);
     expect(model).toMatch(/label:\s*"Net Movement"/);
-    const keys = [
-      "deposits",
-      "withdrawals",
-      "marketplace",
-      "gmEarnings",
-      "giftCredits",
-      "prizes",
-      "net",
-    ];
-    for (const k of keys) {
-      expect(insights).toContain(`"${k}"`);
-    }
-    // Reason: flipped 6 Oct 2026 — Bonuses was refunds; Gift credits is admin add/retract.
-    expect(model).toMatch(/label:\s*"Gift Credits"/);
-    expect(model).not.toMatch(/label:\s*"Bonuses"/);
+    expect(model).toMatch(/resolveCategories/);
+    expect(insights).toMatch(/item\.color/);
+    expect(insights).toMatch(/auto-fill/);
   });
 
   it("KPI / insights / header use neon WALLET_ART tiles like Overview — not Lucide chips", () => {
@@ -201,15 +195,21 @@ describe("Wallet Analytics page wiring", () => {
     expect(model).toMatch(/label:\s*"Total Spend"/);
     expect(model).toMatch(/label:\s*"GM Earnings"/);
     expect(model).toMatch(/label:\s*"Prizes Won"/);
-    expect(model).toMatch(/label:\s*"Marketplace"/);
-    expect(model).toMatch(/label:\s*"GM Spend"/);
-    expect(model).toMatch(/label:\s*"Contest Entries"/);
+    const catalog = readCode(
+      "components/dashboard/wallet/wallet-categories.ts",
+    );
+    expect(catalog).toMatch(/label:\s*"Marketplace"/);
+    expect(catalog).toMatch(/label:\s*"GM Spend"/);
+    expect(catalog).toMatch(/label:\s*"Contest Entries"/);
   });
 
   it("Gift credits come from admin adjustments, never from refunds", () => {
     const charts = readCode("lib/actions/dashboard/charts.ts");
     const model = readCode(
       "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
+    const catalog = readCode(
+      "components/dashboard/wallet/wallet-categories.ts",
     );
     // Reason: the old Bonuses tile summed refunds; Gift credits must read the new buckets.
     expect(charts).toMatch(/giftCredits/);
@@ -218,7 +218,10 @@ describe("Wallet Analytics page wiring", () => {
     expect(charts).toMatch(/case "manual_deposit_credit"/);
     expect(charts).toMatch(/case "gamemaster_subscription"/);
     expect(charts).toMatch(/entry\.gmSpend/);
-    expect(model).toMatch(/giftCredits:\s*r\.giftCredits/);
+    // Reason: flipped 6 Oct 2026 (agnostic) — mapping lives in the catalog + mapRawBreakdownRow.
+    expect(catalog).toMatch(/key:\s*"giftCredits"/);
+    expect(catalog).toMatch(/sourceKey:\s*"giftCredits"/);
+    expect(model).toMatch(/mapRawBreakdownRow/);
     expect(model).not.toMatch(/bonuses:\s*r\.refunds/);
   });
 
@@ -292,6 +295,56 @@ describe("Wallet Analytics page wiring", () => {
     expect(breakdown).toMatch(/stackId=["']credits["']/);
     expect(breakdown).not.toMatch(/BarChart/);
     expect(breakdown).not.toMatch(/maxBarSize/);
+  });
+
+  it("Credit Breakdown summary tiles auto-fill from the catalog with GM after Prizes", () => {
+    const breakdown = readCode(
+      "components/dashboard/wallet/CreditBreakdownPanel.tsx",
+    );
+    const catalog = readCode(
+      "components/dashboard/wallet/wallet-categories.ts",
+    );
+    // Reason: flipped 6 Oct 2026 (agnostic) — fixed grid-cols-3 cannot grow with
+    // new buckets; auto-fill keeps desktop + mobile balanced.
+    expect(breakdown).toMatch(/auto-fill/);
+    expect(breakdown).toMatch(/resolveCategories/);
+    expect(breakdown).toMatch(/sm:text-base/);
+    const gift = catalog.indexOf('label: "Gift Credits"');
+    const prizes = catalog.indexOf('label: "Prizes Won"');
+    const gm = catalog.indexOf('label: "GM Earnings"');
+    expect(gift).toBeGreaterThan(-1);
+    expect(prizes).toBeGreaterThan(gift);
+    expect(gm).toBeGreaterThan(prizes);
+  });
+
+  it("Wallet category catalog is the single series source and discovers unknown keys", () => {
+    const catalog = readCode(
+      "components/dashboard/wallet/wallet-categories.ts",
+    );
+    const model = readCode(
+      "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
+    const breakdown = readCode(
+      "components/dashboard/wallet/CreditBreakdownPanel.tsx",
+    );
+    const desktop = readCode(
+      "components/dashboard/wallet/DesktopWalletAnalytics.tsx",
+    );
+    const mobile = readCode(
+      "components/dashboard/wallet/mobile/MobileWallet.tsx",
+    );
+    expect(catalog).toMatch(/export const WALLET_CATEGORIES/);
+    expect(catalog).toMatch(/export function resolveCategories/);
+    expect(catalog).toMatch(/known:\s*false/);
+    expect(model).toMatch(/resolveCategories/);
+    expect(model).toMatch(/c\.spend/);
+    expect(model).toMatch(/c\.insight/);
+    expect(breakdown).not.toMatch(/const SERIES\s*=/);
+    expect(desktop).toMatch(/categories=\{model\.categories\}/);
+    expect(mobile).toMatch(/categories=\{model\.categories\}/);
+    // Reason: panels must not hard-code game codes (R29 / no-developer-needed).
+    expect(catalog).not.toMatch(/circuit-sprint|circuit-perfect|gameCode|providerKey/);
+    expect(breakdown).not.toMatch(/circuit-sprint|circuit-perfect|gameCode|providerKey/);
   });
 
   it("Spending vs Earnings donut pads the SVG so glow is not clipped", () => {
