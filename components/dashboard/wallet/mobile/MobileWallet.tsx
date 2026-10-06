@@ -54,7 +54,10 @@ export default function MobileWallet({ overview, charts }: Props) {
         totals={model.breakdownTotals}
         categories={model.categories}
       />
-      <SpendingVsEarnings slices={model.spendSlices} />
+      <SpendingVsEarnings
+        spendSlices={model.spendSlices}
+        earnSlices={model.earnSlices}
+      />
       {/* Reason: owner 6 Oct 2026 — Daily Credit Flow is desktop-only. */}
       <MobileWalletInsights items={model.insights} />
       <MobileRecentTransactions />

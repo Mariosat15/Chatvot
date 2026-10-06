@@ -47,7 +47,10 @@ export default function DesktopWalletAnalytics({ overview, charts }: Props) {
           range={model.range}
           onRangeChange={model.setRange}
         />
-        <SpendingVsEarnings slices={model.spendSlices} />
+        <SpendingVsEarnings
+          spendSlices={model.spendSlices}
+          earnSlices={model.earnSlices}
+        />
       </div>
 
       <WalletInsights items={model.insights} />

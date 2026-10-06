@@ -228,29 +228,35 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
     ];
   }, [breakdownDays, history, overview.creditBalance, spendKeys]);
 
-  const spendSlices: SpendingSlice[] = useMemo(() => {
-    const rows: SpendingSlice[] = categories
-      .filter((c) => c.spend)
-      .map((c) => ({
-        key: c.key,
-        label: c.label,
-        value: readFiniteNumber(breakdownTotals, c.key),
-        color: c.color,
-      }))
-      .filter((s) => s.value > 0);
+  // Reason: owner 6 Oct 2026 — Spending vs Earnings must contrast flow out vs
+  // flow in. Putting every bucket in one list duplicated Credit Breakdown.
+  const spendSlices: SpendingSlice[] = useMemo(
+    () =>
+      categories
+        .filter((c) => c.spend && c.flow === "out")
+        .map((c) => ({
+          key: c.key,
+          label: c.label,
+          value: readFiniteNumber(breakdownTotals, c.key),
+          color: c.color,
+        }))
+        .filter((s) => s.value > 0),
+    [breakdownTotals, categories],
+  );
 
-    if (!rows.length) {
-      return [
-        {
-          key: "empty",
-          label: "No activity yet",
-          value: 1,
-          color: "#334155",
-        },
-      ];
-    }
-    return rows;
-  }, [breakdownTotals, categories]);
+  const earnSlices: SpendingSlice[] = useMemo(
+    () =>
+      categories
+        .filter((c) => c.spend && c.flow === "in")
+        .map((c) => ({
+          key: c.key,
+          label: c.label,
+          value: readFiniteNumber(breakdownTotals, c.key),
+          color: c.color,
+        }))
+        .filter((s) => s.value > 0),
+    [breakdownTotals, categories],
+  );
 
   const insights: InsightItem[] = useMemo(() => {
     const { prev, cur } = halfWindow(breakdownDays);
@@ -313,6 +319,7 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
     categories,
     kpis,
     spendSlices,
+    earnSlices,
     insights,
     periodChange,
     moneyIn,

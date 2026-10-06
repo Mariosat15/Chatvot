@@ -372,6 +372,32 @@ describe("Wallet Analytics page wiring", () => {
     expect(spend).toMatch(/className=["']overflow-visible["']/);
   });
 
+  it("Spending vs Earnings contrasts money out vs money in, not a second breakdown", () => {
+    const spend = readCode(
+      "components/dashboard/wallet/SpendingVsEarnings.tsx",
+    );
+    const model = readCode(
+      "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
+    const desktop = readCode(
+      "components/dashboard/wallet/DesktopWalletAnalytics.tsx",
+    );
+    const mobile = readCode(
+      "components/dashboard/wallet/mobile/MobileWallet.tsx",
+    );
+    // Reason: flipped 6 Oct 2026 — one mixed donut duplicated Credit Breakdown totals.
+    expect(spend).toMatch(/spendSlices/);
+    expect(spend).toMatch(/earnSlices/);
+    expect(spend).toMatch(/Net \(in − out\)/);
+    expect(spend).toMatch(/Where it went/);
+    expect(spend).toMatch(/Where it came from/);
+    expect(spend).not.toMatch(/Total Credits/);
+    expect(model).toMatch(/flow === "out"/);
+    expect(model).toMatch(/flow === "in"/);
+    expect(desktop).toMatch(/earnSlices=\{model\.earnSlices\}/);
+    expect(mobile).toMatch(/earnSlices=\{model\.earnSlices\}/);
+  });
+
   it("chart panels carry the reference subtitles", () => {
     const balance = readCode(
       "components/dashboard/wallet/WalletBalanceTrend.tsx",
@@ -391,7 +417,7 @@ describe("Wallet Analytics page wiring", () => {
     expect(breakdown).toMatch(/See how your credits are sourced and used/);
     expect(flow).toMatch(/Daily net credit movement in your wallet/);
     expect(spend).toMatch(
-      /Compare your spending with earnings and prizes/,
+      /Money out versus money in for the selected period/,
     );
   });
 });
