@@ -161,8 +161,8 @@ export const SUGGESTED_PRIZE_ART = {
 export const SUGGESTED_UI_ART = {
   /** Section header star. */
   star: NEON_ICON("star"),
-  clock: NEON_ICON("clock"),
-  users: NEON_ICON("users"),
+  clock: NEON_ICON("clock-v2"),
+  users: NEON_ICON("users-v2"),
   badgeGmFunded: "/assets/neon/overview/suggested/badge-gm-hr.png",
   badgePrivate: "/assets/neon/overview/suggested/badge-private-hr.png",
   badgePublic: "/assets/neon/overview/suggested/badge-public-hr.png",

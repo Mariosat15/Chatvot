@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
@@ -89,6 +89,20 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   }
 }
+
+/**
+ * Reason: owner 6 Oct 2026 — phones should feel like a native app, so pinch-zoom
+ * cannot stretch Wallet / Performance until taps miss SignOut. iOS may still
+ * honour a system accessibility zoom; this is the platform maximumScale lock
+ * (same shape as the play iframe). Landing pages inherit it on purpose.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+};
 
 export default function RootLayout({
   children,

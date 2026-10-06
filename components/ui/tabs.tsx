@@ -61,7 +61,14 @@ function TabsContent({
     <TabsPrimitive.Content
       suppressHydrationWarning
       data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
+      className={cn(
+        // Reason: owner 6 Oct 2026 — SignOut / menu only worked on Overview.
+        // After Wallet or Performance mounted, Radix left inactive tab panels
+        // in the tree; a `flex-1` panel can win `display` over `[hidden]` and
+        // steal clicks on the sidebar and the phone header. Hide by state.
+        "flex-1 outline-none data-[state=inactive]:hidden",
+        className,
+      )}
       {...props}
     />
   );

@@ -636,6 +636,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         </div>
 
         <Button
+          type="button"
           onClick={handleSignOut}
           variant="ghost"
           className={cn(
@@ -656,7 +657,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             <GameIcon
               name="logout"
               size={40}
-              className={NAV_ICON}
+              className={cn(NAV_ICON, "pointer-events-none")}
               alt="Sign out"
             />
           </div>
@@ -676,7 +677,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       {/* Desktop Sidebar — cyan chamfered glow frame */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 hidden h-screen flex-col transition-all duration-300 lg:flex",
+          "fixed left-0 top-0 z-[60] hidden h-screen flex-col transition-all duration-300 lg:flex pointer-events-auto",
           // Reason: no clip-path — the collapse control sits outside the rail (-right-3)
           // and would be cut off; cyan border + glow still matches the mock frame.
           "rounded-r-2xl border-r border-cyan-400/50",
@@ -703,7 +704,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       </aside>
 
       {/* Mobile Header */}
-      <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-cyan-500/20 bg-[#050b16]/95 px-4 backdrop-blur-xl lg:hidden">
+      <header className="fixed left-0 right-0 top-0 z-[100] flex h-16 items-center justify-between border-b border-cyan-500/20 bg-[#050b16]/95 px-4 backdrop-blur-xl lg:hidden pointer-events-auto">
         <Link href="/dashboard" className="flex cursor-pointer items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -733,13 +734,18 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
+      {/*
+        Reason: owner 6 Oct 2026 — a closed overlay that still has
+        backdrop-blur can eat taps on iOS even with pointer-events-none, which
+        is why the menu / SignOut only seemed to work on Overview. Unmount the
+        blur when closed.
+      */}
       <div
         className={cn(
-          "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden",
+          "fixed inset-0 z-[100] bg-black/60 transition-opacity duration-300 lg:hidden",
           isMobileMenuOpen
-            ? "pointer-events-auto opacity-100"
-            : "pointer-events-none opacity-0",
+            ? "pointer-events-auto opacity-100 backdrop-blur-sm"
+            : "hidden pointer-events-none opacity-0",
         )}
         onClick={() => setIsMobileMenuOpen(false)}
       />
@@ -747,7 +753,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       {/* Mobile Menu Drawer — same neon chrome as desktop */}
       <aside
         className={cn(
-          "fixed right-0 top-0 z-50 h-full w-80 max-w-[85vw] transition-transform duration-300 ease-out lg:hidden",
+          "fixed right-0 top-0 z-[110] h-full w-80 max-w-[85vw] transition-transform duration-300 ease-out lg:hidden",
           "rounded-l-2xl border-l border-cyan-400/50",
           SHELL,
           FRAME_GLOW,

@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import { Bell, UserRound } from "lucide-react";
 import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
 import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 
 /**
  * Compact mobile wallet header (~64px). No desktop analytics chrome.
+ *
+ * Reason: owner 6 Oct 2026 — notifications live in the ChartVolt bar; a second
+ * Bell here squeezed the title the same way Performance Analytics did.
  */
 export default function MobileWalletHeader({ rangeLabel }: { rangeLabel: string }) {
   return (
@@ -32,22 +33,6 @@ export default function MobileWalletHeader({ rangeLabel }: { rangeLabel: string 
           />
           <p className="truncate text-[11px] text-slate-400">{rangeLabel}</p>
         </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Link
-          href="/notifications"
-          aria-label="Notifications"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 active:scale-95"
-        >
-          <Bell className="h-5 w-5" aria-hidden />
-        </Link>
-        <Link
-          href="/profile"
-          aria-label="Profile"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 active:scale-95"
-        >
-          <UserRound className="h-5 w-5" aria-hidden />
-        </Link>
       </div>
     </header>
   );

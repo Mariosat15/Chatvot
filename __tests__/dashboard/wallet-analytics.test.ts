@@ -284,6 +284,12 @@ describe("Wallet Analytics page wiring", () => {
     expect(actions).toMatch(/Deposit/);
     expect(actions).toMatch(/Withdraw/);
     expect(actions).toMatch(/href=["']\/wallet["']/);
+    const mobileHeader = readCode(
+      "components/dashboard/wallet/mobile/MobileWalletHeader.tsx",
+    );
+    expect(mobileHeader).not.toMatch(/<Bell\b/);
+    expect(mobileHeader).not.toMatch(/href=["']\/notifications["']/);
+    expect(mobileHeader).not.toMatch(/<UserRound\b/);
     // Reason: flipped 6 Oct 2026 — CreditBreakdownPanel is shared on purpose
     // so the stacked area + donut padding cannot drift from desktop.
     expect(mobile).not.toMatch(

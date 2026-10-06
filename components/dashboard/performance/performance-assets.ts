@@ -50,7 +50,7 @@ export const PERF_SECTION_ICON = {
 export const PERF_METRIC_ICON = {
   winRate: NEON_ICON("target-purple"),
   roi: NEON_ICON("chart-growth-orange"),
-  playTime: NEON_ICON("clock"),
+  playTime: NEON_ICON("clock-v2"),
   activeDays: NEON_ICON("calendar-blue"),
   bestScore: NEON_ICON("star"),
   competitionsWon: NEON_ICON("trophy-green"),
@@ -66,8 +66,8 @@ export const PERF_METRIC_ICON = {
   largestLoss: NEON_ICON("chart-bars-red"),
   gameFallback: NEON_ICON("games-orange"),
   crown: NEON_ICON("crown"),
-  contests: NEON_ICON("users"),
-  rounds: NEON_ICON("clock"),
+  contests: NEON_ICON("users-v2"),
+  rounds: NEON_ICON("clock-v2"),
   trophy: NEON_ICON("trophy-green"),
 } as const;
 

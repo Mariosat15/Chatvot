@@ -402,6 +402,11 @@ describe("performance page structure", () => {
     const trend = stripComments(read(`${DIR}/mobile/MobilePerformanceTrend.tsx`));
     expect(trend).toMatch(/s\.key !== "overall"/);
     expect(trend).toMatch(/h-\[250px\]/);
+    const mobileHeader = stripComments(read(`${DIR}/mobile/MobilePerformanceHeader.tsx`));
+    // Reason: owner 6 Oct 2026 — ChartVolt bar already has the bell.
+    expect(mobileHeader).not.toMatch(/<Bell\b/);
+    expect(mobileHeader).not.toMatch(/href="\/notifications"/);
+    expect(mobileHeader).not.toMatch(/<UserRound\b/);
   });
 
   it("shares the mountain backdrop with Wallet and clips overflow-x without a second scrollbar", () => {
@@ -435,5 +440,10 @@ describe("performance page structure", () => {
     for (const src of allPerformanceAssets()) {
       expect(existsSync(resolve(ROOT, "public", src.replace(/^\//, ""))), src).toBe(true);
     }
+    const assets = stripComments(read(`${DIR}/performance-assets.ts`));
+    expect(assets).toMatch(/NEON_ICON\("clock-v2"\)/);
+    expect(assets).toMatch(/NEON_ICON\("users-v2"\)/);
+    expect(assets).not.toMatch(/NEON_ICON\("clock"\)/);
+    expect(assets).not.toMatch(/NEON_ICON\("users"\)/);
   });
 });

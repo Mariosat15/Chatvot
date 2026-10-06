@@ -104,6 +104,12 @@ describe("mobile dashboard split", () => {
     expect(sidebar).toMatch(
       /overflow-y-auto overscroll-contain scroll-smooth \[-webkit-overflow-scrolling:touch\]/,
     );
+    // Reason: owner 6 Oct 2026 — SignOut / hamburger only worked on Overview.
+    expect(sidebar).toMatch(/type="button"/);
+    expect(sidebar).toMatch(/hidden pointer-events-none/);
+    expect(sidebar).toMatch(/z-\[60\]/);
+    expect(sidebar).toMatch(/z-\[100\]/);
+    expect(sidebar).toMatch(/pointer-events-none/);
   });
 
   it("phone Overview section headers share desktop neon plates (games / fire / blend)", () => {
@@ -308,5 +314,16 @@ describe("mobile dashboard split", () => {
     expect(challenge).toBeGreaterThan(-1);
     expect(cards).toBeGreaterThan(challenge);
     expect((row.match(/className=\{ACTION_BUTTON\}/g) ?? []).length).toBe(2);
+  });
+
+  it("locks phone pinch-zoom and hides inactive dashboard tabs so they cannot steal taps", () => {
+    // Reason: owner 6 Oct 2026 — pinch-zoom broke the view; SignOut only worked
+    // on Overview because a still-flex inactive tab sat over the chrome.
+    const layout = read("app/layout.tsx");
+    expect(layout).toMatch(/export const viewport/);
+    expect(layout).toMatch(/maximumScale:\s*1/);
+    expect(layout).toMatch(/userScalable:\s*false/);
+    const tabs = read("components/ui/tabs.tsx");
+    expect(tabs).toMatch(/data-\[state=inactive\]:hidden/);
   });
 });

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Bell, CalendarDays, Filter, UserRound, X } from "lucide-react";
+import { CalendarDays, Filter, X } from "lucide-react";
 import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
 import { ChartRangeSelector } from "@/components/dashboard/wallet/AnalyticsCard";
 import { NeonIcon } from "../PerformanceChrome";
@@ -13,6 +12,9 @@ import { perfRangeLabel } from "./mobile-perf-shell";
 
 /**
  * Compact phone header. Filters live in a sheet so they do not eat the page.
+ *
+ * Reason: owner 6 Oct 2026 — the ChartVolt bar already has the bell, so a
+ * second Bell/Profile pair here squeezed PERFORMANCE ANALYTICS off the row.
  */
 export default function MobilePerformanceHeader({ model }: { model: PerformanceAnalyticsModel }) {
   const [open, setOpen] = useState(false);
@@ -21,7 +23,7 @@ export default function MobilePerformanceHeader({ model }: { model: PerformanceA
   return (
     <>
       <header className="flex min-h-[64px] items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <NeonIcon src={PERF_SECTION_ICON.page} size={36} />
           <div className="min-w-0">
             <AnalyticsPageHeadline
@@ -54,26 +56,12 @@ export default function MobilePerformanceHeader({ model }: { model: PerformanceA
           >
             <Filter className="h-5 w-5" aria-hidden />
           </button>
-          <Link
-            href="/notifications"
-            aria-label="Notifications"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 active:scale-95"
-          >
-            <Bell className="h-5 w-5" aria-hidden />
-          </Link>
-          <Link
-            href="/profile"
-            aria-label="Profile"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 active:scale-95"
-          >
-            <UserRound className="h-5 w-5" aria-hidden />
-          </Link>
         </div>
       </header>
 
       {open ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-3"
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-black/55 p-3"
           role="dialog"
           aria-modal="true"
           aria-label="Performance filters"
