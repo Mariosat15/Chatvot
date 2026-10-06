@@ -67,7 +67,12 @@ html,body{overflow-x:clip}
 html.cv-embedded,html.cv-embedded body{height:100%;max-height:100%;margin:0;overflow:hidden!important}
 html.cv-embedded body{min-height:0;background-attachment:scroll}
 html.cv-embedded #ambientCanvas{display:none}
-html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:100%!important;max-width:100%;margin:0;padding:6px 10px 4px;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
+/* Reason (6 Oct 2026, second pass / third): fullscreen was pinning HOLD/NEXT to the
+   viewport edges. Cap the WHOLE shell (not only the rails) so the cabinet sits as a
+   centred column with side gutters; the city backdrop still fills via body. */
+html.cv-embedded,html.cv-embedded body{width:100%;height:100%;margin:0;overflow:hidden}
+html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:min(100%,780px)!important;max-width:780px;margin:0 auto;padding:6px 14px 4px;display:flex;flex-direction:column;align-items:center;overflow:hidden;box-sizing:border-box;--rail-w:120px;--stack-content-w:min(100%,calc(var(--cabinet-width) + var(--rail-w)*2 + 16px))}
+html.cv-embedded .topbar,html.cv-embedded .scoreboard,html.cv-embedded .play-layout,html.cv-embedded .touch-controls{width:var(--stack-content-w);max-width:100%;box-sizing:border-box}
 /* Reason: owner 27 Sep 2026 ("these look squeezed and not inline"): the 44px bar and
    40px stat cards crushed the logo, labels and values. Everything in the header now
    sits on one centred line, the buttons share one size, and each stat card is an
@@ -92,11 +97,10 @@ html.cv-embedded .scoreboard span{font-size:10px;letter-spacing:1.8px;line-heigh
 html.cv-embedded .scoreboard strong{font-size:26px;line-height:1;margin:0}
 html.cv-embedded .stat-card>.ui-icon{width:24px;height:24px;flex-shrink:0;display:block}
 html.cv-embedded .timer-ring{width:32px;height:32px;border-width:4px;flex-shrink:0;margin-left:auto;position:static}
-/* Reason: owner 27 Sep — tall 1:2 well sized from the HEIGHT by fit-embed;
-   HOLD/NEXT take whatever width is left (minmax 96px/1fr) so the cabinet
-   fills the stage left and right instead of floating in a narrow strip.
-   The board's width never comes from the rails (0.7fr was the squat bug). */
-html.cv-embedded .play-layout{flex:0 0 auto;min-height:0;gap:8px;margin:auto 0;height:var(--arena-h);max-height:none;grid-template-columns:minmax(96px,1fr) var(--cabinet-width) minmax(96px,1fr);justify-content:stretch;align-items:center;width:100%}
+/* Reason: owner 27 Sep — tall 1:2 well sized from the HEIGHT by fit-embed.
+   AMENDED 6 Oct 2026: rails are capped (not 1fr). Fullscreen 1fr pinned HOLD/NEXT
+   to the viewport edges and left a huge empty gap beside the board. */
+html.cv-embedded .play-layout{flex:0 0 auto;min-height:0;gap:8px;margin:0 auto;height:var(--arena-h);max-height:none;grid-template-columns:minmax(88px,var(--rail-w)) var(--cabinet-width) minmax(88px,var(--rail-w));justify-content:center;align-items:center;width:max-content;max-width:100%}
 html.cv-embedded .board-wrap{padding-top:0;margin:0;height:var(--arena-h);display:flex;flex-direction:column;align-items:center;justify-content:center}
 html.cv-embedded .board-title{height:14px;font-size:9px;gap:10px;top:0;left:8%;right:8%;position:relative}
 /* Reason (6 Oct 2026): flex-grow + height:auto stretched the neon SVG frame in fullscreen. Size to the board vars only. */
@@ -105,14 +109,14 @@ html.cv-embedded .reference-frame{background-size:contain!important}
 html.cv-embedded #gameCanvas{width:var(--board-width)!important;height:var(--board-height)!important;max-height:100%}
 html.cv-embedded #fxCanvas{width:var(--board-width)!important;height:var(--board-height)!important}
 html.cv-embedded .rail-tip{display:none}
-html.cv-embedded .mini-rail{padding:6px;gap:6px;width:100%!important;max-width:none!important;min-width:0;height:var(--arena-h)!important;box-sizing:border-box}
+html.cv-embedded .mini-rail{padding:6px;gap:6px;width:100%!important;max-width:var(--rail-w)!important;min-width:0;height:var(--arena-h)!important;box-sizing:border-box;margin-inline:auto}
 html.cv-embedded .combo-card{min-height:0}
 html.cv-embedded .speed-card{min-height:40px}
 /* Reason: touch row stays visible. Parent iframe grows from fit-embed resize — that is
    what pushes this row down. Owner, 27 Sep 2026: the 42px row looked squeezed, so the
    buttons are taller with room beneath; fit-embed's TOUCH_RESERVE (incl. these margins)
    must move with this height or the row is clipped at the frame's bottom edge. */
-html.cv-embedded .touch-controls{display:grid!important;grid-template-columns:repeat(5,1fr) 1.2fr;flex-shrink:0;margin:8px 0 14px!important;gap:6px;width:100%}
+html.cv-embedded .touch-controls{display:grid!important;grid-template-columns:repeat(5,1fr) 1.2fr;flex-shrink:0;margin:8px auto 14px!important;gap:6px}
 html.cv-embedded .touch-controls button{min-height:64px!important;border-radius:12px;padding:6px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
 html.cv-embedded .touch-controls button b{font-size:22px;line-height:1}
 html.cv-embedded .touch-controls button span{font-size:9px;margin-top:0;line-height:1.15}

@@ -46,10 +46,11 @@
   // playfield. Cap the board; letterbox leftover space instead of stretching pixels.
   const MAX_BOARD_H = 720;
   const MAX_BOARD_W = MAX_BOARD_H / BOARD_ASPECT;
-  // Minimum rail width + both gutters + shell side padding. Rails are
-  // minmax(MIN_RAIL, 1fr) in CSS, so they take all leftover width.
-  const MIN_RAIL = 96;
-  const RAIL_TOTAL = MIN_RAIL * 2 + 8 * 2 + 20;
+  // Reason (6 Oct 2026, third pass): CSS caps the whole shell at 780px and rails
+  // at MAX_RAIL — size the board for that column, not the full viewport width.
+  const MAX_SHELL_W = 780;
+  const MAX_RAIL = 120;
+  const RAIL_TOTAL = MAX_RAIL * 2 + 8 * 2 + 28;
   const FRAME_EXTRA = 4;
 
   let lastApplied = "";
@@ -101,7 +102,7 @@
     if (!shell) return;
 
     const viewH = window.innerHeight;
-    const viewW = window.innerWidth;
+    const viewW = Math.min(window.innerWidth, MAX_SHELL_W);
     const chrome = chromeHeight(shell);
 
     const maxWFromWidth = Math.max(
