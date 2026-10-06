@@ -181,6 +181,58 @@ describe("performance model", () => {
     const gamesOnly = buildGameCards(fixture({ showTrading: false }), "30d", ALL_GAMES);
     expect(gamesOnly.map((c) => c.gameKey)).toEqual(["provider:p1:g1"]);
   });
+
+  it("shows Trade ROI on the Trading card Best score, never wallet credit ROI", () => {
+    const empty = buildGameCards(fixture(), "30d", TRADING_KEY)[0];
+    expect(empty.bestScore).toBe("-");
+    expect(empty.activityLabel).toBe("Trades");
+    const withTrades = buildGameCards(
+      fixture({
+        overview: {
+          roi: 12.5,
+          totalTrades: 4,
+          winRate: 50,
+          totalPnLPercentage: 3.47,
+          profitFactor: 1.2,
+          averageWin: 10,
+          averageLoss: 5,
+          largestWin: 20,
+          largestLoss: 8,
+        },
+      }),
+      "30d",
+      TRADING_KEY,
+    )[0];
+    expect(withTrades.bestScore).toBe("+3.47%");
+    expect(withTrades.bestScore).not.toBe("+12.5%");
+    expect(withTrades.bestScore).not.toBe("12.5%");
+  });
+
+  it("pulls tagline and activity label from the overview play card, never invents game copy", () => {
+    const cards = buildGameCards(
+      fixture({
+        overviewStanding: {
+          playCards: [
+            {
+              gameKey: "provider:p1:g1",
+              tagline: "Connect the paths, beat the clock!",
+              activityLabel: "Races",
+              href: "/games/circuit-sprint",
+              artSrc: "/assets/neon/banner-circuit-sprint.webp",
+            },
+          ],
+        },
+      } as Partial<PerfInput>),
+      "30d",
+      ALL_GAMES,
+    );
+    const game = cards.find((c) => c.gameKey === "provider:p1:g1");
+    expect(game?.tagline).toBe("Connect the paths, beat the clock!");
+    expect(game?.activityLabel).toBe("Races");
+    expect(game?.href).toBe("/games/circuit-sprint");
+    const model = stripComments(read(`${DIR}/performance-game-cards.ts`));
+    expect(model).not.toMatch(/Connect the paths/);
+  });
 });
 
 describe("performance page structure", () => {
@@ -235,12 +287,6 @@ describe("performance page structure", () => {
     }
   });
 
-  it("gives every carousel control an accessible name", () => {
-    const code = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
-    expect(code).toContain('aria-label="Previous games"');
-    expect(code).toContain('aria-label="Next games"');
-  });
-
   it("looks icons up in Maps, never by object index", () => {
     for (const rel of [
       `${DIR}/PerformanceHighlights.tsx`,
@@ -257,22 +303,19 @@ describe("performance page structure", () => {
     expect(code).not.toMatch(/<select\b/);
   });
 
-  it("scrolls the game carousel by one card width, not the whole row", () => {
+  it("uses the Play-by-game card shape: text left, cover art right, bigger two-up grid", () => {
     const code = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
-    expect(code).toMatch(/first\.offsetWidth\s*\+\s*16/);
-    expect(code).toMatch(/sm:w-\[calc\(\(100%-1rem\)\/2\)\]/);
-    expect(code).not.toMatch(/scrollBy\(\{\s*left:\s*dir\s*\*\s*el\.clientWidth/);
-  });
-
-  it("centers game logos with object-contain and prints the title below the art", () => {
-    const code = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
-    expect(code).toMatch(/object-contain object-center/);
-    expect(code).not.toMatch(/object-cover/);
-    expect(code).toMatch(/\{card\.title\}/);
-    const titleAt = code.indexOf("{card.title}");
-    const imgAt = code.indexOf("<Image");
-    expect(imgAt).toBeGreaterThan(-1);
-    expect(titleAt).toBeGreaterThan(imgAt);
+    expect(code).toMatch(/object-cover object-center/);
+    expect(code).toMatch(/lg:grid-cols-2/);
+    expect(code).toMatch(/min-h-\[200px\]/);
+    expect(code).toMatch(/Best score/);
+    expect(code).toMatch(/card\.scoredRounds/);
+    expect(code).toMatch(/card\.contests/);
+    expect(code).toMatch(/card\.avgPlayTime/);
+    expect(code).toMatch(/card\.activityLabel/);
+    expect(code).toMatch(/href=\{card\.href\}/);
+    expect(code).not.toMatch(/Sparkline/);
+    expect(code).not.toMatch(/ChevronLeft|Previous games/);
   });
 
   it("uses the shared two-tone headline (magenta here, cyan on Wallet)", () => {

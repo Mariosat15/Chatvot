@@ -322,6 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Game Performance Play-by-game layout CODE-COMPLETE 6 Oct (eng)** — Performance game cards match Overview Play by game (text left, cover art right), larger two-up grid; numbers: activity count, contests, best score (Trade ROI on Trading), avg play, period/last played. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Trading card Best score = Trade ROI CODE-COMPLETE 6 Oct (eng)** — Game Performance Trading card no longer shows wallet credit ROI as “Best score”; it shows Trade ROI (or `-` with no trades). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Performance header border + no Competitions tab + Trade ROI CODE-COMPLETE 6 Oct (eng)** — Performance banner matches Wallet (magenta plate); Competitions removed from Header `NAV_ITEMS` (`?tab=contests` still works); Trade ROI no longer treats game seats as $10k capital. Tests: `performance-analytics.test.ts`, `games-first-nav.test.ts`. **Never verified by eye.**
 - **Game Performance logos + Trading card + bottom padding CODE-COMPLETE 6 Oct (eng)** — carousel art is `object-contain` with the title under the logo; Trading is the first card when chrome is on; extra bottom padding so 1v1/Competition/Holidays are not clipped. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Performance Analytics polish + shared two-tone headlines CODE-COMPLETE 6 Oct (eng)** — mountain backdrop; carousel scrolls one card; Competition prizes from `competition_win`; 1v1s filter by `gameKey`; shared `AnalyticsPageHeadline`. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
@@ -943,6 +945,22 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Game Performance cards match Play by game (owner request)
+
+**Owner report:** the tall portrait Game Performance cards were wrong; they should match Overview Play by game, bigger, with the Performance numbers.
+
+**Fix:** text left / cover art right, framed strip, two-up grid; activity count + label, contests, best score, avg play, period/last played; tagline/href/activityLabel from overview play cards (R29).
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+
+### 6 October 2026 - Trading card Best score uses Trade ROI (owner request)
+
+**Owner report:** Trading’s Game Performance “Best score” was wallet credit ROI.
+
+**Fix:** that field is Trade ROI (`totalPnLPercentage`); no trades → `-`.
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Performance banner, Header Competitions tab, Trade ROI (owner request)
 

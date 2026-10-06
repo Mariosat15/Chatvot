@@ -1,11 +1,10 @@
 "use client";
 
-import { useRef } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Sparkline } from "@/components/dashboard/wallet/AnalyticsCard";
-import { PerfCard, PerfEmpty, PerfSection } from "./PerformanceChrome";
-import { PERF, PERF_METRIC_ICON, PERF_SECTION_ICON } from "./performance-assets";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { PerfEmpty, PerfSection } from "./PerformanceChrome";
+import { PERF_METRIC_ICON, PERF_SECTION_ICON } from "./performance-assets";
 import { type GameCardView } from "./performance-game-cards";
 import { TRADING_KEY } from "./performance-model";
 
@@ -25,7 +24,7 @@ function StatusPill({ status }: { status: GameCardView["status"] }) {
   const live = status === "live";
   return (
     <span
-      className={`rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
+      className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
         live
           ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
           : "border-slate-400/40 bg-slate-500/15 text-slate-300"
@@ -36,125 +35,120 @@ function StatusPill({ status }: { status: GameCardView["status"] }) {
   );
 }
 
+/**
+ * One title — Overview Play-by-game layout, larger, with Performance numbers.
+ *
+ * Text left / art right (image 2). Numbers: activity count, contests, best
+ * score, avg play, plus period + last played. Titles/taglines/art come from
+ * the payload (R29).
+ */
 export function GamePerformanceCard({ card }: { card: GameCardView }) {
-  const stats: { label: string; value: string }[] = [
-    { label: "Scored rounds", value: card.scoredRounds.toLocaleString() },
-    { label: "Contests", value: card.contests.toLocaleString() },
-    { label: "Best score", value: card.bestScore },
-    { label: "Avg play", value: card.avgPlayTime },
-  ];
-  const logoSrc =
+  const artSrc =
     card.artSrc ??
     (card.gameKey === TRADING_KEY ? PERF_SECTION_ICON.trading : PERF_METRIC_ICON.gameFallback);
+
   return (
-    <PerfCard accent="blue" className="h-full">
-      <div className="flex h-full flex-col" data-game-card={card.gameKey}>
-        <div className="relative h-40 overflow-hidden bg-[#07172c] sm:h-44">
-          <Image
-            src={logoSrc}
-            alt=""
-            fill
-            sizes="560px"
-            className="object-contain object-center p-5"
-            quality={90}
-          />
-          <div className="absolute right-3 top-3">
+    <Link
+      href={card.href}
+      className="group relative flex h-full min-h-[200px] overflow-hidden rounded-xl border border-sky-400/45 bg-[#0A0F1F]/80 shadow-[0_0_12px_-2px_rgba(56,189,248,0.45)] backdrop-blur-sm transition hover:border-sky-300/80 hover:shadow-[0_0_18px_0_rgba(56,189,248,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60 sm:min-h-[220px]"
+      aria-label={`Open ${card.title}`}
+      data-game-card={card.gameKey}
+    >
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between p-4 pr-28 sm:p-5 sm:pr-36">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="truncate text-lg font-black uppercase tracking-wide text-sky-300 sm:text-xl">
+              {card.title}
+            </p>
             <StatusPill status={card.status} />
           </div>
-        </div>
-        <div className="px-4 pt-3 text-center">
-          <h3 className="truncate text-xl font-black tracking-tight text-white sm:text-2xl">
-            {card.title}
-          </h3>
+          <p className="mt-1 line-clamp-2 text-sm text-gray-300">
+            {card.tagline || "Open the game page to play."}
+          </p>
           {card.category ? (
-            <p className="truncate text-sm font-medium text-[#c5d4ee]">{card.category}</p>
+            <p className="mt-1 text-xs font-medium text-[#8ea4c5]">{card.category}</p>
           ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
-          {stats.map((s) => (
-            <div key={s.label} className="min-w-0">
-              <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c5]">
-                {s.label}
-              </div>
-              <div className="truncate text-lg font-black tabular-nums text-white">{s.value}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-auto flex items-end justify-between gap-2 border-t border-white/[0.06] px-4 py-3">
-          <div className="text-xs text-[#8ea4c5]">
-            <div className="font-medium text-[#c5d4ee]">
-              {card.periodRounds.toLocaleString()} rounds this period
-            </div>
-            <div>Last played {lastPlayed(card.lastPlayedAt)}</div>
+        <div className="mt-4 space-y-2.5">
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm text-gray-300">
+            <span>
+              <span className="text-lg font-black tabular-nums text-white sm:text-xl">
+                {card.scoredRounds.toLocaleString()}
+              </span>{" "}
+              <span className="text-gray-500">{card.activityLabel}</span>
+            </span>
+            <span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/90">
+                Contests
+              </span>{" "}
+              <span className="font-bold tabular-nums text-white">
+                {card.contests.toLocaleString()}
+              </span>
+            </span>
           </div>
-          <Sparkline points={card.spark} color={PERF.orange} width={110} height={32} />
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm">
+            <span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/90">
+                Best score
+              </span>{" "}
+              <span className="text-base font-black tabular-nums text-white sm:text-lg">
+                {card.bestScore}
+              </span>
+            </span>
+            <span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-400/90">
+                Avg play
+              </span>{" "}
+              <span className="font-bold tabular-nums text-white">{card.avgPlayTime}</span>
+            </span>
+          </div>
+          <p className="text-xs text-[#8ea4c5]">
+            {card.periodRounds.toLocaleString()} this period · Last played{" "}
+            {lastPlayed(card.lastPlayedAt)}
+          </p>
         </div>
       </div>
-    </PerfCard>
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-[44%] sm:w-[42%]">
+        <Image
+          src={artSrc}
+          alt=""
+          fill
+          sizes="280px"
+          className="object-cover object-center opacity-90 transition duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+          quality={90}
+        />
+        <div className="absolute inset-0 bg-gradient-to-l from-transparent via-[#050B18]/25 to-[#050B18]" />
+      </div>
+      <span className="absolute bottom-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/20 text-sky-300 ring-1 ring-sky-400/40 transition group-hover:bg-sky-500/35">
+        <ArrowRight className="h-4 w-4" aria-hidden />
+      </span>
+    </Link>
   );
 }
 
 /**
- * One card per title the player has played, including Trading. Titles and art
- * come from the payload (R29); Trading is the one platform key (invariant 5).
- *
- * Reason: two cards fill the row so the arrows actually move something. Three
- * fitted cards made scrollBy(clientWidth) a no-op.
+ * Play-by-game strip for Performance — same shape as Overview, larger cards,
+ * Performance numbers. Two-up on desktop so each card stays readable.
  */
 export default function GamePerformanceSection({ cards }: { cards: GameCardView[] }) {
-  const track = useRef<HTMLDivElement>(null);
-  const scroll = (dir: 1 | -1) => {
-    const el = track.current;
-    if (!el) return;
-    const first = el.firstElementChild as HTMLElement | null;
-    const step = first ? first.offsetWidth + 16 : Math.round(el.clientWidth * 0.55);
-    el.scrollBy({ left: dir * step, behavior: "smooth" });
-  };
-  const controls =
-    cards.length > 1 ? (
-      <div className="flex gap-1.5">
-        <button
-          type="button"
-          aria-label="Previous games"
-          onClick={() => scroll(-1)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-500/35 bg-black/45 text-cyan-200 shadow-[0_0_12px_rgba(0,217,255,0.25)] hover:bg-cyan-500/15"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Next games"
-          onClick={() => scroll(1)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-500/35 bg-black/45 text-cyan-200 shadow-[0_0_12px_rgba(0,217,255,0.25)] hover:bg-cyan-500/15"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-      </div>
-    ) : null;
-
   return (
     <PerfSection
       title="Game Performance"
-      subtitle="Every game you have played, including trading."
+      subtitle="Every game you have played, including trading — same layout as Play by game, with your numbers."
       icon={PERF_SECTION_ICON.games}
-      controls={controls}
       testId="games"
     >
       {cards.length === 0 ? (
         <PerfEmpty>No ranked game rounds yet. Play a game contest to see it here.</PerfEmpty>
       ) : (
-        <div
-          ref={track}
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {cards.map((card) => (
-            <div
-              key={card.gameKey}
-              className="w-[min(100%,28rem)] shrink-0 snap-start sm:w-[calc((100%-1rem)/2)]"
-            >
-              <GamePerformanceCard card={card} />
-            </div>
-          ))}
+        <div className="rounded-2xl border border-sky-400/35 bg-[#050B18]/40 p-3 shadow-[0_0_18px_-6px_rgba(56,189,248,0.45),inset_0_0_14px_rgba(56,189,248,0.06)] sm:p-4">
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {cards.map((card) => (
+              <li key={card.gameKey}>
+                <GamePerformanceCard card={card} />
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </PerfSection>
