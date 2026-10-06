@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **AI support handoff vs customer assignment CODE-COMPLETE 6 Oct (eng)** — AI escalate preferred a stale ticket `assignedEmployeeId` over `customer_assignments`, and the unassigned fallback took the first Full Admin in the collection (often named Admin). Handoff now follows the admin assignment badge; temporary chat redirects still win; Full Admin is excluded from auto-assign. Tests: `support-handoff.test.ts`. Existing rows already stamped to Admin need a manual reassign. Never verified by eye.
 - **Sticky Enter bar slogans CODE-COMPLETE 6 Oct (eng)** — the game-page sticky bar no longer says “Better traders / brighter tomorrow”; each visit picks one of 21 owner slogans from `sticky-enter-slogans.ts` (client `useEffect` so SSR does not hydrate-mismatch). Two-tone gold/accent split kept for multi-phrase lines. Tests: `game-page-layout.test.ts`, `sticky-enter-slogans.test.ts`. Never verified by eye.
 - **Game page Enter CTAs → competitions hub CODE-COMPLETE 6 Oct (eng)** — Enter Competition (hero), Enter Now (sidebar + sticky bar) all use `competitionBrowseHref` → `/competitions`. Sticky bar shows WhiteLabel **Brand Icon** (`favicon`), not the wide App Logo wordmark (that crop is why the mark looked like a blob). Slogan half superseded by the row above — **say which**. Tests: `game-page-layout.test.ts`. Never verified by eye.
 - **Volt Velocity hangar fullscreen overlap CODE-COMPLETE 6 Oct (eng)** — mute/pause/settings sat on the VANGUARD ship panel in fullscreen because large viewports scaled those buttons to 68px while hangar top padding stayed 88px. `--cv-hangar-top` clears the header row; hangar action buttons stay 48px. Mirrored into packed `client.html`. Tests: `practice-round-exit.test.ts`. **pull + `pm2 restart chartvolt-games`** (packed client fingerprint changes). Never verified by eye.
@@ -960,6 +961,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - AI support handoff ignored the real account manager (owner report)
+
+**Owner report:** the AI connected a player to an agent who was not their client; in admin the user showed as assigned to Admin.
+
+**Cause:** two escalate paths preferred `conversation.assignedEmployeeId` over `customer_assignments` (the badge operators edit), and the no-assignment / unavailable fallback used `find()` on Full Admin first — usually the seed Admin account. Auto-assign could also mint Full Admin as the account manager when that role sat in `assignableRoles`.
+
+**Shipped:** `resolve-support-handoff.ts` (customer assignment first, temporary redirect exception, Backoffice before Full Admin); support route delegates to `MessagingService.escalateFromAI`; ticket stamps sync from the live assignment; Full Admin excluded from the auto-assign pool.
+
+**Nothing was paid wrongly.** Existing Admin assignments stay until an operator reassigns. Tests: `support-handoff.test.ts`. Never verified by eye.
 
 ### 6 October 2026 - Sticky Enter bar rotating slogans (owner request)
 

@@ -19,6 +19,7 @@ import {
   ConversationType,
 } from "@/database/models/messaging";
 import { resolvePublicName } from "@/lib/utils/username";
+import { resolveSupportHandoffEmployee } from "@/lib/services/messaging/resolve-support-handoff";
 
 // Rate limiting map (in production, use Redis)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -327,17 +328,25 @@ export class MessagingService {
         `📦 [MessagingService] Found existing ACTIVE conversation: ${conversation._id}`,
       );
 
-      // Store assigned employee info on conversation (for escalation later)
-      // But DON'T disable AI - let AI handle until escalation
-      if (assignedEmployee && !conversation.assignedEmployeeId) {
-        conversation.assignedEmployeeId = new Types.ObjectId(
-          assignedEmployee.id,
-        );
-        conversation.assignedEmployeeName = assignedEmployee.name;
-        await conversation.save();
-        console.log(
-          `📦 [MessagingService] Updated assigned employee info (AI still handling)`,
-        );
+      // Reason: keep the ticket stamp aligned with customer_assignments unless
+      // this chat is on a temporary redirect — otherwise AI handoff reads a
+      // stale employee while the admin badge shows someone else.
+      const isTemporaryRedirect =
+        conversation.temporarilyRedirected === true ||
+        (conversation as { isChatTransferred?: boolean }).isChatTransferred ===
+          true;
+      if (assignedEmployee && !isTemporaryRedirect) {
+        const currentId = conversation.assignedEmployeeId?.toString();
+        if (currentId !== assignedEmployee.id) {
+          conversation.assignedEmployeeId = new Types.ObjectId(
+            assignedEmployee.id,
+          );
+          conversation.assignedEmployeeName = assignedEmployee.name;
+          await conversation.save();
+          console.log(
+            `📦 [MessagingService] Synced assigned employee to ${assignedEmployee.name} (AI still handling)`,
+          );
+        }
       }
 
       return conversation;
@@ -1009,73 +1018,44 @@ export class MessagingService {
     );
     const userId = userParticipant?.id;
 
-    // Find employee to assign - priority order:
-    // 1. Already assigned employee on conversation
-    // 2. Customer assignment record
-    // 3. Any available support staff
+    // Find employee to assign — customer_assignments wins over a stale ticket stamp
+    // (see resolve-support-handoff.ts). Temporary chat redirects are the exception.
     let assignedEmployee: { id: string; name: string; avatar?: string } | null =
       null;
 
     const db = mongoose.connection.db;
     if (db && userId) {
-      // PERF: Batch-fetch all active admins in ONE query instead of up to 3 sequential findOne calls
-      const allActiveAdmins = await db.collection("admins").find({ status: "active" }).toArray();
-      const adminById = new Map(allActiveAdmins.map((a) => [a._id.toString(), a]));
+      const allActiveAdmins = await db
+        .collection("admins")
+        .find({ status: "active" })
+        .toArray();
 
-      // Priority 1: Use existing assigned employee on conversation
-      if (conversation.assignedEmployeeId) {
-        const emp = adminById.get(conversation.assignedEmployeeId.toString());
-        if (emp && emp.isAvailableForChat !== false) {
-          assignedEmployee = {
-            id: emp._id.toString(),
-            name: emp.name || emp.email?.split("@")[0],
-            avatar: emp.profileImage,
-          };
-          console.log(
-            `🤖→👤 [escalateFromAI] Using pre-assigned employee: ${assignedEmployee.name}`,
-          );
-        }
-      }
+      const assignment = await db.collection("customer_assignments").findOne({
+        customerId: userId,
+        isActive: true,
+      });
 
-      // Priority 2: Check customer_assignments
-      if (!assignedEmployee) {
-        const assignment = await db.collection("customer_assignments").findOne({
-          customerId: userId,
-          isActive: true,
-        });
+      assignedEmployee = resolveSupportHandoffEmployee({
+        userId,
+        conversation: {
+          assignedEmployeeId: conversation.assignedEmployeeId,
+          temporarilyRedirected: conversation.temporarilyRedirected,
+          isChatTransferred: (
+            conversation as { isChatTransferred?: boolean }
+          ).isChatTransferred,
+        },
+        assignmentEmployeeId: assignment?.employeeId
+          ? assignment.employeeId.toString()
+          : null,
+        activeAdmins: allActiveAdmins,
+      });
 
-        if (assignment?.employeeId) {
-          const emp = adminById.get(assignment.employeeId.toString());
-          if (emp && emp.isAvailableForChat !== false) {
-            assignedEmployee = {
-              id: emp._id.toString(),
-              name: emp.name || emp.email?.split("@")[0],
-              avatar: emp.profileImage,
-            };
-            console.log(
-              `🤖→👤 [escalateFromAI] Using customer assignment: ${assignedEmployee.name}`,
-            );
-          }
-        }
-      }
-
-      // Priority 3: Find any available support staff (from pre-fetched array)
-      if (!assignedEmployee) {
-        const emp = allActiveAdmins.find((a) =>
-          ["Backoffice", "Support Agent", "Full Admin"].includes(a.role) &&
-          a.isLockedOut !== true &&
-          a.isAvailableForChat !== false
+      if (assignedEmployee) {
+        console.log(
+          `🤖→👤 [escalateFromAI] Resolved handoff to: ${assignedEmployee.name}`,
         );
-        if (emp) {
-          assignedEmployee = {
-            id: emp._id.toString(),
-            name: emp.name || emp.email?.split("@")[0],
-            avatar: emp.profileImage,
-          };
-          console.log(
-            `🤖→👤 [escalateFromAI] Using fallback support: ${assignedEmployee.name}`,
-          );
-        }
+      } else {
+        console.log(`🤖→👤 [escalateFromAI] No available employee found`);
       }
     }
 

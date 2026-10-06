@@ -27,6 +27,17 @@ import { escapeHtml, renderChartVoltEmail } from "../nodemailer/chartvolt-email-
 import { getEmailBrand } from "../nodemailer/email-brand";
 import { employeeNotificationService } from "./employee-notification.service";
 
+/** Keep in sync with lib/services/messaging/resolve-support-handoff.ts */
+const AUTO_ASSIGN_EXCLUDED_ROLES = ["Full Admin"] as const;
+
+function filterAutoAssignCandidates<T extends { role?: string }>(
+  employees: T[],
+): T[] {
+  return employees.filter(
+    (e) => !e.role || !AUTO_ASSIGN_EXCLUDED_ROLES.includes(e.role as never),
+  );
+}
+
 export interface AssignCustomerParams {
   customerId: string;
   customerEmail: string;
@@ -591,6 +602,13 @@ class CustomerAssignmentService {
       }).lean();
     } else {
       employees = await Admin.find(query).lean();
+    }
+
+    // Reason: Full Admin is a platform owner. Auto-assign must not mint every
+    // new player as that account's client when the role is in assignableRoles.
+    // Reassignment with anyRoleFallback may still land there as last resort.
+    if (!options.anyRoleFallback) {
+      employees = filterAutoAssignCandidates(employees);
     }
 
     // Reason: when an employee is deleted, their customers must not be orphaned just

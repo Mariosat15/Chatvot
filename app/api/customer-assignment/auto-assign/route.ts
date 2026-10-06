@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import mongoose, { Types } from "mongoose";
 import { sendAccountManagerAssignedEmail } from "@/lib/nodemailer";
 import crypto from "crypto";
+import { filterAutoAssignCandidates } from "@/lib/services/messaging/resolve-support-handoff";
 
 /**
  * POST /api/customer-assignment/auto-assign
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
       })),
     );
 
-    const eligibleEmployeesQuery: any = {
+    const eligibleEmployeesQuery: Record<string, unknown> = {
       status: "active",
       role: { $in: assignableRoles },
     };
@@ -161,7 +162,17 @@ export async function POST(request: NextRequest) {
       eligibleEmployees.map((e) => ({ email: e.email, role: e.role })),
     );
 
-    if (eligibleEmployees.length === 0) {
+    // Reason: Full Admin is a platform owner role. Including it in assignableRoles
+    // (or as the only open seat under least_customers) silently made every new
+    // player "Admin's client" and the AI handoff followed that stamp.
+    const poolEmployees = filterAutoAssignCandidates(eligibleEmployees);
+    if (poolEmployees.length < eligibleEmployees.length) {
+      console.log(
+        `⏭️ [AutoAssign] Excluded Full Admin from pool (${eligibleEmployees.length - poolEmployees.length} removed)`,
+      );
+    }
+
+    if (poolEmployees.length === 0) {
       console.log(
         `⚠️ [AutoAssign] No eligible employees found for ${userEmail}`,
       );
@@ -173,7 +184,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter by max customers if set
-    let availableEmployees = eligibleEmployees;
+    let availableEmployees = poolEmployees;
     if (settings.maxCustomersPerEmployee > 0) {
       const employeeCounts = await assignmentsCollection
         .aggregate([
@@ -190,7 +201,7 @@ export async function POST(request: NextRequest) {
         .toArray();
 
       const countMap = new Map(employeeCounts.map((e) => [e._id, e.count]));
-      availableEmployees = eligibleEmployees.filter((emp) => {
+      availableEmployees = poolEmployees.filter((emp) => {
         const count = countMap.get(emp._id.toString()) || 0;
         return count < settings.maxCustomersPerEmployee;
       });
@@ -208,7 +219,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Select employee based on strategy
-    let selectedEmployee: any = null;
+    type AssignableAdmin = (typeof availableEmployees)[number];
+    let selectedEmployee: AssignableAdmin | null = null;
     const strategy = settings.assignmentStrategy || "least_customers";
 
     switch (strategy) {
@@ -235,13 +247,13 @@ export async function POST(request: NextRequest) {
           const countB = countMap.get(b._id.toString()) || 0;
           return countA - countB;
         });
-        selectedEmployee = availableEmployees[0];
+        selectedEmployee = availableEmployees.at(0) ?? null;
         break;
       }
       case "round_robin": {
         // Simple round robin - use modulo of current timestamp
         const index = Date.now() % availableEmployees.length;
-        selectedEmployee = availableEmployees[index];
+        selectedEmployee = availableEmployees.at(index) ?? null;
         break;
       }
       case "newest_employee": {
@@ -250,7 +262,7 @@ export async function POST(request: NextRequest) {
             new Date(b.createdAt || 0).getTime() -
             new Date(a.createdAt || 0).getTime(),
         );
-        selectedEmployee = availableEmployees[0];
+        selectedEmployee = availableEmployees.at(0) ?? null;
         break;
       }
       case "oldest_employee": {
@@ -259,14 +271,14 @@ export async function POST(request: NextRequest) {
             new Date(a.createdAt || 0).getTime() -
             new Date(b.createdAt || 0).getTime(),
         );
-        selectedEmployee = availableEmployees[0];
+        selectedEmployee = availableEmployees.at(0) ?? null;
         break;
       }
       case "random":
       default: {
         // Use crypto.randomInt for cryptographically secure random selection
         const randomIndex = crypto.randomInt(0, availableEmployees.length);
-        selectedEmployee = availableEmployees[randomIndex];
+        selectedEmployee = availableEmployees.at(randomIndex) ?? null;
         break;
       }
     }

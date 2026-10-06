@@ -451,206 +451,27 @@ async function handleAIResponse(
 }
 
 /**
- * Escalate conversation from AI to human
+ * Escalate conversation from AI to human.
+ * Reason: one path only — MessagingService.escalateFromAI owns the assignment
+ * rules (customer_assignments first). A second copy here used to prefer a stale
+ * ticket stamp and fall back to the first Full Admin in the collection.
  */
 async function escalateToHuman(
   conversationId: string,
-  userId: string,
-  userName: string,
+  _userId: string,
+  _userName: string,
   reason: string,
   transferContent?: (employeeName: string) => string,
 ) {
-  const mongoose = await import("mongoose");
-  const { connectToDatabase } = await import("@/database/mongoose");
+  await MessagingService.escalateFromAI(
+    conversationId,
+    reason,
+    transferContent,
+  );
 
-  await connectToDatabase();
-  const db = mongoose.default.connection.db;
-  if (!db) return null;
-
-  // First get the conversation to check if there's already an assigned employee
-  const conversation = await db.collection("conversations").findOne({
-    _id: new mongoose.default.Types.ObjectId(conversationId),
+  // Return the farewell message so Support POST can broadcast it as aiResponse.
+  const messages = await MessagingService.getMessages(conversationId, {
+    limit: 1,
   });
-
-  let assignedEmployee = null;
-
-  // PERF: Batch-fetch all active admins in ONE query instead of up to 4 sequential findOne calls
-  const allActiveAdmins = await db.collection("admins").find({
-    status: "active",
-  }).toArray();
-
-  const adminById = new Map(allActiveAdmins.map((a) => [a._id.toString(), a]));
-
-  // Priority 1: Use the employee already assigned to this conversation
-  if (conversation?.assignedEmployeeId) {
-    assignedEmployee = adminById.get(conversation.assignedEmployeeId.toString()) || null;
-    if (assignedEmployee) {
-      console.log(
-        `🤖→👤 [Escalate] Using pre-assigned employee from conversation: ${assignedEmployee?.name || assignedEmployee?.email}`,
-      );
-    }
-  }
-
-  // Priority 2: Check customer_assignments if no employee on conversation
-  if (!assignedEmployee) {
-    const assignment = await db.collection("customer_assignments").findOne({
-      customerId: userId,
-      isActive: true,
-    });
-
-    if (assignment?.employeeId) {
-      assignedEmployee = adminById.get(assignment.employeeId.toString()) || null;
-      if (assignedEmployee) {
-        console.log(
-          `🤖→👤 [Escalate] Using customer assignment: ${assignedEmployee?.name || assignedEmployee?.email}`,
-        );
-      }
-    }
-  }
-
-  // Priority 3: If assigned employee is unavailable, find a backup
-  if (assignedEmployee && assignedEmployee.isAvailableForChat === false) {
-    console.log(
-      `🤖→👤 [Escalate] Assigned employee ${assignedEmployee.name} unavailable, finding backup...`,
-    );
-    const originalEmployee = assignedEmployee;
-
-    assignedEmployee = allActiveAdmins.find((a) =>
-      a._id.toString() !== originalEmployee._id.toString() &&
-      ["Backoffice", "Support Agent", "Full Admin"].includes(a.role) &&
-      a.isLockedOut !== true &&
-      a.isAvailableForChat !== false
-    ) || null;
-
-    if (assignedEmployee) {
-      console.log(
-        `🤖→👤 [Escalate] Backup employee: ${assignedEmployee.name || assignedEmployee.email}`,
-      );
-    }
-  }
-
-  // Priority 4: If still no employee, find any available support staff
-  if (!assignedEmployee) {
-    assignedEmployee = allActiveAdmins.find((a) =>
-      ["Backoffice", "Support Agent", "Full Admin"].includes(a.role) &&
-      a.isLockedOut !== true &&
-      a.isAvailableForChat !== false
-    ) || null;
-    console.log(
-      `🤖→👤 [Escalate] Fallback to any available: ${assignedEmployee?.name || assignedEmployee?.email || "none"}`,
-    );
-  }
-
-  const employeeName =
-    assignedEmployee?.name ||
-    assignedEmployee?.email?.split("@")[0] ||
-    "Support Team";
-  const employeeId = assignedEmployee?._id?.toString();
-
-  // Check if employee is already in participants
-  const employeeAlreadyParticipant = conversation?.participants?.some(
-    (p: { id?: string; type?: string }) => p.id === employeeId && p.type === "employee",
-  );
-
-  // Build update operations
-  const updateOps = {
-    $set: {
-      isAIHandled: false,
-      assignedEmployeeId: employeeId
-        ? new mongoose.default.Types.ObjectId(employeeId)
-        : null,
-      assignedEmployeeName: employeeName,
-      lastActivityAt: new Date(),
-      updatedAt: new Date(),
-    },
-  };
-
-  // Update conversation - mark as no longer AI handled
-  await db
-    .collection("conversations")
-    .updateOne(
-      { _id: new mongoose.default.Types.ObjectId(conversationId) },
-      updateOps,
-    );
-
-  // Add employee as participant if not already present
-  if (employeeId && !employeeAlreadyParticipant) {
-    await db
-      .collection("conversations")
-      .updateOne({ _id: new mongoose.default.Types.ObjectId(conversationId) }, {
-        $push: {
-          participants: {
-            id: employeeId,
-            type: "employee",
-            name: employeeName,
-            avatar: assignedEmployee?.profileImage,
-            joinedAt: new Date(),
-            isActive: true,
-          },
-        },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
-    console.log("🤖→👤 [Escalate] Added as participant:", employeeName);
-  }
-
-  // Send escalation message
-  const escalationContent = transferContent
-    ? transferContent(employeeName)
-    : reason === "User requested human assistance"
-      ? `I'm connecting you with ${employeeName}, your dedicated account manager. They'll be with you shortly!`
-      : `I'm transferring you to ${employeeName} who will be able to assist you further. They'll be with you shortly!`;
-
-  const escalationMessage = {
-    conversationId: new mongoose.default.Types.ObjectId(conversationId),
-    senderId: "ai-assistant",
-    senderType: "ai",
-    senderName: "AI Assistant",
-    content: escalationContent,
-    messageType: "system",
-    status: "sent",
-    readBy: [],
-    createdAt: new Date(),
-  };
-
-  const result = await db.collection("messages").insertOne(escalationMessage);
-
-  // Update conversation lastMessage
-  await db.collection("conversations").updateOne(
-    { _id: new mongoose.default.Types.ObjectId(conversationId) },
-    {
-      $set: {
-        lastMessage: {
-          content: escalationContent.substring(0, 100),
-          senderId: "ai-assistant",
-          senderName: "AI Assistant",
-          senderType: "ai",
-          timestamp: new Date(),
-        },
-      },
-    },
-  );
-
-  // Send notification to employee
-  if (employeeId) {
-    try {
-      // Notify via WebSocket
-      const { wsNotifier } =
-        await import("@/lib/services/messaging/websocket-notifier");
-      wsNotifier.notifyEmployeeNewChat(employeeId, {
-        conversationId,
-        customerName: userName,
-        customerId: userId,
-        reason,
-      });
-      console.log("📧 [Escalate] Notified employee:", employeeName);
-    } catch (notifyError) {
-      console.warn("Failed to send escalation notification:", notifyError);
-    }
-  }
-
-  console.log(
-    `🤖→👤 [AI] Escalated conversation ${conversationId} to ${employeeName}. Reason: ${reason}`,
-  );
-
-  return { ...escalationMessage, _id: result.insertedId };
+  return messages[0] ?? null;
 }
