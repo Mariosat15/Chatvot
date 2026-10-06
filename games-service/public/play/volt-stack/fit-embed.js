@@ -32,7 +32,7 @@
   const SHELL_PAD = 10;
   const SAFETY = 4;
   const TOUCH_RESERVE = 86; // 64px buttons + 8px + 14px margins (styles.css embedded rule)
-  const MIN_BOARD_W = 160;
+  const MIN_BOARD_W = 200;
   // Reason: Tetris is 10×20 — height must be 2× width. The earlier 510×590
   // target made a squat well and left HOLD/NEXT taller than the board.
   // 590 is the MINIMUM the frame is asked for; the well then GROWS to fill
@@ -46,11 +46,12 @@
   // playfield. Cap the board; letterbox leftover space instead of stretching pixels.
   const MAX_BOARD_H = 720;
   const MAX_BOARD_W = MAX_BOARD_H / BOARD_ASPECT;
-  // Reason (6 Oct 2026, third pass): CSS caps the whole shell at 780px and rails
-  // at MAX_RAIL — size the board for that column, not the full viewport width.
-  const MAX_SHELL_W = 780;
-  const MAX_RAIL = 120;
-  const RAIL_TOTAL = MAX_RAIL * 2 + 8 * 2 + 28;
+  // Reason (6 Oct 2026, fourth pass): size against the real iframe. Rails stay
+  // a fixed readable width (CSS --rail-w: 176px). Shrinking them clips labels;
+  // stretching them to 1fr pins HOLD/NEXT to the screen edges.
+  const RAIL_W = 176;
+  const LAYOUT_GAP = 12;
+  const RAIL_TOTAL = RAIL_W * 2 + LAYOUT_GAP * 2 + 32;
   const FRAME_EXTRA = 4;
 
   let lastApplied = "";
@@ -102,7 +103,7 @@
     if (!shell) return;
 
     const viewH = window.innerHeight;
-    const viewW = Math.min(window.innerWidth, MAX_SHELL_W);
+    const viewW = window.innerWidth;
     const chrome = chromeHeight(shell);
 
     const maxWFromWidth = Math.max(
@@ -144,6 +145,8 @@
     if (key === lastApplied) return;
     lastApplied = key;
 
+    shell.style.setProperty("--rail-w", `${RAIL_W}px`);
+    shell.style.setProperty("--layout-gap", `${LAYOUT_GAP}px`);
     shell.style.setProperty("--board-width", `${boardW}px`);
     shell.style.setProperty("--board-height", `${boardH}px`);
     shell.style.setProperty("--frame-pad", `${framePad}px`);

@@ -67,12 +67,13 @@ html,body{overflow-x:clip}
 html.cv-embedded,html.cv-embedded body{height:100%;max-height:100%;margin:0;overflow:hidden!important}
 html.cv-embedded body{min-height:0;background-attachment:scroll}
 html.cv-embedded #ambientCanvas{display:none}
-/* Reason (6 Oct 2026, second pass / third): fullscreen was pinning HOLD/NEXT to the
-   viewport edges. Cap the WHOLE shell (not only the rails) so the cabinet sits as a
-   centred column with side gutters; the city backdrop still fills via body. */
+/* Reason (6 Oct 2026, fourth pass): a 780px shell clamp squeezed rails (HOLD→HOL,
+   COMBO→COM) and left a skinny column in a wide arena. 1fr rails stretched to the
+   edges. Shell fills the iframe; the *cluster* (board + fixed rails) is centred
+   and sized from height. Neither stretch nor squeeze. */
 html.cv-embedded,html.cv-embedded body{width:100%;height:100%;margin:0;overflow:hidden}
-html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:min(100%,780px)!important;max-width:780px;margin:0 auto;padding:6px 14px 4px;display:flex;flex-direction:column;align-items:center;overflow:hidden;box-sizing:border-box;--rail-w:120px;--stack-content-w:min(100%,calc(var(--cabinet-width) + var(--rail-w)*2 + 16px))}
-html.cv-embedded .topbar,html.cv-embedded .scoreboard,html.cv-embedded .play-layout,html.cv-embedded .touch-controls{width:var(--stack-content-w);max-width:100%;box-sizing:border-box}
+html.cv-embedded .game-shell{min-height:0!important;height:100%;max-height:100%;width:100%!important;max-width:none;margin:0;padding:8px 16px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;box-sizing:border-box;--rail-w:176px;--layout-gap:12px;--stack-content-w:calc(var(--cabinet-width) + var(--rail-w)*2 + var(--layout-gap)*2)}
+html.cv-embedded .topbar,html.cv-embedded .scoreboard,html.cv-embedded .play-layout,html.cv-embedded .touch-controls{width:var(--stack-content-w);max-width:100%;box-sizing:border-box;flex-shrink:0}
 /* Reason: owner 27 Sep 2026 ("these look squeezed and not inline"): the 44px bar and
    40px stat cards crushed the logo, labels and values. Everything in the header now
    sits on one centred line, the buttons share one size, and each stat card is an
@@ -98,9 +99,8 @@ html.cv-embedded .scoreboard strong{font-size:26px;line-height:1;margin:0}
 html.cv-embedded .stat-card>.ui-icon{width:24px;height:24px;flex-shrink:0;display:block}
 html.cv-embedded .timer-ring{width:32px;height:32px;border-width:4px;flex-shrink:0;margin-left:auto;position:static}
 /* Reason: owner 27 Sep — tall 1:2 well sized from the HEIGHT by fit-embed.
-   AMENDED 6 Oct 2026: rails are capped (not 1fr). Fullscreen 1fr pinned HOLD/NEXT
-   to the viewport edges and left a huge empty gap beside the board. */
-html.cv-embedded .play-layout{flex:0 0 auto;min-height:0;gap:8px;margin:0 auto;height:var(--arena-h);max-height:none;grid-template-columns:minmax(88px,var(--rail-w)) var(--cabinet-width) minmax(88px,var(--rail-w));justify-content:center;align-items:center;width:max-content;max-width:100%}
+   Rails are a FIXED width (not 1fr, not minmax that can collapse). */
+html.cv-embedded .play-layout{flex:0 0 auto;min-height:0;gap:var(--layout-gap);margin:0 auto;height:var(--arena-h);max-height:none;grid-template-columns:var(--rail-w) var(--cabinet-width) var(--rail-w);justify-content:center;align-items:stretch;width:var(--stack-content-w);max-width:100%}
 html.cv-embedded .board-wrap{padding-top:0;margin:0;height:var(--arena-h);display:flex;flex-direction:column;align-items:center;justify-content:center}
 html.cv-embedded .board-title{height:14px;font-size:9px;gap:10px;top:0;left:8%;right:8%;position:relative}
 /* Reason (6 Oct 2026): flex-grow + height:auto stretched the neon SVG frame in fullscreen. Size to the board vars only. */
@@ -109,7 +109,11 @@ html.cv-embedded .reference-frame{background-size:contain!important}
 html.cv-embedded #gameCanvas{width:var(--board-width)!important;height:var(--board-height)!important;max-height:100%}
 html.cv-embedded #fxCanvas{width:var(--board-width)!important;height:var(--board-height)!important}
 html.cv-embedded .rail-tip{display:none}
-html.cv-embedded .mini-rail{padding:6px;gap:6px;width:100%!important;max-width:var(--rail-w)!important;min-width:0;height:var(--arena-h)!important;box-sizing:border-box;margin-inline:auto}
+html.cv-embedded .mini-rail{padding:8px;gap:8px;width:var(--rail-w)!important;max-width:var(--rail-w)!important;min-width:var(--rail-w)!important;height:var(--arena-h)!important;box-sizing:border-box;margin:0;overflow:hidden}
+html.cv-embedded .card-label,html.cv-embedded .combo-title,html.cv-embedded .rail-caption,html.cv-embedded .speed-card .card-label{font-size:13px;letter-spacing:.8px;white-space:nowrap}
+html.cv-embedded .combo-title{font-size:15px;gap:8px}
+html.cv-embedded .combo-card #combo{font-size:28px}
+html.cv-embedded .combo-card #comboChain{font-size:11px}
 html.cv-embedded .combo-card{min-height:0}
 html.cv-embedded .speed-card{min-height:40px}
 /* Reason: touch row stays visible. Parent iframe grows from fit-embed resize — that is
