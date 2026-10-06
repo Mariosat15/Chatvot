@@ -15,6 +15,8 @@ export type SpendingSlice = {
 
 /**
  * Spending vs Earnings — donut + horizontal breakdown (rebuild guide §10).
+ * Reason: owner 6 Oct 2026 — drop-shadow was clipped by a tight viewBox /
+ * container; pad the SVG and keep overflow visible so the ring reads round.
  */
 export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[] }) {
   const total = useMemo(
@@ -25,7 +27,7 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
   const arcs = useMemo(() => {
     if (total <= 0) return [];
     let angle = -90;
-    const r = 58;
+    const r = 54;
     const c = 2 * Math.PI * r;
     return slices
       .filter((s) => s.value > 0)
@@ -57,32 +59,39 @@ export default function SpendingVsEarnings({ slices }: { slices: SpendingSlice[]
         />
       }
       accent="magenta"
-      bodyClassName="justify-center"
+      // Reason: section defaults to overflow-hidden which squares off the ring glow.
+      className="overflow-visible"
+      bodyClassName="justify-center overflow-visible"
     >
-      <div className="flex flex-1 flex-col items-center gap-5 sm:flex-row sm:items-center">
-        <div className="relative mx-auto h-[168px] w-[168px] shrink-0 sm:mx-0">
-          <svg viewBox="0 0 140 140" className="h-full w-full">
+      <div className="flex flex-1 flex-col items-center gap-5 overflow-visible sm:flex-row sm:items-center">
+        {/* Reason: outer box is larger than the ring so glow is not squared off. */}
+        <div className="relative mx-auto flex h-[200px] w-[200px] shrink-0 items-center justify-center overflow-visible sm:mx-0">
+          <svg
+            viewBox="-20 -20 180 180"
+            className="h-[188px] w-[188px] overflow-visible"
+            style={{ overflow: "visible" }}
+          >
             <circle
               cx="70"
               cy="70"
-              r="58"
+              r="54"
               fill="none"
               stroke="rgba(255,255,255,0.06)"
-              strokeWidth="16"
+              strokeWidth="14"
             />
             {arcs.map((a) => (
               <circle
                 key={a.key}
                 cx="70"
                 cy="70"
-                r="58"
+                r="54"
                 fill="none"
                 stroke={a.color}
-                strokeWidth="16"
+                strokeWidth="14"
                 strokeDasharray={a.dash}
                 strokeLinecap="butt"
                 transform={`rotate(${a.rot} 70 70)`}
-                style={{ filter: `drop-shadow(0 0 8px ${a.color})` }}
+                style={{ filter: `drop-shadow(0 0 6px ${a.color}aa)` }}
               />
             ))}
           </svg>

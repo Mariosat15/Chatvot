@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Wallet Analytics Gift credits + spend buckets CODE-COMPLETE 6 Oct (eng)** — Bonuses → Gift credits (`admin_adjustment` / `manual_deposit_credit`); marketplace and GM spend/earn on Spending vs Earnings; mobile charts match desktop glow/axes; shared `useWalletAnalyticsModel`. Tests: `wallet-analytics.test.ts` (12). **Never verified by eye.**
+- **Wallet Analytics chart polish CODE-COMPLETE 6 Oct (eng)** — Credit Breakdown → stacked area; Spending vs Earnings donut glow no longer clipped; mobile uses the same two panels. Tests: `wallet-analytics.test.ts` (14). **Never verified by eye.**
+- **Wallet Analytics Gift credits + spend buckets CODE-COMPLETE 6 Oct (eng)** — Bonuses → Gift credits (`admin_adjustment` / `manual_deposit_credit`); marketplace and GM spend/earn on Spending vs Earnings; mobile charts match desktop glow/axes; shared `useWalletAnalyticsModel`. Tests: `wallet-analytics.test.ts` (14). **Never verified by eye.**
 - **Login / registration mobile + desktop polish CODE-COMPLETE 5 Oct (eng)** — dedicated mobile Sign In + 2-step Register (`md` gate via `AuthViewportSwitch`); desktop mockup unchanged; centered backgrounds; scrollbar chrome hidden; social buttons removed for now; Terms/Privacy are real links; GM `ref` preserved across steps. Spec: `redising login.md`. Tests: `auth-page-look.test.ts`. **Never verified by eye.**
 
 This plan has two tracks. **As of 30 September 2026**:
@@ -933,6 +934,15 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Wallet Analytics chart polish: stacked area + donut glow
+
+**Owner report:** Credit Breakdown sparse bars disliked; Spending vs Earnings donut glow squared off at the edges; fix mobile too.
+
+- **Credit Breakdown** is a stacked `AreaChart` (active series only); hairline `BarChart` removed.
+- **Spending vs Earnings** pads the SVG viewBox and sets `overflow-visible` on the card so the ring glow is not clipped.
+- **Mobile** mounts the same two panels (replacing `MobileMoneyInOut`) so desktop and phone cannot drift.
+- Tests: `wallet-analytics.test.ts` 14. **Never verified by eye.**
 
 ### 6 October 2026 - Wallet Analytics: Gift credits, correct buckets, mobile charts, full Spending vs Earnings
 

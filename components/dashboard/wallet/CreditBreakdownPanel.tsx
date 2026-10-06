@@ -1,8 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import {
-  Bar,
-  BarChart,
+  Area,
+  AreaChart,
   CartesianGrid,
   Legend,
   ResponsiveContainer,
@@ -73,6 +74,8 @@ const SERIES = [
   },
 ] as const;
 
+type SeriesKey = (typeof SERIES)[number]["key"];
+
 function formatAxisDate(iso: string): string {
   const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
   if (Number.isNaN(d.getTime())) return iso.slice(5, 10);
@@ -80,7 +83,9 @@ function formatAxisDate(iso: string): string {
 }
 
 /**
- * Credit Breakdown — multi-series bars + summary tiles (rebuild guide §7).
+ * Credit Breakdown — stacked area over the period + summary tiles.
+ * Reason: owner 6 Oct 2026 — sparse multi-series bars were unreadable; area
+ * shows category mix over time without hairline columns.
  */
 export default function CreditBreakdownPanel({
   data,
@@ -89,6 +94,15 @@ export default function CreditBreakdownPanel({
   data: BreakdownDay[];
   totals: BreakdownTotals;
 }) {
+  // Reason: hide empty series so the legend matches what the eye can see.
+  const activeSeries = useMemo(
+    () =>
+      SERIES.filter((s) =>
+        data.some((d) => (d[s.key as SeriesKey] || 0) > 0),
+      ),
+    [data],
+  );
+
   const summary = [
     { key: "deposits", label: "Total Deposits", value: totals.deposits },
     {
@@ -102,7 +116,11 @@ export default function CreditBreakdownPanel({
     { key: "giftCredits", label: "Gift Credits", value: totals.giftCredits },
     { key: "prizes", label: "Prizes Won", value: totals.prizes },
     { key: "withdrawals", label: "Withdrawals", value: totals.withdrawals },
-  ].filter((row) => row.value > 0 || ["deposits", "prizes", "giftCredits"].includes(row.key));
+  ].filter(
+    (row) =>
+      row.value > 0 ||
+      ["deposits", "prizes", "giftCredits"].includes(row.key),
+  );
 
   return (
     <AnalyticsCard
@@ -124,13 +142,35 @@ export default function CreditBreakdownPanel({
           Your credit breakdown will appear here
         </div>
       ) : (
-        <div className="h-[180px] w-full sm:h-[200px]">
+        <div className="h-[200px] w-full sm:h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
+            <AreaChart
               data={data}
-              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-              barCategoryGap="18%"
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
             >
+              <defs>
+                {SERIES.map((s) => (
+                  <linearGradient
+                    key={s.key}
+                    id={`wallet-bd-${s.key}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor={s.color}
+                      stopOpacity={0.55}
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor={s.color}
+                      stopOpacity={0.06}
+                    />
+                  </linearGradient>
+                ))}
+              </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="rgba(255,255,255,0.06)"
@@ -150,7 +190,9 @@ export default function CreditBreakdownPanel({
                 tickLine={false}
                 width={40}
                 tickFormatter={(v: number) =>
-                  v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))
+                  v >= 1000
+                    ? `${(v / 1000).toFixed(1)}k`
+                    : String(Math.round(v))
                 }
               />
               <Tooltip
@@ -172,18 +214,22 @@ export default function CreditBreakdownPanel({
                 iconType="circle"
                 iconSize={8}
               />
-              {SERIES.map((s) => (
-                <Bar
+              {(activeSeries.length ? activeSeries : SERIES).map((s) => (
+                <Area
                   key={s.key}
+                  type="monotone"
                   dataKey={s.key}
                   name={s.label}
-                  fill={s.color}
-                  radius={[3, 3, 0, 0]}
-                  maxBarSize={10}
-                  style={{ filter: `drop-shadow(0 0 5px ${s.color}99)` }}
+                  stackId="credits"
+                  stroke={s.color}
+                  strokeWidth={1.75}
+                  fill={`url(#wallet-bd-${s.key})`}
+                  fillOpacity={1}
+                  // Reason: soft glow without clipping — area fills stay inside the plot.
+                  style={{ filter: `drop-shadow(0 0 4px ${s.color}66)` }}
                 />
               ))}
-            </BarChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}

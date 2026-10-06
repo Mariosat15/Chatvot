@@ -258,8 +258,8 @@ describe("Wallet Analytics page wiring", () => {
       idx("<MobileWalletOverview"),
     );
     expect(idx("<MobileWalletOverview")).toBeLessThan(idx("<MobileWalletTrend"));
-    expect(idx("<MobileWalletTrend")).toBeLessThan(idx("<MobileMoneyInOut"));
-    expect(idx("<MobileMoneyInOut")).toBeLessThan(idx("<SpendingVsEarnings"));
+    expect(idx("<MobileWalletTrend")).toBeLessThan(idx("<CreditBreakdownPanel"));
+    expect(idx("<CreditBreakdownPanel")).toBeLessThan(idx("<SpendingVsEarnings"));
     expect(idx("<SpendingVsEarnings")).toBeLessThan(idx("<MobileDailyFlow"));
     expect(idx("<MobileDailyFlow")).toBeLessThan(idx("<MobileWalletInsights"));
     expect(idx("<MobileWalletInsights")).toBeLessThan(
@@ -269,9 +269,28 @@ describe("Wallet Analytics page wiring", () => {
     expect(actions).toMatch(/Deposit/);
     expect(actions).toMatch(/Withdraw/);
     expect(actions).toMatch(/href=["']\/wallet["']/);
-    // Reason: must not pull the desktop grid into the phone tree.
-    // SpendingVsEarnings is shared desktop math chrome — allowed on mobile.
-    expect(mobile).not.toMatch(/WalletKpiGrid|CreditBreakdownPanel|WalletBackdrop/);
+    // Reason: flipped 6 Oct 2026 — CreditBreakdownPanel is shared on purpose
+    // so the stacked area + donut padding cannot drift from desktop.
+    expect(mobile).not.toMatch(/WalletKpiGrid|WalletBackdrop|MobileMoneyInOut/);
+  });
+
+  it("Credit Breakdown is a stacked area chart, not sparse multi-series bars", () => {
+    const breakdown = readCode(
+      "components/dashboard/wallet/CreditBreakdownPanel.tsx",
+    );
+    expect(breakdown).toMatch(/AreaChart/);
+    expect(breakdown).toMatch(/stackId=["']credits["']/);
+    expect(breakdown).not.toMatch(/BarChart/);
+    expect(breakdown).not.toMatch(/maxBarSize/);
+  });
+
+  it("Spending vs Earnings donut pads the SVG so glow is not clipped", () => {
+    const spend = readCode(
+      "components/dashboard/wallet/SpendingVsEarnings.tsx",
+    );
+    expect(spend).toMatch(/viewBox=["']-20 -20 180 180["']/);
+    expect(spend).toMatch(/overflow-visible/);
+    expect(spend).toMatch(/className=["']overflow-visible["']/);
   });
 
   it("chart panels carry the reference subtitles", () => {

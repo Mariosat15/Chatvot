@@ -2,13 +2,13 @@
 
 import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 import { useWalletAnalyticsModel } from "../useWalletAnalyticsModel";
+import CreditBreakdownPanel from "../CreditBreakdownPanel";
+import SpendingVsEarnings from "../SpendingVsEarnings";
 import MobileWalletHeader from "./MobileWalletHeader";
 import MobileWalletBalanceCard from "./MobileWalletBalanceCard";
 import MobileWalletActions from "./MobileWalletActions";
 import MobileWalletOverview from "./MobileWalletOverview";
 import MobileWalletTrend from "./MobileWalletTrend";
-import MobileMoneyInOut from "./MobileMoneyInOut";
-import SpendingVsEarnings from "../SpendingVsEarnings";
 import MobileDailyFlow from "./MobileDailyFlow";
 import MobileWalletInsights from "./MobileWalletInsights";
 import MobileRecentTransactions from "./MobileRecentTransactions";
@@ -20,7 +20,8 @@ type Props = {
 
 /**
  * Dedicated mobile Wallet Analytics (below md).
- * Order from rebuild guide §3 — desktop layout is a separate tree.
+ * Reason: Credit Breakdown + Spending vs Earnings use the same panels as
+ * desktop (6 Oct 2026) so the stacked area and donut padding stay in sync.
  */
 export default function MobileWallet({ overview, charts }: Props) {
   const model = useWalletAnalyticsModel(overview, charts);
@@ -49,10 +50,9 @@ export default function MobileWallet({ overview, charts }: Props) {
         range={model.range}
         onRangeChange={model.setRange}
       />
-      <MobileMoneyInOut
+      <CreditBreakdownPanel
+        data={model.breakdownDays}
         totals={model.breakdownTotals}
-        moneyIn={model.moneyIn}
-        moneyOut={model.moneyOut}
       />
       <SpendingVsEarnings slices={model.spendSlices} />
       <MobileDailyFlow data={model.flow} />
