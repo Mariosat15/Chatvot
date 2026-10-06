@@ -363,21 +363,28 @@ describe("Wallet Analytics page wiring", () => {
     expect(breakdown).not.toMatch(/circuit-sprint|circuit-perfect|gameCode|providerKey/);
   });
 
-  it("Spending vs Earnings donut pads the SVG so glow is not clipped", () => {
+  it("Spending vs Earnings uses a comparison bar and two equal columns, not a crowded donut", () => {
     const spend = readCode(
       "components/dashboard/wallet/SpendingVsEarnings.tsx",
     );
-    expect(spend).toMatch(/viewBox=["']-20 -20 180 180["']/);
-    expect(spend).toMatch(/overflow-visible/);
-    expect(spend).toMatch(/className=["']overflow-visible["']/);
+    // Reason: flipped 6 Oct 2026 — donut + dual lists felt crowded; bar + columns replace it.
+    expect(spend).toMatch(/Net earnings − spending/);
+    expect(spend).toMatch(/sm:grid-cols-2/);
+    expect(spend).toMatch(/function SideColumn/);
+    expect(spend).not.toMatch(/viewBox=/);
+    expect(spend).not.toMatch(/Total Credits/);
+    expect(spend).not.toMatch(/Where it went/);
   });
 
-  it("Spending vs Earnings contrasts money out vs money in, not a second breakdown", () => {
+  it("Spending vs Earnings is spendMetric vs earnMetric — deposits and refunds stay out", () => {
     const spend = readCode(
       "components/dashboard/wallet/SpendingVsEarnings.tsx",
     );
     const model = readCode(
       "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
+    const catalog = readCode(
+      "components/dashboard/wallet/wallet-categories.ts",
     );
     const desktop = readCode(
       "components/dashboard/wallet/DesktopWalletAnalytics.tsx",
@@ -385,15 +392,42 @@ describe("Wallet Analytics page wiring", () => {
     const mobile = readCode(
       "components/dashboard/wallet/mobile/MobileWallet.tsx",
     );
-    // Reason: flipped 6 Oct 2026 — one mixed donut duplicated Credit Breakdown totals.
+    // Reason: owner 6 Oct 2026 — deposits/refunds are not platform earnings.
     expect(spend).toMatch(/spendSlices/);
     expect(spend).toMatch(/earnSlices/);
-    expect(spend).toMatch(/Net \(in − out\)/);
-    expect(spend).toMatch(/Where it went/);
-    expect(spend).toMatch(/Where it came from/);
-    expect(spend).not.toMatch(/Total Credits/);
-    expect(model).toMatch(/flow === "out"/);
-    expect(model).toMatch(/flow === "in"/);
+    expect(spend).toMatch(/Deposits and refunds are excluded/);
+    // Reason: assert the slice builders, not moneyIn/moneyOut which still use flow.
+    const spendSliceBlock = model.slice(
+      model.indexOf("const spendSlices"),
+      model.indexOf("const earnSlices"),
+    );
+    const earnSliceBlock = model.slice(
+      model.indexOf("const earnSlices"),
+      model.indexOf("const insights"),
+    );
+    expect(spendSliceBlock).toMatch(/c\.spendMetric/);
+    expect(spendSliceBlock).not.toMatch(/flow/);
+    expect(earnSliceBlock).toMatch(/c\.earnMetric/);
+    expect(earnSliceBlock).not.toMatch(/flow/);
+    expect(earnSliceBlock).not.toMatch(/deposits|refunds/);
+    expect(catalog).toMatch(/earnMetric:\s*true/);
+    expect(catalog).toMatch(/earnMetric:\s*false/);
+    // Reason: pin deposits + refunds as earnMetric false by reading their blocks.
+    const depositsBlock = catalog.slice(
+      catalog.indexOf('key: "deposits"'),
+      catalog.indexOf('key: "contestEntries"'),
+    );
+    const refundsBlock = catalog.slice(
+      catalog.indexOf('key: "refunds"'),
+      catalog.indexOf('key: "other"'),
+    );
+    const prizesBlock = catalog.slice(
+      catalog.indexOf('key: "prizes"'),
+      catalog.indexOf('key: "gmEarnings"'),
+    );
+    expect(depositsBlock).toMatch(/earnMetric:\s*false/);
+    expect(refundsBlock).toMatch(/earnMetric:\s*false/);
+    expect(prizesBlock).toMatch(/earnMetric:\s*true/);
     expect(desktop).toMatch(/earnSlices=\{model\.earnSlices\}/);
     expect(mobile).toMatch(/earnSlices=\{model\.earnSlices\}/);
   });
@@ -417,7 +451,7 @@ describe("Wallet Analytics page wiring", () => {
     expect(breakdown).toMatch(/See how your credits are sourced and used/);
     expect(flow).toMatch(/Daily net credit movement in your wallet/);
     expect(spend).toMatch(
-      /Money out versus money in for the selected period/,
+      /Platform earnings versus spending\. Deposits and refunds are excluded/,
     );
   });
 });

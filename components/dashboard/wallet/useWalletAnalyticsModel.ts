@@ -228,12 +228,12 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
     ];
   }, [breakdownDays, history, overview.creditBalance, spendKeys]);
 
-  // Reason: owner 6 Oct 2026 — Spending vs Earnings must contrast flow out vs
-  // flow in. Putting every bucket in one list duplicated Credit Breakdown.
+  // Reason: owner 6 Oct 2026 — compare spendMetric vs earnMetric only.
+  // Deposits and refunds stay on Credit Breakdown; they are not earnings.
   const spendSlices: SpendingSlice[] = useMemo(
     () =>
       categories
-        .filter((c) => c.spend && c.flow === "out")
+        .filter((c) => c.spendMetric)
         .map((c) => ({
           key: c.key,
           label: c.label,
@@ -247,7 +247,7 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
   const earnSlices: SpendingSlice[] = useMemo(
     () =>
       categories
-        .filter((c) => c.spend && c.flow === "in")
+        .filter((c) => c.earnMetric)
         .map((c) => ({
           key: c.key,
           label: c.label,

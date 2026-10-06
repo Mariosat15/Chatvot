@@ -22,46 +22,61 @@ function sumSlices(slices: SpendingSlice[]): number {
 }
 
 function formatCompact(n: number): string {
-  if (n >= 1000) {
-    return `${(n / 1000).toFixed(2).replace(/\.?0+$/, "")}K`;
+  const abs = Math.abs(n);
+  if (abs >= 1000) {
+    const compact = `${(abs / 1000).toFixed(2).replace(/\.?0+$/, "")}K`;
+    return n < 0 ? `-${compact}` : compact;
   }
   return formatVolts(n);
 }
 
-function CategoryList({
+function SideColumn({
   title,
-  slices,
   total,
+  shareLabel,
+  accentClass,
+  borderClass,
+  slices,
   emptyLabel,
 }: {
   title: string;
-  slices: SpendingSlice[];
   total: number;
+  shareLabel: string;
+  accentClass: string;
+  borderClass: string;
+  slices: SpendingSlice[];
   emptyLabel: string;
 }) {
-  if (!slices.length) {
-    return (
-      <div className="min-w-0 flex-1">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+  return (
+    <div
+      className={`flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl border ${borderClass} bg-black/20`}
+    >
+      <div className="border-b border-white/5 px-4 py-3">
+        <p
+          className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${accentClass}`}
+        >
           {title}
         </p>
-        <p className="text-xs text-slate-500">{emptyLabel}</p>
+        <p className="mt-1 text-xl font-bold tabular-nums text-white sm:text-2xl">
+          {formatVolts(total)}
+        </p>
+        <p className="mt-0.5 text-[11px] tabular-nums text-slate-500">
+          {shareLabel}
+        </p>
       </div>
-    );
-  }
 
-  return (
-    <div className="min-w-0 flex-1">
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        {title}
-      </p>
-      <ul className="flex flex-col gap-2">
-        {slices.map((s) => {
-          const pct = total > 0 ? (s.value / total) * 100 : 0;
-          return (
-            <li key={s.key} className="min-w-0">
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                <span className="flex min-w-0 items-center gap-2 text-slate-300">
+      {slices.length === 0 ? (
+        <p className="px-4 py-5 text-sm text-slate-500">{emptyLabel}</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-white/5 px-1 py-1">
+          {slices.map((s) => {
+            const pct = total > 0 ? (s.value / total) * 100 : 0;
+            return (
+              <li
+                key={s.key}
+                className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 px-3 py-2.5"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
                   <span
                     className="h-2 w-2 shrink-0 rounded-full"
                     style={{
@@ -69,38 +84,41 @@ function CategoryList({
                       boxShadow: `0 0 8px ${s.color}`,
                     }}
                   />
-                  <span className="truncate font-medium">{s.label}</span>
-                  <span className="tabular-nums text-slate-500">
-                    {pct.toFixed(0)}%
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums font-semibold text-slate-100">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-200">
+                      {s.label}
+                    </p>
+                    <p className="text-[11px] tabular-nums text-slate-500">
+                      {pct.toFixed(0)}% of {title.toLowerCase()}
+                    </p>
+                  </div>
+                </div>
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-100">
                   {formatVolts(s.value)}
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, pct)}%`,
-                    background: s.color,
-                    boxShadow: `0 0 10px ${s.color}`,
-                  }}
-                />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                </p>
+                <div className="col-span-2 h-1 overflow-hidden rounded-full bg-white/5">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${Math.min(100, pct)}%`,
+                      background: s.color,
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }
 
 /**
- * Spending vs Earnings — true comparison, not a second Credit Breakdown.
- * Reason: owner 6 Oct 2026 — the old donut mixed every bucket into one total
- * (same numbers as Credit Breakdown tiles). This panel answers one question:
- * how much went out vs how much came in, then what built each side.
+ * Spending vs Earnings — platform earnings versus spending only.
+ * Reason: owner 6 Oct 2026 — deposits and refunds are not earnings; the panel
+ * must not mix them in. Layout is two equal columns under a single comparison
+ * bar so desktop and mobile share one structured view.
  */
 export default function SpendingVsEarnings({
   spendSlices,
@@ -113,31 +131,13 @@ export default function SpendingVsEarnings({
   const earnTotal = useMemo(() => sumSlices(earnSlices), [earnSlices]);
   const combined = spendTotal + earnTotal;
   const net = earnTotal - spendTotal;
-
-  const arcs = useMemo(() => {
-    if (combined <= 0) return [];
-    const r = 54;
-    const c = 2 * Math.PI * r;
-    let angle = -90;
-    return [
-      { key: "spend", value: spendTotal, color: SPEND_RING, label: "Spending" },
-      { key: "earn", value: earnTotal, color: EARN_RING, label: "Earnings" },
-    ]
-      .filter((s) => s.value > 0)
-      .map((s) => {
-        const share = s.value / combined;
-        const len = share * c;
-        const dash = `${len} ${c - len}`;
-        const rot = angle;
-        angle += share * 360;
-        return { ...s, dash, rot, share };
-      });
-  }, [combined, earnTotal, spendTotal]);
+  const spendShare = combined > 0 ? (spendTotal / combined) * 100 : 50;
+  const earnShare = combined > 0 ? (earnTotal / combined) * 100 : 50;
 
   return (
     <AnalyticsCard
       title="Spending vs Earnings"
-      subtitle="Money out versus money in for the selected period."
+      subtitle="Platform earnings versus spending. Deposits and refunds are excluded."
       icon={
         <WalletNeonIcon
           src={WALLET_ART.spending}
@@ -148,99 +148,93 @@ export default function SpendingVsEarnings({
       }
       accent="magenta"
       className="overflow-visible"
-      bodyClassName="justify-center overflow-visible gap-4"
+      bodyClassName="justify-start overflow-visible gap-4"
     >
-      <div className="flex flex-1 flex-col items-center gap-4 overflow-visible sm:flex-row sm:items-center sm:gap-5">
-        <div className="relative mx-auto flex h-[200px] w-[200px] shrink-0 items-center justify-center overflow-visible sm:mx-0">
-          <svg
-            viewBox="-20 -20 180 180"
-            className="h-[188px] w-[188px] overflow-visible"
-            style={{ overflow: "visible" }}
-          >
-            <circle
-              cx="70"
-              cy="70"
-              r="54"
-              fill="none"
-              stroke="rgba(255,255,255,0.06)"
-              strokeWidth="14"
-            />
-            {arcs.map((a) => (
-              <circle
-                key={a.key}
-                cx="70"
-                cy="70"
-                r="54"
-                fill="none"
-                stroke={a.color}
-                strokeWidth="14"
-                strokeDasharray={a.dash}
-                strokeLinecap="butt"
-                transform={`rotate(${a.rot} 70 70)`}
-                style={{ filter: `drop-shadow(0 0 6px ${a.color}aa)` }}
-              />
-            ))}
-          </svg>
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-3 text-center">
-            <span
-              className={`text-lg font-bold tabular-nums ${
+      {/* Comparison strip — one glance, then the two columns */}
+      <div className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3.5">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-pink-300/90">
+              Spending
+            </p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums text-white sm:text-xl">
+              {formatVolts(spendTotal)}
+            </p>
+          </div>
+          <div className="text-center">
+            <p
+              className={`text-base font-bold tabular-nums sm:text-lg ${
                 net >= 0 ? "text-emerald-300" : "text-rose-300"
               }`}
             >
               {net >= 0 ? "+" : ""}
               {formatCompact(net)}
-            </span>
-            <span className="text-[10px] uppercase tracking-wider text-slate-400">
-              Net (in − out)
-            </span>
+            </p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500">
+              Net earnings − spending
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-300/90">
+              Earnings
+            </p>
+            <p className="mt-0.5 text-lg font-bold tabular-nums text-white sm:text-xl">
+              {formatVolts(earnTotal)}
+            </p>
           </div>
         </div>
 
-        <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-pink-400/35 bg-pink-500/10 px-3 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-pink-200/80">
-                Spending
-              </p>
-              <p className="mt-0.5 text-base font-bold tabular-nums text-white sm:text-lg">
-                {formatVolts(spendTotal)}
-              </p>
-              <p className="text-[10px] tabular-nums text-slate-400">
-                {combined > 0
-                  ? `${((spendTotal / combined) * 100).toFixed(0)}% of activity`
-                  : "—"}
-              </p>
-            </div>
-            <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-2.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-200/80">
-                Earnings
-              </p>
-              <p className="mt-0.5 text-base font-bold tabular-nums text-white sm:text-lg">
-                {formatVolts(earnTotal)}
-              </p>
-              <p className="text-[10px] tabular-nums text-slate-400">
-                {combined > 0
-                  ? `${((earnTotal / combined) * 100).toFixed(0)}% of activity`
-                  : "—"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
-            <CategoryList
-              title="Where it went"
-              slices={spendSlices}
-              total={spendTotal}
-              emptyLabel="No spending in this period"
-            />
-            <CategoryList
-              title="Where it came from"
-              slices={earnSlices}
-              total={earnTotal}
-              emptyLabel="No earnings in this period"
-            />
-          </div>
+        <div className="flex h-2.5 overflow-hidden rounded-full bg-white/5">
+          <div
+            className="h-full transition-[width] duration-500"
+            style={{
+              width: `${spendShare}%`,
+              background: SPEND_RING,
+              boxShadow: `0 0 12px ${SPEND_RING}88`,
+            }}
+          />
+          <div
+            className="h-full transition-[width] duration-500"
+            style={{
+              width: `${earnShare}%`,
+              background: EARN_RING,
+              boxShadow: `0 0 12px ${EARN_RING}88`,
+            }}
+          />
         </div>
+        <div className="mt-2 flex justify-between text-[11px] tabular-nums text-slate-500">
+          <span>{combined > 0 ? `${spendShare.toFixed(0)}%` : "—"}</span>
+          <span>{combined > 0 ? `${earnShare.toFixed(0)}%` : "—"}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <SideColumn
+          title="Spending"
+          total={spendTotal}
+          shareLabel={
+            combined > 0
+              ? `${spendShare.toFixed(0)}% of this comparison`
+              : "No activity in this period"
+          }
+          accentClass="text-pink-300/90"
+          borderClass="border-pink-400/25"
+          slices={spendSlices}
+          emptyLabel="No spending in this period"
+        />
+        <SideColumn
+          title="Earnings"
+          total={earnTotal}
+          shareLabel={
+            combined > 0
+              ? `${earnShare.toFixed(0)}% of this comparison`
+              : "No activity in this period"
+          }
+          accentClass="text-emerald-300/90"
+          borderClass="border-emerald-400/25"
+          slices={earnSlices}
+          emptyLabel="No earnings in this period"
+        />
       </div>
     </AnalyticsCard>
   );

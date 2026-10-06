@@ -34,8 +34,14 @@ export type WalletCategoryDef = {
   summary: boolean;
   spend: boolean;
   insight: boolean;
-  /** Contributes to the Total Spend KPI. */
+  /** Contributes to the Total Spend KPI and Spending side of Spend vs Earn. */
   spendMetric: boolean;
+  /**
+   * Contributes to the Earnings side of Spend vs Earn.
+   * Reason: owner 6 Oct 2026 — deposits and refunds are money movement, not
+   * platform earnings, so they must stay out of this comparison.
+   */
+  earnMetric: boolean;
   /** Keep a summary tile even at zero. */
   alwaysShowInSummary?: boolean;
 };
@@ -56,6 +62,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: true,
     spendMetric: false,
+    earnMetric: false,
     alwaysShowInSummary: true,
   },
   {
@@ -70,6 +77,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: false,
     spendMetric: true,
+    earnMetric: false,
   },
   {
     key: "marketplace",
@@ -82,6 +90,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: true,
     spendMetric: true,
+    earnMetric: false,
   },
   {
     key: "giftCredits",
@@ -94,6 +103,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: true,
     spendMetric: false,
+    earnMetric: true,
     alwaysShowInSummary: true,
   },
   {
@@ -108,6 +118,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: true,
     spendMetric: false,
+    earnMetric: true,
     alwaysShowInSummary: true,
   },
   {
@@ -121,6 +132,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: true,
     spendMetric: false,
+    earnMetric: true,
   },
   {
     key: "gmSpend",
@@ -133,6 +145,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: false,
     spendMetric: true,
+    earnMetric: false,
   },
   {
     key: "withdrawals",
@@ -145,6 +158,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: true,
     spendMetric: true,
+    earnMetric: false,
   },
   {
     key: "giftCreditsOut",
@@ -157,6 +171,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: false,
     spendMetric: true,
+    earnMetric: false,
   },
   {
     key: "refunds",
@@ -169,6 +184,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: false,
     spendMetric: false,
+    earnMetric: false,
   },
   {
     key: "other",
@@ -181,6 +197,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     spend: true,
     insight: false,
     spendMetric: true,
+    earnMetric: false,
   },
 ] as const;
 
@@ -228,6 +245,7 @@ export type ResolvedWalletCategory = {
   spend: boolean;
   insight: boolean;
   spendMetric: boolean;
+  earnMetric: boolean;
   alwaysShowInSummary: boolean;
   known: boolean;
 };
@@ -243,6 +261,7 @@ function toResolved(def: WalletCategoryDef): ResolvedWalletCategory {
     spend: def.spend,
     insight: def.insight,
     spendMetric: def.spendMetric,
+    earnMetric: def.earnMetric,
     alwaysShowInSummary: Boolean(def.alwaysShowInSummary),
     known: true,
   };
@@ -281,6 +300,7 @@ export function resolveCategories(
       spend: true,
       insight: false,
       spendMetric: true,
+      earnMetric: false,
       alwaysShowInSummary: false,
       known: false,
     });

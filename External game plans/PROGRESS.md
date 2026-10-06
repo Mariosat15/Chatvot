@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Spending vs Earnings contrast CODE-COMPLETE 6 Oct (eng)** — donut is spend vs earn (not every bucket); net centre; two breakdown columns. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
+- **Spending vs Earnings structure CODE-COMPLETE 6 Oct (eng)** — comparison bar + two equal columns; `spendMetric` vs `earnMetric` only (deposits/refunds excluded). Desktop + mobile share the panel. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
+- **Spending vs Earnings contrast CODE-COMPLETE 6 Oct (eng)** — first pass (flow in/out donut). Superseded by structure pass above — deposits/refunds wrongly counted as earnings. **Say which.**
 - **Wallet Insights fill + balance chart gap CODE-COMPLETE 6 Oct (eng)** — insight tiles use equal `1fr` columns (no auto-fill dead space); balance trend / daily flow grow with `flex-1`; mobile trend 200px. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Wallet Analytics data-agnostic CODE-COMPLETE 6 Oct (eng)** — `wallet-categories.ts` is the single catalog; charts/tiles/insights/spend resolve from it plus unknown numeric keys; desktop + mobile share the model. Tests: `wallet-analytics.test.ts` (17). **Never verified by eye.**
 - **Daily Credit Flow desktop-only CODE-COMPLETE 6 Oct (eng)** — removed from mobile; desktop uses composed area/line instead of bars. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
@@ -947,12 +948,21 @@ Newest at the top.
 - Mobile no longer mounts `MobileDailyFlow`.
 - Tests flipped in `wallet-analytics.test.ts`. **Never verified by eye.**
 
+### 6 October 2026 - Spending vs Earnings structure + true earnings only
+
+**Owner report:** layout crowded; deposits and refunds must not sit in Earnings.
+
+- Earnings = `earnMetric` only (gift credits, prizes, GM earnings). Deposits and refunds stay `earnMetric: false` and remain on Credit Breakdown.
+- Spending = `spendMetric` (contest entries, marketplace, GM spend, withdrawals, gift removed, other).
+- UI: comparison bar with net, then two equal columns (desktop `sm:grid-cols-2`, mobile stacks). Donut removed.
+- Same component on desktop and mobile. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
+
 ### 6 October 2026 - Spending vs Earnings is a real contrast
 
 **Owner report:** Credit Breakdown and Spending vs Earnings showed the same category totals (image).
 
 - Root cause: `spendSlices` included every catalog bucket with `spend: true` (in and out) in one donut labelled “Total Credits”.
-- Fix: model splits `flow === "out"` / `flow === "in"`; panel donut is two arcs (Spending / Earnings), centre is net (in − out), lists are “Where it went” / “Where it came from”.
+- First fix (same day, superseded): split by `flow` in/out. That still counted deposits and refunds as earnings — corrected in the structure pass above.
 - Credit Breakdown stays the per-bucket time series + tiles. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Wallet Insights fill row; balance chart gap removed
