@@ -7,9 +7,24 @@
 html #hangar.cv-hangar{position:absolute;inset:0;display:grid;box-sizing:border-box;overflow:hidden;
   grid-template-columns:minmax(280px,32%) minmax(0,1fr) minmax(260px,27%);
   grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"intro stage ship" "dock dock dock";
-  gap:16px 22px;padding:88px 28px 18px;align-items:start;
+  gap:16px 22px;padding:var(--cv-hangar-top,110px) 28px 18px;align-items:start;
   background:linear-gradient(90deg,#030914f0,#050e1dc4 24%,#05101c00 44%,#05101c00 66%,#050e1dcc 82%,#030914ee),
     linear-gradient(0deg,#030914f5,#03091400 38%)}
+/* Reason (6 Oct 2026, owner): fullscreen / large viewports scale mute·pause·settings up to
+   68px while hangar top padding stayed 88px, so the buttons sat on the ship panel. Reserve
+   space from the header row (logo + actions) and keep hangar action buttons at a fixed size. */
+html body[data-state=hangar]{
+  --cv-hangar-top:max(110px,calc(24px + 70px + 20px));
+}
+@media (min-width:1100px) and (min-height:650px){
+  html body[data-state=hangar]{
+    --cv-hangar-top:max(128px,calc(2.4vh + 70px + 24px));
+  }
+}
+html body[data-state=hangar] header .actions button{
+  width:48px;height:48px;min-width:48px;
+}
+html body[data-state=hangar] header .actions button svg{width:22px;height:22px}
 #hangar .cv-intro{grid-area:intro;min-height:0;overflow:hidden}
 #hangar .cv-intro h1{font-size:clamp(30px,3.4vw,56px);line-height:.95;margin:10px 0 14px;white-space:normal}
 #hangar .cv-intro h1 em{display:block}
@@ -63,14 +78,14 @@ html #hangar.cv-hangar{position:absolute;inset:0;display:grid;box-sizing:border-
 @keyframes cv-launch-glow{0%,100%{box-shadow:0 0 22px #3de1ff55}50%{box-shadow:0 0 40px #3de1ffaa}}
 
 /* Lobby list (multiplayer) sits over the empty centre of the hangar, not over the controls. */
-html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:96px;transform:translateX(-50%);
+html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:calc(var(--cv-hangar-top,110px) + 8px);transform:translateX(-50%);
   width:min(300px,30vw);max-height:calc(100dvh - 330px);overflow:auto}
 
 /* Tablet / narrow window: two columns, fleet above the launch button. */
 @media (max-width:900px){
-  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"intro ship" "dock dock";padding:92px 22px 18px}
+  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"intro ship" "dock dock";padding:var(--cv-hangar-top,110px) 22px 18px}
   #hangar .cv-dock{grid-template-columns:minmax(0,1fr)}
-  html body[data-state=hangar][data-mode] #liveStandings{top:auto;bottom:calc(100% - 92px);opacity:0;pointer-events:none}
+  html body[data-state=hangar][data-mode] #liveStandings{top:auto;bottom:calc(100% - var(--cv-hangar-top,110px));opacity:0;pointer-events:none}
 }
 @media (max-width:900px) and (min-height:900px){
   html #hangar.cv-hangar{grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"intro ship" "stage stage" "dock dock"}
@@ -80,8 +95,9 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:9
 
 /* Phone portrait: one column; ships become a swipe strip. */
 @media (max-width:600px){
+  html body[data-state=hangar]{--cv-hangar-top:max(74px,calc(12px + 44px + 14px))}
   html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;
-    grid-template-areas:"intro" "stage" "ship" "dock";gap:10px;padding:74px 12px 12px}
+    grid-template-areas:"intro" "stage" "ship" "dock";gap:10px;padding:var(--cv-hangar-top,74px) 12px 12px}
   #hangar .cv-intro .eyebrow{display:none}
   #hangar .cv-intro h1{font-size:28px;margin:0 0 8px}
   #hangar .cv-ship{padding:10px 12px;max-height:34dvh}
@@ -100,8 +116,9 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:9
 
 /* Phone landscape / very short windows. */
 @media (max-height:500px){
+  html body[data-state=hangar]{--cv-hangar-top:max(58px,calc(8px + 44px + 10px))}
   html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;
-    grid-template-areas:"intro ship" "dock dock";gap:8px 14px;padding:58px 14px 10px}
+    grid-template-areas:"intro ship" "dock dock";gap:8px 14px;padding:var(--cv-hangar-top,58px) 14px 10px}
   #hangar .cv-intro .eyebrow,#hangar .cv-ship #shipDescription,#hangar .cv-keys,#hangar .cv-label span{display:none}
   #hangar .cv-intro h1{font-size:24px;margin:0 0 6px}
   #hangar .cv-intro .rule{margin:0 0 6px}

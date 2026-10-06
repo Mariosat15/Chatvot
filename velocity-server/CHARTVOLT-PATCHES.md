@@ -56,6 +56,7 @@ is `src/input-frames.js`, shared with the server byte for byte). What they do:
 | Clearer capsules, a flash and a pop when one is collected | `client-patches/scene.js`, `powerups.js`, `main.js`, `root/index.html` (`#pickupFlash`) |
 | Start screen fits one screen: ship picker, visible Launch button, obsolete text removed | `root/index.html`, `main.js`, `root/chartvolt.css` |
 | **Ship picker two rows of four** (6 Oct 2026): eight `1fr` columns clipped names to VANGU/TEMPE in the practice frame; dock launch column narrowed | `root/chartvolt.css` (mirrored into packed `client.html`) |
+| **Hangar fullscreen overlap** (6 Oct 2026): mute/pause/settings sat on the ship panel when actions scaled to 68px; `--cv-hangar-top` + fixed hangar action size | `root/chartvolt.css` (mirrored into packed `client.html`) |
 | Race HUD moved to the edges on PC, tablet and short windows (phones keep the vendor layout) | `root/chartvolt.css`, appended by `root/tools/build.mjs` |
 | Amber turn chevrons painted on the road before each corner | `client-patches/road-arrows.js`, called from `environment.js` |
 | Scene slightly brighter (tone-mapping exposure 1.0 -> 1.16). **Buildings were not redesigned** | `client-patches/scene.js` |

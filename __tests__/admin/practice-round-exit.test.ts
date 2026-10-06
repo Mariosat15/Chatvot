@@ -98,4 +98,16 @@ describe("Volt Velocity practice hangar is not squeezed", () => {
     expect(page).toContain("88rem");
     expect(page).not.toMatch(/max-w-5xl/);
   });
+
+  it("keeps mute/pause/settings clear of the ship panel in fullscreen", () => {
+    // Reason (6 Oct 2026, owner): large viewports scaled action buttons to 68px while
+    // hangar padding stayed 88px, so they overlapped VANGUARD.
+    const hangar = read("velocity-server/client-patches/root/chartvolt.css");
+    const packed = read("games-service/vendor/volt-velocity/client.html");
+    for (const source of [hangar, packed]) {
+      expect(source).toMatch(/--cv-hangar-top/);
+      expect(source).toMatch(/data-state=hangar\]\s*header\s*\.actions\s*button/);
+      expect(source).not.toMatch(/padding:88px 28px 18px/);
+    }
+  });
 });

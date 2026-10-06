@@ -323,6 +323,7 @@ project low risk.
 ## START HERE NEXT
 
 - **Game page Enter CTAs → competitions hub CODE-COMPLETE 6 Oct (eng)** — Enter Competition (hero), Enter Now (sidebar + sticky bar) all use `competitionBrowseHref` → `/competitions`. Sticky bar shows WhiteLabel **Brand Icon** (`favicon`), not the wide App Logo wordmark (that crop is why the mark looked like a blob). Tests: `game-page-layout.test.ts`. Never verified by eye.
+- **Volt Velocity hangar fullscreen overlap CODE-COMPLETE 6 Oct (eng)** — mute/pause/settings sat on the VANGUARD ship panel in fullscreen because large viewports scaled those buttons to 68px while hangar top padding stayed 88px. `--cv-hangar-top` clears the header row; hangar action buttons stay 48px. Mirrored into packed `client.html`. Tests: `practice-round-exit.test.ts`. **pull + `pm2 restart chartvolt-games`** (packed client fingerprint changes). Never verified by eye.
 - **Volt Velocity practice stuck on “being confirmed” CODE-COMPLETE 6 Oct (eng)** — after the race the host blanked the client and posted `finished` only; practice kept the iframe forever, and a refresh/exit mid-pull voided rounds into Ended/-. Host now **Close + auto-`exit`** after hand-off (`?v=20261006e`); practice retries the score pull and **never voids while finishing**. Tests: `practice-round-exit.test.ts`. **pull + `pm2 restart chartvolt-games`**. Never verified by eye.
 - **Volt Velocity hangar squeeze + load bar CODE-COMPLETE 6 Oct (eng)** — ship picker was `repeat(8,minmax(0,1fr))` so names clipped to VANGU/TEMPE; now **two rows of four**. Practice page widened (`max-w-5xl` → `88rem`). Host loading screen has an animated bar under the copy. Cache-bust amended to `velocity-host.js?v=20261006e` by the stuck-practice fix above. **pull + `pm2 restart chartvolt-games`** (client.html fingerprint changes with the hangar CSS). Never verified by eye.
 - **Volt Stack squeeze/stretch CODE-COMPLETE 6 Oct (eng)** — fourth pass: the 780px shell clamp squeezed rails (HOLD/COMBO clipped) and left a skinny column. Shell is full iframe; centred cluster = board (1:2 from height, cap 720) + **fixed 176px rails** (never 1fr). Cache-bust `?v=20261006c`. **pull + `pm2 restart chartvolt-games`**, then hard refresh. Never verified by eye.
@@ -958,6 +959,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Volt Velocity hangar fullscreen overlap (owner request)
+
+**Owner report:** in fullscreen, mute / pause / settings overlapped the VANGUARD ship panel (circled).
+
+**Cause:** the vendor scales those buttons to `clamp(48px, 3.7vw, 68px)` on large viewports while hangar top padding stayed `88px`, so the header row landed on the ship card. Fullscreen made the iframe tall enough to hit that breakpoint.
+
+**Shipped:** `--cv-hangar-top` sized from the logo + actions row; hangar action buttons fixed at 48px; lobby standings top follows the same variable. Mirrored into packed `client.html`.
+
+**Nothing was paid wrongly.** Tests: `practice-round-exit.test.ts`. **Needs pull + `pm2 restart chartvolt-games`.** Never verified by eye.
 
 ### 6 October 2026 - Volt Velocity practice stuck on “being confirmed” (owner request)
 
