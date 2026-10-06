@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Game Performance compact cards + both arrows CODE-COMPLETE 6 Oct (eng)** — cards shrunk (hero ~148px); Previous/Next live in the section header and on the row (no negative translate, so they are not clipped under the sidebar); hero art `object-[center_38%]` so the logo sits in the crop. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Game Performance one arrow pair + auto hero crop CODE-COMPLETE 6 Oct (eng)** — header arrows removed; row arrows only. Hero box size unchanged; `heroObjectPosition` pins cover to `center top` when the strip is wider than the art (catalogue 16:9 wordmarks). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Game Performance compact cards + both arrows CODE-COMPLETE 6 Oct (eng)** — cards shrunk (hero ~148px). Header-arrow half is stale as a present fact — **say which**; the row pair above is current. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Game Performance Image-1 cards CODE-COMPLETE 6 Oct (eng)** — hero + identity + 2×2 metrics + sparkline, two at a time. Compact/arrow pass above is the present fact. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Game Performance Play-by-game layout CODE-COMPLETE 6 Oct (eng)** — correct as history and stale as a present fact — **say which**. Owner then asked for Image 1 (hero cards), not Overview Play by game.
 - **Trading card Best score = Trade ROI CODE-COMPLETE 6 Oct (eng)** — Game Performance Trading card no longer shows wallet credit ROI as “Best score”; it shows Trade ROI (or `-` with no trades). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
@@ -947,6 +948,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - One arrow pair; hero crop auto-pins logos (owner request)
+
+**Owner report:** arrows appeared twice (header + row); Circuit Sprint (and other titles) still hid the wordmark. Image 2 (`/games` cards) shows logos because cover is pinned to the art, not because the card is taller.
+
+**Cause:** header `controls` duplicated the row arrows. `object-[center_38%]` still cropped the top ~50px of 16:9 key art in a 132–148px strip.
+
+**Fix:** header arrows removed. `heroObjectPosition` + ResizeObserver: when the box is wider than the image, cover uses `center top`; when it is not (catalogue-shaped 16/11), `center center`. Box height unchanged. No game names (R29).
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Game Performance cards smaller, both arrows, logos in crop (owner request)
 

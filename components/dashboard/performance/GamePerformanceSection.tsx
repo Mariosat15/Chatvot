@@ -12,21 +12,17 @@ function ArrowButton({
   dir,
   disabled,
   onStep,
-  decorative = false,
 }: {
   label: string;
   dir: -1 | 1;
   disabled: boolean;
   onStep: (dir: -1 | 1) => void;
-  decorative?: boolean;
 }) {
   const Icon = dir === -1 ? ChevronLeft : ChevronRight;
   return (
     <button
       type="button"
-      aria-label={decorative ? undefined : label}
-      aria-hidden={decorative || undefined}
-      tabIndex={decorative ? -1 : undefined}
+      aria-label={label}
       disabled={disabled}
       onClick={() => onStep(dir)}
       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-400/50 bg-[#041025]/95 text-cyan-200 shadow-[0_0_12px_rgba(0,217,255,.28)] disabled:cursor-not-allowed disabled:opacity-40"
@@ -37,9 +33,8 @@ function ArrowButton({
 }
 
 /**
- * Two compact Image-1 cards at a time. Arrows sit in the header (never under
- * the sidebar) and again on the row. Reason: `overflow-x-clip` plus a
- * negative-translate left control painted the Previous button behind the menu.
+ * Two compact Image-1 cards at a time. Arrows sit on the row only (not in the
+ * section header). Gutter `px-11` keeps them inside the clip, not under the menu.
  */
 export default function GamePerformanceSection({ cards }: { cards: GameCardView[] }) {
   const scroller = useRef<HTMLUListElement>(null);
@@ -67,48 +62,28 @@ export default function GamePerformanceSection({ cards }: { cards: GameCardView[
     syncEdges();
   }, [syncEdges, cards.length]);
 
-  const arrows = showArrows ? (
-    <div className="flex items-center gap-2">
-      <ArrowButton label="Previous games" dir={-1} disabled={atStart} onStep={step} />
-      <ArrowButton label="Next games" dir={1} disabled={atEnd} onStep={step} />
-    </div>
-  ) : null;
-
   return (
     <PerfSection
       title="Game Performance"
       subtitle="Every game you have played, including trading — artwork, metrics and trend, two at a time."
       icon={PERF_SECTION_ICON.games}
       testId="games"
-      controls={arrows}
     >
       {cards.length === 0 ? (
         <PerfEmpty>No ranked game rounds yet. Play a game contest to see it here.</PerfEmpty>
       ) : (
         <div className="relative min-w-0">
           {showArrows ? (
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden items-center pl-1 sm:flex">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center pl-1">
               <div className="pointer-events-auto">
-                <ArrowButton
-                  label="Previous games"
-                  dir={-1}
-                  disabled={atStart}
-                  onStep={step}
-                  decorative
-                />
+                <ArrowButton label="Previous games" dir={-1} disabled={atStart} onStep={step} />
               </div>
             </div>
           ) : null}
           {showArrows ? (
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden items-center pr-1 sm:flex">
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center pr-1">
               <div className="pointer-events-auto">
-                <ArrowButton
-                  label="Next games"
-                  dir={1}
-                  disabled={atEnd}
-                  onStep={step}
-                  decorative
-                />
+                <ArrowButton label="Next games" dir={1} disabled={atEnd} onStep={step} />
               </div>
             </div>
           ) : null}

@@ -1,12 +1,63 @@
 "use client";
 
+import { useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Minus } from "lucide-react";
 import { NeonIcon, accentHex } from "./PerformanceChrome";
 import { PERF, PERF_METRIC_ICON, PERF_SECTION_ICON } from "./performance-assets";
 import { type GameCardView } from "./performance-game-cards";
+import { heroObjectPosition } from "./performance-hero-art";
 import { TRADING_KEY } from "./performance-model";
+
+function GameHeroArt({ src }: { src: string }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  const apply = useCallback(() => {
+    const box = boxRef.current;
+    const img = imgRef.current;
+    if (!box || !img || img.naturalWidth < 1) return;
+    img.style.objectPosition = heroObjectPosition(
+      img.naturalWidth,
+      img.naturalHeight,
+      box.clientWidth,
+      box.clientHeight,
+    );
+  }, []);
+
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const observer = new ResizeObserver(() => apply());
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [apply, src]);
+
+  return (
+    <div ref={boxRef} className="game-hero relative h-[132px] w-full overflow-hidden sm:h-[148px]">
+      <Image
+        src={src}
+        alt=""
+        fill
+        sizes="(min-width: 1024px) 50vw, 100vw"
+        className="object-cover [object-position:center_top]"
+        quality={90}
+        onLoad={(event) => {
+          imgRef.current = event.currentTarget;
+          apply();
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(0,0,0,0) 45%, rgba(2,8,23,.25) 70%, rgba(2,8,23,.92) 100%)",
+        }}
+      />
+    </div>
+  );
+}
 
 function lastPlayed(iso: string | null): string {
   if (!iso) return "-";
@@ -198,23 +249,7 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
         boxShadow: `0 0 20px ${hex}33, inset 0 1px 0 rgba(255,255,255,.05)`,
       }}
     >
-      <div className="game-hero relative h-[132px] w-full overflow-hidden sm:h-[148px]">
-        <Image
-          src={artSrc}
-          alt=""
-          fill
-          sizes="(min-width: 1024px) 50vw, 100vw"
-          className="object-cover object-[center_38%]"
-          quality={90}
-        />
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to bottom, rgba(0,0,0,0) 45%, rgba(2,8,23,.25) 70%, rgba(2,8,23,.92) 100%)",
-          }}
-        />
-      </div>
+      <GameHeroArt src={artSrc} />
 
       <div className="flex flex-1 flex-col gap-2.5 px-3 pb-3 pt-2 sm:px-3.5">
         <div className="flex flex-wrap items-center gap-2">

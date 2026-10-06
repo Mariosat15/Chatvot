@@ -16,6 +16,7 @@ import {
   type PerfInput,
 } from "@/components/dashboard/performance/performance-model";
 import { buildGameCards } from "@/components/dashboard/performance/performance-game-cards";
+import { heroObjectPosition } from "@/components/dashboard/performance/performance-hero-art";
 import { buildTrend } from "@/components/dashboard/performance/performance-trend";
 import { allPerformanceAssets } from "@/components/dashboard/performance/performance-assets";
 
@@ -308,7 +309,11 @@ describe("performance page structure", () => {
     const card = stripComments(read(`${DIR}/GamePerformanceCard.tsx`));
     expect(card).toMatch(/game-hero/);
     expect(card).toMatch(/h-\[132px\]/);
-    expect(card).toMatch(/object-cover object-\[center_38%\]/);
+    expect(card).toMatch(/object-cover/);
+    expect(card).toMatch(/heroObjectPosition/);
+    expect(card).toMatch(/ResizeObserver/);
+    expect(card).not.toMatch(/object-\[center_38%\]/);
+    expect(section).not.toMatch(/controls=\{arrows\}/);
     expect(card).toMatch(/View Details/);
     expect(card).toMatch(/Best score/);
     expect(card).toMatch(/card\.scoredRounds/);
@@ -324,6 +329,13 @@ describe("performance page structure", () => {
     expect(section).toMatch(/Next games/);
     expect(section).toMatch(/ChevronLeft/);
     expect(section).not.toMatch(/lg:grid-cols-2/);
+  });
+
+  it("pins Game Performance heroes to the top of key art when the box is a wide strip", () => {
+    // 16:9 art in a ~3.4:1 strip (132–148px hero) — same cut that hid Circuit Sprint's wordmark.
+    expect(heroObjectPosition(1280, 720, 500, 148)).toBe("center top");
+    expect(heroObjectPosition(1280, 720, 460, 318)).toBe("center center");
+    expect(heroObjectPosition(0, 0, 100, 100)).toBe("center top");
   });
 
   it("Trading Game Performance card uses cyan; other titles never named (R29)", () => {
