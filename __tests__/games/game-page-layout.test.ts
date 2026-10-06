@@ -60,6 +60,25 @@ describe("player game page layout", () => {
     expect(view).not.toMatch(/>\s*CV\s*</);
   });
 
+  it("picks a sticky-bar slogan at random each visit from the owner list", () => {
+    // Reason (6 Oct 2026, owner): replace the fixed Better traders / brighter
+    // tomorrow line with one of the competition slogans per visit.
+    expect(view).toContain("pickStickyEnterSlogan");
+    expect(view).toContain("STICKY_ENTER_SLOGANS");
+    expect(view).not.toMatch(/Better traders/i);
+    expect(view).not.toMatch(/brighter tomorrow/i);
+
+    const slogans = readCode(
+      "components/game-page/sticky-enter-slogans.ts",
+    );
+    expect(slogans).toContain("We Came. We Competed. We Conquered.");
+    expect(slogans).toContain("Built to Compete. Made to Win.");
+    expect(slogans).toContain("Trade. Game. Compete. Conquer.");
+    // Reason: pick after mount — a random initialiser hydrates differently
+    // on every visit and React warns.
+    expect(view).toMatch(/useEffect\s*\(\s*\(\)\s*=>\s*\{[\s\S]*?pickStickyEnterSlogan/);
+  });
+
   it("does not render the Ready to Play CTA panel on overview", () => {
     expect(overview).not.toMatch(/Ready to Play/i);
     expect(overview).not.toContain("PlayNowButton");

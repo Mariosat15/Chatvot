@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Zap } from "lucide-react";
 import {
   challengeCreateHref,
@@ -18,6 +18,12 @@ import { GamePageHowItWorks } from "./GamePageHowItWorks";
 import { GamePageFeatured } from "./GamePageFeatured";
 import { GamePagePanel, GP_CTA_PRIMARY, GP_CTA_GREEN } from "./GamePageChrome";
 import { gpSans } from "./game-page-fonts";
+import {
+  pickStickyEnterSlogan,
+  splitSloganTone,
+  STICKY_ENTER_SLOGANS,
+  type StickyEnterSlogan,
+} from "./sticky-enter-slogans";
 
 function RulesTab({ game }: { game: GamePageData }) {
   const howTo =
@@ -89,6 +95,15 @@ function GalleryTab({ game }: { game: GamePageData }) {
 
 function StickyEnterBar({ game }: { game: GamePageData }) {
   const { images } = useWhiteLabelImages();
+  // Reason: pick after mount so SSR and the first client paint agree; a random
+  // choice in the initialiser would hydrate-mismatch on every visit.
+  const [slogan, setSlogan] = useState<StickyEnterSlogan>(
+    STICKY_ENTER_SLOGANS[0],
+  );
+  useEffect(() => {
+    setSlogan(pickStickyEnterSlogan());
+  }, []);
+
   if (game.comingSoon) {
     return (
       <div className="sticky bottom-3 z-40 mt-6 overflow-hidden rounded-[12px] border border-sky-500/30 bg-[var(--gp-panel,#07152c)]/95 px-4 py-3 shadow-[0_0_40px_rgba(0,0,0,.5)] backdrop-blur">
@@ -101,7 +116,9 @@ function StickyEnterBar({ game }: { game: GamePageData }) {
   // Reason (6 Oct 2026, owner): Enter Now → competitions hub.
   // Reason (6 Oct 2026, owner): square Brand Icon (favicon), never the wide
   // App Logo wordmark — a 36px box crops a wordmark into an unreadable blob.
+  // Reason (6 Oct 2026, owner): slogan rotates from STICKY_ENTER_SLOGANS each visit.
   const href = competitionBrowseHref(game.slug);
+  const { lead, trail } = splitSloganTone(slogan);
   return (
     <div className="sticky bottom-3 z-40 mt-6 overflow-hidden rounded-[12px] border border-[var(--gp-card-border,rgba(40,130,255,.35))] bg-[var(--gp-panel,#07152c)]/95 px-4 py-3 shadow-[0_0_40px_rgba(0,0,0,.5)] backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -119,8 +136,13 @@ function StickyEnterBar({ game }: { game: GamePageData }) {
             />
           </div>
           <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[var(--gp-muted)]">
-            <span className="text-[var(--gp-gold,#ffd33d)]">Better traders</span>{" "}
-            <span className="text-[var(--gp-accent)]">brighter tomorrow</span>
+            <span className="text-[var(--gp-gold,#ffd33d)]">{lead}</span>
+            {trail ? (
+              <>
+                {" "}
+                <span className="text-[var(--gp-accent)]">{trail}</span>
+              </>
+            ) : null}
           </p>
         </div>
         <Link href={href} className={`${GP_CTA_PRIMARY} !px-4 !py-2 !text-[13px]`}>

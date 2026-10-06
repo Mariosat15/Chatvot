@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Game page Enter CTAs → competitions hub CODE-COMPLETE 6 Oct (eng)** — Enter Competition (hero), Enter Now (sidebar + sticky bar) all use `competitionBrowseHref` → `/competitions`. Sticky bar shows WhiteLabel **Brand Icon** (`favicon`), not the wide App Logo wordmark (that crop is why the mark looked like a blob). Tests: `game-page-layout.test.ts`. Never verified by eye.
+- **Sticky Enter bar slogans CODE-COMPLETE 6 Oct (eng)** — the game-page sticky bar no longer says “Better traders / brighter tomorrow”; each visit picks one of 21 owner slogans from `sticky-enter-slogans.ts` (client `useEffect` so SSR does not hydrate-mismatch). Two-tone gold/accent split kept for multi-phrase lines. Tests: `game-page-layout.test.ts`, `sticky-enter-slogans.test.ts`. Never verified by eye.
+- **Game page Enter CTAs → competitions hub CODE-COMPLETE 6 Oct (eng)** — Enter Competition (hero), Enter Now (sidebar + sticky bar) all use `competitionBrowseHref` → `/competitions`. Sticky bar shows WhiteLabel **Brand Icon** (`favicon`), not the wide App Logo wordmark (that crop is why the mark looked like a blob). Slogan half superseded by the row above — **say which**. Tests: `game-page-layout.test.ts`. Never verified by eye.
 - **Volt Velocity hangar fullscreen overlap CODE-COMPLETE 6 Oct (eng)** — mute/pause/settings sat on the VANGUARD ship panel in fullscreen because large viewports scaled those buttons to 68px while hangar top padding stayed 88px. `--cv-hangar-top` clears the header row; hangar action buttons stay 48px. Mirrored into packed `client.html`. Tests: `practice-round-exit.test.ts`. **pull + `pm2 restart chartvolt-games`** (packed client fingerprint changes). Never verified by eye.
 - **Volt Velocity practice stuck on “being confirmed” CODE-COMPLETE 6 Oct (eng)** — after the race the host blanked the client and posted `finished` only; practice kept the iframe forever, and a refresh/exit mid-pull voided rounds into Ended/-. Host now **Close + auto-`exit`** after hand-off (`?v=20261006e`); practice retries the score pull and **never voids while finishing**. Tests: `practice-round-exit.test.ts`. **pull + `pm2 restart chartvolt-games`**. Never verified by eye.
 - **Volt Velocity hangar squeeze + load bar CODE-COMPLETE 6 Oct (eng)** — ship picker was `repeat(8,minmax(0,1fr))` so names clipped to VANGU/TEMPE; now **two rows of four**. Practice page widened (`max-w-5xl` → `88rem`). Host loading screen has an animated bar under the copy. Cache-bust amended to `velocity-host.js?v=20261006e` by the stuck-practice fix above. **pull + `pm2 restart chartvolt-games`** (client.html fingerprint changes with the hangar CSS). Never verified by eye.
@@ -959,6 +960,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Sticky Enter bar rotating slogans (owner request)
+
+**Owner report:** replace the fixed “BETTER TRADERS BRIGHTER TOMORROW” line on the game-page sticky Enter bar with a random pick each visit from the supplied competition slogans.
+
+**Shipped:** `components/game-page/sticky-enter-slogans.ts` holds all 21 slogans; `StickyEnterBar` picks one in a client `useEffect` (avoids SSR hydration mismatch) and keeps the gold / accent two-tone split for multi-phrase lines. Brand Icon + Enter Now unchanged.
+
+**Nothing was paid wrongly.** Tests: `sticky-enter-slogans.test.ts`, `game-page-layout.test.ts`. Never verified by eye.
 
 ### 6 October 2026 - Volt Velocity hangar fullscreen overlap (owner request)
 
