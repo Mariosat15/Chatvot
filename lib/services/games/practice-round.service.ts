@@ -88,6 +88,11 @@ type TitleLookup =
 const TRADING_UNSUPPORTED =
   "Trading does not have a practice area yet. Trading is only played inside competitions.";
 
+/** The game often finishes a beat before the host asks to void it. That is success, not a fault. */
+function practiceAlreadyClosedAtProvider(error: string | undefined): boolean {
+  return typeof error === "string" && /already finished as .+ and cannot be voided/i.test(error);
+}
+
 async function lookUpPracticeTitle(slug: string): Promise<TitleLookup> {
   const card = await getBrowsableGameBySlug(slug);
   if (!card) {
@@ -157,12 +162,19 @@ export async function endLivePracticeRounds(
   gameKey: string,
   roundId?: string,
 ): Promise<number> {
+  // Leaving a named round also voids one the provider already finished: the iframe
+  // posts `finished` after the game marks completed, then the host DELETEs. Launch
+  // cleanup (no roundId) only closes still-live rounds so history is not rewritten.
+  const statuses: RoundStatus[] = roundId
+    ? [...LIVE_ROUND_STATUSES, "completed", "abandoned", "expired"]
+    : [...LIVE_ROUND_STATUSES];
+
   const live = await GameRound.find({
     contestType: "practice",
     contestId: null,
     userId,
     gameKey,
-    status: { $in: LIVE_ROUND_STATUSES },
+    status: { $in: statuses },
     ...(roundId ? { roundId } : {}),
   });
 
@@ -179,7 +191,7 @@ export async function endLivePracticeRounds(
       void adapter
         .voidRound(round.roundId)
         .then((outcome) => {
-          if (!outcome.success) {
+          if (!outcome.success && !practiceAlreadyClosedAtProvider(outcome.error)) {
             console.warn(
               `⚠️ Provider did not void practice round ${round.roundId}: ${outcome.error}`,
             );

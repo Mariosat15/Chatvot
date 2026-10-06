@@ -2089,6 +2089,10 @@ practice and removing them is a mirrored migration for no gain.
   provider that has simply never run is not healthy - nothing has been proven - and it is not
   down either. Reporting it as healthy is how a launch-day integration passes its own health
   check while being completely untested.
+- **Practice rounds are not traffic.** Amended 6 October 2026: the 24-hour round counts and
+  the kill-switch evidence query exclude `contestType: "practice"`. Voiding a free practice
+  round on leave is the intended ending, and counting those voids as "finished with no score"
+  marked ChartVolt Games Down while it was working. Challenges stay in — they are paid.
 
 **Deliberately not built:** no round list, because the round inspector is that screen and a
 second one drifts from it. `07`'s `provider_health_check` model was **not** created, for the

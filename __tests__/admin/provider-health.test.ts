@@ -345,6 +345,36 @@ describe("unresolved rounds are judged as a share, not as a count", () => {
     const [row] = await getProviderHealth();
     expect(row.verdict).toBe("down");
   });
+
+  it("does not judge a provider by practice rounds", async () => {
+    // Reason: owner 6 Oct 2026 — ChartVolt Games looked Down because three practice
+    // rounds were voided on leave and none produced a score. Practice is free and
+    // unranked; it is not evidence the provider is broken.
+    await seedRunnableProvider();
+    await seedRound("voided", {
+      contestType: "practice",
+      contestId: null,
+      mode: "practice",
+    });
+    await seedRound("completed", {
+      contestType: "practice",
+      contestId: null,
+      mode: "practice",
+      resultReceivedAt: new Date(),
+      rawScore: 0,
+    });
+    await seedRound("expired", {
+      contestType: "practice",
+      contestId: null,
+      mode: "practice",
+    });
+
+    const [row] = await getProviderHealth();
+    expect(row.verdict).toBe("no_traffic");
+    expect(row.rounds.total).toBe(0);
+    expect(row.rounds.endedWithoutResult).toBe(0);
+    expect(row.summary).toMatch(/nothing to judge/i);
+  });
 });
 
 describe("the facts beside the verdict", () => {

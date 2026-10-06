@@ -360,6 +360,32 @@ describe("runProviderKillSwitch", () => {
     expect(row?.enabled).toBe(true);
   });
 
+  it("does not treat practice voids as outage evidence", async () => {
+    await seedEnabledProvider();
+    await GameRound.create({
+      roundId: `cv_rnd_kill_practice_${Date.now()}`,
+      providerKey: MOCK_PROVIDER_KEY,
+      gameCode: "mock",
+      gameKey: `provider:${MOCK_PROVIDER_KEY}:mock`,
+      userId: new mongoose.Types.ObjectId().toString(),
+      contestType: "practice",
+      contestId: null,
+      attemptNumber: 1,
+      mode: "practice",
+      status: "voided",
+      expiresAt: new Date(Date.now() + 60_000),
+      pollAttempts: 0,
+    });
+
+    const summary = await runProviderKillSwitch(new Date());
+    const row = await GameProvider.findOne({
+      providerKey: MOCK_PROVIDER_KEY,
+    }).lean<{ healthFailureStreak?: number; healthStatus?: string }>();
+    expect(summary.providers[0]?.evidence).toBe("no_evidence");
+    expect(row?.healthFailureStreak).toBe(0);
+    expect(recordAlert).not.toHaveBeenCalled();
+  });
+
   it("skips providers with no registered adapter", async () => {
     await GameProvider.create({
       providerKey: "unknown-vendor",

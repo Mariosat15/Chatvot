@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { createRound } from "../rounds/create";
 import { finishRound, playability } from "../rounds/lifecycle";
 import { buildResultBody } from "../rounds/report";
-import { Round } from "../store/round.model";
+import { Round, isTerminal } from "../store/round.model";
 import { ApiError, unknownRound } from "./errors";
 
 /**
@@ -81,6 +81,14 @@ export async function postVoidRound(req: Request, res: Response): Promise<void> 
   if (round.status === "voided") {
     // Idempotent success. A retried void has achieved what it asked for, and an error would invite
     // a third attempt at something already done.
+    res.json(buildResultBody(round.toObject()));
+    return;
+  }
+
+  // Practice is closed from the host AFTER the game has already finished (completed,
+  // abandoned, or the clock ran out). The platform DELETE then asks to void it. Ranked
+  // still refuses: voiding a scored paid round would take a result away.
+  if (round.mode === "practice" && isTerminal(round.status)) {
     res.json(buildResultBody(round.toObject()));
     return;
   }

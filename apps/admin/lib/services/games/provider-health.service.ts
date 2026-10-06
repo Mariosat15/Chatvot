@@ -123,7 +123,10 @@ export async function getProviderHealth(): Promise<ProviderHealthRow[]> {
   // query per provider per status would be a query count that grows with the catalogue.
   const [roundStats, eventStats, lastRounds, titleCounts] = await Promise.all([
     GameRound.aggregate<{ _id: { providerKey: string; status: string }; n: number }>([
-      { $match: { createdAt: { $gte: since } } },
+      // Reason: practice is free and unranked. Voiding it on leave is the intended
+      // ending, so counting those voids as "finished with no score" marks a working
+      // provider Down (owner, 6 Oct 2026). Challenges stay in — they are paid.
+      { $match: { createdAt: { $gte: since }, contestType: { $ne: "practice" } } },
       {
         $group: {
           _id: { providerKey: "$providerKey", status: "$status" },
@@ -150,7 +153,7 @@ export async function getProviderHealth(): Promise<ProviderHealthRow[]> {
     // an operator asks precisely when the window is empty, and a windowed answer would
     // return null exactly then.
     GameRound.aggregate<{ _id: string; at: Date }>([
-      { $match: { status: "completed" } },
+      { $match: { status: "completed", contestType: { $ne: "practice" } } },
       {
         $group: {
           _id: "$providerKey",

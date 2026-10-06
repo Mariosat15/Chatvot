@@ -7,7 +7,7 @@ import { ProviderGameFrame } from "./ProviderGameFrame";
 import { Button } from "@/components/ui/button";
 import { neonButtonClasses } from "@/components/neon/Buttons";
 import { NEON_PANEL } from "@/components/neon/tokens";
-import { formatGameScore, type GameScoreType } from "@/lib/utils/format-game-score";
+import type { GameScoreType } from "@/lib/utils/format-game-score";
 import type { PracticeRoundView } from "./practice-state";
 
 /**
@@ -27,6 +27,7 @@ type Phase =
 interface PracticeRoundHostProps {
   slug: string;
   gameName: string;
+  /** Kept so the page can pass the title's type; practice never prints a score. */
   scoreType?: GameScoreType;
   initialRounds: PracticeRoundView[];
 }
@@ -41,7 +42,6 @@ const STATUS_LABELS = new Map<string, string>([
 export function PracticeRoundHost({
   slug,
   gameName,
-  scoreType,
   initialRounds,
 }: PracticeRoundHostProps) {
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
@@ -168,13 +168,8 @@ export function PracticeRoundHost({
           </h3>
           <ul className="mt-3 space-y-2">
             {rounds.map((round) => (
-              <li key={round.roundId} className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">
-                  {round.isLive ? "In progress" : (STATUS_LABELS.get(round.status) ?? round.status)}
-                </span>
-                <span className="font-mono text-white">
-                  {formatGameScore(round.score, scoreType)}
-                </span>
+              <li key={round.roundId} className="text-sm text-gray-400">
+                {round.isLive ? "In progress" : (STATUS_LABELS.get(round.status) ?? round.status)}
               </li>
             ))}
           </ul>

@@ -165,6 +165,38 @@ describe("leaving a practice round closes it", () => {
     voided.mockRestore();
   });
 
+  it("voids a practice round the provider already finished, without warning", async () => {
+    const mock = getProviderAdapter(MOCK_PROVIDER_KEY) as MockProviderAdapter;
+    const voided = vi
+      .spyOn(mock, "voidRound")
+      .mockResolvedValue({
+        success: false,
+        error:
+          "Round 'cv_rnd_x' already finished as 'completed' and cannot be voided.",
+        retryable: false,
+      });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const userId = new Types.ObjectId().toString();
+    const first = await practice(userId, GAME_A);
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+    await GameRound.updateOne(
+      { roundId: first.roundId },
+      { $set: { status: "completed", rawScore: 0 } },
+    );
+
+    expect(await endLivePracticeRounds(userId, keyOf(GAME_A), first.roundId)).toBe(
+      1,
+    );
+    const stored = await GameRound.findOne({ roundId: first.roundId }).lean<{
+      status: string;
+    }>();
+    expect(stored?.status).toBe("voided");
+    expect(warn.mock.calls.join(" ")).not.toMatch(/did not void practice/);
+    voided.mockRestore();
+    warn.mockRestore();
+  });
+
   it("is idempotent: a round already closed ends nothing", async () => {
     const userId = new Types.ObjectId().toString();
     const round = await practice(userId, GAME_A);

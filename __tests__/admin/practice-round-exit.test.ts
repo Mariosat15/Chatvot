@@ -24,6 +24,7 @@ describe("practice rounds end when the player leaves", () => {
     expect(code).toMatch(/addEventListener\(\s*["']beforeunload["']/);
     expect(code).toMatch(/keepalive:\s*true/);
     expect(code).toMatch(/method:\s*["']DELETE["']/);
+    expect(code).not.toMatch(/formatGameScore/);
   });
 });
 

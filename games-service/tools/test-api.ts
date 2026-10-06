@@ -909,6 +909,27 @@ async function main(): Promise<number> {
     assert.equal(voided.status, 409);
   });
 
+  await test("voiding a finished PRACTICE round is success, not a conflict", async () => {
+    // The host DELETEs after the iframe posts finished; the game has already completed.
+    await clearRounds();
+    const body = createBody({
+      resultCallbackUrl: callbackUrl,
+      mode: "practice",
+      contentSeed: undefined,
+    });
+    const created = await callApi<{ launchUrl: string }>("/v1/rounds", { method: "POST", body });
+    const token = tokenFromLaunchUrl(created.body.launchUrl);
+    const { callPlay } = await import("./api-harness");
+    await callPlay("/play/api/session", { t: token });
+    await callPlay("/play/api/leave", { t: token });
+
+    const voided = await callApi(`/v1/rounds/${body.roundId}/void`, {
+      method: "POST",
+      body: {},
+    });
+    assert.equal(voided.status, 200);
+  });
+
   console.log("");
   console.log("Errors are always JSON (section 14)");
 

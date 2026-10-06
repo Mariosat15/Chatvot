@@ -171,7 +171,8 @@ export async function loadProviderEvidence(
 ): Promise<Parameters<typeof classifyProviderEvidence>[0]> {
   const [rounds, events] = await Promise.all([
     GameRound.aggregate<{ _id: string; n: number }>([
-      { $match: { providerKey, createdAt: { $gte: since } } },
+      // Same filter as provider health: practice voids are not an outage.
+      { $match: { providerKey, createdAt: { $gte: since }, contestType: { $ne: "practice" } } },
       { $group: { _id: "$status", n: { $sum: 1 } } },
     ]),
     ProviderEvent.aggregate<{ _id: string; n: number }>([
