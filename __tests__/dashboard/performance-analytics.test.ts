@@ -307,8 +307,8 @@ describe("performance page structure", () => {
     const section = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
     const card = stripComments(read(`${DIR}/GamePerformanceCard.tsx`));
     expect(card).toMatch(/game-hero/);
-    expect(card).toMatch(/h-\[220px\]/);
-    expect(card).toMatch(/object-cover object-center/);
+    expect(card).toMatch(/h-\[132px\]/);
+    expect(card).toMatch(/object-cover object-\[center_38%\]/);
     expect(card).toMatch(/View Details/);
     expect(card).toMatch(/Best score/);
     expect(card).toMatch(/card\.scoredRounds/);
@@ -317,7 +317,9 @@ describe("performance page structure", () => {
     expect(card).toMatch(/GameSparkline/);
     expect(card).not.toMatch(/w-\[44%\]|w-\[42%\]/);
     expect(card).not.toMatch(/lg:grid-cols-2/);
-    expect(section).toMatch(/sm:w-\[calc\(\(100%-1\.25rem\)\/2\)\]/);
+    expect(section).toMatch(/sm:w-\[calc\(\(100%-1rem\)\/2\)\]/);
+    expect(section).toMatch(/px-11/);
+    expect(section).not.toMatch(/-translate-x-1\/2/);
     expect(section).toMatch(/Previous games/);
     expect(section).toMatch(/Next games/);
     expect(section).toMatch(/ChevronLeft/);

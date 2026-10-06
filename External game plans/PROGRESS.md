@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Game Performance Image-1 cards CODE-COMPLETE 6 Oct (eng)** — Game Performance is hero artwork + identity + 2×2 metric tiles + sparkline footer; two cards visible, extra titles via carousel arrows. Play-by-game text-left/art-right is superseded. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Game Performance compact cards + both arrows CODE-COMPLETE 6 Oct (eng)** — cards shrunk (hero ~148px); Previous/Next live in the section header and on the row (no negative translate, so they are not clipped under the sidebar); hero art `object-[center_38%]` so the logo sits in the crop. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Game Performance Image-1 cards CODE-COMPLETE 6 Oct (eng)** — hero + identity + 2×2 metrics + sparkline, two at a time. Compact/arrow pass above is the present fact. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Game Performance Play-by-game layout CODE-COMPLETE 6 Oct (eng)** — correct as history and stale as a present fact — **say which**. Owner then asked for Image 1 (hero cards), not Overview Play by game.
 - **Trading card Best score = Trade ROI CODE-COMPLETE 6 Oct (eng)** — Game Performance Trading card no longer shows wallet credit ROI as “Best score”; it shows Trade ROI (or `-` with no trades). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Performance header border + no Competitions tab + Trade ROI CODE-COMPLETE 6 Oct (eng)** — Performance banner matches Wallet (magenta plate); Competitions removed from Header `NAV_ITEMS` (`?tab=contests` still works); Trade ROI no longer treats game seats as $10k capital. Tests: `performance-analytics.test.ts`, `games-first-nav.test.ts`. **Never verified by eye.**
@@ -946,6 +947,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Game Performance cards smaller, both arrows, logos in crop (owner request)
+
+**Owner report:** cards were huge; the left arrow was missing; the left of the page sat under the menu; artwork cropped the logo.
+
+**Cause:** hero ~250px plus a Previous control at `left-0 -translate-x-1/2`, which `overflow-x-clip` painted behind the sidebar.
+
+**Fix:** compact card; arrows in the section header and inset on the row; `object-[center_38%]` on the hero.
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Game Performance cards rebuilt to Image 1 (owner request)
 

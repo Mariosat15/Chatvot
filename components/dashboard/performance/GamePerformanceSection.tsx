@@ -7,9 +7,39 @@ import { PerfEmpty, PerfSection } from "./PerformanceChrome";
 import { PERF_SECTION_ICON } from "./performance-assets";
 import { type GameCardView } from "./performance-game-cards";
 
+function ArrowButton({
+  label,
+  dir,
+  disabled,
+  onStep,
+  decorative = false,
+}: {
+  label: string;
+  dir: -1 | 1;
+  disabled: boolean;
+  onStep: (dir: -1 | 1) => void;
+  decorative?: boolean;
+}) {
+  const Icon = dir === -1 ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      aria-label={decorative ? undefined : label}
+      aria-hidden={decorative || undefined}
+      tabIndex={decorative ? -1 : undefined}
+      disabled={disabled}
+      onClick={() => onStep(dir)}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-400/50 bg-[#041025]/95 text-cyan-200 shadow-[0_0_12px_rgba(0,217,255,.28)] disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <Icon className="h-5 w-5" aria-hidden />
+    </button>
+  );
+}
+
 /**
- * Game Performance — two large Image-1 cards at a time, extra titles via
- * carousel. Do not stack every game in a vertical grid (image 2).
+ * Two compact Image-1 cards at a time. Arrows sit in the header (never under
+ * the sidebar) and again on the row. Reason: `overflow-x-clip` plus a
+ * negative-translate left control painted the Previous button behind the menu.
  */
 export default function GamePerformanceSection({ cards }: { cards: GameCardView[] }) {
   const scroller = useRef<HTMLUListElement>(null);
@@ -27,7 +57,7 @@ export default function GamePerformanceSection({ cards }: { cards: GameCardView[
     const el = scroller.current;
     const first = el?.firstElementChild as HTMLElement | null;
     if (!el || !first) return;
-    const gap = Number.parseFloat(getComputedStyle(el).columnGap || getComputedStyle(el).gap) || 20;
+    const gap = Number.parseFloat(getComputedStyle(el).columnGap || getComputedStyle(el).gap) || 16;
     el.scrollBy({ left: dir * (first.offsetWidth + gap), behavior: "smooth" });
   }, []);
 
@@ -37,75 +67,65 @@ export default function GamePerformanceSection({ cards }: { cards: GameCardView[
     syncEdges();
   }, [syncEdges, cards.length]);
 
+  const arrows = showArrows ? (
+    <div className="flex items-center gap-2">
+      <ArrowButton label="Previous games" dir={-1} disabled={atStart} onStep={step} />
+      <ArrowButton label="Next games" dir={1} disabled={atEnd} onStep={step} />
+    </div>
+  ) : null;
+
   return (
     <PerfSection
       title="Game Performance"
       subtitle="Every game you have played, including trading — artwork, metrics and trend, two at a time."
       icon={PERF_SECTION_ICON.games}
       testId="games"
+      controls={arrows}
     >
       {cards.length === 0 ? (
         <PerfEmpty>No ranked game rounds yet. Play a game contest to see it here.</PerfEmpty>
       ) : (
-        <div className="relative">
+        <div className="relative min-w-0">
           {showArrows ? (
-            <button
-              type="button"
-              aria-label="Previous games"
-              disabled={atStart}
-              onClick={() => step(-1)}
-              className="absolute left-0 top-1/2 z-10 hidden h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-400/50 bg-[#041025]/90 text-cyan-200 shadow-[0_0_16px_rgba(0,217,255,.28)] disabled:opacity-30 sm:flex"
-            >
-              <ChevronLeft className="h-6 w-6" aria-hidden />
-            </button>
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden items-center pl-1 sm:flex">
+              <div className="pointer-events-auto">
+                <ArrowButton
+                  label="Previous games"
+                  dir={-1}
+                  disabled={atStart}
+                  onStep={step}
+                  decorative
+                />
+              </div>
+            </div>
           ) : null}
           {showArrows ? (
-            <button
-              type="button"
-              aria-label="Next games"
-              disabled={atEnd}
-              onClick={() => step(1)}
-              className="absolute right-0 top-1/2 z-10 hidden h-11 w-11 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-400/50 bg-[#041025]/90 text-cyan-200 shadow-[0_0_16px_rgba(0,217,255,.28)] disabled:opacity-30 sm:flex"
-            >
-              <ChevronRight className="h-6 w-6" aria-hidden />
-            </button>
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden items-center pr-1 sm:flex">
+              <div className="pointer-events-auto">
+                <ArrowButton
+                  label="Next games"
+                  dir={1}
+                  disabled={atEnd}
+                  onStep={step}
+                  decorative
+                />
+              </div>
+            </div>
           ) : null}
           <ul
             ref={scroller}
             onScroll={syncEdges}
-            className="flex snap-x snap-mandatory gap-5 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex min-w-0 snap-x snap-mandatory gap-4 overflow-x-auto px-11 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {cards.map((card) => (
               <li
                 key={card.gameKey}
-                className="w-full shrink-0 snap-start sm:w-[calc((100%-1.25rem)/2)]"
+                className="w-full shrink-0 snap-start sm:w-[calc((100%-1rem)/2)]"
               >
                 <GamePerformanceCard card={card} />
               </li>
             ))}
           </ul>
-          {showArrows ? (
-            <div className="mt-3 flex justify-center gap-3 sm:hidden">
-              <button
-                type="button"
-                aria-label="Previous games"
-                disabled={atStart}
-                onClick={() => step(-1)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/50 bg-[#041025] text-cyan-200 disabled:opacity-30"
-              >
-                <ChevronLeft className="h-5 w-5" aria-hidden />
-              </button>
-              <button
-                type="button"
-                aria-label="Next games"
-                disabled={atEnd}
-                onClick={() => step(1)}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/50 bg-[#041025] text-cyan-200 disabled:opacity-30"
-              >
-                <ChevronRight className="h-5 w-5" aria-hidden />
-              </button>
-            </div>
-          ) : null}
         </div>
       )}
     </PerfSection>

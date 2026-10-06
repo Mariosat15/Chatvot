@@ -13,7 +13,7 @@ import { WALLET_PAGE_BG } from "./wallet/wallet-tokens";
  */
 export default function DashboardBackdrop({ children }: { children: ReactNode }) {
   return (
-    <div className="relative isolate rounded-2xl">
+    <div className="relative isolate min-w-0 overflow-x-clip rounded-2xl">
       <div
         className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-2xl"
         aria-hidden

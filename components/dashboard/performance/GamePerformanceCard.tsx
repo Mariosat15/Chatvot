@@ -21,11 +21,11 @@ function lastPlayed(iso: string | null): string {
 
 function MetricTrend({ value }: { value: number | null }) {
   if (value === null || !Number.isFinite(value)) {
-    return <span className="text-[15px] font-semibold text-[#6b7f9c]">-</span>;
+    return <span className="text-xs font-semibold text-[#6b7f9c]">-</span>;
   }
   if (Math.abs(value) < 0.05) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[15px] font-semibold text-[#6b7f9c]">
+      <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-[#6b7f9c]">
         <Minus className="h-3.5 w-3.5" aria-hidden /> 0%
       </span>
     );
@@ -34,7 +34,7 @@ function MetricTrend({ value }: { value: number | null }) {
   const Icon = up ? ArrowUpRight : ArrowDownRight;
   return (
     <span
-      className={`inline-flex items-center gap-0.5 text-[15px] font-semibold ${
+      className={`inline-flex items-center gap-0.5 text-xs font-semibold ${
         up ? "text-[#00e6a3]" : "text-[#ff4b67]"
       }`}
     >
@@ -55,7 +55,7 @@ function GameSparkline({
   id: string;
 }) {
   const width = 280;
-  const height = 70;
+  const height = 40;
   const idSafe = id.replace(/[^a-zA-Z0-9_-]/g, "");
   if (points.length < 2) {
     return (
@@ -122,18 +122,18 @@ function MetricTile({
 }) {
   return (
     <div
-      className="flex min-h-[72px] items-center gap-3 rounded-[14px] px-4 py-3"
+      className="flex min-h-[54px] items-center gap-2 rounded-[12px] px-3 py-2"
       style={{
         background: "linear-gradient(135deg, rgba(6,24,55,.96), rgba(4,12,30,.98))",
         border: `1px solid ${hex}73`,
         boxShadow: `0 0 14px ${hex}22`,
       }}
     >
-      <NeonIcon src={icon} size={46} />
+      <NeonIcon src={icon} size={32} />
       <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-bold uppercase tracking-wider text-[#8ea4c5]">{label}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[#8ea4c5]">{label}</p>
         <div className="mt-0.5 flex items-baseline justify-between gap-2">
-          <span className="truncate text-[28px] font-black leading-none tabular-nums text-white">{value}</span>
+          <span className="truncate text-xl font-black leading-none tabular-nums text-white">{value}</span>
           <MetricTrend value={trend} />
         </div>
       </div>
@@ -190,7 +190,7 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
 
   return (
     <article
-      className="flex h-full flex-col overflow-hidden rounded-[22px]"
+      className="flex h-full flex-col overflow-hidden rounded-[18px]"
       data-game-card={card.gameKey}
       style={{
         background: PERF.bg2,
@@ -198,13 +198,13 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
         boxShadow: `0 0 20px ${hex}33, inset 0 1px 0 rgba(255,255,255,.05)`,
       }}
     >
-      <div className="game-hero relative h-[220px] w-full overflow-hidden sm:h-[250px]">
+      <div className="game-hero relative h-[132px] w-full overflow-hidden sm:h-[148px]">
         <Image
           src={artSrc}
           alt=""
           fill
           sizes="(min-width: 1024px) 50vw, 100vw"
-          className="object-cover object-center"
+          className="object-cover object-[center_38%]"
           quality={90}
         />
         <div
@@ -216,12 +216,12 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
         />
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 px-4 pb-4 pt-3 sm:px-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <NeonIcon src={identityIcon} size={48} />
+      <div className="flex flex-1 flex-col gap-2.5 px-3 pb-3 pt-2 sm:px-3.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <NeonIcon src={identityIcon} size={36} />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-[24px] font-black leading-tight text-white sm:text-[26px]">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h3 className="truncate text-lg font-black leading-tight text-white sm:text-xl">
                 {card.title}
               </h3>
               <span
@@ -245,12 +245,12 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
               </span>
             </div>
             {subtitle ? (
-              <p className="mt-0.5 truncate text-[14px] text-[#8ea4c5] sm:text-[15px]">{subtitle}</p>
+              <p className="mt-0.5 truncate text-xs text-[#8ea4c5] sm:text-[13px]">{subtitle}</p>
             ) : null}
           </div>
           <Link
             href={card.href}
-            className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-[22px] text-sm font-bold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2"
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-3.5 text-xs font-bold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2"
             style={{
               border: `1px solid ${hex}`,
               boxShadow: `0 0 14px ${hex}44`,
@@ -269,7 +269,7 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 items-center gap-3 border-t border-white/10 pt-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 items-center gap-2 border-t border-white/10 pt-2 sm:grid-cols-2">
           <div>
             <p className="text-sm font-semibold text-white">
               {card.periodRounds.toLocaleString()} {activityUnit.toLowerCase()} this period
