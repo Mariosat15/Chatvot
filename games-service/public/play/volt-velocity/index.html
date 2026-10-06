@@ -81,6 +81,23 @@
         color: #ff8a8a;
         max-width: 32rem;
       }
+      /* Reason (6 Oct 2026): practice kept the host iframe after finished, so without a
+         Close control the player sat on "being confirmed" until a refresh voided rounds. */
+      #close {
+        margin-top: 12px;
+        padding: 10px 22px;
+        border: 1px solid rgba(0, 213, 255, 0.55);
+        border-radius: 10px;
+        background: linear-gradient(135deg, #00d5ff, #3b82f6);
+        color: #041018;
+        font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+      #close[hidden] {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -96,7 +113,8 @@
       <span id="message">Loading the race&hellip;</span>
       <div id="loadbar" aria-hidden="true"><i></i></div>
       <span id="error"></span>
+      <button type="button" id="close" hidden>Close</button>
     </div>
-    <script src="/play/volt-velocity/velocity-host.js?v=20261006d"></script>
+    <script src="/play/volt-velocity/velocity-host.js?v=20261006e"></script>
   </body>
 </html>

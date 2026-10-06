@@ -260,6 +260,9 @@ export async function endPracticeRound(
 /**
  * The frame posted `finished`: pull the provider score for this one practice round.
  * Returns the updated view so the host can refresh the recent list without a second GET.
+ *
+ * Retries briefly because a race receipt can land a beat after the frame posts `finished`
+ * (Volt Velocity practice, owner 6 Oct 2026).
  */
 export async function finishPracticeRound(
   slug: string,
@@ -269,16 +272,28 @@ export async function finishPracticeRound(
   const card = await getBrowsableGameBySlug(slug);
   if (!card) return { found: false, round: null };
   await connectToDatabase();
-  await pullLivePracticeResults(userId, card.gameKey, roundId);
-  const stored = await GameRound.findOne({
-    contestType: "practice",
-    contestId: null,
-    userId,
-    gameKey: card.gameKey,
-    roundId,
-  })
-    .select("roundId status rawScore scoreBreakdown completedAt")
-    .lean<StoredPracticeRound | null>();
+
+  let stored: StoredPracticeRound | null = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await pullLivePracticeResults(userId, card.gameKey, roundId);
+    stored = await GameRound.findOne({
+      contestType: "practice",
+      contestId: null,
+      userId,
+      gameKey: card.gameKey,
+      roundId,
+    })
+      .select("roundId status rawScore scoreBreakdown completedAt")
+      .lean<StoredPracticeRound | null>();
+    if (stored && !(LIVE_ROUND_STATUSES as readonly string[]).includes(stored.status)) {
+      break;
+    }
+    if (attempt < 3) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 400);
+      });
+    }
+  }
   return { found: true, round: stored ? toView(stored) : null };
 }
 

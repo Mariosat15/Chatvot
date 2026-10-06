@@ -32,8 +32,34 @@ describe("practice rounds end when the player leaves", () => {
     const code = read("components/games/PracticeRoundHost.tsx");
     expect(code).toMatch(/method:\s*["']PATCH["']/);
     expect(code).toMatch(/scoredRoundId/);
+    expect(code).toMatch(/finishingRoundId/);
+    expect(code).toMatch(/FINISH_PULL_ATTEMPTS/);
     expect(code).toMatch(/onFinished=\{\(\)\s*=>\s*void handleFinished/);
     expect(code).toMatch(/onExit=\{\(\)\s*=>\s*handleExit/);
+  });
+
+  it("does not void a practice round while the finish pull is still running", () => {
+    // Reason: Velocity posts exit ~1s after finished; voiding mid-pull left Ended/- rows
+    // after a refresh (owner, 6 Oct 2026).
+    const code = read("components/games/PracticeRoundHost.tsx");
+    expect(code).toMatch(/finishingRoundId\.current === id/);
+    expect(code).toMatch(/stillFinishing/);
+    expect(code).toMatch(/goIdleAfterResult/);
+  });
+});
+
+describe("Volt Velocity hands practice back after the race", () => {
+  it("posts exit after finished and offers a Close control", () => {
+    // Reason: practice kept the host iframe; without exit the player sat on
+    // "Race complete. Your result is being confirmed." forever.
+    const host = read("games-service/public/play/volt-velocity/velocity-host.js");
+    const page = read("games-service/public/play/volt-velocity/index.html");
+    expect(host).toMatch(/scheduleHandBack/);
+    expect(host).toMatch(/handBackToPlatform/);
+    expect(host).toMatch(/tellPlatform\(\s*["']exit["']\s*\)/);
+    expect(host).toMatch(/HANDOFF_MS/);
+    expect(page).toContain('id="close"');
+    expect(page).toContain("velocity-host.js?v=20261006e");
   });
 });
 

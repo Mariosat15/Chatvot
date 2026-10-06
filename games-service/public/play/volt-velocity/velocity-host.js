@@ -26,6 +26,8 @@
   const CONNECT_TIMEOUT_MS = 60000;
   const CONNECT_POLL_MS = 250;
   const END_POLL_MS = 500;
+  // Reason: give the practice host time to PATCH/pull the score before exit lands.
+  const HANDOFF_MS = 1200;
 
   const params = new URLSearchParams(location.search);
   let token = (params.get("t") || "").trim();
@@ -46,12 +48,15 @@
 
   let parentOrigin = "*";
   let finishedSent = false;
+  let exitSent = false;
+  let handoffTimer = null;
 
   const frame = document.getElementById("race");
   const statusBox = document.getElementById("status");
   const messageEl = document.getElementById("message");
   const errorEl = document.getElementById("error");
   const loadbarEl = document.getElementById("loadbar");
+  const closeEl = document.getElementById("close");
 
   function tellPlatform(type, extra) {
     if (window.parent === window) return;
@@ -74,23 +79,55 @@
     tellPlatform("resize", { height });
   }
 
-  function showStatus(message, error) {
+  function showStatus(message, error, options) {
+    const waiting = !(options && options.done);
     statusBox.hidden = false;
     messageEl.textContent = message || "";
     errorEl.textContent = error || "";
-    // Reason: the bar is only for waiting; an error state must not keep animating.
-    if (loadbarEl) loadbarEl.hidden = Boolean(error);
+    // Reason: the bar is only for waiting; race-complete / error must not keep animating.
+    if (loadbarEl) loadbarEl.hidden = !waiting || Boolean(error);
+    if (closeEl) closeEl.hidden = waiting;
   }
 
   function hideStatus() {
     statusBox.hidden = true;
     if (loadbarEl) loadbarEl.hidden = true;
+    if (closeEl) closeEl.hidden = true;
   }
 
   function markFinished() {
     if (finishedSent) return;
     finishedSent = true;
     tellPlatform("finished");
+  }
+
+  /**
+   * Hand the player back to the practice / arena host.
+   *
+   * Contests already leave the iframe on `finished` (RoundResultPanel), so a later `exit` is
+   * a no-op there. Practice keeps the iframe until `exit`, and without this hand-off Velocity
+   * sat on "being confirmed" forever (owner, 6 Oct 2026).
+   */
+  function handBackToPlatform() {
+    if (exitSent) return;
+    exitSent = true;
+    if (handoffTimer) {
+      clearTimeout(handoffTimer);
+      handoffTimer = null;
+    }
+    tellPlatform("exit");
+  }
+
+  function scheduleHandBack() {
+    if (exitSent || handoffTimer) return;
+    if (closeEl) closeEl.hidden = false;
+    handoffTimer = setTimeout(handBackToPlatform, HANDOFF_MS);
+  }
+
+  if (closeEl) {
+    closeEl.addEventListener("click", () => {
+      handBackToPlatform();
+    });
   }
 
   async function startSession() {
@@ -195,11 +232,12 @@
         /* ignore */
       }
       if (done) {
-        showStatus("Race complete. Your result is being confirmed.");
+        showStatus("Race complete. Your result is being confirmed.", "", { done: true });
         markFinished();
+        scheduleHandBack();
       } else if (!finishedSent) {
-        showStatus("You left the race.");
-        tellPlatform("exit");
+        showStatus("You left the race.", "", { done: true });
+        handBackToPlatform();
       }
     }, END_POLL_MS);
   }
@@ -258,8 +296,9 @@
         parentOrigin = session.parentOrigin;
       }
       if (session.finished) {
-        showStatus("This race has finished.");
+        showStatus("This race has finished.", "", { done: true });
         markFinished();
+        scheduleHandBack();
         return;
       }
 

@@ -23,9 +23,10 @@ import type { PracticeRoundView } from "./practice-state";
  * The practice area for any provider game.
  *
  * The round is created by a CLICK (a POST), never by rendering. When the game posts
- * `finished`, the host pulls the score and KEEPS the iframe open so the player can read the
- * in-game result page (owner, 6 Oct 2026). Closing that screen (`exit`) returns to Start.
- * Leaving mid-round voids the attempt. Nothing here names a game.
+ * `finished`, the host pulls the score and KEEPS the iframe open so Circuit / Stack can show
+ * their in-game result page; Close/`exit` returns to Start. Velocity tears its board down and
+ * posts `exit` itself after a short hand-off so practice is not stuck on "being confirmed"
+ * (owner, 6 Oct 2026). Leaving mid-round voids the attempt. Nothing here names a game.
  */
 
 type Phase =
@@ -47,6 +48,16 @@ const FEATURES = [
   { label: "Unlimited Practice", icon: InfinityIcon, tone: "text-fuchsia-300" },
 ] as const;
 
+/** Race-server result can lag the frame's `finished` by a beat; retry before giving up. */
+const FINISH_PULL_ATTEMPTS = 6;
+const FINISH_PULL_GAP_MS = 500;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 export function PracticeRoundHost({
   slug,
   gameName,
@@ -60,6 +71,8 @@ export function PracticeRoundHost({
   const liveRoundId = useRef<string | null>(null);
   // Reason: after `finished` the score is pulled and must not be voided by pagehide / exit.
   const scoredRoundId = useRef<string | null>(null);
+  // Reason: Velocity posts exit ~1s after finished; voiding during the pull made Ended/- rows.
+  const finishingRoundId = useRef<string | null>(null);
   const endpoint = `/api/games/${encodeURIComponent(slug)}/practice/rounds`;
 
   const endRound = useCallback(
@@ -92,7 +105,9 @@ export function PracticeRoundHost({
     // result the list exists to show.
     const endIfLiveUnscored = () => {
       const id = liveRoundId.current;
-      if (id && scoredRoundId.current !== id) endRound(id);
+      if (!id) return;
+      if (scoredRoundId.current === id || finishingRoundId.current === id) return;
+      endRound(id);
     };
     window.addEventListener("pagehide", endIfLiveUnscored);
     window.addEventListener("beforeunload", endIfLiveUnscored);
@@ -106,6 +121,7 @@ export function PracticeRoundHost({
   const launch = useCallback(async () => {
     setRefusal(null);
     scoredRoundId.current = null;
+    finishingRoundId.current = null;
     setPhase({ name: "launching" });
     try {
       const response = await fetch(endpoint, { method: "POST" });
@@ -125,53 +141,103 @@ export function PracticeRoundHost({
 
   const handleFinished = useCallback(
     async (roundId: string) => {
-      // Keep the iframe up so Circuit / Stack / Velocity can show their own result screen.
-      scoredRoundId.current = roundId;
-      liveRoundId.current = null;
+      // Keep the iframe up for Circuit / Stack Close. Do NOT mark scored until a pull lands
+      // a closed round - marking early then voiding on a premature exit made Ended/- rows.
+      finishingRoundId.current = roundId;
       try {
-        const response = await fetch(endpoint, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ roundId }),
-        });
-        const data = await response.json();
-        if (response.ok && data.success && data.round) {
-          setRounds((previous) => {
-            const rest = previous.filter((row) => row.roundId !== roundId);
-            return [data.round as PracticeRoundView, ...rest].slice(0, 5);
-          });
-          return;
+        for (let attempt = 0; attempt < FINISH_PULL_ATTEMPTS; attempt++) {
+          try {
+            const response = await fetch(endpoint, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ roundId }),
+            });
+            const data = await response.json();
+            if (response.ok && data.success && data.round) {
+              const view = data.round as PracticeRoundView;
+              setRounds((previous) => {
+                const rest = previous.filter((row) => row.roundId !== roundId);
+                return [view, ...rest].slice(0, 5);
+              });
+              if (!view.isLive) {
+                scoredRoundId.current = roundId;
+                liveRoundId.current = null;
+                return;
+              }
+            }
+          } catch {
+            /* Retry - race-server receipt can lag the frame. */
+          }
+          if (attempt < FINISH_PULL_ATTEMPTS - 1) await wait(FINISH_PULL_GAP_MS);
         }
-      } catch {
-        /* Fall through to a full refresh. */
+        await refreshRounds();
+      } finally {
+        if (finishingRoundId.current === roundId) finishingRoundId.current = null;
       }
-      await refreshRounds();
     },
     [endpoint, refreshRounds],
   );
 
   const handleExit = useCallback(
     (roundId: string) => {
+      const goIdleAfterResult = async () => {
+        // Reason: Velocity exits while the finish pull may still be retrying.
+        for (let i = 0; i < 24 && finishingRoundId.current === roundId; i++) {
+          await wait(125);
+        }
+        if (scoredRoundId.current !== roundId && liveRoundId.current === roundId) {
+          // Last chance pull before returning - never void a race that just finished.
+          try {
+            const response = await fetch(endpoint, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ roundId }),
+            });
+            const data = await response.json();
+            if (response.ok && data.success && data.round && !data.round.isLive) {
+              scoredRoundId.current = roundId;
+              setRounds((previous) => {
+                const rest = previous.filter((row) => row.roundId !== roundId);
+                return [data.round as PracticeRoundView, ...rest].slice(0, 5);
+              });
+            } else {
+              await refreshRounds();
+            }
+          } catch {
+            await refreshRounds();
+          }
+        } else {
+          await refreshRounds();
+        }
+        liveRoundId.current = null;
+        scoredRoundId.current = null;
+        finishingRoundId.current = null;
+        setPhase({ name: "idle" });
+      };
+
       const alreadyScored = scoredRoundId.current === roundId;
+      const stillFinishing = finishingRoundId.current === roundId;
+      if (alreadyScored || stillFinishing) {
+        void goIdleAfterResult();
+        return;
+      }
+
       liveRoundId.current = null;
       scoredRoundId.current = null;
-      if (!alreadyScored) {
-        endRound(roundId);
-        setRounds((previous) =>
-          previous.some((round) => round.roundId === roundId)
-            ? previous.map((round) =>
-                round.roundId === roundId
-                  ? { ...round, status: "voided", isLive: false, score: undefined }
-                  : round,
-              )
-            : [{ roundId, status: "voided", isLive: false }, ...previous].slice(0, 5),
-        );
-      } else {
-        void refreshRounds();
-      }
+      finishingRoundId.current = null;
+      endRound(roundId);
+      setRounds((previous) =>
+        previous.some((round) => round.roundId === roundId)
+          ? previous.map((round) =>
+              round.roundId === roundId
+                ? { ...round, status: "voided", isLive: false, score: undefined }
+                : round,
+            )
+          : [{ roundId, status: "voided", isLive: false }, ...previous].slice(0, 5),
+      );
       setPhase({ name: "idle" });
     },
-    [endRound, refreshRounds],
+    [endRound, endpoint, refreshRounds],
   );
 
   const forgetRound = useCallback(
