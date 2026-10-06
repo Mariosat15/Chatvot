@@ -53,8 +53,8 @@ export default function DailyCreditFlowPanel({
 
   return (
     <AnalyticsCard
-      title="Daily Credit Flow"
-      subtitle="Daily net credit movement in your wallet."
+      title="Daily Volt Flow"
+      subtitle="Daily net volt movement in your wallet."
       icon={
         <WalletNeonIcon
           src={WALLET_ART.dailyFlow}
@@ -70,7 +70,7 @@ export default function DailyCreditFlowPanel({
     >
       {data.length < 1 ? (
         <div className="flex min-h-[200px] flex-1 items-center justify-center text-sm text-slate-500">
-          Daily credit flow will appear once you have activity
+          Daily volt flow will appear once you have activity
         </div>
       ) : (
         <div className="min-h-[200px] w-full flex-1 sm:min-h-[220px]">

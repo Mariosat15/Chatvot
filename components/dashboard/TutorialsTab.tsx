@@ -29,7 +29,7 @@ function categoryLabel(id: string): string {
     case "trading":
       return "Trading";
     case "wallet":
-      return "Wallet & Credits";
+      return "Wallet & Volts";
     case "competitions":
       return "Competitions";
     case "challenges":

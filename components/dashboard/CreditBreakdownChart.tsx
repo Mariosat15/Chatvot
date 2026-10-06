@@ -127,11 +127,11 @@ export default function CreditBreakdownChart({
       >
         {!embedded ? (
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-            📊 Credit Breakdown
+            📊 Volt Breakdown
           </h3>
         ) : null}
         <div className="h-48 flex items-center justify-center text-gray-500 text-sm">
-          Your credit breakdown will appear here
+          Your volt breakdown will appear here
         </div>
       </motion.div>
     );
@@ -152,7 +152,7 @@ export default function CreditBreakdownChart({
         <div className="min-w-0">
           {!embedded ? (
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-            📊 Credit Breakdown
+            📊 Volt Breakdown
           </h3>
           ) : null}
           <div className="flex items-center gap-3 mt-1 flex-wrap">

@@ -47,7 +47,7 @@ export default function MobileDailyFlow({ data }: { data: FlowPoint[] }) {
           className="mt-0.5 h-7 w-7 shrink-0 object-contain"
         />
         <div>
-          <h2 className="text-sm font-bold text-white">Daily Credit Flow</h2>
+          <h2 className="text-sm font-bold text-white">Daily Volt Flow</h2>
           <p className="mt-0.5 text-[11px] text-slate-400">
             Green = Volts in · Red = Volts out
           </p>

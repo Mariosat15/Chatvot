@@ -110,8 +110,12 @@ describe("R21 dashboard extract (structural)", () => {
       "components/dashboard/performance/mobile/MobilePerformance.tsx",
     ]) {
       const tree = stripComments(read(rel));
+      // Reason: 6 Oct 2026 mobile rebuild — the trading tiles live in
+      // MobileTradingPerformance, mounted only behind the same R21 gate.
       const mounts = [
-        ...tree.matchAll(/<TradingPerformanceSection|<TradingMetricTile/g),
+        ...tree.matchAll(
+          /<TradingPerformanceSection|<TradingMetricTile|<MobileTradingPerformance/g,
+        ),
       ];
       expect(mounts.length, rel).toBeGreaterThan(0);
       for (const m of mounts) {

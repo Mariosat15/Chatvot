@@ -329,6 +329,11 @@ describe("performance page structure", () => {
     expect(section).toMatch(/Next games/);
     expect(section).toMatch(/ChevronLeft/);
     expect(section).not.toMatch(/lg:grid-cols-2/);
+    expect(section).toMatch(/Every game you have played, including trading\./);
+    expect(section).not.toMatch(/artwork, metrics and trend/);
+    const summary = stripComments(read(`${DIR}/PerformanceSummaryPanel.tsx`));
+    expect(summary).toMatch(/Volts won/);
+    expect(summary).not.toMatch(/Credits won/);
   });
 
   it("pins Game Performance heroes to the top of key art when the box is a wide strip", () => {
@@ -359,6 +364,44 @@ describe("performance page structure", () => {
     expect(shared).toMatch(/new Map/);
     expect(shared).toContain("#ff36ca");
     expect(shared).toContain("#00d9ff");
+  });
+
+  it("rebuilds mobile as its own tree, not a shrink of desktop", () => {
+    const mobile = stripComments(read(`${DIR}/mobile/MobilePerformance.tsx`));
+    const order = [
+      "<MobilePerformanceHeader",
+      "<MobileOverallPerformanceCard",
+      "<MobilePerformanceHighlights",
+      "<MobileGamePerformanceCarousel",
+      "<MobilePerformanceTrend",
+      "<MobilePerformanceModeTabs",
+      "<MobileTradingPerformance",
+      'kind="challenges"',
+      'kind="competitions"',
+      "<MobileMarketHolidays",
+    ].map((s) => mobile.indexOf(s));
+    for (const i of order) expect(i).toBeGreaterThan(-1);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(mobile).not.toMatch(/<PerformanceHeader/);
+    expect(mobile).not.toMatch(/<GamePerformanceSection/);
+    expect(mobile).not.toMatch(/<PerformanceTrendSection/);
+    expect(mobile).not.toMatch(/<TradingPerformanceSection/);
+    expect(mobile).not.toMatch(/<PerformanceSummaryPanel/);
+    expect(mobile).not.toMatch(/<MarketHolidaysSection/);
+    const highlights = stripComments(read(`${DIR}/mobile/MobilePerformanceHighlights.tsx`));
+    expect(highlights).toMatch(/snap-x/);
+    expect(highlights).toMatch(/58vw/);
+    expect(highlights).not.toMatch(/grid-cols-8|2xl:grid-cols-8/);
+    const games = stripComments(read(`${DIR}/mobile/MobileGamePerformanceCarousel.tsx`));
+    expect(games).toMatch(/aria-label="Previous game"/);
+    expect(games).toMatch(/aria-label="Next game"/);
+    expect(games).toMatch(/snap-center/);
+    const trading = stripComments(read(`${DIR}/mobile/MobileTradingPerformance.tsx`));
+    expect(trading).toMatch(/grid-cols-2/);
+    expect(trading).not.toMatch(/2xl:grid-cols-8/);
+    const trend = stripComments(read(`${DIR}/mobile/MobilePerformanceTrend.tsx`));
+    expect(trend).toMatch(/s\.key !== "overall"/);
+    expect(trend).toMatch(/h-\[250px\]/);
   });
 
   it("shares the mountain backdrop with Wallet and clips overflow-x without a second scrollbar", () => {

@@ -65,7 +65,7 @@ export default function GamePerformanceSection({ cards }: { cards: GameCardView[
   return (
     <PerfSection
       title="Game Performance"
-      subtitle="Every game you have played, including trading — artwork, metrics and trend, two at a time."
+      subtitle="Every game you have played, including trading."
       icon={PERF_SECTION_ICON.games}
       testId="games"
     >

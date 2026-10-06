@@ -95,7 +95,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
   {
     key: "giftCredits",
     sourceKey: "giftCredits",
-    label: "Gift Credits",
+    label: "Gift Volts",
     color: WALLET_PINK,
     flow: "in",
     chart: true,
@@ -163,7 +163,7 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
   {
     key: "giftCreditsOut",
     sourceKey: "giftCreditsOut",
-    label: "Gift Credits Removed",
+    label: "Gift Volts Removed",
     color: "#C084FC",
     flow: "out",
     chart: false,

@@ -31,7 +31,7 @@ export default function WalletAnalyticsHeader({
           lead="Wallet"
           accentWord="Analytics"
           accent="cyan"
-          subtitle="Track your credits, spending, earnings and overall wallet activity."
+          subtitle="Track your volts, spending, earnings and overall wallet activity."
           icon={
             <WalletNeonIcon
               src={WALLET_ART.header}

@@ -100,7 +100,7 @@ export default function MobileMoneyInOut({
           height={22}
           className="h-[22px] w-[22px] object-contain"
         />
-        Credit Breakdown
+        Volt Breakdown
       </h2>
       <div className="space-y-3">
         <div className="rounded-[18px] border border-emerald-400/30 bg-[linear-gradient(160deg,rgba(6,32,24,0.9)_0%,rgba(5,10,22,0.96)_100%)] p-4 shadow-[0_0_18px_rgba(16,185,129,0.12)]">

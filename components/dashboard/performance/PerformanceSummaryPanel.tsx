@@ -97,7 +97,7 @@ export default function PerformanceSummaryPanel({
             ))}
           </div>
           <div className="mt-auto flex items-center justify-between border-t border-white/[0.08] pt-3 text-sm">
-            <span className="text-[#8ea4c5]">Credits won</span>
+            <span className="text-[#8ea4c5]">Volts won</span>
             <span className="text-base font-black tabular-nums text-[#ffc51b]">
               {empty
                 ? "-"

@@ -1,23 +1,23 @@
 "use client";
 
-import GamePerformanceSection from "../GamePerformanceSection";
-import MarketHolidaysSection from "../MarketHolidaysSection";
-import PerformanceHeader from "../PerformanceHeader";
-import { HighlightMetricCard } from "../PerformanceHighlights";
-import PerformanceSummaryPanel from "../PerformanceSummaryPanel";
-import PerformanceTrendSection from "../PerformanceTrendSection";
-import { TradingMetricTile } from "../TradingPerformanceSection";
-import { PerfSection } from "../PerformanceChrome";
-import { PERF_SECTION_ICON } from "../performance-assets";
-import type { PerfInput } from "../performance-model";
-import type { MarketHolidaysState } from "../useMarketHolidays";
-import { usePerformanceAnalyticsModel } from "../usePerformanceAnalyticsModel";
+import { useState } from "react";
 import DashboardBackdrop from "@/components/dashboard/DashboardBackdrop";
+import type { PerfInput } from "../performance-model";
+import { usePerformanceAnalyticsModel } from "../usePerformanceAnalyticsModel";
+import type { MarketHolidaysState } from "../useMarketHolidays";
+import MobilePerformanceHeader from "./MobilePerformanceHeader";
+import MobileOverallPerformanceCard from "./MobileOverallPerformanceCard";
+import MobilePerformanceHighlights from "./MobilePerformanceHighlights";
+import MobileGamePerformanceCarousel from "./MobileGamePerformanceCarousel";
+import MobilePerformanceTrend from "./MobilePerformanceTrend";
+import MobilePerformanceModeTabs, { type PerfBreakdownMode } from "./MobilePerformanceModeTabs";
+import MobileTradingPerformance from "./MobileTradingPerformance";
+import MobilePerformanceSummaryCard from "./MobilePerformanceSummaryCard";
+import MobileMarketHolidays from "./MobileMarketHolidays";
 
 /**
- * Phone arrangement over the same model as desktop. Rows that would wrap into
- * four lines of tiny cards become swipeable snap rows instead, and the bottom
- * row stacks.
+ * Dedicated phone Performance Analytics. Same model as desktop; never a shrink
+ * of the 8-up highlights / two-up game cards / eight-circle trading row.
  */
 export default function MobilePerformance({
   input,
@@ -27,58 +27,40 @@ export default function MobilePerformance({
   holidays: MarketHolidaysState;
 }) {
   const model = usePerformanceAnalyticsModel(input);
+  const [mode, setMode] = useState<PerfBreakdownMode>(() =>
+    input.showTrading ? "trading" : "challenges",
+  );
+  const spark = model.trend.points.map((p) => p.overall);
+  const breakdown: PerfBreakdownMode =
+    mode === "trading" && !model.showTradingSection ? "challenges" : mode;
 
   return (
     <DashboardBackdrop>
-    <div className="space-y-4 pb-6">
-      <PerformanceHeader model={model} compact />
-
-      <PerfSection
-        title="Highlights"
-        icon={PERF_SECTION_ICON.highlights}
-        testId="highlights"
+      <div
+        className="mx-auto w-full max-w-[430px] space-y-5 px-1"
+        style={{ paddingBottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
       >
-        <div
-          className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1"
-          aria-label="Performance highlights"
-        >
-          {model.highlights.map((h) => (
-            <HighlightMetricCard
-              key={h.key}
-              highlight={h}
-              className="w-[46%] min-w-[150px] shrink-0 snap-start"
-            />
-          ))}
-        </div>
-      </PerfSection>
-
-      {model.showGamesSection ? <GamePerformanceSection cards={model.gameCards} /> : null}
-
-      <PerformanceTrendSection model={model} height={220} />
-
-      {model.showTradingSection ? (
-        <PerfSection title="Trading Performance" icon={PERF_SECTION_ICON.trading} testId="trading">
-          <div
-            className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1"
-            aria-label="Trading metrics"
-          >
-            {model.tradingMetrics.map((m) => (
-              <div key={m.key} className="w-[46%] min-w-[150px] shrink-0 snap-start">
-                <TradingMetricTile metric={m} />
-              </div>
-            ))}
-          </div>
-        </PerfSection>
-      ) : null}
-
-      <PerformanceSummaryPanel
-        kind="challenges"
-        summary={model.challengeSummary}
-        filteredOut={model.challengesFilteredOut}
-      />
-      <PerformanceSummaryPanel kind="competitions" summary={model.competitionSummary} />
-      <MarketHolidaysSection state={holidays} />
-    </div>
+        <MobilePerformanceHeader model={model} />
+        <MobileOverallPerformanceCard highlights={model.highlights} spark={spark} />
+        <MobilePerformanceHighlights highlights={model.highlights} />
+        {model.showGamesSection ? <MobileGamePerformanceCarousel cards={model.gameCards} /> : null}
+        <MobilePerformanceTrend model={model} />
+        <MobilePerformanceModeTabs
+          mode={breakdown}
+          onChange={setMode}
+          showTrading={model.showTradingSection}
+        />
+        {breakdown === "trading" && model.showTradingSection ? (
+          <MobileTradingPerformance metrics={model.tradingMetrics} />
+        ) : null}
+        {breakdown === "challenges" ? (
+          <MobilePerformanceSummaryCard kind="challenges" summary={model.challengeSummary} />
+        ) : null}
+        {breakdown === "competitions" ? (
+          <MobilePerformanceSummaryCard kind="competitions" summary={model.competitionSummary} />
+        ) : null}
+        <MobileMarketHolidays state={holidays} />
+      </div>
     </DashboardBackdrop>
   );
 }

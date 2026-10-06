@@ -322,6 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Mobile Performance Analytics CODE-COMPLETE 6 Oct (eng)** — dedicated phone tree (`components/dashboard/performance/mobile/`), not a shrink of desktop. Spec: `External game plans/design-reference/mobile Performance Analytics version`. Same `usePerformanceAnalyticsModel`. Order: compact header + filter sheet, overall hero, swipe highlights, one-game carousel, Overall-only trend, Trading/1v1/Competitions tabs, holidays (3). Desktop Image-1 cards unchanged. Tests: `performance-analytics.test.ts`, `r21-dashboard-extract.test.ts`. **Never verified by eye.**
+- **Dashboard wording: Volts, not Credits CODE-COMPLETE 6 Oct (eng)** — Game Performance subtitle trimmed; player-facing dashboard copy (Overview KPI, Performance 1v1/Competition, Wallet Analytics) says Volts. Field names unchanged. Tests: `performance-analytics.test.ts`, `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Game Performance one arrow pair + auto hero crop CODE-COMPLETE 6 Oct (eng)** — header arrows removed; row arrows only. Hero box size unchanged; `heroObjectPosition` pins cover to `center top` when the strip is wider than the art (catalogue 16:9 wordmarks). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Game Performance compact cards + both arrows CODE-COMPLETE 6 Oct (eng)** — cards shrunk (hero ~148px). Header-arrow half is stale as a present fact — **say which**; the row pair above is current. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Game Performance Image-1 cards CODE-COMPLETE 6 Oct (eng)** — hero + identity + 2×2 metrics + sparkline, two at a time. Compact/arrow pass above is the present fact. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
@@ -948,6 +950,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Volts wording on the dashboard (owner request)
+
+**Owner report:** drop “artwork, metrics and trend, two at a time”; Credits won → Volts won; replace credits with volts elsewhere on the dashboard.
+
+**Fix:** Game Performance subtitle is “Every game you have played, including trading.” Player-facing dashboard strings (Overview Volts KPI, Volt Balance, Volt Breakdown, Daily Volt Flow, Gift Volts, Wallet & Volts, available volts) updated. Identifiers and `stackId` unchanged.
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`, `wallet-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - One arrow pair; hero crop auto-pins logos (owner request)
 

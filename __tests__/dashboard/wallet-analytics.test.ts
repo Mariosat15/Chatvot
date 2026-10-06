@@ -123,7 +123,7 @@ describe("Wallet Analytics page wiring", () => {
     // only renders item.label / item.color. Net Movement stays on the model.
     expect(catalog).toMatch(/label:\s*"Deposits"/);
     expect(catalog).toMatch(/label:\s*"Prizes Won"/);
-    expect(catalog).toMatch(/label:\s*"Gift Credits"/);
+    expect(catalog).toMatch(/label:\s*"Gift Volts"/);
     expect(catalog).not.toMatch(/label:\s*"Bonuses"/);
     expect(model).toMatch(/label:\s*"Net Movement"/);
     expect(model).toMatch(/resolveCategories/);
@@ -207,7 +207,7 @@ describe("Wallet Analytics page wiring", () => {
     expect(breakdown).toMatch(/WALLET_ART\.breakdown/);
     expect(flow).toMatch(/WALLET_ART\.dailyFlow/);
     expect(spending).toMatch(/WALLET_ART\.spending/);
-    expect(model).toMatch(/label:\s*"Credit Balance"/);
+    expect(model).toMatch(/label:\s*"Volt Balance"/);
     expect(model).toMatch(/label:\s*"Total Spend"/);
     expect(model).toMatch(/label:\s*"GM Earnings"/);
     expect(model).toMatch(/label:\s*"Prizes Won"/);
@@ -325,7 +325,7 @@ describe("Wallet Analytics page wiring", () => {
     expect(breakdown).toMatch(/auto-fill/);
     expect(breakdown).toMatch(/resolveCategories/);
     expect(breakdown).toMatch(/sm:text-base/);
-    const gift = catalog.indexOf('label: "Gift Credits"');
+    const gift = catalog.indexOf('label: "Gift Volts"');
     const prizes = catalog.indexOf('label: "Prizes Won"');
     const gm = catalog.indexOf('label: "GM Earnings"');
     expect(gift).toBeGreaterThan(-1);
@@ -448,8 +448,8 @@ describe("Wallet Analytics page wiring", () => {
     expect(balance).toMatch(
       /Track your wallet balance over time with daily changes/,
     );
-    expect(breakdown).toMatch(/See how your credits are sourced and used/);
-    expect(flow).toMatch(/Daily net credit movement in your wallet/);
+    expect(breakdown).toMatch(/See how your volts are sourced and used/);
+    expect(flow).toMatch(/Daily net volt movement in your wallet/);
     expect(spend).toMatch(
       /Platform earnings versus spending\. Deposits and refunds are excluded/,
     );

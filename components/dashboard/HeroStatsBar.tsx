@@ -30,7 +30,7 @@ interface HeroStatsBarProps {
 const STAT_CONFIG = [
   {
     key: "balance",
-    label: "Credit Balance",
+    label: "Volt Balance",
     icon: Wallet,
     color: "#EAB308",
     gradient: "from-yellow-500/20 to-amber-600/5",
@@ -123,7 +123,7 @@ export default function HeroStatsBar({
       {
         ...STAT_CONFIG[0],
         value: `${symbol} ${creditBalance.toFixed(decimals)}`,
-        sub: "available credits",
+        sub: "available volts",
       },
       {
         ...STAT_CONFIG[1],

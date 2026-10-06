@@ -89,8 +89,8 @@ export default function CreditBreakdownPanel({
 
   return (
     <AnalyticsCard
-      title="Credit Breakdown"
-      subtitle="See how your credits are sourced and used."
+      title="Volt Breakdown"
+      subtitle="See how your volts are sourced and used."
       icon={
         <WalletNeonIcon
           src={WALLET_ART.breakdown}
@@ -104,7 +104,7 @@ export default function CreditBreakdownPanel({
     >
       {data.length < 1 ? (
         <div className="flex h-[200px] items-center justify-center text-sm text-slate-500">
-          Your credit breakdown will appear here
+          Your volt breakdown will appear here
         </div>
       ) : (
         <div className="h-[200px] w-full sm:h-[220px]">

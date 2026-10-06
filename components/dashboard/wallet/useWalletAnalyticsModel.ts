@@ -194,7 +194,7 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
     return [
       {
         key: "balance",
-        label: "Credit Balance",
+        label: "Volt Balance",
         value: overview.creditBalance,
         deltaPct: pctChange(balCur, balPrev),
         accent: "gold",

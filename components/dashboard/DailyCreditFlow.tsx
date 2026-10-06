@@ -182,11 +182,11 @@ export default function DailyCreditFlow({
       >
         {!embedded ? (
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-            💰 Daily Credit Flow
+            💰 Daily Volt Flow
           </h3>
         ) : null}
         <div className="h-48 flex items-center justify-center text-gray-500 text-sm">
-          Your credit activity will appear here
+          Your volt activity will appear here
         </div>
       </motion.div>
     );
@@ -204,7 +204,7 @@ export default function DailyCreditFlow({
         <div className="min-w-0">
           {!embedded ? (
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-            💰 Daily Credit Flow
+            💰 Daily Volt Flow
           </h3>
           ) : null}
           {hoveredPoint ? (

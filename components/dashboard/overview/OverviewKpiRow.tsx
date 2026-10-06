@@ -345,7 +345,7 @@ export default function OverviewKpiRow({
   return (
     <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <KpiCard
-        label="Credits"
+        label="Volts"
         value={formatVolts(liveCredits)}
         artSrc={OVERVIEW_KPI_ART.credits}
         tone="gold"
