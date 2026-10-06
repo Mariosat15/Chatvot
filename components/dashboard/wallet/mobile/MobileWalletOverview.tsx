@@ -28,7 +28,7 @@ function Delta({ pct }: { pct: number | null | undefined }) {
 }
 
 /**
- * Compact 2×2 wallet overview — Total Spent / Game Earnings / Prizes / Net.
+ * Compact 2×2 wallet overview — Total Spent / GM Earnings / Prizes / Net.
  */
 export default function MobileWalletOverview({ kpis, netInsight }: Props) {
   const spend = kpis.find((k) => k.key === "spend");
@@ -46,7 +46,7 @@ export default function MobileWalletOverview({ kpis, netInsight }: Props) {
     },
     {
       key: "game",
-      label: "Game Earnings",
+      label: "GM Earnings",
       value: game?.value ?? 0,
       deltaPct: game?.deltaPct,
       art: WALLET_ART.gameEarnings,

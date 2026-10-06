@@ -12,9 +12,9 @@ export type InsightItem = {
   key:
     | "deposits"
     | "withdrawals"
-    | "purchases"
-    | "gameEarnings"
-    | "bonuses"
+    | "marketplace"
+    | "gmEarnings"
+    | "giftCredits"
     | "prizes"
     | "net";
   label: string;
@@ -26,9 +26,9 @@ export type InsightItem = {
 const ART: Record<InsightItem["key"], string> = {
   deposits: WALLET_ART.deposits,
   withdrawals: WALLET_ART.withdrawals,
-  purchases: WALLET_ART.purchases,
-  gameEarnings: WALLET_ART.gameEarnings,
-  bonuses: WALLET_ART.bonuses,
+  marketplace: WALLET_ART.marketplace,
+  gmEarnings: WALLET_ART.gameEarnings,
+  giftCredits: WALLET_ART.giftCredits,
   prizes: WALLET_ART.prizes,
   net: WALLET_ART.netMovement,
 };
@@ -36,9 +36,9 @@ const ART: Record<InsightItem["key"], string> = {
 const COLORS: Record<InsightItem["key"], string> = {
   deposits: WALLET_CATEGORY.deposits,
   withdrawals: WALLET_CATEGORY.withdrawals,
-  purchases: WALLET_CATEGORY.purchases,
-  gameEarnings: WALLET_CATEGORY.gameEarnings,
-  bonuses: WALLET_CATEGORY.bonuses,
+  marketplace: WALLET_CATEGORY.marketplace,
+  gmEarnings: WALLET_CATEGORY.gmEarnings,
+  giftCredits: WALLET_CATEGORY.giftCredits,
   prizes: WALLET_CATEGORY.prizes,
   net: WALLET_CATEGORY.net,
 };
@@ -46,9 +46,9 @@ const COLORS: Record<InsightItem["key"], string> = {
 const BORDERS: Record<InsightItem["key"], string> = {
   deposits: "border-emerald-400/40",
   withdrawals: "border-rose-400/40",
-  purchases: "border-amber-400/40",
-  gameEarnings: "border-cyan-400/40",
-  bonuses: "border-fuchsia-400/40",
+  marketplace: "border-pink-400/40",
+  gmEarnings: "border-cyan-400/40",
+  giftCredits: "border-fuchsia-400/40",
   prizes: "border-orange-400/40",
   net: "border-emerald-400/40",
 };

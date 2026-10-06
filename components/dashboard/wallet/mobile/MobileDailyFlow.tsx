@@ -30,13 +30,13 @@ function barColor(net: number): string {
 }
 
 /**
- * Daily Volt Flow — compact positive/negative bars around zero.
+ * Daily Volt Flow — desktop-parity positive/negative bars with glow.
  */
 export default function MobileDailyFlow({ data }: { data: FlowPoint[] }) {
   return (
     <section
       aria-label="Daily volt flow"
-      className="rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4"
+      className="rounded-[18px] border border-cyan-400/25 bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4 shadow-[0_0_22px_rgba(0,229,255,0.1)]"
     >
       <div className="mb-2 flex items-start gap-2">
         <Image
@@ -55,44 +55,50 @@ export default function MobileDailyFlow({ data }: { data: FlowPoint[] }) {
       </div>
 
       {data.length < 1 ? (
-        <div className="flex h-[220px] items-center justify-center text-sm text-slate-500">
+        <div className="flex h-[250px] items-center justify-center text-sm text-slate-500">
           Daily flow will appear once you have activity
         </div>
       ) : (
-        <div className="mt-2 h-[230px] w-full">
+        <div className="mt-2 h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
-              margin={{ top: 8, right: 4, left: -12, bottom: 0 }}
+              margin={{ top: 10, right: 4, left: 0, bottom: 0 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="rgba(255,255,255,0.05)"
+                stroke="rgba(255,255,255,0.06)"
                 vertical={false}
               />
               <XAxis
                 dataKey="date"
                 tickFormatter={formatAxisDate}
-                tick={{ fill: "#64748B", fontSize: 10 }}
+                tick={{ fill: "#64748B", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                minTickGap={36}
+                minTickGap={28}
                 interval="preserveStartEnd"
               />
               <YAxis
-                tick={{ fill: "#64748B", fontSize: 10 }}
+                orientation="right"
+                tick={{ fill: "#64748B", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                width={40}
-                tickCount={4}
+                width={44}
+                tickFormatter={(v: number) =>
+                  Math.abs(v) >= 1000
+                    ? `${(v / 1000).toFixed(1)}k`
+                    : String(Math.round(v))
+                }
               />
-              <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" />
+              <ReferenceLine y={0} stroke="rgba(255,255,255,0.25)" />
               <Tooltip
                 contentStyle={{
-                  background: "rgba(8,14,28,0.96)",
-                  border: "1px solid rgba(0,229,255,0.3)",
-                  borderRadius: 12,
-                  fontSize: 13,
+                  background: "rgba(5,12,28,0.95)",
+                  border: "1px solid rgba(0,229,255,0.35)",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: "#fff",
                 }}
                 labelFormatter={(v) => formatAxisDate(String(v))}
                 formatter={(value: number) => [
@@ -100,9 +106,15 @@ export default function MobileDailyFlow({ data }: { data: FlowPoint[] }) {
                   "Net",
                 ]}
               />
-              <Bar dataKey="net" radius={[4, 4, 0, 0]} maxBarSize={18}>
+              <Bar dataKey="net" radius={[4, 4, 4, 4]} maxBarSize={18}>
                 {data.map((d, i) => (
-                  <Cell key={`${d.date}-${i}`} fill={barColor(d.net)} />
+                  <Cell
+                    key={`${d.date}-${i}`}
+                    fill={barColor(d.net)}
+                    style={{
+                      filter: `drop-shadow(0 0 6px ${barColor(d.net)}88)`,
+                    }}
+                  />
                 ))}
               </Bar>
             </BarChart>

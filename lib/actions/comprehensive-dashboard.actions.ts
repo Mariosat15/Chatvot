@@ -852,6 +852,9 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         marketplace: financialSummary.marketplaceSpent,
         gmEarnings: financialSummary.gmEarnings,
         refunds: financialSummary.competitionRefunds + financialSummary.challengeRefunds,
+        giftCredits: financialSummary.giftCredits,
+        giftCreditsOut: financialSummary.giftCreditsOut,
+        gmSpend: financialSummary.gmSpend,
       },
     },
     recentActivity: {

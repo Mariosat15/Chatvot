@@ -19,31 +19,52 @@ import { WALLET_CATEGORY } from "./wallet-tokens";
 export type BreakdownDay = {
   date: string;
   deposits: number;
-  purchases: number;
-  gameEarnings: number;
-  bonuses: number;
+  contestEntries: number;
+  marketplace: number;
+  gmSpend: number;
+  gmEarnings: number;
+  giftCredits: number;
   prizes: number;
   withdrawals: number;
+  refunds: number;
 };
 
 export type BreakdownTotals = {
   deposits: number;
-  purchases: number;
-  gameEarnings: number;
-  bonuses: number;
+  contestEntries: number;
+  marketplace: number;
+  gmSpend: number;
+  gmEarnings: number;
+  giftCredits: number;
+  giftCreditsOut: number;
   prizes: number;
   withdrawals: number;
+  refunds: number;
 };
 
 const SERIES = [
   { key: "deposits", label: "Deposits", color: WALLET_CATEGORY.deposits },
-  { key: "purchases", label: "Purchases", color: WALLET_CATEGORY.purchases },
   {
-    key: "gameEarnings",
-    label: "Game Earnings",
-    color: WALLET_CATEGORY.gameEarnings,
+    key: "contestEntries",
+    label: "Contest Entries",
+    color: WALLET_CATEGORY.contestEntries,
   },
-  { key: "bonuses", label: "Bonuses", color: WALLET_CATEGORY.bonuses },
+  {
+    key: "marketplace",
+    label: "Marketplace",
+    color: WALLET_CATEGORY.marketplace,
+  },
+  { key: "gmSpend", label: "GM Spend", color: WALLET_CATEGORY.gmSpend },
+  {
+    key: "gmEarnings",
+    label: "GM Earnings",
+    color: WALLET_CATEGORY.gmEarnings,
+  },
+  {
+    key: "giftCredits",
+    label: "Gift Credits",
+    color: WALLET_CATEGORY.giftCredits,
+  },
   { key: "prizes", label: "Prizes", color: WALLET_CATEGORY.prizes },
   {
     key: "withdrawals",
@@ -59,7 +80,7 @@ function formatAxisDate(iso: string): string {
 }
 
 /**
- * Credit Breakdown — multi-series bars + six summary tiles (rebuild guide §7).
+ * Credit Breakdown — multi-series bars + summary tiles (rebuild guide §7).
  */
 export default function CreditBreakdownPanel({
   data,
@@ -70,12 +91,18 @@ export default function CreditBreakdownPanel({
 }) {
   const summary = [
     { key: "deposits", label: "Total Deposits", value: totals.deposits },
-    { key: "purchases", label: "Total Purchases", value: totals.purchases },
-    { key: "gameEarnings", label: "Game Earnings", value: totals.gameEarnings },
-    { key: "bonuses", label: "Bonuses", value: totals.bonuses },
+    {
+      key: "contestEntries",
+      label: "Contest Entries",
+      value: totals.contestEntries,
+    },
+    { key: "marketplace", label: "Marketplace", value: totals.marketplace },
+    { key: "gmSpend", label: "GM Spend", value: totals.gmSpend },
+    { key: "gmEarnings", label: "GM Earnings", value: totals.gmEarnings },
+    { key: "giftCredits", label: "Gift Credits", value: totals.giftCredits },
     { key: "prizes", label: "Prizes Won", value: totals.prizes },
     { key: "withdrawals", label: "Withdrawals", value: totals.withdrawals },
-  ] as const;
+  ].filter((row) => row.value > 0 || ["deposits", "prizes", "giftCredits"].includes(row.key));
 
   return (
     <AnalyticsCard
@@ -152,7 +179,7 @@ export default function CreditBreakdownPanel({
                   name={s.label}
                   fill={s.color}
                   radius={[3, 3, 0, 0]}
-                  maxBarSize={12}
+                  maxBarSize={10}
                   style={{ filter: `drop-shadow(0 0 5px ${s.color}99)` }}
                 />
               ))}
@@ -161,7 +188,7 @@ export default function CreditBreakdownPanel({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {summary.map((row) => {
           const color =
             WALLET_CATEGORY[row.key as keyof typeof WALLET_CATEGORY] ??

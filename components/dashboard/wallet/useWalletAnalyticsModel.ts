@@ -35,12 +35,14 @@ export function toBreakdownDay(r: RawBreakdown): BreakdownDay {
   return {
     date: r.date,
     deposits: r.deposits || 0,
-    // Reason: marketplace + contest entries are both player spend.
-    purchases: (r.marketplace || 0) + (r.entries || 0),
-    gameEarnings: r.gmEarnings || 0,
-    bonuses: r.refunds || 0,
+    contestEntries: r.entries || 0,
+    marketplace: r.marketplace || 0,
+    gmSpend: r.gmSpend || 0,
+    gmEarnings: r.gmEarnings || 0,
+    giftCredits: r.giftCredits || 0,
     prizes: r.wins || 0,
     withdrawals: r.withdrawals || 0,
+    refunds: r.refunds || 0,
   };
 }
 
@@ -59,6 +61,16 @@ export function formatRangeLabel(history: { date: string }[]): string {
     });
   };
   return `${fmt(first)} – ${fmt(last)}`;
+}
+
+function periodSpend(r: RawBreakdown): number {
+  return (
+    (r.entries || 0) +
+    (r.marketplace || 0) +
+    (r.gmSpend || 0) +
+    (r.withdrawals || 0) +
+    (r.giftCreditsOut || 0)
+  );
 }
 
 /**
@@ -100,33 +112,47 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
   const breakdownTotals: BreakdownTotals = useMemo(() => {
     const empty: BreakdownTotals = {
       deposits: 0,
-      purchases: 0,
-      gameEarnings: 0,
-      bonuses: 0,
+      contestEntries: 0,
+      marketplace: 0,
+      gmSpend: 0,
+      gmEarnings: 0,
+      giftCredits: 0,
+      giftCreditsOut: 0,
       prizes: 0,
       withdrawals: 0,
+      refunds: 0,
     };
     for (const d of breakdownDays) {
       empty.deposits += d.deposits;
-      empty.purchases += d.purchases;
-      empty.gameEarnings += d.gameEarnings;
-      empty.bonuses += d.bonuses;
+      empty.contestEntries += d.contestEntries;
+      empty.marketplace += d.marketplace;
+      empty.gmSpend += d.gmSpend;
+      empty.gmEarnings += d.gmEarnings;
+      empty.giftCredits += d.giftCredits;
       empty.prizes += d.prizes;
       empty.withdrawals += d.withdrawals;
+      empty.refunds += d.refunds;
+    }
+    for (const r of breakdownRaw) {
+      empty.giftCreditsOut += r.giftCreditsOut || 0;
     }
     // Reason: if the window is empty, fall back to all-time so tiles are not blank.
     if (breakdownDays.length === 0) {
       return {
         deposits: totals.deposits,
-        purchases: totals.marketplace + totals.entries,
-        gameEarnings: totals.gmEarnings,
-        bonuses: totals.refunds,
+        contestEntries: totals.entries,
+        marketplace: totals.marketplace,
+        gmSpend: totals.gmSpend,
+        gmEarnings: totals.gmEarnings,
+        giftCredits: totals.giftCredits,
+        giftCreditsOut: totals.giftCreditsOut,
         prizes: totals.wins,
         withdrawals: totals.withdrawals,
+        refunds: totals.refunds,
       };
     }
     return empty;
-  }, [breakdownDays, totals]);
+  }, [breakdownDays, breakdownRaw, totals]);
 
   const rangeLabel = useMemo(() => formatRangeLabel(history), [history]);
 
@@ -149,12 +175,10 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
       overview.creditBalance;
 
     const { prev: bPrev, cur: bCur } = halfWindow(breakdownRaw);
-    const spendCur =
-      sumField(bCur, (r) => r.entries + r.marketplace + r.withdrawals);
-    const spendPrev =
-      sumField(bPrev, (r) => r.entries + r.marketplace + r.withdrawals);
-    const gameCur = sumField(bCur, (r) => r.gmEarnings);
-    const gamePrev = sumField(bPrev, (r) => r.gmEarnings);
+    const spendCur = sumField(bCur, periodSpend);
+    const spendPrev = sumField(bPrev, periodSpend);
+    const gmCur = sumField(bCur, (r) => r.gmEarnings);
+    const gmPrev = sumField(bPrev, (r) => r.gmEarnings);
     const prizeCur = sumField(bCur, (r) => r.wins);
     const prizePrev = sumField(bPrev, (r) => r.wins);
 
@@ -170,57 +194,50 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
       {
         key: "spend",
         label: "Total Spend",
-        value: overview.totalSpent,
+        // Reason: period spend — overview.totalSpent is all-time and mixed periods.
+        value: spendCur,
         deltaPct: pctChange(spendCur, spendPrev),
         accent: "magenta",
-        spark: breakdownRaw
-          .map((d) => d.entries + d.marketplace + d.withdrawals)
-          .slice(-14),
+        spark: breakdownRaw.map(periodSpend).slice(-14),
       },
       {
         key: "game",
-        label: "Game Earnings",
-        value: gameCur || totals.gmEarnings || 0,
-        deltaPct: pctChange(gameCur, gamePrev),
+        label: "GM Earnings",
+        value: gmCur,
+        deltaPct: pctChange(gmCur, gmPrev),
         accent: "cyan",
         spark: breakdownRaw.map((d) => d.gmEarnings).slice(-14),
       },
       {
         key: "prizes",
         label: "Prizes Won",
-        value: overview.totalPrizesWon,
+        value: prizeCur,
         deltaPct: pctChange(prizeCur, prizePrev),
         accent: "orange",
         spark: breakdownRaw.map((d) => d.wins).slice(-14),
       },
     ];
-  }, [breakdownRaw, history, overview, totals.gmEarnings]);
+  }, [breakdownRaw, history, overview.creditBalance]);
 
   const spendSlices: SpendingSlice[] = useMemo(() => {
     const rows: SpendingSlice[] = [
       {
-        key: "purchases",
-        label: "Purchases",
-        value: breakdownTotals.purchases,
-        color: WALLET_CATEGORY.purchases,
+        key: "contestEntries",
+        label: "Contest Entries",
+        value: breakdownTotals.contestEntries,
+        color: WALLET_CATEGORY.contestEntries,
       },
       {
-        key: "prizes",
-        label: "Prizes Won",
-        value: breakdownTotals.prizes,
-        color: WALLET_CATEGORY.prizes,
+        key: "marketplace",
+        label: "Marketplace",
+        value: breakdownTotals.marketplace,
+        color: WALLET_CATEGORY.marketplace,
       },
       {
-        key: "game",
-        label: "Game Earnings",
-        value: breakdownTotals.gameEarnings,
-        color: WALLET_CATEGORY.gameEarnings,
-      },
-      {
-        key: "bonuses",
-        label: "Bonuses",
-        value: breakdownTotals.bonuses,
-        color: WALLET_CATEGORY.bonuses,
+        key: "gmSpend",
+        label: "GM Spend",
+        value: breakdownTotals.gmSpend,
+        color: WALLET_CATEGORY.gmSpend,
       },
       {
         key: "withdrawals",
@@ -229,10 +246,40 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
         color: WALLET_CATEGORY.withdrawals,
       },
       {
+        key: "giftCreditsOut",
+        label: "Gift Credits Removed",
+        value: breakdownTotals.giftCreditsOut,
+        color: WALLET_CATEGORY.giftCreditsOut,
+      },
+      {
         key: "deposits",
         label: "Deposits",
         value: breakdownTotals.deposits,
         color: WALLET_CATEGORY.deposits,
+      },
+      {
+        key: "prizes",
+        label: "Prizes Won",
+        value: breakdownTotals.prizes,
+        color: WALLET_CATEGORY.prizes,
+      },
+      {
+        key: "gmEarnings",
+        label: "GM Earnings",
+        value: breakdownTotals.gmEarnings,
+        color: WALLET_CATEGORY.gmEarnings,
+      },
+      {
+        key: "giftCredits",
+        label: "Gift Credits",
+        value: breakdownTotals.giftCredits,
+        color: WALLET_CATEGORY.giftCredits,
+      },
+      {
+        key: "refunds",
+        label: "Refunds",
+        value: breakdownTotals.refunds,
+        color: WALLET_CATEGORY.refunds,
       },
     ].filter((s) => s.value > 0);
 
@@ -255,12 +302,12 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
     const depositsPrev = sumField(prev, (r) => r.deposits);
     const withdrawCur = sumField(cur, (r) => r.withdrawals);
     const withdrawPrev = sumField(prev, (r) => r.withdrawals);
-    const purchaseCur = sumField(cur, (r) => r.marketplace + r.entries);
-    const purchasePrev = sumField(prev, (r) => r.marketplace + r.entries);
-    const gameCur = sumField(cur, (r) => r.gmEarnings);
-    const gamePrev = sumField(prev, (r) => r.gmEarnings);
-    const bonusCur = sumField(cur, (r) => r.refunds);
-    const bonusPrev = sumField(prev, (r) => r.refunds);
+    const marketCur = sumField(cur, (r) => r.marketplace);
+    const marketPrev = sumField(prev, (r) => r.marketplace);
+    const gmCur = sumField(cur, (r) => r.gmEarnings);
+    const gmPrev = sumField(prev, (r) => r.gmEarnings);
+    const giftCur = sumField(cur, (r) => r.giftCredits);
+    const giftPrev = sumField(prev, (r) => r.giftCredits);
     const prizeCur = sumField(cur, (r) => r.wins);
     const prizePrev = sumField(prev, (r) => r.wins);
 
@@ -272,45 +319,42 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
       {
         key: "deposits",
         label: "Deposits",
-        value: depositsCur || breakdownTotals.deposits,
+        value: depositsCur,
         deltaPct: pctChange(depositsCur, depositsPrev),
         spark: breakdownRaw.map((d) => d.deposits).slice(-10),
       },
       {
         key: "withdrawals",
         label: "Withdrawals",
-        value: withdrawCur || breakdownTotals.withdrawals,
+        value: withdrawCur,
         deltaPct: pctChange(withdrawCur, withdrawPrev),
         spark: breakdownRaw.map((d) => d.withdrawals).slice(-10),
       },
       {
-        key: "purchases",
-        label: "Purchases",
-        // Reason: parentheses — `a + b || c` short-circuits on a alone.
-        value: purchaseCur || breakdownTotals.purchases,
-        deltaPct: pctChange(purchaseCur, purchasePrev),
-        spark: breakdownRaw
-          .map((d) => d.marketplace + d.entries)
-          .slice(-10),
+        key: "marketplace",
+        label: "Marketplace",
+        value: marketCur,
+        deltaPct: pctChange(marketCur, marketPrev),
+        spark: breakdownRaw.map((d) => d.marketplace).slice(-10),
       },
       {
-        key: "gameEarnings",
-        label: "Game Earnings",
-        value: gameCur || breakdownTotals.gameEarnings,
-        deltaPct: pctChange(gameCur, gamePrev),
+        key: "gmEarnings",
+        label: "GM Earnings",
+        value: gmCur,
+        deltaPct: pctChange(gmCur, gmPrev),
         spark: breakdownRaw.map((d) => d.gmEarnings).slice(-10),
       },
       {
-        key: "bonuses",
-        label: "Bonuses",
-        value: bonusCur || breakdownTotals.bonuses,
-        deltaPct: pctChange(bonusCur, bonusPrev),
-        spark: breakdownRaw.map((d) => d.refunds).slice(-10),
+        key: "giftCredits",
+        label: "Gift Credits",
+        value: giftCur,
+        deltaPct: pctChange(giftCur, giftPrev),
+        spark: breakdownRaw.map((d) => d.giftCredits).slice(-10),
       },
       {
         key: "prizes",
         label: "Prizes Won",
-        value: prizeCur || breakdownTotals.prizes,
+        value: prizeCur,
         deltaPct: pctChange(prizeCur, prizePrev),
         spark: breakdownRaw.map((d) => d.wins).slice(-10),
       },
@@ -322,18 +366,24 @@ export function useWalletAnalyticsModel(overview: Overview, charts: Charts) {
         spark: flow.map((d) => d.net).slice(-10),
       },
     ];
-  }, [breakdownRaw, breakdownTotals, flow]);
+  }, [breakdownRaw, flow]);
 
   const moneyIn = useMemo(
     () =>
       breakdownTotals.deposits +
-      breakdownTotals.gameEarnings +
+      breakdownTotals.gmEarnings +
       breakdownTotals.prizes +
-      breakdownTotals.bonuses,
+      breakdownTotals.giftCredits +
+      breakdownTotals.refunds,
     [breakdownTotals],
   );
   const moneyOut = useMemo(
-    () => breakdownTotals.purchases + breakdownTotals.withdrawals,
+    () =>
+      breakdownTotals.contestEntries +
+      breakdownTotals.marketplace +
+      breakdownTotals.gmSpend +
+      breakdownTotals.withdrawals +
+      breakdownTotals.giftCreditsOut,
     [breakdownTotals],
   );
 

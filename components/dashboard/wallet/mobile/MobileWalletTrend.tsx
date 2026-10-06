@@ -33,7 +33,7 @@ function formatTipDate(iso: string): string {
 }
 
 /**
- * Full-width mobile balance trend — tall chart, sparse axes, shared range.
+ * Full-width mobile balance trend — desktop-parity gold glow chart.
  */
 export default function MobileWalletTrend({
   data,
@@ -47,7 +47,7 @@ export default function MobileWalletTrend({
   return (
     <section
       aria-label="Wallet balance trend"
-      className="rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4"
+      className="rounded-[18px] border border-amber-400/25 bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4 shadow-[0_0_22px_rgba(250,204,21,0.1)]"
     >
       <div className="mb-3 flex flex-col gap-2">
         <div className="flex items-start gap-2">
@@ -69,50 +69,62 @@ export default function MobileWalletTrend({
       </div>
 
       {data.length < 2 ? (
-        <div className="flex h-[230px] items-center justify-center text-sm text-slate-500">
+        <div className="flex h-[250px] items-center justify-center text-sm text-slate-500">
           Make a deposit to start tracking your wallet balance
         </div>
       ) : (
-        <div className="h-[240px] w-full">
+        <div className="h-[260px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
-              margin={{ top: 8, right: 4, left: -12, bottom: 0 }}
+              margin={{ top: 10, right: 4, left: 0, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="mwGoldFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={WALLET_GOLD} stopOpacity={0.55} />
-                  <stop offset="55%" stopColor={WALLET_GOLD} stopOpacity={0.16} />
+                  <stop offset="55%" stopColor={WALLET_GOLD} stopOpacity={0.18} />
                   <stop offset="100%" stopColor={WALLET_GOLD} stopOpacity={0.02} />
                 </linearGradient>
+                <filter id="mwGoldGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="rgba(255,255,255,0.06)"
+                stroke="rgba(255,255,255,0.07)"
                 vertical={false}
               />
               <XAxis
                 dataKey="date"
                 tickFormatter={formatAxisDate}
-                tick={{ fill: "#94A3B8", fontSize: 10 }}
+                tick={{ fill: "#94A3B8", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                minTickGap={40}
+                minTickGap={28}
                 interval="preserveStartEnd"
               />
               <YAxis
-                tick={{ fill: "#64748B", fontSize: 10 }}
+                orientation="right"
+                tick={{ fill: "#94A3B8", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                width={40}
-                tickCount={4}
+                width={44}
+                tickFormatter={(v: number) =>
+                  v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))
+                }
               />
               <Tooltip
                 contentStyle={{
-                  background: "rgba(8,14,28,0.96)",
-                  border: "1px solid rgba(250,204,21,0.35)",
-                  borderRadius: 12,
-                  fontSize: 13,
+                  background: "rgba(5,12,28,0.95)",
+                  border: `1px solid ${WALLET_GOLD}99`,
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: "#fff",
+                  boxShadow: `0 0 18px ${WALLET_GOLD}55`,
                   padding: "10px 12px",
                 }}
                 labelFormatter={(v) => formatTipDate(String(v))}
@@ -131,9 +143,16 @@ export default function MobileWalletTrend({
                 type="monotone"
                 dataKey="balance"
                 stroke={WALLET_GOLD}
-                strokeWidth={2.5}
+                strokeWidth={3}
                 fill="url(#mwGoldFill)"
-                activeDot={{ r: 5, strokeWidth: 0, fill: WALLET_GOLD }}
+                filter="url(#mwGoldGlow)"
+                dot={{ r: 2.5, fill: WALLET_GOLD, stroke: "#fff", strokeWidth: 1 }}
+                activeDot={{
+                  r: 6,
+                  fill: WALLET_GOLD,
+                  stroke: "#fff",
+                  strokeWidth: 2,
+                }}
               />
             </AreaChart>
           </ResponsiveContainer>

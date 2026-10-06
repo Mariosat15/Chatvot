@@ -123,15 +123,18 @@ describe("Wallet Analytics page wiring", () => {
     const keys = [
       "deposits",
       "withdrawals",
-      "purchases",
-      "gameEarnings",
-      "bonuses",
+      "marketplace",
+      "gmEarnings",
+      "giftCredits",
       "prizes",
       "net",
     ];
     for (const k of keys) {
       expect(insights).toContain(`"${k}"`);
     }
+    // Reason: flipped 6 Oct 2026 — Bonuses was refunds; Gift credits is admin add/retract.
+    expect(model).toMatch(/label:\s*"Gift Credits"/);
+    expect(model).not.toMatch(/label:\s*"Bonuses"/);
   });
 
   it("KPI / insights / header use neon WALLET_ART tiles like Overview — not Lucide chips", () => {
@@ -196,8 +199,44 @@ describe("Wallet Analytics page wiring", () => {
     expect(spending).toMatch(/WALLET_ART\.spending/);
     expect(model).toMatch(/label:\s*"Credit Balance"/);
     expect(model).toMatch(/label:\s*"Total Spend"/);
-    expect(model).toMatch(/label:\s*"Game Earnings"/);
+    expect(model).toMatch(/label:\s*"GM Earnings"/);
     expect(model).toMatch(/label:\s*"Prizes Won"/);
+    expect(model).toMatch(/label:\s*"Marketplace"/);
+    expect(model).toMatch(/label:\s*"GM Spend"/);
+    expect(model).toMatch(/label:\s*"Contest Entries"/);
+  });
+
+  it("Gift credits come from admin adjustments, never from refunds", () => {
+    const charts = readCode("lib/actions/dashboard/charts.ts");
+    const model = readCode(
+      "components/dashboard/wallet/useWalletAnalyticsModel.ts",
+    );
+    // Reason: the old Bonuses tile summed refunds; Gift credits must read the new buckets.
+    expect(charts).toMatch(/giftCredits/);
+    expect(charts).toMatch(/giftCreditsOut/);
+    expect(charts).toMatch(/case "admin_adjustment"/);
+    expect(charts).toMatch(/case "manual_deposit_credit"/);
+    expect(charts).toMatch(/case "gamemaster_subscription"/);
+    expect(charts).toMatch(/entry\.gmSpend/);
+    expect(model).toMatch(/giftCredits:\s*r\.giftCredits/);
+    expect(model).not.toMatch(/bonuses:\s*r\.refunds/);
+  });
+
+  it("mobile mounts Spending vs Earnings and desktop-parity chart glow", () => {
+    const mobile = readCode(
+      "components/dashboard/wallet/mobile/MobileWallet.tsx",
+    );
+    const trend = readCode(
+      "components/dashboard/wallet/mobile/MobileWalletTrend.tsx",
+    );
+    const flow = readCode(
+      "components/dashboard/wallet/mobile/MobileDailyFlow.tsx",
+    );
+    expect(mobile).toMatch(/SpendingVsEarnings/);
+    expect(trend).toMatch(/mwGoldGlow/);
+    expect(trend).toMatch(/orientation="right"/);
+    expect(flow).toMatch(/orientation="right"/);
+    expect(flow).toMatch(/drop-shadow/);
   });
 
   it("mobile wallet is a dedicated tree with Deposit/Withdraw and shared model", () => {
@@ -220,7 +259,8 @@ describe("Wallet Analytics page wiring", () => {
     );
     expect(idx("<MobileWalletOverview")).toBeLessThan(idx("<MobileWalletTrend"));
     expect(idx("<MobileWalletTrend")).toBeLessThan(idx("<MobileMoneyInOut"));
-    expect(idx("<MobileMoneyInOut")).toBeLessThan(idx("<MobileDailyFlow"));
+    expect(idx("<MobileMoneyInOut")).toBeLessThan(idx("<SpendingVsEarnings"));
+    expect(idx("<SpendingVsEarnings")).toBeLessThan(idx("<MobileDailyFlow"));
     expect(idx("<MobileDailyFlow")).toBeLessThan(idx("<MobileWalletInsights"));
     expect(idx("<MobileWalletInsights")).toBeLessThan(
       idx("<MobileRecentTransactions"),
@@ -230,6 +270,7 @@ describe("Wallet Analytics page wiring", () => {
     expect(actions).toMatch(/Withdraw/);
     expect(actions).toMatch(/href=["']\/wallet["']/);
     // Reason: must not pull the desktop grid into the phone tree.
+    // SpendingVsEarnings is shared desktop math chrome — allowed on mobile.
     expect(mobile).not.toMatch(/WalletKpiGrid|CreditBreakdownPanel|WalletBackdrop/);
   });
 

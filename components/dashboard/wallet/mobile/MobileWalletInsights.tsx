@@ -11,9 +11,9 @@ import { MOBILE_CAROUSEL } from "@/components/dashboard/mobile/MobileSection";
 const ART_BY_KEY: Record<string, string> = {
   deposits: WALLET_ART.deposits,
   withdrawals: WALLET_ART.withdrawals,
-  purchases: WALLET_ART.purchases,
-  gameEarnings: WALLET_ART.gameEarnings,
-  bonuses: WALLET_ART.bonuses,
+  marketplace: WALLET_ART.marketplace,
+  gmEarnings: WALLET_ART.gameEarnings,
+  giftCredits: WALLET_ART.giftCredits,
   prizes: WALLET_ART.prizes,
   net: WALLET_ART.netMovement,
 };
@@ -21,9 +21,9 @@ const ART_BY_KEY: Record<string, string> = {
 const COLOR_BY_KEY: Record<string, string> = {
   deposits: WALLET_CATEGORY.deposits,
   withdrawals: WALLET_CATEGORY.withdrawals,
-  purchases: WALLET_CATEGORY.purchases,
-  gameEarnings: WALLET_CATEGORY.gameEarnings,
-  bonuses: WALLET_CATEGORY.bonuses,
+  marketplace: WALLET_CATEGORY.marketplace,
+  gmEarnings: WALLET_CATEGORY.gmEarnings,
+  giftCredits: WALLET_CATEGORY.giftCredits,
   prizes: WALLET_CATEGORY.prizes,
   net: WALLET_CATEGORY.net,
 };
@@ -51,7 +51,7 @@ export default function MobileWalletInsights({ items }: { items: InsightItem[] }
           return (
             <article
               key={item.key}
-              className="w-[72%] shrink-0 snap-start rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4"
+              className="w-[72%] shrink-0 snap-start rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4 shadow-[0_0_16px_rgba(0,229,255,0.08)]"
             >
               <div className="flex items-center gap-2">
                 <Image

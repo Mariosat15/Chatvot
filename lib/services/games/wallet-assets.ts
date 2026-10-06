@@ -17,7 +17,7 @@ export const WALLET_ART = {
   balance: NEON_ICON("deposit"),
   /** Total Spend KPI. */
   spend: NEON_ICON("withdrawal"),
-  /** Game Earnings. */
+  /** GM Earnings KPI / insight. */
   gameEarnings: NEON_ICON("games-orange"),
   /** Prizes Won. */
   prizes: NEON_ICON("trophy-purple"),
@@ -34,7 +34,12 @@ export const WALLET_ART = {
   deposits: NEON_ICON("deposit"),
   withdrawals: NEON_ICON("withdrawal"),
   purchases: NEON_ICON("purchases"),
+  marketplace: NEON_ICON("purchases"),
+  /** Admin add/retract — formerly mislabelled "Bonuses". */
+  giftCredits: NEON_ICON("gift"),
+  /** @deprecated use giftCredits — kept so a missed rename still resolves art. */
   bonuses: NEON_ICON("gift"),
+  gmSpend: NEON_ICON("crown"),
   /** Net Movement insight. */
   netMovement: NEON_ICON("chart-growth-orange"),
 } as const;

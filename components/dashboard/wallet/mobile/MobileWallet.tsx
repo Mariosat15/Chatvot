@@ -8,6 +8,7 @@ import MobileWalletActions from "./MobileWalletActions";
 import MobileWalletOverview from "./MobileWalletOverview";
 import MobileWalletTrend from "./MobileWalletTrend";
 import MobileMoneyInOut from "./MobileMoneyInOut";
+import SpendingVsEarnings from "../SpendingVsEarnings";
 import MobileDailyFlow from "./MobileDailyFlow";
 import MobileWalletInsights from "./MobileWalletInsights";
 import MobileRecentTransactions from "./MobileRecentTransactions";
@@ -53,6 +54,7 @@ export default function MobileWallet({ overview, charts }: Props) {
         moneyIn={model.moneyIn}
         moneyOut={model.moneyOut}
       />
+      <SpendingVsEarnings slices={model.spendSlices} />
       <MobileDailyFlow data={model.flow} />
       <MobileWalletInsights items={model.insights} />
       <MobileRecentTransactions />

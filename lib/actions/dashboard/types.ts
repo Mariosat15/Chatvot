@@ -93,6 +93,9 @@ export interface ComprehensiveDashboardData {
       entries: number;
       withdrawals: number;
       marketplace: number;
+      giftCredits: number;
+      giftCreditsOut: number;
+      gmSpend: number;
       other: number;
     }[];
     // Reason: All-time totals from getUserFinancialSummary() — single source of truth.
@@ -106,6 +109,9 @@ export interface ComprehensiveDashboardData {
       marketplace: number;
       gmEarnings: number;
       refunds: number;
+      giftCredits: number;
+      giftCreditsOut: number;
+      gmSpend: number;
     };
     winLossDistribution: { wins: number; losses: number; breakeven: number };
     tradesBySymbol: { symbol: string; count: number; pnl: number }[];

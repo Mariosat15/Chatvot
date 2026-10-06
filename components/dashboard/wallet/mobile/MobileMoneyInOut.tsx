@@ -15,7 +15,13 @@ function CategoryBars({ rows, max }: { rows: BarRow[]; max: number }) {
       {rows.map((r) => (
         <li key={r.label}>
           <div className="mb-1 flex items-center justify-between gap-2 text-[11px]">
-            <span className="text-slate-300">{r.label}</span>
+            <span className="flex min-w-0 items-center gap-1.5 text-slate-300">
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: r.color, boxShadow: `0 0 6px ${r.color}` }}
+              />
+              <span className="truncate">{r.label}</span>
+            </span>
             <span className="tabular-nums text-white">{formatVolts(r.value)}</span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-white/5">
@@ -24,6 +30,7 @@ function CategoryBars({ rows, max }: { rows: BarRow[]; max: number }) {
               style={{
                 width: `${Math.max(4, (r.value / denom) * 100)}%`,
                 backgroundColor: r.color,
+                boxShadow: `0 0 10px ${r.color}88`,
               }}
             />
           </div>
@@ -49,23 +56,43 @@ export default function MobileMoneyInOut({
     { label: "Deposits", value: totals.deposits, color: WALLET_CATEGORY.deposits },
     { label: "Prizes", value: totals.prizes, color: WALLET_CATEGORY.prizes },
     {
-      label: "Game Earnings",
-      value: totals.gameEarnings,
-      color: WALLET_CATEGORY.gameEarnings,
+      label: "GM Earnings",
+      value: totals.gmEarnings,
+      color: WALLET_CATEGORY.gmEarnings,
     },
-    { label: "Bonuses", value: totals.bonuses, color: WALLET_CATEGORY.bonuses },
+    {
+      label: "Gift Credits",
+      value: totals.giftCredits,
+      color: WALLET_CATEGORY.giftCredits,
+    },
+    { label: "Refunds", value: totals.refunds, color: WALLET_CATEGORY.refunds },
   ].filter((r) => r.value > 0);
 
   const outRows: BarRow[] = [
     {
-      label: "Purchases",
-      value: totals.purchases,
-      color: WALLET_CATEGORY.purchases,
+      label: "Contest Entries",
+      value: totals.contestEntries,
+      color: WALLET_CATEGORY.contestEntries,
+    },
+    {
+      label: "Marketplace",
+      value: totals.marketplace,
+      color: WALLET_CATEGORY.marketplace,
+    },
+    {
+      label: "GM Spend",
+      value: totals.gmSpend,
+      color: WALLET_CATEGORY.gmSpend,
     },
     {
       label: "Withdrawals",
       value: totals.withdrawals,
       color: WALLET_CATEGORY.withdrawals,
+    },
+    {
+      label: "Gift Credits Removed",
+      value: totals.giftCreditsOut,
+      color: WALLET_CATEGORY.giftCreditsOut,
     },
   ].filter((r) => r.value > 0);
 
@@ -85,7 +112,7 @@ export default function MobileMoneyInOut({
         Credit Breakdown
       </h2>
       <div className="space-y-3">
-        <div className="rounded-[18px] border border-emerald-400/30 bg-[linear-gradient(160deg,rgba(6,32,24,0.9)_0%,rgba(5,10,22,0.96)_100%)] p-4">
+        <div className="rounded-[18px] border border-emerald-400/30 bg-[linear-gradient(160deg,rgba(6,32,24,0.9)_0%,rgba(5,10,22,0.96)_100%)] p-4 shadow-[0_0_18px_rgba(16,185,129,0.12)]">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
             Money In
           </p>
@@ -98,7 +125,7 @@ export default function MobileMoneyInOut({
             <p className="mt-3 text-xs text-slate-500">No inflow in this period</p>
           )}
         </div>
-        <div className="rounded-[18px] border border-rose-400/30 bg-[linear-gradient(160deg,rgba(36,12,20,0.9)_0%,rgba(5,10,22,0.96)_100%)] p-4">
+        <div className="rounded-[18px] border border-rose-400/30 bg-[linear-gradient(160deg,rgba(36,12,20,0.9)_0%,rgba(5,10,22,0.96)_100%)] p-4 shadow-[0_0_18px_rgba(244,63,94,0.12)]">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-300">
             Money Out
           </p>

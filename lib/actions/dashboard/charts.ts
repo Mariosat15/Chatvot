@@ -216,14 +216,28 @@ export async function buildChartData(
   // Daily Credit Breakdown — categorized income vs spending per day
   const breakdownMap = new Map<
     string,
-    { deposits: number; wins: number; gmEarnings: number; refunds: number; entries: number; withdrawals: number; marketplace: number; other: number }
+    {
+      deposits: number;
+      wins: number;
+      gmEarnings: number;
+      refunds: number;
+      entries: number;
+      withdrawals: number;
+      marketplace: number;
+      // Reason: owner 6 Oct 2026 — Gift credits are admin add/retract, not refunds.
+      giftCredits: number;
+      giftCreditsOut: number;
+      gmSpend: number;
+      other: number;
+    }
   >();
   for (let i = 29; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
     breakdownMap.set(toISODateStr(date), {
       deposits: 0, wins: 0, gmEarnings: 0, refunds: 0,
-      entries: 0, withdrawals: 0, marketplace: 0, other: 0,
+      entries: 0, withdrawals: 0, marketplace: 0,
+      giftCredits: 0, giftCreditsOut: 0, gmSpend: 0, other: 0,
     });
   }
   for (const tx of walletTransactions) {
@@ -231,7 +245,8 @@ export async function buildChartData(
     const dateStr = toISODateStr(txDate);
     const entry = breakdownMap.get(dateStr);
     if (!entry) continue;
-    const amount = Math.abs(tx.amount || 0);
+    const signed = tx.amount || 0;
+    const amount = Math.abs(signed);
     const txType = (tx as any).transactionType as string;
     // Reason: Only actual user deposits count as "deposits". Previously, manual_deposit_credit,
     // incident_compensation, admin_adjustment, and any unknown positive-amount transaction were
@@ -241,6 +256,7 @@ export async function buildChartData(
         entry.deposits += amount; break;
       case "competition_win":
       case "challenge_win":
+      case "prize_adjustment_add":
         entry.wins += amount; break;
       case "gamemaster_earning":
       case "gamemaster_challenge_referral":
@@ -255,15 +271,24 @@ export async function buildChartData(
         entry.refunds += amount; break;
       case "competition_entry":
       case "challenge_entry":
+      case "free_private_entry_payment":
         entry.entries += amount; break;
       case "withdrawal":
       case "withdrawal_fee":
+      case "chargeback_clawback":
+      case "prize_reclaim":
+      case "prize_adjustment_deduct":
         entry.withdrawals += amount; break;
       case "marketplace_purchase":
-      case "gamemaster_subscription":
         entry.marketplace += amount; break;
+      case "gamemaster_subscription":
+        entry.gmSpend += amount; break;
       case "manual_deposit_credit":
       case "admin_adjustment":
+        // Reason: admin add → Gift credits in; admin retract → Gift credits out.
+        if (signed >= 0) entry.giftCredits += amount;
+        else entry.giftCreditsOut += amount;
+        break;
       case "platform_fee":
       default:
         entry.other += amount;
@@ -279,6 +304,9 @@ export async function buildChartData(
     entries: Number(d.entries.toFixed(2)),
     withdrawals: Number(d.withdrawals.toFixed(2)),
     marketplace: Number(d.marketplace.toFixed(2)),
+    giftCredits: Number(d.giftCredits.toFixed(2)),
+    giftCreditsOut: Number(d.giftCreditsOut.toFixed(2)),
+    gmSpend: Number(d.gmSpend.toFixed(2)),
     other: Number(d.other.toFixed(2)),
   }));
 

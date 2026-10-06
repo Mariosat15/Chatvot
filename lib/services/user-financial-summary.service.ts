@@ -44,11 +44,18 @@ export interface UserFinancialSummary {
 
   // GM Earnings (from gamemaster_earning + gamemaster_challenge_referral)
   gmEarnings: number;
+  // Reason: GM package fee is spend, not marketplace — Wallet Analytics lists it alone.
+  gmSpend: number;
 
   // Admin adjustments (manual credits/debits by admin — tracked separately)
   // Reason: Admin adjustments are NOT included in ROI or netProfit because
   // they are manual corrections, not investment returns.
   adminAdjustments: number; // net (positive = credits added, negative = debits)
+  // Reason: Wallet Analytics "Gift credits" = admin add/retract + manual deposit credit.
+  // Aggregation is per-type net, so in/out of mixed admin_adjustment rows collapse here;
+  // the daily chart buckets still split each transaction by sign.
+  giftCredits: number; // max(0, admin + manual)
+  giftCreditsOut: number; // abs(min(0, admin + manual))
 }
 
 // ── Transaction types we aggregate ─────────────────────────────────────────
@@ -63,7 +70,9 @@ const ALL_FINANCIAL_TX_TYPES = [
   "marketplace_purchase",
   "gamemaster_earning",
   "gamemaster_challenge_referral",
+  "gamemaster_subscription",
   "admin_adjustment",
+  "manual_deposit_credit",
 ] as const;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -98,6 +107,11 @@ function buildSummaryFromMap(txMap: Map<string, number>): UserFinancialSummary {
   // Reason: Admin adjustments are signed (+credits, -debits).
   // Keep the raw total — NOT included in ROI/profit calculations.
   const adminAdjustments = txMap.get("admin_adjustment") || 0;
+  const manualDepositCredit = txMap.get("manual_deposit_credit") || 0;
+  const giftNet = adminAdjustments + manualDepositCredit;
+  const giftCredits = giftNet > 0 ? giftNet : 0;
+  const giftCreditsOut = giftNet < 0 ? Math.abs(giftNet) : 0;
+  const gmSpend = Math.abs(txMap.get("gamemaster_subscription") || 0);
 
   return {
     competitionWins,
@@ -114,7 +128,10 @@ function buildSummaryFromMap(txMap: Map<string, number>): UserFinancialSummary {
     netProfit,
     roi,
     gmEarnings,
+    gmSpend,
     adminAdjustments,
+    giftCredits,
+    giftCreditsOut,
   };
 }
 
@@ -241,6 +258,9 @@ export function emptyFinancialSummary(): UserFinancialSummary {
     netProfit: 0,
     roi: 0,
     gmEarnings: 0,
+    gmSpend: 0,
     adminAdjustments: 0,
+    giftCredits: 0,
+    giftCreditsOut: 0,
   };
 }

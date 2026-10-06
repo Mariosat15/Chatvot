@@ -322,12 +322,13 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Wallet Analytics Gift credits + spend buckets CODE-COMPLETE 6 Oct (eng)** — Bonuses → Gift credits (`admin_adjustment` / `manual_deposit_credit`); marketplace and GM spend/earn on Spending vs Earnings; mobile charts match desktop glow/axes; shared `useWalletAnalyticsModel`. Tests: `wallet-analytics.test.ts` (12). **Never verified by eye.**
 - **Login / registration mobile + desktop polish CODE-COMPLETE 5 Oct (eng)** — dedicated mobile Sign In + 2-step Register (`md` gate via `AuthViewportSwitch`); desktop mockup unchanged; centered backgrounds; scrollbar chrome hidden; social buttons removed for now; Terms/Privacy are real links; GM `ref` preserved across steps. Spec: `redising login.md`. Tests: `auth-page-look.test.ts`. **Never verified by eye.**
 
 This plan has two tracks. **As of 30 September 2026**:
 
 - **Mobile Overview polish CODE-COMPLETE 3 Oct (eng)** — removed Upcoming competitions (Suggested already lists open contests; deleted `MobileUpcomingCompetitions.tsx`); carousels use `snap-proximity` + `scroll-smooth` + touch momentum; drawer scroll smoothed; `MobileDashboardBackBar` on non-overview tabs; sidebar Dashboard → `/dashboard?tab=overview` (with `isActive` stripping the query). Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
-- **Wallet Analytics neon icon remap CODE-COMPLETE 3 Oct (eng)** — header/insights/trend→wallet; Credit Balance→deposit; Total Spend / Spending vs Earnings / Withdrawals→withdrawal; Game Earnings→games; Prizes Won→trophy; Credit Breakdown→credits; Daily Credit Flow→chart2; Deposits→deposit; Purchases→purch; Bonuses→gift; Net Movement→chart. `WalletNeonIcon` + mobile images use `mix-blend-screen` and `bg-transparent`. Assets under `public/assets/neon/wallet/icon-*`. Desktop + mobile. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
+- **Wallet Analytics neon icon remap CODE-COMPLETE 3 Oct (eng)** — header/insights/trend→wallet; Credit Balance→deposit; Total Spend / Spending vs Earnings / Withdrawals→withdrawal; Game Earnings→games; Prizes Won→trophy; Credit Breakdown→credits; Daily Credit Flow→chart2; Deposits→deposit; Purchases→purch; Bonuses→gift; Net Movement→chart. `WalletNeonIcon` + mobile images use `mix-blend-screen` and `bg-transparent`. Assets under `public/assets/neon/wallet/icon-*`. Desktop + mobile. Tests: `wallet-analytics.test.ts`. **Never verified by eye.** **Amended 6 Oct 2026:** Bonuses label is gone — the gift tile is **Gift credits** (admin add/retract); Menuitems WebP remap superseded the JPG `mix-blend-screen` set (5 Oct); see work log.
 - **Mobile Overview neon plates refreshed 3 Oct (eng)** — owner re-supplied deposit/withdrawal/trophy/games/wallet/chart/lamp/purchases; files overwritten under `public/assets/neon/wallet/` + `icon-lamp.jpg`. Mapping unchanged (`MOBILE_OVERVIEW_ART` + `ICON_BOX` h-10 + screen blend). **Never verified by eye.**
 - **Suggested for You rebuilt to Image 2 CODE-COMPLETE 3 Oct (eng)** — clean cover (no Upcoming/fee pills); GM/Private/Public badges; full prize-banner background + small trophy icon (not a 42% framed crop); Join plate alone (fixes JJoin); curated `overviewPlayCardArt` covers. Tests: `overview-standing.test.ts`. **Never verified by eye.** The earlier densify-to-Image-1 pass is correct as history only.
 - **Mobile Overview Quick Actions / Quick Access neon remap CODE-COMPLETE 3 Oct (eng)** — Deposit→deposit, Withdraw→withdrawal, Compete→trophy, Play→games, Wallet Analytics→wallet, Performance→chart, Tutorials→lamp, Marketplace→purchases, Wallet/Volts→wallet. Shared `ICON_BOX` h-10 + `mix-blend-screen` / `bg-transparent` (no black canvas). Assets under `public/assets/neon/wallet/icon-*` + `overview/items/icon-lamp.jpg`. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
@@ -932,6 +933,15 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Wallet Analytics: Gift credits, correct buckets, mobile charts, full Spending vs Earnings
+
+**Owner instruction:** (1) replace Bonuses with Gift credits (admin add/retract); (2) verify values and calculations; (3) make mobile graphs match desktop quality; (4) Spending vs Earnings must list marketplace and GM spend/earn.
+
+- **Gift credits.** Daily bucketing in `lib/actions/dashboard/charts.ts` maps `admin_adjustment` and `manual_deposit_credit` to `giftCredits` / `giftCreditsOut` by sign. The old "Bonuses" tile had been reading `refunds`. `gamemaster_subscription` is `gmSpend`, separate from marketplace. All-time totals come from `user-financial-summary.service.ts` (`giftCredits`, `giftCreditsOut`, `gmSpend`) and are mirrored into admin. Period KPIs use the selected window only — no `|| allTime` mix.
+- **Spending vs Earnings.** Shared model builds slices for contest entries, marketplace, GM spend, withdrawals, gift credits removed, deposits, prizes, GM earnings, gift credits, refunds (filter `value > 0`). Mobile mounts the same `SpendingVsEarnings` panel.
+- **Mobile charts.** Trend and daily flow gained desktop-parity glow, right Y-axis, and taller Recharts height.
+- **Tests.** `__tests__/dashboard/wallet-analytics.test.ts` 12 tests (flipped Bonuses/Game Earnings expectations; added gift-credit and mobile-parity guards). ESLint clean on touched files. **Never verified by eye.**
 
 ### 5 October 2026 - Overview + Wallet Analytics icons from the Menuitems set; support email on sign-in
 
