@@ -98,18 +98,24 @@ function StickyEnterBar({ game }: { game: GamePageData }) {
       </div>
     );
   }
-  // Reason (6 Oct 2026, owner): Enter Now → competitions hub; mark from branding, not "CV".
+  // Reason (6 Oct 2026, owner): Enter Now → competitions hub.
+  // Reason (6 Oct 2026, owner): square Brand Icon (favicon), never the wide
+  // App Logo wordmark — a 36px box crops a wordmark into an unreadable blob.
   const href = competitionBrowseHref(game.slug);
   return (
     <div className="sticky bottom-3 z-40 mt-6 overflow-hidden rounded-[12px] border border-[var(--gp-card-border,rgba(40,130,255,.35))] bg-[var(--gp-panel,#07152c)]/95 px-4 py-3 shadow-[0_0_40px_rgba(0,0,0,.5)] backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--gp-border)] bg-black/40">
+          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={images.appLogo}
-              alt=""
-              className="h-full w-full object-contain p-0.5"
+              src={images.favicon}
+              alt="logo"
+              className="h-11 w-11 object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  "/assets/images/brand-icon.jpg";
+              }}
             />
           </div>
           <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[var(--gp-muted)]">

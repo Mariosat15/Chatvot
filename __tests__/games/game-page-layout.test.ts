@@ -51,9 +51,12 @@ describe("player game page layout", () => {
     }
   });
 
-  it("shows the branding app logo on the sticky enter bar, not a CV placeholder", () => {
+  it("shows the branding Brand Icon on the sticky enter bar, not the App Logo wordmark", () => {
+    // Reason: the bar is a 44px square; App Logo is a wide wordmark and
+    // reads as a blob. Brand Icon is WhiteLabel.favicon (admin Images).
     expect(view).toContain("useWhiteLabelImages");
-    expect(view).toContain("images.appLogo");
+    expect(view).toContain("images.favicon");
+    expect(view).not.toContain("images.appLogo");
     expect(view).not.toMatch(/>\s*CV\s*</);
   });
 

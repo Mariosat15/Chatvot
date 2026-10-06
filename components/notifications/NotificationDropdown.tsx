@@ -272,7 +272,9 @@ export default function NotificationDropdown() {
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-96 p-0 bg-gray-900 border-gray-800"
+        // Reason: the desktop sidebar is z-[60] and the mobile drawer is z-[110];
+        // the shared popover default is z-50, so the list sat behind the menu.
+        className="z-[120] w-96 p-0 bg-gray-900 border-gray-800"
         align="end"
         sideOffset={8}
       >
