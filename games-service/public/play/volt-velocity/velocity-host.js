@@ -51,6 +51,7 @@
   const statusBox = document.getElementById("status");
   const messageEl = document.getElementById("message");
   const errorEl = document.getElementById("error");
+  const loadbarEl = document.getElementById("loadbar");
 
   function tellPlatform(type, extra) {
     if (window.parent === window) return;
@@ -67,7 +68,9 @@
    * host's default min-height (320) left the race squeezed in a short strip (owner, 6 Oct 2026).
    */
   function askForRoom() {
-    const height = Math.max(720, Math.min(1100, Math.round(window.innerHeight || 720)));
+    // Reason: practice/arena embeds start short; ask for a tall stage so the hangar
+    // is not vertically squeezed (owner, 6 Oct 2026).
+    const height = Math.max(820, Math.min(1200, Math.round(window.innerHeight || 820)));
     tellPlatform("resize", { height });
   }
 
@@ -75,10 +78,13 @@
     statusBox.hidden = false;
     messageEl.textContent = message || "";
     errorEl.textContent = error || "";
+    // Reason: the bar is only for waiting; an error state must not keep animating.
+    if (loadbarEl) loadbarEl.hidden = Boolean(error);
   }
 
   function hideStatus() {
     statusBox.hidden = true;
+    if (loadbarEl) loadbarEl.hidden = true;
   }
 
   function markFinished() {

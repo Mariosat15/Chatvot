@@ -215,9 +215,9 @@ export function PracticeRoundHost({
 
   if (phase.name === "playing") {
     return (
-      // Reason: Velocity never posts resize; a tall stage gives flex-1 room so the race is
-      // not stuck in a 320px strip. Circuit and Stack still drive height via resize.
-      <div className="flex min-h-[min(85vh,900px)] flex-col">
+      // Reason: Velocity asks for height via resize; a tall, full-width stage keeps the
+      // hangar from squeezing ship names. Circuit and Stack still drive height via resize.
+      <div className="flex min-h-[min(90vh,980px)] w-full flex-col">
         <ProviderGameFrame
           launchUrl={phase.launchUrl}
           gameName={gameName}

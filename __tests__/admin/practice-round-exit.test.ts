@@ -53,3 +53,23 @@ describe("Round Inspector ends practice in place", () => {
     expect(code).toMatch(/practice/);
   });
 });
+
+describe("Volt Velocity practice hangar is not squeezed", () => {
+  it("lays ships in two rows of four and shows a host load bar", () => {
+    // Reason (6 Oct 2026, owner): eight 1fr columns clipped ship names; load copy
+    // had no bar so waiting looked stuck.
+    const hangar = read("velocity-server/client-patches/root/chartvolt.css");
+    expect(hangar).toMatch(
+      /\.ship-picker\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/,
+    );
+    expect(hangar).not.toMatch(
+      /\.ship-picker\{[^}]*grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/,
+    );
+    const host = read("games-service/public/play/volt-velocity/index.html");
+    expect(host).toContain('id="loadbar"');
+    expect(host).toContain("@keyframes vv-load");
+    const page = read("app/(root)/games/[slug]/practice/page.tsx");
+    expect(page).toContain("88rem");
+    expect(page).not.toMatch(/max-w-5xl/);
+  });
+});

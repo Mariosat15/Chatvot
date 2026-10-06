@@ -64,8 +64,10 @@ export default async function GamePracticePage({
 
   const rounds = (await listPracticeRounds(slug, session.user.id)) ?? [];
 
+  // Reason (6 Oct 2026, owner): max-w-5xl left Velocity's hangar squeezed in a
+  // ~1000px column; ship names truncated. Give practice the room a race needs.
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
+    <div className="mx-auto w-full max-w-[min(100%,88rem)] px-3 py-6 sm:px-4 sm:py-8">
       <DashboardBackdrop>
         <header className="space-y-1 pb-2 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">

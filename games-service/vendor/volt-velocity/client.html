@@ -173,9 +173,9 @@ body[data-state=racing] .brand,body[data-state=countdown] .brand{background:#071
 
 /* ---------- Start screen (hangar): never scrolls, launch always visible ---------- */
 html #hangar.cv-hangar{position:absolute;inset:0;display:grid;box-sizing:border-box;overflow:hidden;
-  grid-template-columns:minmax(260px,31%) minmax(0,1fr) minmax(250px,26%);
+  grid-template-columns:minmax(280px,32%) minmax(0,1fr) minmax(260px,27%);
   grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"intro stage ship" "dock dock dock";
-  gap:16px 26px;padding:96px 34px 22px;align-items:start;
+  gap:16px 22px;padding:88px 28px 18px;align-items:start;
   background:linear-gradient(90deg,#030914f0,#050e1dc4 24%,#05101c00 44%,#05101c00 66%,#050e1dcc 82%,#030914ee),
     linear-gradient(0deg,#030914f5,#03091400 38%)}
 #hangar .cv-intro{grid-area:intro;min-height:0;overflow:hidden}
@@ -196,16 +196,18 @@ html #hangar.cv-hangar{position:absolute;inset:0;display:grid;box-sizing:border-
 #hangar .cv-ship #shipTradeoffs{margin:0 0 10px}
 #hangar .cv-ship .personal-best{margin:0}
 
-#hangar .cv-dock{grid-area:dock;display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,280px);gap:14px 20px;align-items:end;
+/* Reason (6 Oct 2026, owner): eight 1fr columns squeezed names to "VANGU"/"TEMPE".
+   Two rows of four keep every ship label readable in the practice/arena frame. */
+#hangar .cv-dock{grid-area:dock;display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,240px);gap:14px 18px;align-items:end;
   padding:14px 16px;border:1px solid var(--edge);border-radius:14px;background:#061321e0;backdrop-filter:blur(10px);
   box-shadow:0 -10px 40px #0005}
 #hangar .cv-label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 8px;
   font:10px ui-monospace,monospace;letter-spacing:2px;color:var(--muted)}
 #hangar .cv-label b{color:#e8fbff;font-weight:700}
-#hangar .cv-fleet .ship-picker{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;margin:0;padding:3px 0 0}
+#hangar .cv-fleet .ship-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:3px 0 0}
 #hangar .ship-picker button{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;
-  min-height:62px;min-width:0;padding:9px 8px 9px 14px;margin:0;text-align:left;overflow:hidden;
-  font:800 11px/1.15 Arial,Helvetica,sans-serif;letter-spacing:1px;color:#e8fbff;white-space:nowrap;text-overflow:ellipsis;
+  min-height:68px;min-width:0;padding:10px 12px 10px 16px;margin:0;text-align:left;overflow:hidden;
+  font:800 12px/1.15 Arial,Helvetica,sans-serif;letter-spacing:.5px;color:#e8fbff;white-space:nowrap;text-overflow:ellipsis;
   border:1px solid #6bcce945;border-radius:9px;cursor:pointer;
   background:linear-gradient(160deg,color-mix(in srgb,var(--paint) 26%,#0b1c2c),#06121f 78%);
   transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
