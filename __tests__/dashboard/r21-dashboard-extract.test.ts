@@ -101,11 +101,23 @@ describe("R21 dashboard extract (structural)", () => {
     expect(source).toMatch(
       /tradingEnabled\s*\|\|\s*overview\.totalTrades\s*>\s*0/,
     );
-    // Reason: count PerformanceRings mounts — must be inside the gate, not beside it.
-    const ringsIdx = source.indexOf("<PerformanceRings");
-    const gateIdx = source.lastIndexOf("showTradingChrome", ringsIdx);
-    expect(ringsIdx).toBeGreaterThan(-1);
-    expect(gateIdx).toBeGreaterThan(-1);
-    expect(gateIdx).toBeLessThan(ringsIdx);
+    // Reason: re-pointed 6 Oct 2026 when the Performance tab became
+    // components/dashboard/performance/. The claim is unchanged — the trading
+    // row must sit inside the gate, not beside it — only the location moved.
+    expect(source).toMatch(/showTradingChrome=\{showTradingChrome\}/);
+    for (const rel of [
+      "components/dashboard/performance/DesktopPerformance.tsx",
+      "components/dashboard/performance/mobile/MobilePerformance.tsx",
+    ]) {
+      const tree = stripComments(read(rel));
+      const mounts = [
+        ...tree.matchAll(/<TradingPerformanceSection|<TradingMetricTile/g),
+      ];
+      expect(mounts.length, rel).toBeGreaterThan(0);
+      for (const m of mounts) {
+        const gateIdx = tree.lastIndexOf("model.showTradingSection ?", m.index);
+        expect(gateIdx, rel).toBeGreaterThan(-1);
+      }
+    }
   });
 });

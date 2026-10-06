@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Performance Analytics REBUILT 6 Oct (eng)** — `components/dashboard/performance/`, separate desktop + mobile trees on one model; trading row R21-gated; 1v1 counted under All games only; page ends at Market Holidays. Tests: `performance-analytics.test.ts` (16). **Never verified by eye.**
 - **Spending vs Earnings structure CODE-COMPLETE 6 Oct (eng)** — comparison bar + two equal columns; `spendMetric` vs `earnMetric` only (deposits/refunds excluded). Desktop + mobile share the panel. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Spending vs Earnings contrast CODE-COMPLETE 6 Oct (eng)** — first pass (flow in/out donut). Superseded by structure pass above — deposits/refunds wrongly counted as earnings. **Say which.**
 - **Wallet Insights fill + balance chart gap CODE-COMPLETE 6 Oct (eng)** — insight tiles use equal `1fr` columns (no auto-fill dead space); balance trend / daily flow grow with `flex-1`; mobile trend 200px. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
@@ -939,6 +940,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Performance Analytics page rebuilt (`/dashboard?tab=performance`)
+
+**Owner brief:** rebuild the page to `CHARTVOLT PERFORMANCE ANALYTICS PAGE` and its reference image, using the supplied neon icons (`design-reference/Menuitems`); the product ends at the Market Holidays row — the guide sidebar and reusable-components strip are **not** built.
+
+- New folder `components/dashboard/performance/`: one pure model (`performance-model.ts`) behind `usePerformanceAnalyticsModel`, a shell (`PerformanceAnalytics.tsx`) that fetches holidays once, and two separate trees — `DesktopPerformance.tsx` and `mobile/MobilePerformance.tsx` (snap carousels, stacked bottom panels), not a shrunk desktop.
+- Desktop order: header + filters → 8 highlight cards → game carousel → trend (overall / trading / games / competitions / 1v1 counts, toggleable) → trading row → 1v1, competition and Market Holidays panels.
+- Game cards come from `lib/services/games/player-game-activity.service.ts` via `gameActivity` on the dashboard action; no game codes appear in UI code (a test forbids them).
+- **Trading row is R21-gated** (`showTradingChrome = tradingEnabled || totalTrades > 0`, rendered behind `model.showTradingSection`). Trading money with no trades shows a dash.
+- **1v1 results carry no game label, so they count only under "All games"**; under a game filter the panel says so instead of showing a zero.
+- **Games are hidden under the Trading filter**, so the page never claims a player "has not played" a game it was told to leave out.
+- The old `PlayerGamePerformancePanel` / trading performance components are kept but no longer mounted from this tab.
+- Two older structural tests (`r21-dashboard-extract`, `player-game-performance-r64`) were re-pointed at the new files; their claims are unchanged.
+- Tests: `__tests__/dashboard/performance-analytics.test.ts` (16). **Never verified by eye.**
 
 ### 6 October 2026 - Daily Credit Flow desktop chart swap; removed from mobile
 

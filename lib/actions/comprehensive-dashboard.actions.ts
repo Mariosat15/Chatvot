@@ -24,6 +24,7 @@ import {
 } from "@/lib/services/pnl-calculator.service";
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import { getPlayerGamePerformance } from "@/lib/services/games/player-game-performance.service";
+import { getPlayerGameActivity } from "@/lib/services/games/player-game-activity.service";
 import { getPlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
 import { getOverviewStanding } from "@/lib/services/games/overview-standing.service";
 import { CROSS_GAME_SCORING_STARTED_CAPTION } from "@/lib/services/games/game-leaderboard.service";
@@ -144,7 +145,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   // Reason: R64 player twin + 13 s5 summary cards. Fail soft so a games DB blip
   // cannot blank the whole trading dashboard. Fetched in parallel — neither
   // depends on the other, and both read UserGameStats / game_round only.
-  const [gamePerformanceRows, gameStanding] = await Promise.all([
+  const [gamePerformanceRows, gameStanding, gameActivity] = await Promise.all([
     getPlayerGamePerformance(userId).catch((err) => {
       console.warn("⚠️ gamePerformance fetch failed:", err);
       return [] as Awaited<ReturnType<typeof getPlayerGamePerformance>>;
@@ -156,6 +157,10 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         perGame: [],
         startsFromCaption: CROSS_GAME_SCORING_STARTED_CAPTION,
       } as Awaited<ReturnType<typeof getPlayerGameProfile>>;
+    }),
+    getPlayerGameActivity(userId).catch((err) => {
+      console.warn("⚠️ gameActivity fetch failed:", err);
+      return [] as Awaited<ReturnType<typeof getPlayerGameActivity>>;
     }),
   ]);
 
@@ -921,6 +926,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       lastPlayedAt: row.lastPlayedAt,
       bestRoundBreakdown: row.bestRoundBreakdown,
     })),
+    gameActivity,
     gameStanding,
     overviewStanding,
     tradingEnabled,

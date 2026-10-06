@@ -50,23 +50,22 @@ describe("R64 player dashboard twin", () => {
   });
 
   it("mounts the games panel above trading performance on the Performance tab", () => {
+    // Reason: flipped 6 Oct 2026 — the tab is now rendered by
+    // components/dashboard/performance/. Same claim: games before trading, and
+    // games never gated on trades (the admin defect R64 named).
     const code = stripComments(
+      read("components/dashboard/performance/DesktopPerformance.tsx"),
+    );
+    const games = code.indexOf("<GamePerformanceSection");
+    const trading = code.indexOf("<TradingPerformanceSection");
+    expect(games).toBeGreaterThan(-1);
+    expect(trading).toBeGreaterThan(-1);
+    expect(games).toBeLessThan(trading);
+    expect(code).not.toMatch(/totalTrades/);
+    const layout = stripComments(
       read("components/dashboard/DashboardLayout.tsx"),
     );
-    const panel = code.indexOf("<PlayerGamePerformancePanel");
-    const tradingHeading = code.indexOf("Trading performance");
-    const rings = code.indexOf("<PerformanceRings");
-    expect(panel).toBeGreaterThan(-1);
-    expect(tradingHeading).toBeGreaterThan(-1);
-    expect(rings).toBeGreaterThan(-1);
-    expect(panel).toBeLessThan(tradingHeading);
-    expect(tradingHeading).toBeLessThan(rings);
-    // Reason: games must not be gated on totalTrades — that is the admin defect.
-    const performanceTab = code.slice(
-      code.indexOf('value="performance"'),
-      code.indexOf('value="contests"'),
-    );
-    expect(performanceTab).not.toMatch(/totalTrades\s*===\s*0/);
+    expect(layout).toContain("gamePerformance={gamePerformance}");
   });
 
   it("keeps the client panel free of service / model imports (R58)", () => {

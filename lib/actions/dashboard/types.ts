@@ -3,6 +3,7 @@
  * Extracted for R21 so the mega-action can shrink without changing the shape.
  */
 import type { PlayerGamePerformanceRow } from "@/lib/services/games/player-game-performance.service";
+import type { PlayerGameActivityDay } from "@/lib/services/games/player-game-activity.service";
 import type { PlayerGameProfile } from "@/lib/services/games/player-game-stats.service";
 import type { OverviewStanding } from "@/lib/services/games/overview-types";
 
@@ -231,6 +232,12 @@ export interface ComprehensiveDashboardData {
    * Trading metrics stay under `overview` / Performance rings — this never replaces them.
    */
   gamePerformance: PlayerGamePerformanceRow[];
+
+  /**
+   * Scored ranked rounds per game per UTC day (last 120 days). Feeds the
+   * Performance trend and game-card sparklines. Counts only — never scores.
+   */
+  gameActivity: PlayerGameActivityDay[];
 
   /**
    * Per-game standing from UserGameStats (13 s5 summary cards).

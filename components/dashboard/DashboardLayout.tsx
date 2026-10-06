@@ -5,13 +5,8 @@ import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-dashboard.actions";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import TradingAnalytics from "./TradingAnalytics";
 import ContestsSidebar from "./ContestsSidebar";
-import PerformanceRings from "./PerformanceRings";
-import ContestStatsCards from "./ContestStatsCards";
 import GettingStartedCard from "./GettingStartedCard";
-import PlayerGamePerformancePanel from "./PlayerGamePerformancePanel";
-import MarketHolidaysCard from "./MarketHolidaysCard";
 import DesktopDashboard from "./desktop/DesktopDashboard";
 import MobileDashboard from "./mobile/MobileDashboard";
 import MobileDashboardBackBar from "./mobile/MobileDashboardBackBar";
@@ -27,6 +22,11 @@ const TutorialsTab = dynamic(() => import("./TutorialsTab"), { ssr: false });
 const WalletAnalytics = dynamic(() => import("./wallet/WalletAnalytics"), {
   ssr: false,
 });
+// Reason: Performance mounts Recharts — same lazy treatment as Wallet.
+const PerformanceAnalytics = dynamic(
+  () => import("./performance/PerformanceAnalytics"),
+  { ssr: false },
+);
 
 const TAB_STORAGE_KEY = "chartvolt_dashboard_tab";
 
@@ -51,6 +51,8 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
     challenges,
     journey,
     gamePerformance,
+    gameActivity,
+    overviewStanding,
     tradingEnabled,
   } = data;
 
@@ -152,44 +154,17 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           <WalletAnalytics overview={overview} charts={charts} />
         </TabsContent>
 
-        <TabsContent value="performance" className="mt-4 space-y-4">
-          <PlayerGamePerformancePanel games={gamePerformance} />
-
-          {showTradingChrome ? (
-            <>
-              <div>
-                <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-gray-400">
-                  Trading performance
-                </h3>
-                <PerformanceRings
-                  winRate={overview.winRate}
-                  roi={overview.roi}
-                  tradeRoi={overview.totalPnLPercentage}
-                  profitFactor={overview.profitFactor}
-                  avgWin={overview.averageWin}
-                  avgLoss={overview.averageLoss}
-                  largestWin={overview.largestWin}
-                  largestLoss={overview.largestLoss}
-                />
-              </div>
-
-              <TradingAnalytics
-                winLoss={charts.winLossDistribution}
-                tradesBySymbol={charts.tradesBySymbol}
-                tradesByHour={charts.tradesByHour}
-                totalTrades={overview.totalTrades}
-                winningTrades={overview.winningTrades}
-                losingTrades={overview.losingTrades}
-              />
-            </>
-          ) : null}
-
-          <ContestStatsCards
-            competitionStats={competitions.stats}
-            challengeStats={challenges.stats}
+        <TabsContent value="performance" className="mt-4">
+          <PerformanceAnalytics
+            overview={overview}
+            charts={charts}
+            gamePerformance={gamePerformance}
+            gameActivity={gameActivity}
+            competitions={competitions}
+            challenges={challenges}
+            overviewStanding={overviewStanding}
+            showTradingChrome={showTradingChrome}
           />
-
-          {showTradingChrome ? <MarketHolidaysCard /> : null}
         </TabsContent>
 
         <TabsContent value="contests" className="mt-4 space-y-4">

@@ -1,0 +1,148 @@
+"use client";
+
+import { useRef } from "react";
+import Image from "next/image";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkline } from "@/components/dashboard/wallet/AnalyticsCard";
+import { NeonIcon, PerfCard, PerfEmpty, PerfSection } from "./PerformanceChrome";
+import { PERF, PERF_METRIC_ICON, PERF_SECTION_ICON } from "./performance-assets";
+import type { GameCardView } from "./performance-model";
+
+function lastPlayed(iso: string | null): string {
+  if (!iso) return "-";
+  const ms = new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return "-";
+  const days = Math.floor((Date.now() - ms) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days}d ago`;
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function StatusPill({ status }: { status: GameCardView["status"] }) {
+  if (status === "active") return null;
+  const live = status === "live";
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+        live
+          ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
+          : "border-slate-400/40 bg-slate-500/15 text-slate-300"
+      }`}
+    >
+      {live ? "Playing now" : "Retired"}
+    </span>
+  );
+}
+
+export function GamePerformanceCard({ card }: { card: GameCardView }) {
+  const stats: { label: string; value: string }[] = [
+    { label: "Scored rounds", value: card.scoredRounds.toLocaleString() },
+    { label: "Contests", value: card.contests.toLocaleString() },
+    { label: "Best score", value: card.bestScore },
+    { label: "Avg play", value: card.avgPlayTime },
+  ];
+  return (
+    <PerfCard accent="blue" className="h-full">
+      <div className="flex h-full flex-col" data-game-card={card.gameKey}>
+        <div className="relative h-24 overflow-hidden">
+          {card.artSrc ? (
+            <Image src={card.artSrc} alt="" fill sizes="360px" className="object-cover opacity-80" />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-[#07172c]">
+              <NeonIcon src={PERF_METRIC_ICON.gameFallback} size={56} />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#041025] via-[#041025]/40 to-transparent" />
+          <div className="absolute right-2 top-2">
+            <StatusPill status={card.status} />
+          </div>
+          <div className="absolute bottom-2 left-3 right-3 min-w-0">
+            <h3 className="truncate text-base font-bold text-white">{card.title}</h3>
+            {card.category ? (
+              <p className="truncate text-[11px] text-[#8ea4c5]">{card.category}</p>
+            ) : null}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 p-3">
+          {stats.map((s) => (
+            <div key={s.label} className="min-w-0">
+              <div className="truncate text-[10px] uppercase tracking-wide text-[#8ea4c5]">
+                {s.label}
+              </div>
+              <div className="truncate text-sm font-bold tabular-nums text-white">{s.value}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-auto flex items-end justify-between gap-2 border-t border-white/[0.06] px-3 py-2">
+          <div className="text-[10px] text-[#8ea4c5]">
+            <div>{card.periodRounds.toLocaleString()} rounds this period</div>
+            <div>Last played {lastPlayed(card.lastPlayedAt)}</div>
+          </div>
+          <Sparkline points={card.spark} color={PERF.orange} width={88} height={28} />
+        </div>
+      </div>
+    </PerfCard>
+  );
+}
+
+/**
+ * One card per provider title the player has played — straight from the payload,
+ * never a hard-coded list (R29). Trading has its own section below.
+ */
+export default function GamePerformanceSection({ cards }: { cards: GameCardView[] }) {
+  const track = useRef<HTMLDivElement>(null);
+  const scroll = (dir: 1 | -1) => {
+    const el = track.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth, behavior: "smooth" });
+  };
+  const controls =
+    cards.length > 1 ? (
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          aria-label="Previous games"
+          onClick={() => scroll(-1)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-500/25 bg-black/35 text-cyan-200 hover:bg-cyan-500/10"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          aria-label="Next games"
+          onClick={() => scroll(1)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-500/25 bg-black/35 text-cyan-200 hover:bg-cyan-500/10"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    ) : null;
+
+  return (
+    <PerfSection
+      title="Game Performance"
+      subtitle="Every game you have played in a ranked round."
+      icon={PERF_SECTION_ICON.games}
+      controls={controls}
+      testId="games"
+    >
+      {cards.length === 0 ? (
+        <PerfEmpty>No ranked game rounds yet. Play a game contest to see it here.</PerfEmpty>
+      ) : (
+        <div
+          ref={track}
+          className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {cards.map((card) => (
+            <div
+              key={card.gameKey}
+              className="shrink-0 basis-full snap-start md:basis-[calc((100%-1rem)/2)] xl:basis-[calc((100%-2rem)/3)]"
+            >
+              <GamePerformanceCard card={card} />
+            </div>
+          ))}
+        </div>
+      )}
+    </PerfSection>
+  );
+}
