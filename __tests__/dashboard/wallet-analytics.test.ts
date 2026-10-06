@@ -222,21 +222,18 @@ describe("Wallet Analytics page wiring", () => {
     expect(model).not.toMatch(/bonuses:\s*r\.refunds/);
   });
 
-  it("mobile mounts Spending vs Earnings and desktop-parity chart glow", () => {
+  it("mobile mounts Spending vs Earnings and omits Daily Credit Flow", () => {
     const mobile = readCode(
       "components/dashboard/wallet/mobile/MobileWallet.tsx",
     );
     const trend = readCode(
       "components/dashboard/wallet/mobile/MobileWalletTrend.tsx",
     );
-    const flow = readCode(
-      "components/dashboard/wallet/mobile/MobileDailyFlow.tsx",
-    );
     expect(mobile).toMatch(/SpendingVsEarnings/);
+    // Reason: flipped 6 Oct 2026 — Daily Credit Flow removed from mobile only.
+    expect(mobile).not.toMatch(/MobileDailyFlow|DailyCreditFlowPanel/);
     expect(trend).toMatch(/mwGoldGlow/);
     expect(trend).toMatch(/orientation="right"/);
-    expect(flow).toMatch(/orientation="right"/);
-    expect(flow).toMatch(/drop-shadow/);
   });
 
   it("mobile wallet is a dedicated tree with Deposit/Withdraw and shared model", () => {
@@ -260,8 +257,7 @@ describe("Wallet Analytics page wiring", () => {
     expect(idx("<MobileWalletOverview")).toBeLessThan(idx("<MobileWalletTrend"));
     expect(idx("<MobileWalletTrend")).toBeLessThan(idx("<CreditBreakdownPanel"));
     expect(idx("<CreditBreakdownPanel")).toBeLessThan(idx("<SpendingVsEarnings"));
-    expect(idx("<SpendingVsEarnings")).toBeLessThan(idx("<MobileDailyFlow"));
-    expect(idx("<MobileDailyFlow")).toBeLessThan(idx("<MobileWalletInsights"));
+    expect(idx("<SpendingVsEarnings")).toBeLessThan(idx("<MobileWalletInsights"));
     expect(idx("<MobileWalletInsights")).toBeLessThan(
       idx("<MobileRecentTransactions"),
     );
@@ -271,7 +267,21 @@ describe("Wallet Analytics page wiring", () => {
     expect(actions).toMatch(/href=["']\/wallet["']/);
     // Reason: flipped 6 Oct 2026 — CreditBreakdownPanel is shared on purpose
     // so the stacked area + donut padding cannot drift from desktop.
-    expect(mobile).not.toMatch(/WalletKpiGrid|WalletBackdrop|MobileMoneyInOut/);
+    expect(mobile).not.toMatch(
+      /WalletKpiGrid|WalletBackdrop|MobileMoneyInOut|MobileDailyFlow/,
+    );
+  });
+
+  it("desktop Daily Credit Flow is a composed area/line chart, not bars", () => {
+    const flow = readCode(
+      "components/dashboard/wallet/DailyCreditFlowPanel.tsx",
+    );
+    expect(flow).toMatch(/ComposedChart/);
+    expect(flow).toMatch(/dataKey=["']net["']/);
+    expect(flow).toMatch(/dataKey=["']gain["']/);
+    expect(flow).toMatch(/dataKey=["']loss["']/);
+    expect(flow).not.toMatch(/BarChart/);
+    expect(flow).not.toMatch(/maxBarSize/);
   });
 
   it("Credit Breakdown is a stacked area chart, not sparse multi-series bars", () => {

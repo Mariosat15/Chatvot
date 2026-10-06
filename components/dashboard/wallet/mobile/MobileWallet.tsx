@@ -9,7 +9,6 @@ import MobileWalletBalanceCard from "./MobileWalletBalanceCard";
 import MobileWalletActions from "./MobileWalletActions";
 import MobileWalletOverview from "./MobileWalletOverview";
 import MobileWalletTrend from "./MobileWalletTrend";
-import MobileDailyFlow from "./MobileDailyFlow";
 import MobileWalletInsights from "./MobileWalletInsights";
 import MobileRecentTransactions from "./MobileRecentTransactions";
 
@@ -55,7 +54,7 @@ export default function MobileWallet({ overview, charts }: Props) {
         totals={model.breakdownTotals}
       />
       <SpendingVsEarnings slices={model.spendSlices} />
-      <MobileDailyFlow data={model.flow} />
+      {/* Reason: owner 6 Oct 2026 — Daily Credit Flow is desktop-only. */}
       <MobileWalletInsights items={model.insights} />
       <MobileRecentTransactions />
     </div>

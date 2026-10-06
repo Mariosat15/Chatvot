@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Daily Credit Flow desktop-only CODE-COMPLETE 6 Oct (eng)** — removed from mobile; desktop uses composed area/line instead of bars. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Wallet Analytics chart polish CODE-COMPLETE 6 Oct (eng)** — Credit Breakdown → stacked area; Spending vs Earnings donut glow no longer clipped; mobile uses the same two panels. Tests: `wallet-analytics.test.ts` (14). **Never verified by eye.**
 - **Wallet Analytics Gift credits + spend buckets CODE-COMPLETE 6 Oct (eng)** — Bonuses → Gift credits (`admin_adjustment` / `manual_deposit_credit`); marketplace and GM spend/earn on Spending vs Earnings; mobile charts match desktop glow/axes; shared `useWalletAnalyticsModel`. Tests: `wallet-analytics.test.ts` (14). **Never verified by eye.**
 - **Login / registration mobile + desktop polish CODE-COMPLETE 5 Oct (eng)** — dedicated mobile Sign In + 2-step Register (`md` gate via `AuthViewportSwitch`); desktop mockup unchanged; centered backgrounds; scrollbar chrome hidden; social buttons removed for now; Terms/Privacy are real links; GM `ref` preserved across steps. Spec: `redising login.md`. Tests: `auth-page-look.test.ts`. **Never verified by eye.**
@@ -934,6 +935,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Daily Credit Flow desktop chart swap; removed from mobile
+
+**Owner instruction:** remove Daily Credit Flow from mobile only; on desktop replace the bar chart.
+
+- Desktop `DailyCreditFlowPanel` is a `ComposedChart` (teal/rose area fills + cyan net line around zero).
+- Mobile no longer mounts `MobileDailyFlow`.
+- Tests flipped in `wallet-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Wallet Analytics chart polish: stacked area + donut glow
 

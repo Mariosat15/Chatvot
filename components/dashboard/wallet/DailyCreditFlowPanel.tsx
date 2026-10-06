@@ -1,10 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import {
-  Bar,
-  BarChart,
+  Area,
   CartesianGrid,
-  Cell,
+  ComposedChart,
+  Line,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -14,7 +15,7 @@ import {
 import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 import { AnalyticsCard, ChartRangeSelector } from "./AnalyticsCard";
 import WalletNeonIcon from "./WalletNeonIcon";
-import { WALLET_GOLD, WALLET_RED, WALLET_TEAL, type WalletRange } from "./wallet-tokens";
+import { WALLET_RED, WALLET_TEAL, type WalletRange } from "./wallet-tokens";
 
 type FlowPoint = { date: string; net: number };
 
@@ -24,14 +25,10 @@ function formatAxisDate(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function barColor(net: number): string {
-  if (net > 0) return WALLET_TEAL;
-  if (net < 0) return WALLET_RED;
-  return WALLET_GOLD;
-}
-
 /**
- * Daily Credit Flow — positive/negative bars around zero (rebuild guide §9, §18).
+ * Daily Credit Flow — area + line around zero (desktop only).
+ * Reason: owner 6 Oct 2026 — diverging bars were hard to read; wave chart
+ * shows net movement continuously while keeping the zero baseline.
  */
 export default function DailyCreditFlowPanel({
   data,
@@ -42,6 +39,18 @@ export default function DailyCreditFlowPanel({
   range: WalletRange;
   onRangeChange: (next: WalletRange) => void;
 }) {
+  // Reason: split so teal fills above zero and rose fills below without stacking.
+  const chartData = useMemo(
+    () =>
+      data.map((d) => ({
+        date: d.date,
+        net: d.net,
+        gain: d.net > 0 ? d.net : 0,
+        loss: d.net < 0 ? d.net : 0,
+      })),
+    [data],
+  );
+
   return (
     <AnalyticsCard
       title="Daily Credit Flow"
@@ -65,10 +74,20 @@ export default function DailyCreditFlowPanel({
       ) : (
         <div className="h-[240px] w-full sm:h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
+            <ComposedChart
+              data={chartData}
               margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
             >
+              <defs>
+                <linearGradient id="wallet-flow-gain" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={WALLET_TEAL} stopOpacity={0.55} />
+                  <stop offset="100%" stopColor={WALLET_TEAL} stopOpacity={0.04} />
+                </linearGradient>
+                <linearGradient id="wallet-flow-loss" x1="0" y1="1" x2="0" y2="0">
+                  <stop offset="0%" stopColor={WALLET_RED} stopOpacity={0.55} />
+                  <stop offset="100%" stopColor={WALLET_RED} stopOpacity={0.04} />
+                </linearGradient>
+              </defs>
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="rgba(255,255,255,0.06)"
@@ -94,8 +113,9 @@ export default function DailyCreditFlowPanel({
                     : String(Math.round(v))
                 }
               />
-              <ReferenceLine y={0} stroke="rgba(255,255,255,0.25)" />
+              <ReferenceLine y={0} stroke="rgba(255,255,255,0.28)" strokeWidth={1} />
               <Tooltip
+                filterNull
                 contentStyle={{
                   background: "rgba(5,12,28,0.95)",
                   border: "1px solid rgba(0,229,255,0.35)",
@@ -104,30 +124,44 @@ export default function DailyCreditFlowPanel({
                   color: "#fff",
                 }}
                 labelFormatter={(label) => formatAxisDate(String(label))}
-                formatter={(value) => [
-                  Number(value) >= 0
-                    ? `+${Number(value).toFixed(2)}`
-                    : Number(value).toFixed(2),
-                  "Net",
-                ]}
+                // Reason: gain/loss areas are fill only — tooltip reports the net line.
+                formatter={(value, name) => {
+                  if (name !== "Net") return [undefined, undefined];
+                  const n = Number(value);
+                  return [n >= 0 ? `+${n.toFixed(2)}` : n.toFixed(2), "Net"];
+                }}
               />
-              <Bar
+              <Area
+                type="monotone"
+                dataKey="gain"
+                legendType="none"
+                stroke="none"
+                fill="url(#wallet-flow-gain)"
+                fillOpacity={1}
+                isAnimationActive={false}
+                activeDot={false}
+              />
+              <Area
+                type="monotone"
+                dataKey="loss"
+                legendType="none"
+                stroke="none"
+                fill="url(#wallet-flow-loss)"
+                fillOpacity={1}
+                isAnimationActive={false}
+                activeDot={false}
+              />
+              <Line
+                type="monotone"
                 dataKey="net"
-                radius={[4, 4, 4, 4]}
-                maxBarSize={20}
-                style={{ filter: "drop-shadow(0 0 6px rgba(16,185,129,0.35))" }}
-              >
-                {data.map((entry) => (
-                  <Cell
-                    key={entry.date}
-                    fill={barColor(entry.net)}
-                    style={{
-                      filter: `drop-shadow(0 0 6px ${barColor(entry.net)}88)`,
-                    }}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
+                name="Net"
+                stroke="#67E8F9"
+                strokeWidth={2.25}
+                dot={false}
+                activeDot={{ r: 4, fill: "#A5F3FC", stroke: "#0891B2" }}
+                style={{ filter: "drop-shadow(0 0 6px rgba(103,232,249,0.55))" }}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
