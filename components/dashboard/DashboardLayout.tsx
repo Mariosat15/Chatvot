@@ -112,7 +112,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
   );
 
   return (
-    <div className="w-full overflow-x-hidden">
+    <div className="w-full overflow-x-clip">
       {/*
         Reason: phones withhold the Header tab strip, so Wallet / Performance /
         Tutorials / Contests need an explicit path back to Overview.

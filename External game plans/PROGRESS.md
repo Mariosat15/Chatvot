@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Performance Analytics REBUILT 6 Oct (eng)** — `components/dashboard/performance/`, separate desktop + mobile trees on one model; trading row R21-gated; 1v1 counted under All games only; page ends at Market Holidays. Tests: `performance-analytics.test.ts` (16). **Never verified by eye.**
+- **Performance Analytics polish + shared two-tone headlines CODE-COMPLETE 6 Oct (eng)** — mountain backdrop on Performance (desktop + mobile); game carousel scrolls one card (`offsetWidth + gap`) so arrows move something; Competition prizes from `competition_win` + `competitionId`; 1v1s filter by stamped `gameKey` (absent → trading, invariant 5); shared `AnalyticsPageHeadline` (Performance magenta, Wallet cyan, Arena gold, Challenges orange). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Performance Analytics REBUILT 6 Oct (eng)** — `components/dashboard/performance/`, separate desktop + mobile trees on one model; trading row R21-gated; page ends at Market Holidays. **Amended same day:** 1v1s are no longer All-games-only — they carry `gameKey`. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Spending vs Earnings structure CODE-COMPLETE 6 Oct (eng)** — comparison bar + two equal columns; `spendMetric` vs `earnMetric` only (deposits/refunds excluded). Desktop + mobile share the panel. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Spending vs Earnings contrast CODE-COMPLETE 6 Oct (eng)** — first pass (flow in/out donut). Superseded by structure pass above — deposits/refunds wrongly counted as earnings. **Say which.**
 - **Wallet Insights fill + balance chart gap CODE-COMPLETE 6 Oct (eng)** — insight tiles use equal `1fr` columns (no auto-fill dead space); balance trend / daily flow grow with `flex-1`; mobile trend 200px. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
@@ -940,6 +941,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Performance Analytics polish + shared two-tone headlines (owner request)
+
+**Owner reports:** double page scrollbar; Game Performance artwork/fonts too small and carousel arrows did nothing; trend and bottom row too empty; filters only seemed to work on All games; 1v1 / Competition looked broken; headlines should match Performance (white + coloured second word) on Wallet (blue/cyan) and other pages.
+
+**Causes:** nested `overflow-x-hidden` computes `overflow-y: auto` (second scrollbar); three game cards at `xl:basis-1/3` filled the row so `scrollBy(clientWidth)` was a no-op; `CompetitionParticipant` has no `prizeWon` so Credits won stayed 0; dashboard `ChallengeData` omitted `gameKey` so 1v1s only counted under All games.
+
+**Fix:** `overflow-x-clip` on the dashboard wrapper; carousel shows ~2 cards and scrolls one card width; prizes from `competition_win` keyed by `competitionId`; challenges select + stamp `gameKey` (absent → trading); shared `AnalyticsPageHeadline` on Performance (magenta), Wallet (cyan), Trading Arena (gold), My Challenges (orange); shared `DashboardBackdrop` mountain wash.
+
+**Nothing was paid wrongly.** Reporting/display only; nothing backfilled. Tests: `__tests__/dashboard/performance-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - "Other" in the Credit Breakdown no longer double-counts free contests (owner request)
 

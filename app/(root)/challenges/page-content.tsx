@@ -16,6 +16,7 @@ import {
   Zap,
   ChevronDown,
 } from "lucide-react";
+import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
 import ChallengeCard from "@/components/trading/ChallengeCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
 
@@ -226,12 +227,14 @@ export default function ChallengesPageContent({
               </div>
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white truncate">
-                My Challenges
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-400">
-                1v1 Trading Battles
-              </p>
+              <AnalyticsPageHeadline
+                lead="My"
+                accentWord="Challenges"
+                accent="orange"
+                compact
+                tag="h1"
+                subtitle="1v1 skill matches"
+              />
             </div>
           </div>
 

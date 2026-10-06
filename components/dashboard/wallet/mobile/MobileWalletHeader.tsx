@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Bell, UserRound } from "lucide-react";
+import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
 import { WALLET_ART } from "@/lib/services/games/wallet-assets";
 
 /**
@@ -22,9 +23,13 @@ export default function MobileWalletHeader({ rangeLabel }: { rangeLabel: string 
           />
         </span>
         <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold tracking-tight text-white">
-            Wallet
-          </h1>
+          <AnalyticsPageHeadline
+            lead="Wallet"
+            accentWord="Analytics"
+            accent="cyan"
+            compact
+            tag="h1"
+          />
           <p className="truncate text-[11px] text-slate-400">{rangeLabel}</p>
         </div>
       </div>

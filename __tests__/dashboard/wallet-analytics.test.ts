@@ -155,7 +155,7 @@ describe("Wallet Analytics page wiring", () => {
     const header = readCode(
       "components/dashboard/wallet/WalletAnalyticsHeader.tsx",
     );
-    const backdrop = readCode("components/dashboard/wallet/WalletBackdrop.tsx");
+    const backdrop = readCode("components/dashboard/DashboardBackdrop.tsx");
     const neon = readCode("components/dashboard/wallet/WalletNeonIcon.tsx");
     const assets = readCode("lib/services/games/wallet-assets.ts");
     const model = readCode(

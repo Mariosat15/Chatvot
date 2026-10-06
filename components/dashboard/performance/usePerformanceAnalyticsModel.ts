@@ -51,7 +51,7 @@ export function usePerformanceAnalyticsModel(input: PerfInput) {
       tradingMetrics: buildTradingMetrics(input.overview),
       challengeSummary: buildChallengeSummary(input, range, activeGame),
       competitionSummary: buildCompetitionSummary(input, range, activeGame),
-      challengesFilteredOut: activeGame !== ALL_GAMES,
+      challengesFilteredOut: false,
     };
   }, [input, range, activeGame, options]);
 }

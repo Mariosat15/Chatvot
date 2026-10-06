@@ -40,62 +40,70 @@ export default function PerformanceSummaryPanel({
 }: {
   kind: "challenges" | "competitions";
   summary: SummaryPanelView;
-  /** 1v1 rows carry no game label, so a single-game filter cannot split them. */
+  /** Kept for the rare payload that still has no game label on 1v1s. */
   filteredOut?: boolean;
 }) {
   const { settings } = useAppSettings();
   const meta = KIND.get(kind);
   if (!meta) return null;
   const hex = accentHex(meta.accent);
+  const empty = filteredOut || summary.played === 0;
 
   return (
     <PerfSection title={meta.title} subtitle={meta.subtitle} icon={meta.icon} testId={kind}>
-      <PerfCard accent={meta.accent} className="h-full">
-        <div className="flex h-full flex-col gap-3 p-4">
-          {filteredOut ? (
-            <p className="text-xs text-[#8ea4c5]">
-              1v1 results are not split by game. Choose All games to see them.
+      <PerfCard accent={meta.accent} className="h-full min-h-[280px]">
+        <div className="flex h-full flex-col gap-4 p-5">
+          {empty ? (
+            <p className="text-sm text-[#8ea4c5]">
+              {filteredOut
+                ? "1v1 results are not split by game. Choose All games to see them."
+                : meta.empty}
             </p>
-          ) : summary.played === 0 ? (
-            <p className="text-xs text-[#8ea4c5]">{meta.empty}</p>
-          ) : (
-            <>
-              <div className="flex items-center gap-3">
-                <NeonIcon src={PERF_METRIC_ICON.crown} size={40} />
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-[#8ea4c5]">Win rate</div>
-                  <div className="text-3xl font-black tabular-nums" style={{ color: hex }}>
-                    {summary.headline === null ? "-" : `${summary.headline.toFixed(0)}%`}
-                  </div>
+          ) : null}
+          <div className="flex items-center gap-3">
+            <NeonIcon src={PERF_METRIC_ICON.crown} size={48} />
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-[#8ea4c5]">
+                Win rate
+              </div>
+              <div className="text-4xl font-black tabular-nums leading-none" style={{ color: hex }}>
+                {empty || summary.headline === null ? "-" : `${summary.headline.toFixed(0)}%`}
+              </div>
+            </div>
+          </div>
+          <dl className="grid grid-cols-2 gap-2.5">
+            {summary.rows.map((r) => (
+              <div key={r.label} className="rounded-xl bg-white/[0.04] px-3 py-2.5">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c5]">
+                  {r.label}
+                </dt>
+                <dd className="text-lg font-black tabular-nums text-white">
+                  {empty ? "-" : r.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <div className="space-y-3">
+            {summary.bars.map((b) => (
+              <div key={b.label}>
+                <div className="mb-1.5 flex justify-between text-sm">
+                  <span className="text-[#8ea4c5]">{b.label}</span>
+                  <span className="font-bold tabular-nums text-white">
+                    {empty ? "-" : b.caption}
+                  </span>
                 </div>
+                <PerfBar value={empty ? null : b.value} accent={meta.accent} />
               </div>
-              <dl className="grid grid-cols-2 gap-2">
-                {summary.rows.map((r) => (
-                  <div key={r.label} className="rounded-lg bg-white/[0.03] px-2.5 py-1.5">
-                    <dt className="text-[10px] uppercase tracking-wide text-[#8ea4c5]">{r.label}</dt>
-                    <dd className="text-sm font-bold tabular-nums text-white">{r.value}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div className="space-y-2">
-                {summary.bars.map((b) => (
-                  <div key={b.label}>
-                    <div className="mb-1 flex justify-between text-[11px]">
-                      <span className="text-[#8ea4c5]">{b.label}</span>
-                      <span className="font-semibold tabular-nums text-white">{b.caption}</span>
-                    </div>
-                    <PerfBar value={b.value} accent={meta.accent} />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-auto flex items-center justify-between border-t border-white/[0.06] pt-2 text-xs">
-                <span className="text-[#8ea4c5]">Credits won</span>
-                <span className="font-bold tabular-nums text-[#ffc51b]">
-                  {formatVolts(summary.credits, { symbol: settings?.credits?.symbol })}
-                </span>
-              </div>
-            </>
-          )}
+            ))}
+          </div>
+          <div className="mt-auto flex items-center justify-between border-t border-white/[0.08] pt-3 text-sm">
+            <span className="text-[#8ea4c5]">Credits won</span>
+            <span className="text-base font-black tabular-nums text-[#ffc51b]">
+              {empty
+                ? "-"
+                : formatVolts(summary.credits, { symbol: settings?.credits?.symbol })}
+            </span>
+          </div>
         </div>
       </PerfCard>
     </PerfSection>

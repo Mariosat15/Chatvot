@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -24,7 +25,7 @@ import type { PerformanceAnalyticsModel } from "./usePerformanceAnalyticsModel";
  */
 export default function PerformanceTrendSection({
   model,
-  height = 260,
+  height = 280,
 }: {
   model: PerformanceAnalyticsModel;
   height?: number;
@@ -72,13 +73,17 @@ export default function PerformanceTrendSection({
                     aria-pressed={on}
                     onClick={() => toggle(s.key)}
                     title={empty ? "Nothing in this period" : undefined}
-                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-                      on ? "border-white/20 bg-white/[0.06] text-white" : "border-white/10 text-[#8ea4c5]"
+                    className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
+                      on ? "border-white/25 bg-white/[0.08] text-white" : "border-white/10 text-[#8ea4c5]"
                     }`}
                   >
                     <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ background: s.color, opacity: on ? 1 : 0.4 }}
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{
+                        background: s.color,
+                        opacity: on ? 1 : 0.4,
+                        boxShadow: on ? `0 0 8px ${s.color}` : undefined,
+                      }}
                     />
                     {s.label}
                     <span className="tabular-nums text-[#8ea4c5]">{total.toLocaleString()}</span>
@@ -88,30 +93,59 @@ export default function PerformanceTrendSection({
             </div>
             <div style={{ height }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: -18 }}>
-                  <CartesianGrid stroke="rgba(142,164,197,0.08)" vertical={false} />
+                <ComposedChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+                  <defs>
+                    {TREND_SERIES.map((s) => (
+                      <linearGradient
+                        key={s.key}
+                        id={`perf-fill-${s.key}`}
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="0%" stopColor={s.color} stopOpacity={s.key === "overall" ? 0.38 : 0.22} />
+                        <stop offset="100%" stopColor={s.color} stopOpacity={0.02} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <CartesianGrid stroke="rgba(142,164,197,0.12)" vertical={false} strokeDasharray="3 3" />
                   <XAxis
                     dataKey="label"
-                    tick={{ fill: PERF.muted, fontSize: 10 }}
+                    tick={{ fill: PERF.muted, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                     minTickGap={18}
                   />
                   <YAxis
                     allowDecimals={false}
-                    tick={{ fill: PERF.muted, fontSize: 10 }}
+                    tick={{ fill: PERF.muted, fontSize: 11 }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: PERF.bg2,
-                      border: "1px solid rgba(0,217,255,0.3)",
+                      background: "rgba(5,12,28,0.95)",
+                      border: "1px solid rgba(0,217,255,0.35)",
                       borderRadius: 10,
                       fontSize: 12,
+                      color: "#fff",
                     }}
                     labelStyle={{ color: PERF.text }}
                   />
+                  {visible.map((s) => (
+                    <Area
+                      key={`fill-${s.key}`}
+                      type="monotone"
+                      dataKey={s.key}
+                      stroke="none"
+                      fill={`url(#perf-fill-${s.key})`}
+                      fillOpacity={1}
+                      isAnimationActive={false}
+                      legendType="none"
+                      tooltipType="none"
+                    />
+                  ))}
                   {visible.map((s) => (
                     <Line
                       key={s.key}
@@ -119,13 +153,14 @@ export default function PerformanceTrendSection({
                       dataKey={s.key}
                       name={s.label}
                       stroke={s.color}
-                      strokeWidth={s.key === "overall" ? 2.75 : 1.75}
+                      strokeWidth={s.key === "overall" ? 3 : 2.1}
                       dot={false}
-                      activeDot={{ r: 3 }}
+                      activeDot={{ r: 4, fill: s.color, stroke: "#041025", strokeWidth: 1 }}
                       isAnimationActive={false}
+                      style={{ filter: `drop-shadow(0 0 7px ${s.color}aa)` }}
                     />
                   ))}
-                </LineChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </div>

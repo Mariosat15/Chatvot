@@ -7,6 +7,7 @@ import PerformanceHighlights from "./PerformanceHighlights";
 import PerformanceSummaryPanel from "./PerformanceSummaryPanel";
 import PerformanceTrendSection from "./PerformanceTrendSection";
 import TradingPerformanceSection from "./TradingPerformanceSection";
+import DashboardBackdrop from "@/components/dashboard/DashboardBackdrop";
 import type { PerfInput } from "./performance-model";
 import type { MarketHolidaysState } from "./useMarketHolidays";
 import { usePerformanceAnalyticsModel } from "./usePerformanceAnalyticsModel";
@@ -25,6 +26,7 @@ export default function DesktopPerformance({
   const model = usePerformanceAnalyticsModel(input);
 
   return (
+    <DashboardBackdrop>
     <div className="space-y-5">
       <PerformanceHeader model={model} />
       <PerformanceHighlights highlights={model.highlights} />
@@ -43,5 +45,6 @@ export default function DesktopPerformance({
         <MarketHolidaysSection state={holidays} />
       </div>
     </div>
+    </DashboardBackdrop>
   );
 }

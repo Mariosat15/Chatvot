@@ -12,6 +12,7 @@ import { PERF_SECTION_ICON } from "../performance-assets";
 import type { PerfInput } from "../performance-model";
 import type { MarketHolidaysState } from "../useMarketHolidays";
 import { usePerformanceAnalyticsModel } from "../usePerformanceAnalyticsModel";
+import DashboardBackdrop from "@/components/dashboard/DashboardBackdrop";
 
 /**
  * Phone arrangement over the same model as desktop. Rows that would wrap into
@@ -28,6 +29,7 @@ export default function MobilePerformance({
   const model = usePerformanceAnalyticsModel(input);
 
   return (
+    <DashboardBackdrop>
     <div className="space-y-4">
       <PerformanceHeader model={model} compact />
 
@@ -77,5 +79,6 @@ export default function MobilePerformance({
       <PerformanceSummaryPanel kind="competitions" summary={model.competitionSummary} />
       <MarketHolidaysSection state={holidays} />
     </div>
+    </DashboardBackdrop>
   );
 }

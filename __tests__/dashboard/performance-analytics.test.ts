@@ -111,13 +111,17 @@ describe("performance model", () => {
     expect(percentChange(15, 10)).toBe(50);
   });
 
-  it("counts 1v1s only under All games — they carry no game label", () => {
-    const all = buildChallengeSummary(fixture(), "30d", ALL_GAMES);
-    expect(all.played).toBe(1);
-    const one = buildChallengeSummary(fixture(), "30d", "provider:p1:g1");
-    expect(one.played).toBe(0);
-    const h = new Map(buildHighlights(fixture(), "30d", "provider:p1:g1").map((x) => [x.key, x]));
-    expect(h.get("challengeWins")?.value).toBe("-");
+  it("counts 1v1s for the selected game, using trading when the label is missing", () => {
+    const labelled = fixture({
+      challenges: {
+        completed: [{ endTime: iso(5), isWinner: true, prizeWon: 10, gameKey: "provider:p1:g1" }],
+      },
+    });
+    expect(buildChallengeSummary(labelled, "30d", ALL_GAMES).played).toBe(1);
+    expect(buildChallengeSummary(labelled, "30d", "provider:p1:g1").played).toBe(1);
+    expect(buildChallengeSummary(labelled, "30d", TRADING_KEY).played).toBe(0);
+    const unlabelled = buildChallengeSummary(fixture(), "30d", TRADING_KEY);
+    expect(unlabelled.played).toBe(1);
   });
 
   it("scopes competitions to the selected game", () => {
@@ -217,6 +221,44 @@ describe("performance page structure", () => {
     const code = stripComments(read(`${DIR}/PerformanceHeader.tsx`));
     expect(code).toMatch(/from\s+"@\/components\/ui\/select"/);
     expect(code).not.toMatch(/<select\b/);
+  });
+
+  it("scrolls the game carousel by one card width, not the whole row", () => {
+    const code = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
+    expect(code).toMatch(/first\.offsetWidth\s*\+\s*16/);
+    expect(code).toMatch(/sm:w-\[calc\(\(100%-1rem\)\/2\)\]/);
+    expect(code).not.toMatch(/scrollBy\(\{\s*left:\s*dir\s*\*\s*el\.clientWidth/);
+  });
+
+  it("uses the shared two-tone headline (magenta here, cyan on Wallet)", () => {
+    const header = stripComments(read(`${DIR}/PerformanceHeader.tsx`));
+    const wallet = stripComments(read("components/dashboard/wallet/WalletAnalyticsHeader.tsx"));
+    const shared = stripComments(read("components/dashboard/AnalyticsPageHeadline.tsx"));
+    expect(header).toMatch(/lead="Performance"/);
+    expect(header).toMatch(/accent="magenta"/);
+    expect(wallet).toMatch(/lead="Wallet"/);
+    expect(wallet).toMatch(/accent="cyan"/);
+    expect(shared).toMatch(/new Map/);
+    expect(shared).toContain("#ff36ca");
+    expect(shared).toContain("#00d9ff");
+  });
+
+  it("shares the mountain backdrop with Wallet and clips overflow-x without a second scrollbar", () => {
+    const desktop = stripComments(read(`${DIR}/DesktopPerformance.tsx`));
+    const mobile = stripComments(read(`${DIR}/mobile/MobilePerformance.tsx`));
+    const layout = stripComments(read("components/dashboard/DashboardLayout.tsx"));
+    expect(desktop).toMatch(/<DashboardBackdrop>/);
+    expect(mobile).toMatch(/<DashboardBackdrop>/);
+    expect(layout).toMatch(/overflow-x-clip/);
+    expect(layout).not.toMatch(/overflow-x-hidden/);
+  });
+
+  it("stamps challenge gameKey in the dashboard payload so a game filter can see 1v1s", () => {
+    const process = stripComments(read("lib/actions/dashboard/process-challenges.ts"));
+    const action = stripComments(read("lib/actions/comprehensive-dashboard.actions.ts"));
+    expect(process).toMatch(/gameKey:/);
+    expect(action).toMatch(/const challengeSelect = ".*gameKey/);
+    expect(action).toMatch(/prizeByCompetitionId/);
   });
 
   it("ships every neon icon it references", () => {

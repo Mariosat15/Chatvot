@@ -104,6 +104,12 @@ export function processChallengeParticipations(params: {
       isLeading: userRankingVal >= opponentRankingVal,
       isWinner: userParticipation.isWinner,
       prizeWon: userParticipation.prizeReceived,
+      // Reason: invariant 5 — an absent label is trading. Without this stamp the
+      // Performance tab could only show 1v1s under All games.
+      gameKey:
+        typeof challenge.gameKey === "string" && challenge.gameKey.trim() !== ""
+          ? challenge.gameKey
+          : "trading",
     };
 
     processedChallenges.stats.total++;

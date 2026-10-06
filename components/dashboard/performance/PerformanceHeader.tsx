@@ -8,8 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
 import { NeonIcon } from "./PerformanceChrome";
-import { PERF, PERF_SECTION_ICON } from "./performance-assets";
+import { PERF_SECTION_ICON } from "./performance-assets";
 import type { PerformanceAnalyticsModel } from "./usePerformanceAnalyticsModel";
 
 /**
@@ -30,20 +31,14 @@ export default function PerformanceHeader({
       className={`flex gap-4 ${compact ? "flex-col" : "flex-col lg:flex-row lg:items-end lg:justify-between"}`}
       data-perf-section="header"
     >
-      <div className="flex items-center gap-3">
-        <NeonIcon src={PERF_SECTION_ICON.page} size={compact ? 40 : 52} />
-        <div className="min-w-0">
-          <h2
-            className={`font-black uppercase tracking-tight ${compact ? "text-2xl" : "text-3xl lg:text-4xl"}`}
-          >
-            <span style={{ color: PERF.text }}>Performance </span>
-            <span style={{ color: PERF.magenta }}>Analytics</span>
-          </h2>
-          <p className="mt-0.5 text-sm" style={{ color: PERF.muted }}>
-            How you are doing across every game, competition and 1v1.
-          </p>
-        </div>
-      </div>
+      <AnalyticsPageHeadline
+        lead="Performance"
+        accentWord="Analytics"
+        accent="magenta"
+        compact={compact}
+        subtitle="How you are doing across every game, competition and 1v1."
+        icon={<NeonIcon src={PERF_SECTION_ICON.page} size={compact ? 40 : 56} />}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <ChartRangeSelector value={model.range} onChange={model.setRange} />

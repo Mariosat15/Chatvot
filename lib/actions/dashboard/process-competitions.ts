@@ -25,8 +25,10 @@ export async function processCompetitionParticipations(params: {
   userId: string;
   competitionParticipations: any[];
   allCompetitions: any[];
+  /** Credits from the player's `competition_win` rows, keyed by competition id. */
+  prizeByCompetitionId?: Map<string, number>;
 }): Promise<{ processedCompetitions: ProcessedCompetitions }> {
-  const { userId, competitionParticipations, allCompetitions } = params;
+  const { userId, competitionParticipations, allCompetitions, prizeByCompetitionId } = params;
 
   const competitionsMap = new Map(
     allCompetitions.map((c: any) => [c._id.toString(), c]),
@@ -143,7 +145,7 @@ export async function processCompetitionParticipations(params: {
       losingTrades: participation.losingTrades || 0,
       winRate: participation.winRate || 0,
       openPositions: participation.currentOpenPositions || 0,
-      prizeWon: participation.prizeWon,
+      prizeWon: prizeByCompetitionId?.get(competition._id.toString()) ?? participation.prizeWon,
       // Win Potential Card data
       rankingMethod: competition.rules?.rankingMethod || "pnl",
       prizeDistribution: competition.prizeDistribution || [],

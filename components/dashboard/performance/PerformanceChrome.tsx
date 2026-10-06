@@ -61,7 +61,7 @@ export function PerfCard({
         background:
           "linear-gradient(135deg, rgba(6,20,45,.97), rgba(3,12,30,.96))",
         borderColor: `${hex}59`,
-        boxShadow: `0 0 18px ${hex}14, inset 0 1px 0 rgba(255,255,255,0.04)`,
+        boxShadow: `0 0 28px ${hex}28, inset 0 1px 0 rgba(255,255,255,0.06)`,
       }}
     >
       {children}
@@ -93,7 +93,7 @@ export function PerfSection({
         <div className="flex min-w-0 items-center gap-2.5">
           <NeonIcon src={icon} size={34} />
           <div className="min-w-0">
-            <h2 className="text-[15px] font-bold tracking-tight text-[#f5f8ff] sm:text-base">
+            <h2 className="text-base font-bold tracking-tight text-[#f5f8ff] sm:text-lg">
               {title}
             </h2>
             {subtitle ? (

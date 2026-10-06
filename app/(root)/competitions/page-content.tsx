@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import CompetitionCard from "@/components/trading/CompetitionCard";
 import WalletBalanceDisplay from "@/components/trading/WalletBalanceDisplay";
@@ -32,7 +33,6 @@ import {
 import {
   calculateCompetitionDifficulty,
   DifficultyLevel,
-  getAllDifficultyLevels,
 } from "@/lib/utils/competition-difficulty";
 import type { TitleLevel } from "@/lib/constants/levels";
 import { resolveLevelName } from "@/lib/utils/level-title";
@@ -587,25 +587,22 @@ export default function CompetitionsPageContent({
     profit_factor: "⚡ Profit Factor",
   };
 
-  const DIFFICULTY_LABELS: Record<
+  // Reason: a Record lookup on a stored/iterated key walks the prototype chain (R60 sibling).
+  const DIFFICULTY_LABELS = new Map<
     DifficultyLevel,
     { label: string; emoji: string; color: string }
-  > = {
-    Novice: { label: "Novice Trader", emoji: "🌱", color: "text-green-400" },
-    Apprentice: { label: "Apprentice", emoji: "📚", color: "text-green-300" },
-    Skilled: { label: "Skilled Trader", emoji: "⚔️", color: "text-blue-400" },
-    Expert: { label: "Expert Trader", emoji: "🎯", color: "text-blue-300" },
-    Elite: { label: "Elite Trader", emoji: "💎", color: "text-yellow-400" },
-    Master: { label: "Master Trader", emoji: "👑", color: "text-yellow-300" },
-    "Grand Master": {
-      label: "Grand Master",
-      emoji: "🔥",
-      color: "text-orange-400",
-    },
-    Champion: { label: "Champion", emoji: "⚡", color: "text-orange-300" },
-    Legend: { label: "Legend", emoji: "🌟", color: "text-red-400" },
-    "Trading God": { label: "Trading God", emoji: "👑", color: "text-red-500" },
-  };
+  >([
+    ["Novice", { label: "Novice Trader", emoji: "🌱", color: "text-green-400" }],
+    ["Apprentice", { label: "Apprentice", emoji: "📚", color: "text-green-300" }],
+    ["Skilled", { label: "Skilled Trader", emoji: "⚔️", color: "text-blue-400" }],
+    ["Expert", { label: "Expert Trader", emoji: "🎯", color: "text-blue-300" }],
+    ["Elite", { label: "Elite Trader", emoji: "💎", color: "text-yellow-400" }],
+    ["Master", { label: "Master Trader", emoji: "👑", color: "text-yellow-300" }],
+    ["Grand Master", { label: "Grand Master", emoji: "🔥", color: "text-orange-400" }],
+    ["Champion", { label: "Champion", emoji: "⚡", color: "text-orange-300" }],
+    ["Legend", { label: "Legend", emoji: "🌟", color: "text-red-400" }],
+    ["Trading God", { label: "Trading God", emoji: "👑", color: "text-red-500" }],
+  ]);
 
   /*
     R90, fourth site. This was a ten-entry `Record<number, string>` whose names disagreed with
@@ -663,13 +660,14 @@ export default function CompetitionsPageContent({
               </div>
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-gray-100 flex items-center gap-2 truncate">
-                <span className="truncate">Trading Arena</span>
-                <GameIcon name="star1" size={24} className="flex-shrink-0" />
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-400 hidden sm:block">
-                Compete with traders worldwide • Win massive prizes
-              </p>
+              <AnalyticsPageHeadline
+                lead="Trading"
+                accentWord="Arena"
+                accent="gold"
+                compact
+                tag="h1"
+                subtitle="Compete with traders worldwide • Win massive prizes"
+              />
             </div>
           </div>
 
@@ -837,8 +835,7 @@ export default function CompetitionsPageContent({
               Difficulty
             </span>
             <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(DIFFICULTY_LABELS) as DifficultyLevel[]).map(
-                (level) => (
+              {Array.from(DIFFICULTY_LABELS.entries()).map(([level, meta]) => (
                   <button
                     key={level}
                     onClick={() => {
@@ -852,12 +849,12 @@ export default function CompetitionsPageContent({
                     }}
                     className={`px-2.5 py-2 min-h-[40px] rounded-lg text-[11px] font-medium transition-all flex items-center justify-center ${
                       difficultyFilter.includes(level)
-                        ? `${DIFFICULTY_LABELS[level].color.replace("text-", "bg-").replace("-400", "-500").replace("-300", "-400")} ${level === "Novice" || level === "Apprentice" || level === "Elite" || level === "Master" ? "text-gray-900" : "text-white"}`
+                        ? `${meta.color.replace("text-", "bg-").replace("-400", "-500").replace("-300", "-400")} ${level === "Novice" || level === "Apprentice" || level === "Elite" || level === "Master" ? "text-gray-900" : "text-white"}`
                         : "bg-gray-700 text-gray-300"
                     }`}
                   >
-                    {DIFFICULTY_LABELS[level].emoji}{" "}
-                    {DIFFICULTY_LABELS[level].label}
+                    {meta.emoji}{" "}
+                    {meta.label}
                   </button>
                 ),
               )}
@@ -1131,8 +1128,7 @@ export default function CompetitionsPageContent({
                 Difficulty Level
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-gray-700" />
-              {(Object.keys(DIFFICULTY_LABELS) as DifficultyLevel[]).map(
-                (level) => (
+              {Array.from(DIFFICULTY_LABELS.entries()).map(([level, meta]) => (
                   <DropdownMenuCheckboxItem
                     key={level}
                     checked={difficultyFilter.includes(level)}
@@ -1147,9 +1143,9 @@ export default function CompetitionsPageContent({
                     }}
                     className="text-gray-300"
                   >
-                    <span className={DIFFICULTY_LABELS[level].color}>
-                      {DIFFICULTY_LABELS[level].emoji}{" "}
-                      {DIFFICULTY_LABELS[level].label}
+                    <span className={meta.color}>
+                      {meta.emoji}{" "}
+                      {meta.label}
                     </span>
                   </DropdownMenuCheckboxItem>
                 ),

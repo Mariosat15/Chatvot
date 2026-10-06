@@ -84,7 +84,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const tradeSelect = "symbol side entryPrice exitPrice quantity realizedPnl isWinner openedAt closedAt competitionId challengeId";
   // Reason: Challenge model uses challengerName/challengedName (not *Username), entryFee (not stakeAmount), and has no "name" field
   // Reason: Include "rules" to access rules.rankingMethod for correct dashboard metric display
-  const challengeSelect = "_id challengerId challengedId status startTime endTime entryFee challengerName challengedName rules";
+  const challengeSelect = "_id challengerId challengedId status startTime endTime entryFee challengerName challengedName rules gameKey gameType";
 
   // Reason: Charts (win/loss donut, top symbols, by-hour, monthly) and streaks
   // must reflect ALL closed trades — competitions AND challenges — to stay
@@ -137,7 +137,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     // Reason: No limit — all transactions needed for accurate dashboard totals.
     // .limit(1000) was silently truncating data for active users.
     WalletTransaction.find({ userId, status: "completed" })
-      .select("createdAt balanceAfter amount transactionType")
+      .select("createdAt balanceAfter amount transactionType competitionId challengeId")
       .sort({ createdAt: 1 })
       .lean(),
   ]);
@@ -224,10 +224,21 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       ? await Competition.find({ _id: { $in: userCompIds } }).select(competitionSelect).lean()
       : [];
 
+  // Reason: `CompetitionParticipant` declares no `prizeWon`, so the seat never carried the
+  // prize and Competition Performance read "Credits won 0" beside real wins. The credited
+  // amount lives on the player's own `competition_win` ledger rows, keyed by `competitionId`.
+  const prizeByCompetitionId = new Map<string, number>();
+  for (const tx of walletTransactions as any[]) {
+    if (tx.transactionType !== "competition_win" || !tx.competitionId) continue;
+    const key = tx.competitionId.toString();
+    prizeByCompetitionId.set(key, (prizeByCompetitionId.get(key) ?? 0) + Math.abs(tx.amount || 0));
+  }
+
   const { processedCompetitions } = await processCompetitionParticipations({
     userId,
     competitionParticipations: competitionParticipations as any[],
     allCompetitions: allCompetitions as any[],
+    prizeByCompetitionId,
   });
 
   const { processedChallenges } = processChallengeParticipations({

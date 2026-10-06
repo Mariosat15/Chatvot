@@ -31,12 +31,12 @@ export function HighlightMetricCard({
       <div className="flex h-full flex-col gap-2 p-3" data-highlight={highlight.key}>
         <div className="flex items-center gap-2">
           <NeonIcon src={style.icon} size={30} />
-          <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c5]">
+          <span className="truncate text-xs font-semibold uppercase tracking-wide text-[#8ea4c5]">
             {highlight.label}
           </span>
         </div>
         <div
-          className="truncate text-2xl font-black tabular-nums leading-none"
+          className="truncate text-3xl font-black tabular-nums leading-none"
           style={{ color: accentHex(style.accent) }}
         >
           {highlight.value}

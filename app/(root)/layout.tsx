@@ -94,7 +94,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
             without pt-16 the first 64px of every page sat under it (the owner's
             "account status hidden under the logo", 29 Sep 2026).
           */}
-          <main className="flex-1 min-h-screen overflow-x-hidden pt-16 lg:pt-0">
+          <main className="flex-1 min-h-screen overflow-x-clip pt-16 lg:pt-0">
             {/*
               Reason: Overview mock Header — Overview/Wallet/Performance/Competitions/
               Tutorials. Games/Challenges/Marketplace stay on the sidebar (recorded

@@ -358,6 +358,8 @@ export interface ChallengeData {
   isLeading: boolean;
   isWinner?: boolean;
   prizeWon?: number;
+  /** Invariant 5: absent means trading. Lets Performance filter 1v1s by game. */
+  gameKey?: string;
 }
 
 export interface TradeData {

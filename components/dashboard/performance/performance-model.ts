@@ -128,10 +128,9 @@ export function windowFacts(
     .map((c) => c.currentRank)
     .filter((r): r is number => typeof r === "number" && r > 0);
 
-  const challenges =
-    gameFilter === ALL_GAMES
-      ? input.challenges.completed.filter((c) => inWindow(toMs(c.endTime), w))
-      : [];
+  const challenges = input.challenges.completed.filter(
+    (c) => inWindow(toMs(c.endTime), w) && matchesGame(gameKeyOf(c), gameFilter),
+  );
 
   const activeDays = new Set<string>();
   const tradingIncluded = gameFilter === ALL_GAMES || gameFilter === TRADING_KEY;
@@ -319,14 +318,9 @@ export function buildHighlights(
     {
       key: "challengeWins",
       label: "1v1 Wins",
-      value: gameFilter === ALL_GAMES ? String(cur.challengeWins) : "-",
-      hint:
-        gameFilter === ALL_GAMES
-          ? `${cur.challengesPlayed} played`
-          : "Shown under All games",
-      delta: prev && gameFilter === ALL_GAMES
-        ? percentChange(cur.challengeWins, prev.challengeWins)
-        : null,
+      value: String(cur.challengeWins),
+      hint: `${cur.challengesPlayed} played`,
+      delta: prev ? percentChange(cur.challengeWins, prev.challengeWins) : null,
     },
     {
       key: "consistency",
@@ -489,7 +483,9 @@ export function buildTrend(
   const comps = input.competitions.completed.filter((c) =>
     matchesGame(gameKeyOf(c), gameFilter),
   );
-  const challenges = gameFilter === ALL_GAMES ? input.challenges.completed : [];
+  const challenges = input.challenges.completed.filter((c) =>
+    matchesGame(gameKeyOf(c), gameFilter),
+  );
   const activity = input.gameActivity.filter((a) => matchesGame(a.gameKey, gameFilter));
 
   const points = buckets.map((b) => {
