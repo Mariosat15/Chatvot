@@ -27,7 +27,7 @@ export default function DesktopPerformance({
 
   return (
     <DashboardBackdrop>
-    <div className="space-y-5">
+    <div className="space-y-5 pb-4">
       <PerformanceHeader model={model} />
       <PerformanceHighlights highlights={model.highlights} />
       {model.showGamesSection ? <GamePerformanceSection cards={model.gameCards} /> : null}

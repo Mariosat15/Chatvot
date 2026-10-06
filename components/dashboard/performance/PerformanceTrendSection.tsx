@@ -14,7 +14,7 @@ import {
 import { ChartRangeSelector } from "@/components/dashboard/wallet/AnalyticsCard";
 import { PerfCard, PerfEmpty, PerfSection } from "./PerformanceChrome";
 import { PERF, PERF_SECTION_ICON } from "./performance-assets";
-import { TREND_SERIES, type TrendSeriesKey } from "./performance-model";
+import { TREND_SERIES, type TrendSeriesKey } from "./performance-trend";
 import type { PerformanceAnalyticsModel } from "./usePerformanceAnalyticsModel";
 
 /**

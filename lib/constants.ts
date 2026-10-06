@@ -2,12 +2,14 @@ export const NAV_ITEMS = [
   { href: "/dashboard?tab=overview", label: "Overview", tab: "overview" },
   { href: "/dashboard?tab=wallet", label: "Wallet Analytics", tab: "wallet" },
   { href: "/dashboard?tab=performance", label: "Performance", tab: "performance" },
-  { href: "/dashboard?tab=contests", label: "Competitions", tab: "contests" },
   { href: "/dashboard?tab=tutorials", label: "Tutorials", tab: "tutorials" },
 ] as const;
 
 export type DashboardNavTab =
-  (typeof NAV_ITEMS)[number]["tab"];
+  | (typeof NAV_ITEMS)[number]["tab"]
+  // Reason: owner 6 Oct 2026 — Competitions left the Header strip. The
+  // dashboard tab still exists so a saved `?tab=contests` does not 404.
+  | "contests";
 
 export const DASHBOARD_TABS: DashboardNavTab[] = [
   "overview",

@@ -19,19 +19,27 @@ function readCode(relativePath: string): string {
 }
 
 describe("dashboard Header NAV_ITEMS", () => {
-  it("lists the five Overview mock destinations with ?tab= deep links", () => {
+  it("lists Overview, Wallet, Performance and Tutorials — Competitions is not a Header tab", () => {
     expect(NAV_ITEMS.map((i) => i.tab)).toEqual([
+      "overview",
+      "wallet",
+      "performance",
+      "tutorials",
+    ]);
+    for (const item of NAV_ITEMS) {
+      expect(item.href).toBe(`/dashboard?tab=${item.tab}`);
+    }
+    expect(NAV_ITEMS.some((i) => i.tab === "contests")).toBe(false);
+    expect(DASHBOARD_TABS).toContain("contests");
+    // Reason: owner 6 Oct 2026 — strip Competitions from the Header. The
+    // dashboard tab stays addressable so a saved ?tab=contests still opens.
+    expect(DASHBOARD_TABS).toEqual([
       "overview",
       "wallet",
       "performance",
       "contests",
       "tutorials",
     ]);
-    for (const item of NAV_ITEMS) {
-      expect(item.href).toBe(`/dashboard?tab=${item.tab}`);
-    }
-    expect(DASHBOARD_TABS).toEqual(NAV_ITEMS.map((i) => i.tab));
-    // Reason: owner 30 Sep 2026 — Wallet tab label is "Wallet Analytics".
     expect(NAV_ITEMS.find((i) => i.tab === "wallet")?.label).toBe(
       "Wallet Analytics",
     );
@@ -62,7 +70,7 @@ describe("dashboard Header NAV_ITEMS", () => {
   it("Header tab strip is desktop-only — withheld on every phone page", () => {
     /*
       Reason: owner 30 Sep 2026 — do not show Overview/Wallet/Performance/
-      Competitions/Tutorials on mobile anywhere until told to put it back.
+      Tutorials on mobile anywhere until told to put it back.
       MobileTabStrip is deleted rather than gated; sidebar drawer is the phone nav.
     */
     const header = readCode("components/Header.tsx");

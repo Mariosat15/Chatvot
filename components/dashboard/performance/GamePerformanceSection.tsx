@@ -4,9 +4,10 @@ import { useRef } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Sparkline } from "@/components/dashboard/wallet/AnalyticsCard";
-import { NeonIcon, PerfCard, PerfEmpty, PerfSection } from "./PerformanceChrome";
+import { PerfCard, PerfEmpty, PerfSection } from "./PerformanceChrome";
 import { PERF, PERF_METRIC_ICON, PERF_SECTION_ICON } from "./performance-assets";
-import type { GameCardView } from "./performance-model";
+import { type GameCardView } from "./performance-game-cards";
+import { TRADING_KEY } from "./performance-model";
 
 function lastPlayed(iso: string | null): string {
   if (!iso) return "-";
@@ -42,36 +43,32 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
     { label: "Best score", value: card.bestScore },
     { label: "Avg play", value: card.avgPlayTime },
   ];
+  const logoSrc =
+    card.artSrc ??
+    (card.gameKey === TRADING_KEY ? PERF_SECTION_ICON.trading : PERF_METRIC_ICON.gameFallback);
   return (
     <PerfCard accent="blue" className="h-full">
       <div className="flex h-full flex-col" data-game-card={card.gameKey}>
-        <div className="relative h-40 overflow-hidden sm:h-44">
-          {card.artSrc ? (
-            <Image
-              src={card.artSrc}
-              alt=""
-              fill
-              sizes="560px"
-              className="object-cover object-center"
-              quality={90}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center bg-[#07172c]">
-              <NeonIcon src={PERF_METRIC_ICON.gameFallback} size={72} />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#041025] via-[#041025]/35 to-transparent" />
+        <div className="relative h-40 overflow-hidden bg-[#07172c] sm:h-44">
+          <Image
+            src={logoSrc}
+            alt=""
+            fill
+            sizes="560px"
+            className="object-contain object-center p-5"
+            quality={90}
+          />
           <div className="absolute right-3 top-3">
             <StatusPill status={card.status} />
           </div>
-          <div className="absolute bottom-3 left-4 right-4 min-w-0">
-            <h3 className="truncate text-xl font-black tracking-tight text-white sm:text-2xl">
-              {card.title}
-            </h3>
-            {card.category ? (
-              <p className="truncate text-sm font-medium text-[#c5d4ee]">{card.category}</p>
-            ) : null}
-          </div>
+        </div>
+        <div className="px-4 pt-3 text-center">
+          <h3 className="truncate text-xl font-black tracking-tight text-white sm:text-2xl">
+            {card.title}
+          </h3>
+          {card.category ? (
+            <p className="truncate text-sm font-medium text-[#c5d4ee]">{card.category}</p>
+          ) : null}
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
           {stats.map((s) => (
@@ -98,8 +95,8 @@ export function GamePerformanceCard({ card }: { card: GameCardView }) {
 }
 
 /**
- * One card per provider title the player has played — straight from the payload,
- * never a hard-coded list (R29). Trading has its own section below.
+ * One card per title the player has played, including Trading. Titles and art
+ * come from the payload (R29); Trading is the one platform key (invariant 5).
  *
  * Reason: two cards fill the row so the arrows actually move something. Three
  * fitted cards made scrollBy(clientWidth) a no-op.
@@ -138,7 +135,7 @@ export default function GamePerformanceSection({ cards }: { cards: GameCardView[
   return (
     <PerfSection
       title="Game Performance"
-      subtitle="Every game you have played in a ranked round."
+      subtitle="Every game you have played, including trading."
       icon={PERF_SECTION_ICON.games}
       controls={controls}
       testId="games"

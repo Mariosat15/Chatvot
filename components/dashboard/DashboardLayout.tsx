@@ -130,8 +130,8 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
       {/*
         Reason: Header already carries Overview / Wallet / Performance /
-        Competitions / Tutorials. A second TabsList would be two navs for one
-        fact. Tabs still drive content; chrome is hidden.
+        Tutorials. A second TabsList would be two navs for one fact. Tabs still
+        drive content; chrome is hidden. `contests` stays addressable.
       */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4">
         <TabsContent value="overview" className="mt-0">
@@ -154,7 +154,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           <WalletAnalytics overview={overview} charts={charts} />
         </TabsContent>
 
-        <TabsContent value="performance" className="mt-4">
+        <TabsContent value="performance" className="mt-4 pb-10 sm:pb-14">
           <PerformanceAnalytics
             overview={overview}
             charts={charts}

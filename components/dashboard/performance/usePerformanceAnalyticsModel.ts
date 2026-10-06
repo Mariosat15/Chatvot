@@ -6,14 +6,14 @@ import {
   TRADING_KEY,
   buildChallengeSummary,
   buildCompetitionSummary,
-  buildGameCards,
   buildHighlights,
   buildTradingMetrics,
-  buildTrend,
   gameOptions,
   type PerfInput,
   type PerfRange,
 } from "./performance-model";
+import { buildGameCards } from "./performance-game-cards";
+import { buildTrend } from "./performance-trend";
 
 /**
  * One model for both the desktop and mobile trees, so the two layouts can never
@@ -35,6 +35,7 @@ export function usePerformanceAnalyticsModel(input: PerfInput) {
   return useMemo(() => {
     const showTradingSection =
       input.showTrading && (activeGame === ALL_GAMES || activeGame === TRADING_KEY);
+    const gameCards = buildGameCards(input, range, activeGame);
     return {
       range,
       setRange,
@@ -42,12 +43,10 @@ export function usePerformanceAnalyticsModel(input: PerfInput) {
       setGameKey,
       gameOptions: options,
       highlights: buildHighlights(input, range, activeGame),
-      gameCards: buildGameCards(input, range, activeGame),
+      gameCards,
       trend: buildTrend(input, range, activeGame),
       showTradingSection,
-      // Reason: with Trading selected, an empty games carousel would read as
-      // "you have never played a game" — a false statement, not a filtered one.
-      showGamesSection: activeGame !== TRADING_KEY,
+      showGamesSection: gameCards.length > 0,
       tradingMetrics: buildTradingMetrics(input.overview),
       challengeSummary: buildChallengeSummary(input, range, activeGame),
       competitionSummary: buildCompetitionSummary(input, range, activeGame),

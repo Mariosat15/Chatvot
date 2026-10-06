@@ -9,14 +9,14 @@ import {
   ALL_GAMES,
   TRADING_KEY,
   buildChallengeSummary,
-  buildGameCards,
   buildHighlights,
   buildTradingMetrics,
-  buildTrend,
   gameOptions,
   percentChange,
   type PerfInput,
 } from "@/components/dashboard/performance/performance-model";
+import { buildGameCards } from "@/components/dashboard/performance/performance-game-cards";
+import { buildTrend } from "@/components/dashboard/performance/performance-trend";
 import { allPerformanceAssets } from "@/components/dashboard/performance/performance-assets";
 
 const ROOT = process.cwd();
@@ -95,8 +95,9 @@ describe("performance model", () => {
     expect(byKey.get("bestScore")?.value).toBe("-");
     expect(byKey.get("playTime")?.value).toBe("-");
     const cards = buildGameCards(fixture(), "30d", ALL_GAMES);
-    expect(cards[0].bestScore).toBe("-");
-    expect(cards[0].avgPlayTime).toBe("-");
+    const game = cards.find((c) => c.gameKey === "provider:p1:g1");
+    expect(game?.bestScore).toBe("-");
+    expect(game?.avgPlayTime).toBe("-");
   });
 
   it("has no period comparison for All time", () => {
@@ -142,10 +143,43 @@ describe("performance model", () => {
     expect(m.get("avgWin")).toBe("-");
     expect(m.get("largestLoss")).toBe("-");
     expect(m.get("totalTrades")).toBe("0");
+    expect(m.get("tradeRoi")).toBe("-");
+  });
+
+  it("prints Trade ROI from trading PnL %, not the wallet credit ROI", () => {
+    const m = new Map(
+      buildTradingMetrics(
+        fixture({
+          overview: {
+            roi: 12.5,
+            totalTrades: 4,
+            winRate: 50,
+            totalPnLPercentage: 3.47,
+            profitFactor: 1.2,
+            averageWin: 10,
+            averageLoss: 5,
+            largestWin: 20,
+            largestLoss: 8,
+          },
+        }).overview,
+      ).map((x) => [x.key, x.value]),
+    );
+    expect(m.get("tradeRoi")).toBe("+3.47%");
+    expect(m.get("tradeRoi")).not.toBe("+12.50%");
   });
 
   it("puts scored rounds on the Games trend series", () => {
     expect(buildTrend(fixture(), "30d", ALL_GAMES).totals.games).toBe(3);
+  });
+
+  it("puts Trading first in Game Performance when trading chrome is on", () => {
+    const all = buildGameCards(fixture(), "30d", ALL_GAMES);
+    expect(all.map((c) => c.gameKey)).toEqual([TRADING_KEY, "provider:p1:g1"]);
+    expect(all[0].title).toBe("Trading");
+    const onlyTrading = buildGameCards(fixture(), "30d", TRADING_KEY);
+    expect(onlyTrading.map((c) => c.gameKey)).toEqual([TRADING_KEY]);
+    const gamesOnly = buildGameCards(fixture({ showTrading: false }), "30d", ALL_GAMES);
+    expect(gamesOnly.map((c) => c.gameKey)).toEqual(["provider:p1:g1"]);
   });
 });
 
@@ -230,14 +264,28 @@ describe("performance page structure", () => {
     expect(code).not.toMatch(/scrollBy\(\{\s*left:\s*dir\s*\*\s*el\.clientWidth/);
   });
 
+  it("centers game logos with object-contain and prints the title below the art", () => {
+    const code = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
+    expect(code).toMatch(/object-contain object-center/);
+    expect(code).not.toMatch(/object-cover/);
+    expect(code).toMatch(/\{card\.title\}/);
+    const titleAt = code.indexOf("{card.title}");
+    const imgAt = code.indexOf("<Image");
+    expect(imgAt).toBeGreaterThan(-1);
+    expect(titleAt).toBeGreaterThan(imgAt);
+  });
+
   it("uses the shared two-tone headline (magenta here, cyan on Wallet)", () => {
     const header = stripComments(read(`${DIR}/PerformanceHeader.tsx`));
     const wallet = stripComments(read("components/dashboard/wallet/WalletAnalyticsHeader.tsx"));
     const shared = stripComments(read("components/dashboard/AnalyticsPageHeadline.tsx"));
     expect(header).toMatch(/lead="Performance"/);
     expect(header).toMatch(/accent="magenta"/);
+    expect(header).toMatch(/rounded-\[16px\]/);
+    expect(header).toMatch(/border-\[#ff36ca\]\/30/);
     expect(wallet).toMatch(/lead="Wallet"/);
     expect(wallet).toMatch(/accent="cyan"/);
+    expect(wallet).toMatch(/border-cyan-400\/30/);
     expect(shared).toMatch(/new Map/);
     expect(shared).toContain("#ff36ca");
     expect(shared).toContain("#00d9ff");
@@ -251,6 +299,9 @@ describe("performance page structure", () => {
     expect(mobile).toMatch(/<DashboardBackdrop>/);
     expect(layout).toMatch(/overflow-x-clip/);
     expect(layout).not.toMatch(/overflow-x-hidden/);
+    expect(layout).toMatch(/value="performance"[\s\S]*pb-10/);
+    const backdrop = stripComments(read("components/dashboard/DashboardBackdrop.tsx"));
+    expect(backdrop).toMatch(/pb-10/);
   });
 
   it("stamps challenge gameKey in the dashboard payload so a game filter can see 1v1s", () => {
@@ -259,6 +310,12 @@ describe("performance page structure", () => {
     expect(process).toMatch(/gameKey:/);
     expect(action).toMatch(/const challengeSelect = ".*gameKey/);
     expect(action).toMatch(/prizeByCompetitionId/);
+  });
+
+  it("does not invent $10k starting capital when computing Trade ROI", () => {
+    const action = stripComments(read("lib/actions/comprehensive-dashboard.actions.ts"));
+    expect(action).not.toMatch(/startingCapital \|\| 10000/);
+    expect(action).toMatch(/cap > 0/);
   });
 
   it("ships every neon icon it references", () => {

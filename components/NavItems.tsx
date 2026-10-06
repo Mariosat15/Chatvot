@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Wallet,
   BarChart3,
-  Trophy,
   GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,14 +15,13 @@ const TAB_ICONS = new Map<DashboardNavTab, typeof LayoutDashboard>([
   ["overview", LayoutDashboard],
   ["wallet", Wallet],
   ["performance", BarChart3],
-  ["contests", Trophy],
   ["tutorials", GraduationCap],
 ]);
 
 /**
- * Dashboard destinations for Overview / Wallet / Performance / Competitions /
- * Tutorials. Active state follows `?tab=` on `/dashboard` so Header deep links
- * and the in-page tabs stay one fact.
+ * Dashboard destinations for Overview / Wallet / Performance / Tutorials.
+ * Active state follows `?tab=` on `/dashboard` so Header deep links and the
+ * in-page tabs stay one fact. Competitions lives on `/competitions`, not here.
  *
  * Lucide icon + label pills (29 Sep 2026 owner preference after rejecting neon
  * HUD plates / shared frame). Active = gold pill; inactive = white.

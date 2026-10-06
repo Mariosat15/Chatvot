@@ -322,7 +322,9 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Performance Analytics polish + shared two-tone headlines CODE-COMPLETE 6 Oct (eng)** — mountain backdrop on Performance (desktop + mobile); game carousel scrolls one card (`offsetWidth + gap`) so arrows move something; Competition prizes from `competition_win` + `competitionId`; 1v1s filter by stamped `gameKey` (absent → trading, invariant 5); shared `AnalyticsPageHeadline` (Performance magenta, Wallet cyan, Arena gold, Challenges orange). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Performance header border + no Competitions tab + Trade ROI CODE-COMPLETE 6 Oct (eng)** — Performance banner matches Wallet (magenta plate); Competitions removed from Header `NAV_ITEMS` (`?tab=contests` still works); Trade ROI no longer treats game seats as $10k capital. Tests: `performance-analytics.test.ts`, `games-first-nav.test.ts`. **Never verified by eye.**
+- **Game Performance logos + Trading card + bottom padding CODE-COMPLETE 6 Oct (eng)** — carousel art is `object-contain` with the title under the logo; Trading is the first card when chrome is on; extra bottom padding so 1v1/Competition/Holidays are not clipped. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Performance Analytics polish + shared two-tone headlines CODE-COMPLETE 6 Oct (eng)** — mountain backdrop; carousel scrolls one card; Competition prizes from `competition_win`; 1v1s filter by `gameKey`; shared `AnalyticsPageHeadline`. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Performance Analytics REBUILT 6 Oct (eng)** — `components/dashboard/performance/`, separate desktop + mobile trees on one model; trading row R21-gated; page ends at Market Holidays. **Amended same day:** 1v1s are no longer All-games-only — they carry `gameKey`. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Spending vs Earnings structure CODE-COMPLETE 6 Oct (eng)** — comparison bar + two equal columns; `spendMetric` vs `earnMetric` only (deposits/refunds excluded). Desktop + mobile share the panel. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Spending vs Earnings contrast CODE-COMPLETE 6 Oct (eng)** — first pass (flow in/out donut). Superseded by structure pass above — deposits/refunds wrongly counted as earnings. **Say which.**
@@ -941,6 +943,24 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Performance banner, Header Competitions tab, Trade ROI (owner request)
+
+**Owner reports:** Performance Analytics had no bordered banner like Wallet; Competitions sat in the top dashboard menu; Trade ROI showed 0.00%.
+
+**Causes:** Performance header was bare type on the wash; `NAV_ITEMS` still listed `contests`; Trade ROI divided realized PnL by every seat's capital with `startingCapital || 10000`, so each provider (no-capital) seat counted as a $10k trading account and drowned the real figure.
+
+**Fix:** magenta glass plate on Performance; Competitions removed from Header (`?tab=contests` still opens); Trade ROI sums only trading seats with a real positive starting capital.
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`, `games-first-nav.test.ts`. **Never verified by eye.**
+
+### 6 October 2026 - Game Performance logos, Trading card, page bottom padding (owner request)
+
+**Owner reports:** Game Performance crops/off-centres the artwork and hides the title; the row only listed provider games, not Trading; the 1v1 / Competition / Holidays row sat flush with the bottom of the viewport.
+
+**Fix:** card art uses `object-contain` in a centred plate, title printed below; Trading is prepended to the carousel when trading chrome is on (it is not a `game_round` row); `DashboardBackdrop` and the Performance tab get bottom padding.
+
+**Nothing was paid wrongly.** Tests: `__tests__/dashboard/performance-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Performance Analytics polish + shared two-tone headlines (owner request)
 

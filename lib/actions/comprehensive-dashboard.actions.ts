@@ -80,7 +80,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   // PERF: .select() on every query to fetch only fields used by dashboard
   // Reason: `score` is the provider-game equivalent of `pnl`. Without it here the card
   // renders every provider contest at zero - the read-side half of R37, one screen along.
-  const participantSelect = "competitionId challengeId userId username currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status unrealizedPnl currentOpenPositions prizeWon isWinner prizeReceived createdAt score";
+  const participantSelect = "competitionId challengeId userId username currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status unrealizedPnl currentOpenPositions prizeWon isWinner prizeReceived createdAt score gameKey";
   const tradeSelect = "symbol side entryPrice exitPrice quantity realizedPnl isWinner openedAt closedAt competitionId challengeId";
   // Reason: Challenge model uses challengerName/challengedName (not *Username), entryFee (not stakeAmount), and has no "name" field
   // Reason: Include "rules" to access rules.rankingMethod for correct dashboard metric display
@@ -499,11 +499,19 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   // Calculate streaks
   const streaks = calculateStreaks(chartTrades as any[]);
 
-  // Calculate starting capital for percentage
-  const totalStartingCapital = allParticipations.reduce(
-    (sum, p) => sum + (p.startingCapital || 10000),
-    0,
-  );
+  // Trade ROI = realized PnL ÷ virtual starting capital of TRADING seats.
+  // Reason: `startingCapital || 10000` treated every provider seat (no capital)
+  // as a $10k trading account, so one real contest was drowned and Trade ROI
+  // rendered 0.00%. Absent / zero capital is not a missing 10k (R45).
+  const totalStartingCapital = allParticipations.reduce((sum, p) => {
+    const key = typeof p.gameKey === "string" ? p.gameKey.trim() : "";
+    const isTrading = key === "" || key === "trading";
+    if (!isTrading) return sum;
+    const cap = p.startingCapital;
+    return typeof cap === "number" && Number.isFinite(cap) && cap > 0
+      ? sum + cap
+      : sum;
+  }, 0);
   const totalPnLPercentage =
     totalStartingCapital > 0 ? (totalPnL / totalStartingCapital) * 100 : 0;
 

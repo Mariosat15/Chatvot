@@ -10,8 +10,8 @@ import NavItems from "@/components/NavItems";
  * duplicating them here was the owner's "X" on the banner (29 Sep 2026 polish).
  * NavItems still reads `?tab=` so deep links work.
  *
- * Mobile: the Overview/Wallet/Performance/Competitions/Tutorials strip is
- * withheld on every page until the owner asks to bring it back (30 Sep 2026).
+ * Mobile: the Overview/Wallet/Performance/Tutorials strip is withheld on every
+ * page until the owner asks to bring it back (30 Sep 2026).
  * Phones use the sidebar drawer for navigation.
  */
 const Header = ({ user: _user }: { user: User }) => {

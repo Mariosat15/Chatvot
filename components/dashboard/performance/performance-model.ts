@@ -18,7 +18,7 @@ export const ALL_GAMES = "all";
 /** Invariant 5: an absent game label means trading. */
 export const TRADING_KEY = "trading";
 
-const DAY_MS = 86_400_000;
+export const DAY_MS = 86_400_000;
 
 export type PerfInput = Pick<
   ComprehensiveDashboardData,
@@ -52,13 +52,13 @@ export function previousWindow(range: PerfRange, now: number): Window | null {
   return { start: now - 2 * days * DAY_MS, end: now - days * DAY_MS };
 }
 
-function toMs(value: unknown): number | null {
+export function toMs(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const ms = new Date(value as string | number | Date).getTime();
   return Number.isFinite(ms) ? ms : null;
 }
 
-function inWindow(ms: number | null, w: Window): boolean {
+export function inWindow(ms: number | null, w: Window): boolean {
   if (ms === null) return false;
   if (w.start !== null && ms < w.start) return false;
   return ms <= w.end;
@@ -68,11 +68,11 @@ function dayKey(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function gameKeyOf(row: { gameKey?: string }): string {
+export function gameKeyOf(row: { gameKey?: string }): string {
   return row.gameKey && row.gameKey.trim() !== "" ? row.gameKey : TRADING_KEY;
 }
 
-function matchesGame(key: string, filter: string): boolean {
+export function matchesGame(key: string, filter: string): boolean {
   return filter === ALL_GAMES || key === filter;
 }
 
@@ -219,11 +219,11 @@ export function formatScore(score: number | null, unit?: string): string {
   return unit ? `${n} ${unit}` : n;
 }
 
-function pct(value: number | null, digits = 1): string {
+export function pct(value: number | null, digits = 1): string {
   return value === null ? "-" : `${value.toFixed(digits)}%`;
 }
 
-function filteredGames(input: PerfInput, gameFilter: string) {
+export function filteredGames(input: PerfInput, gameFilter: string) {
   return input.gamePerformance.filter((g) => matchesGame(g.gameKey, gameFilter));
 }
 
@@ -332,7 +332,7 @@ export function buildHighlights(
   ];
 }
 
-function spanDaysSinceFirstActivity(input: PerfInput, now: number): number | null {
+export function spanDaysSinceFirstActivity(input: PerfInput, now: number): number | null {
   const stamps: number[] = [];
   for (const d of input.charts.dailyPnL) {
     const ms = toMs(d.date);
@@ -352,164 +352,6 @@ function spanDaysSinceFirstActivity(input: PerfInput, now: number): number | nul
   }
   if (!stamps.length) return null;
   return Math.max(1, Math.ceil((now - Math.min(...stamps)) / DAY_MS));
-}
-
-/* ------------------------------------------------------------- game cards */
-
-export interface GameCardView {
-  gameKey: string;
-  title: string;
-  category?: string;
-  artSrc: string | null;
-  status: "live" | "retired" | "active";
-  scoredRounds: number;
-  contests: number;
-  bestScore: string;
-  avgPlayTime: string;
-  lastPlayedAt: string | null;
-  spark: number[];
-  periodRounds: number;
-}
-
-export function buildGameCards(
-  input: PerfInput,
-  range: PerfRange,
-  gameFilter: string,
-): GameCardView[] {
-  const now = input.now ?? Date.now();
-  const w = currentWindow(range, now);
-  const artByKey = new Map(
-    input.overviewStanding.playCards.map((c) => [c.gameKey, c.artSrc]),
-  );
-  const buckets = trendBuckets(range, now, input);
-
-  return filteredGames(input, gameFilter).map((g) => {
-    const activity = input.gameActivity.filter((a) => a.gameKey === g.gameKey);
-    const spark = buckets.map((b) =>
-      activity
-        .filter((a) => {
-          const ms = toMs(a.date);
-          return ms !== null && ms >= b.start && ms < b.end;
-        })
-        .reduce((s, a) => s + a.rounds, 0),
-    );
-    const periodRounds = activity
-      .filter((a) => inWindow(toMs(a.date), w))
-      .reduce((s, a) => s + a.rounds, 0);
-    return {
-      gameKey: g.gameKey,
-      title: g.title,
-      category: g.category?.label,
-      artSrc: artByKey.get(g.gameKey) ?? null,
-      status: g.rounds.live > 0 ? "live" : g.inCatalogue ? "active" : "retired",
-      scoredRounds: g.rounds.scored,
-      contests: g.competitions + g.challenges,
-      bestScore: formatScore(g.bestScore, g.scoreUnit),
-      avgPlayTime: formatDuration(g.averagePlaySeconds),
-      lastPlayedAt: g.lastPlayedAt,
-      spark,
-      periodRounds,
-    };
-  });
-}
-
-/* ------------------------------------------------------------------- trend */
-
-export type TrendSeriesKey = "overall" | "trading" | "games" | "competitions" | "challenges";
-
-export const TREND_SERIES: { key: TrendSeriesKey; label: string; color: string }[] = [
-  { key: "overall", label: "Overall", color: "#00d9ff" },
-  { key: "trading", label: "Trading", color: "#00e6a3" },
-  { key: "games", label: "Games", color: "#ff7b17" },
-  { key: "competitions", label: "Competitions", color: "#9d39ff" },
-  { key: "challenges", label: "1v1", color: "#ff36ca" },
-];
-
-export interface TrendBucket {
-  start: number;
-  end: number;
-  label: string;
-}
-
-/**
- * Daily buckets for 7D/30D, weekly for 90D, weekly or monthly for All.
- * All starts at the first recorded activity so the chart is not mostly empty.
- */
-export function trendBuckets(range: PerfRange, now: number, input?: PerfInput): TrendBucket[] {
-  const days = rangeDays(range);
-  const totalDays = days ?? (input ? spanDaysSinceFirstActivity(input, now) ?? 30 : 30);
-  const step = totalDays <= 31 ? 1 : totalDays <= 200 ? 7 : 30;
-  const count = Math.max(1, Math.ceil(totalDays / step));
-  const endDay = Math.floor(now / DAY_MS) * DAY_MS + DAY_MS;
-  const out: TrendBucket[] = [];
-  for (let i = count - 1; i >= 0; i -= 1) {
-    const end = endDay - i * step * DAY_MS;
-    const start = end - step * DAY_MS;
-    const d = new Date(start);
-    const label =
-      step === 30
-        ? d.toLocaleDateString(undefined, { month: "short", year: "2-digit" })
-        : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    out.push({ start, end, label });
-  }
-  return out;
-}
-
-export type TrendPoint = { label: string } & Record<TrendSeriesKey, number>;
-
-/**
- * Activity per period across every way the player plays.
- *
- * Reason: the series share ONE unit — things completed (trades closed, scored
- * rounds, competitions finished, 1v1s finished) — because trading P&L, game
- * scores and prizes have no common scale. Overall is their sum, not an index.
- */
-export function buildTrend(
-  input: PerfInput,
-  range: PerfRange,
-  gameFilter: string,
-): { points: TrendPoint[]; totals: Record<TrendSeriesKey, number> } {
-  const now = input.now ?? Date.now();
-  const buckets = trendBuckets(range, now, input);
-  const tradingIncluded =
-    input.showTrading && (gameFilter === ALL_GAMES || gameFilter === TRADING_KEY);
-
-  const sumIn = <T>(rows: T[], when: (r: T) => number | null, weight: (r: T) => number, b: TrendBucket) =>
-    rows.reduce((s, r) => {
-      const ms = when(r);
-      return ms !== null && ms >= b.start && ms < b.end ? s + weight(r) : s;
-    }, 0);
-
-  const comps = input.competitions.completed.filter((c) =>
-    matchesGame(gameKeyOf(c), gameFilter),
-  );
-  const challenges = input.challenges.completed.filter((c) =>
-    matchesGame(gameKeyOf(c), gameFilter),
-  );
-  const activity = input.gameActivity.filter((a) => matchesGame(a.gameKey, gameFilter));
-
-  const points = buckets.map((b) => {
-    const trading = tradingIncluded
-      ? sumIn(input.charts.dailyPnL, (d) => toMs(d.date), (d) => d.trades, b)
-      : 0;
-    const games = sumIn(activity, (a) => toMs(a.date), (a) => a.rounds, b);
-    const competitions = sumIn(comps, (c) => toMs(c.endTime), () => 1, b);
-    const challengeCount = sumIn(challenges, (c) => toMs(c.endTime), () => 1, b);
-    return {
-      label: b.label,
-      trading,
-      games,
-      competitions,
-      challenges: challengeCount,
-      overall: trading + games + competitions + challengeCount,
-    };
-  });
-
-  const totals = TREND_SERIES.reduce(
-    (acc, s) => ({ ...acc, [s.key]: points.reduce((sum, p) => sum + p[s.key], 0) }),
-    {} as Record<TrendSeriesKey, number>,
-  );
-  return { points, totals };
 }
 
 /* ------------------------------------------------------------ trading row */

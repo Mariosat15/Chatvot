@@ -33,7 +33,9 @@ export default function DashboardBackdrop({ children }: { children: ReactNode })
         <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0A0F26] via-[#0A0F26]/75 to-transparent" />
         <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#0A0F26] to-transparent" />
       </div>
-      <div className="relative z-10 space-y-3.5 p-1 sm:space-y-4 sm:p-2">{children}</div>
+      <div className="relative z-10 space-y-3.5 p-1 pb-10 sm:space-y-4 sm:p-2 sm:pb-14">
+        {children}
+      </div>
     </div>
   );
 }

@@ -30,7 +30,7 @@ export default function MobilePerformance({
 
   return (
     <DashboardBackdrop>
-    <div className="space-y-4">
+    <div className="space-y-4 pb-6">
       <PerformanceHeader model={model} compact />
 
       <PerfSection
