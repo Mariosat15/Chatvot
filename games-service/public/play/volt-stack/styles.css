@@ -96,10 +96,12 @@ html.cv-embedded .timer-ring{width:32px;height:32px;border-width:4px;flex-shrink
    HOLD/NEXT take whatever width is left (minmax 96px/1fr) so the cabinet
    fills the stage left and right instead of floating in a narrow strip.
    The board's width never comes from the rails (0.7fr was the squat bug). */
-html.cv-embedded .play-layout{flex:1 1 auto;min-height:0;gap:8px;margin:0;height:var(--arena-h);max-height:none;grid-template-columns:minmax(96px,1fr) var(--cabinet-width) minmax(96px,1fr);justify-content:stretch;align-items:stretch;width:100%}
-html.cv-embedded .board-wrap{padding-top:0;margin:0;height:var(--arena-h);display:flex;flex-direction:column}
+html.cv-embedded .play-layout{flex:0 0 auto;min-height:0;gap:8px;margin:auto 0;height:var(--arena-h);max-height:none;grid-template-columns:minmax(96px,1fr) var(--cabinet-width) minmax(96px,1fr);justify-content:stretch;align-items:center;width:100%}
+html.cv-embedded .board-wrap{padding-top:0;margin:0;height:var(--arena-h);display:flex;flex-direction:column;align-items:center;justify-content:center}
 html.cv-embedded .board-title{height:14px;font-size:9px;gap:10px;top:0;left:8%;right:8%;position:relative}
-html.cv-embedded .game-stage{margin:0;flex:1 1 auto;width:var(--cabinet-width);height:auto!important;min-height:0;display:flex;align-items:stretch;justify-content:center}
+/* Reason (6 Oct 2026): flex-grow + height:auto stretched the neon SVG frame in fullscreen. Size to the board vars only. */
+html.cv-embedded .game-stage{margin:0;flex:0 0 auto;width:var(--cabinet-width);height:calc(var(--board-height) + var(--frame-pad)*2 + 4px)!important;min-height:0;display:flex;align-items:center;justify-content:center}
+html.cv-embedded .reference-frame{background-size:contain!important}
 html.cv-embedded #gameCanvas{width:var(--board-width)!important;height:var(--board-height)!important;max-height:100%}
 html.cv-embedded #fxCanvas{width:var(--board-width)!important;height:var(--board-height)!important}
 html.cv-embedded .rail-tip{display:none}

@@ -310,7 +310,10 @@ export function ProviderGameFrame({
         onLoad={() => setDocumentLoaded(true)}
         title={gameName}
         // See the header for why `allow-top-navigation` and `allow-popups` are absent.
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        // Reason (6 Oct 2026): Circuit Sprint's Leave uses window.confirm. Without
+        // allow-modals a sandboxed iframe's confirm returns false immediately, so Leave
+        // appears broken. Volt Stack's <dialog> needs the same permission.
+        sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
         allow="fullscreen; autoplay"
         // Reason: the launch URL is single-use and short-lived, but our own contest URL is
         // still ours. No need to hand a third party the page the player came from.

@@ -905,7 +905,13 @@ function renderResult() {
     }
   }
 
-  ui.done.textContent = state.returnUrl || window.parent !== window ? "Back to contest" : "Close";
+  // Reason: practice has no contest to go back to; "Close" matches the host's exit path.
+  ui.done.textContent =
+    state.mode === "practice"
+      ? "Close"
+      : state.returnUrl || window.parent !== window
+        ? "Back to contest"
+        : "Close";
   show("result");
 
   // `finished` is a cue for the platform to go and poll for the result, never the result itself,

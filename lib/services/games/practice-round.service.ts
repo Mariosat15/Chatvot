@@ -7,6 +7,7 @@ import GameRound, {
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import { createRound } from "./round.service";
+import { applyResult } from "./result-ingestion.service";
 import {
   defaultConfigValues,
   parseConfigSchema,
@@ -45,6 +46,10 @@ import type { PracticeRoundView } from "@/components/games/practice-state";
 const PRACTICE_WINDOW_SLACK_SECONDS = 300;
 /** Used only when a title declares no ceiling at all. */
 const FALLBACK_PRACTICE_SECONDS = 600;
+/** Cap how many live practice rounds one pull pass will ask the provider about. */
+const PRACTICE_PULL_LIMIT = 3;
+/** Recent practice history shown on the practice page. */
+export const PRACTICE_HISTORY_LIMIT = 5;
 
 export type PracticeRefusal =
   | "not_found"
@@ -139,42 +144,77 @@ async function lookUpPracticeTitle(slug: string): Promise<TitleLookup> {
 }
 
 /**
- * Closes the caller's live practice rounds of one game, here and at the provider.
+ * Pulls the provider's result for the caller's live practice rounds of one game.
  *
- * PRACTICE KEEPS NO RESULT (owner, 28 Sep 2026: "no need to calculate any results just exit
- * ... after leave the practice game close the round"). So a round the player leaves is
- * `voided` - the status that means "this attempt produced nothing" - rather than scored, and
- * the provider is asked to void it too so it stops running there.
+ * A provider never pushes a practice result (requirements v1.10, `01` s4.2), so the host asks
+ * when the frame posts `finished`. It goes through `applyResult`, the single ingestion door.
+ * A round still in play reports a live status, which gate 8 refuses without writing.
  *
- * It writes a STATUS, never a score, so it is not a second ingestion door - the same argument
- * as `endLiveRoundsForContest`. `resultSource` is left unset: no result came from anywhere.
+ * Owner reversed the 28 Sep "keep no result" rule on 6 Oct 2026: practice must show the score
+ * and keep the last five rounds. Failures are swallowed - this only refreshes a practice screen.
+ */
+export async function pullLivePracticeResults(
+  userId: string,
+  gameKey: string,
+  roundId?: string,
+): Promise<void> {
+  const live = await GameRound.find({
+    contestType: "practice",
+    contestId: null,
+    userId,
+    gameKey,
+    status: { $in: LIVE_ROUND_STATUSES },
+    ...(roundId ? { roundId } : {}),
+  })
+    .sort({ createdAt: -1 })
+    .limit(roundId ? 1 : PRACTICE_PULL_LIMIT)
+    .select("roundId providerKey")
+    .lean<Array<{ roundId: string; providerKey: string }>>();
+
+  for (const round of live) {
+    try {
+      const adapter = getProviderAdapter(round.providerKey);
+      if (!adapter) continue;
+      const pulled = await adapter.fetchRound(round.roundId);
+      if (!pulled.success) continue;
+      await applyResult({
+        providerKey: round.providerKey,
+        normalised: pulled.data,
+        source: "poll",
+      });
+    } catch (error) {
+      console.warn(`⚠️ Could not refresh practice round ${round.roundId}:`, error);
+    }
+  }
+}
+
+/**
+ * Closes the caller's still-live practice rounds of one game, here and at the provider.
  *
- * Every Start calls this first as well, because `createRound` is idempotent on the live round:
- * a round left open by a closed tab would otherwise be RESUMED instead of a new one opened.
+ * Used when the player leaves mid-round (or closes the tab) BEFORE a result is pulled.
+ * A finished practice round is scored by `pullLivePracticeResults` and must NOT be voided -
+ * voiding would wipe the score the practice page exists to show (owner, 6 Oct 2026).
  *
- * Scoped by `userId` (from the session), `gameKey`, `contestType: "practice"` and
- * `contestId: null`, so it can never touch another player's round or a paid contest's round.
- * The provider call is not awaited: the platform status is the answer, and a provider that is
- * slow or down must not hold the player on a spinner.
+ * It writes a STATUS, never a score, so it is not a second ingestion door. Every Start also
+ * calls this first, because `createRound` is idempotent on the live round: a round left open
+ * by a closed tab would otherwise be RESUMED instead of a new one opened.
+ *
+ * Scoped by `userId`, `gameKey`, `contestType: "practice"` and `contestId: null`. The provider
+ * call is not awaited: the platform status is the answer.
  */
 export async function endLivePracticeRounds(
   userId: string,
   gameKey: string,
   roundId?: string,
 ): Promise<number> {
-  // Leaving a named round also voids one the provider already finished: the iframe
-  // posts `finished` after the game marks completed, then the host DELETEs. Launch
-  // cleanup (no roundId) only closes still-live rounds so history is not rewritten.
-  const statuses: RoundStatus[] = roundId
-    ? [...LIVE_ROUND_STATUSES, "completed", "abandoned", "expired"]
-    : [...LIVE_ROUND_STATUSES];
-
+  // Reason: only LIVE statuses. A completed practice row is history the player can delete
+  // deliberately; rewriting it to voided on leave was the defect that emptied the list.
   const live = await GameRound.find({
     contestType: "practice",
     contestId: null,
     userId,
     gameKey,
-    status: { $in: statuses },
+    status: { $in: LIVE_ROUND_STATUSES },
     ...(roundId ? { roundId } : {}),
   });
 
@@ -205,7 +245,7 @@ export async function endLivePracticeRounds(
   return ended;
 }
 
-/** The player left a practice round. Idempotent: an already-closed round ends nothing. */
+/** The player left a practice round mid-play. Idempotent: an already-closed round ends nothing. */
 export async function endPracticeRound(
   slug: string,
   userId: string,
@@ -215,6 +255,80 @@ export async function endPracticeRound(
   if (!card) return { found: false, ended: 0 };
   await connectToDatabase();
   return { found: true, ended: await endLivePracticeRounds(userId, card.gameKey, roundId) };
+}
+
+/**
+ * The frame posted `finished`: pull the provider score for this one practice round.
+ * Returns the updated view so the host can refresh the recent list without a second GET.
+ */
+export async function finishPracticeRound(
+  slug: string,
+  userId: string,
+  roundId: string,
+): Promise<{ found: boolean; round: PracticeRoundView | null }> {
+  const card = await getBrowsableGameBySlug(slug);
+  if (!card) return { found: false, round: null };
+  await connectToDatabase();
+  await pullLivePracticeResults(userId, card.gameKey, roundId);
+  const stored = await GameRound.findOne({
+    contestType: "practice",
+    contestId: null,
+    userId,
+    gameKey: card.gameKey,
+    roundId,
+  })
+    .select("roundId status rawScore scoreBreakdown completedAt")
+    .lean<StoredPracticeRound | null>();
+  return { found: true, round: stored ? toView(stored) : null };
+}
+
+/**
+ * Deletes one of the caller's own practice history rows. Refuses a still-live round - end it
+ * first - so a mid-play DELETE cannot erase an open attempt without voiding it.
+ */
+export async function deletePracticeRound(
+  slug: string,
+  userId: string,
+  roundId: string,
+): Promise<{ found: boolean; deleted: boolean; reason?: string }> {
+  const card = await getBrowsableGameBySlug(slug);
+  if (!card) return { found: false, deleted: false };
+  await connectToDatabase();
+  const round = await GameRound.findOne({
+    contestType: "practice",
+    contestId: null,
+    userId,
+    gameKey: card.gameKey,
+    roundId,
+  }).select("status");
+  if (!round) return { found: true, deleted: false, reason: "Round not found." };
+  if ((LIVE_ROUND_STATUSES as readonly string[]).includes(round.status)) {
+    return {
+      found: true,
+      deleted: false,
+      reason: "Leave the round before deleting it from your history.",
+    };
+  }
+  await GameRound.deleteOne({ _id: round._id });
+  return { found: true, deleted: true };
+}
+
+/** Clears every non-live practice history row for this game and player. Live rounds stay. */
+export async function clearPracticeRounds(
+  slug: string,
+  userId: string,
+): Promise<{ found: boolean; deleted: number }> {
+  const card = await getBrowsableGameBySlug(slug);
+  if (!card) return { found: false, deleted: 0 };
+  await connectToDatabase();
+  const result = await GameRound.deleteMany({
+    contestType: "practice",
+    contestId: null,
+    userId,
+    gameKey: card.gameKey,
+    status: { $nin: LIVE_ROUND_STATUSES },
+  });
+  return { found: true, deleted: result.deletedCount ?? 0 };
 }
 
 /** Read-only: whether the practice area can start a round. Safe to call from a page render. */
@@ -248,7 +362,9 @@ export async function launchPracticeRound(
     const lookup = await lookUpPracticeTitle(slug);
     if (!lookup.ok) return { success: false, refusal: lookup.refusal, error: lookup.error };
     const { title } = lookup;
-    // Reason: close any round left open (a closed tab), or `createRound` would resume it.
+    // Reason: settle a finished leftover first, then void anything still live, or
+    // `createRound` would resume a stale launched round from a closed tab.
+    await pullLivePracticeResults(actor.userId, title.gameKey);
     await endLivePracticeRounds(actor.userId, title.gameKey);
 
     const parsed = parseConfigSchema(title.configSchema);
@@ -340,11 +456,14 @@ function toView(round: StoredPracticeRound): PracticeRoundView {
 export async function listPracticeRounds(
   slug: string,
   userId: string,
-  limit = 5,
+  limit = PRACTICE_HISTORY_LIMIT,
 ): Promise<PracticeRoundView[] | null> {
   const card = await getBrowsableGameBySlug(slug);
   if (!card) return null;
   await connectToDatabase();
+  // Reason: pull before reading so a finished round the host has not yet PATCHed still
+  // shows a score when the player reloads the practice page.
+  await pullLivePracticeResults(userId, card.gameKey);
   const rounds = await GameRound.find({
     contestType: "practice",
     contestId: null,

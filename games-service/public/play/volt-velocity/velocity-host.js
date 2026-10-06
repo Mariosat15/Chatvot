@@ -52,14 +52,23 @@
   const messageEl = document.getElementById("message");
   const errorEl = document.getElementById("error");
 
-  function tellPlatform(type) {
+  function tellPlatform(type, extra) {
     if (window.parent === window) return;
-    const target = type === "ready" || parentOrigin === "*" ? "*" : parentOrigin;
+    const target = type === "ready" || type === "resize" || parentOrigin === "*" ? "*" : parentOrigin;
     try {
-      window.parent.postMessage({ type }, target);
+      window.parent.postMessage(Object.assign({ type }, extra || {}), target);
     } catch {
       /* A frame that cannot post is still a playable race. */
     }
+  }
+
+  /**
+   * Ask the arena for a tall enough frame. Velocity never posts resize otherwise, so the
+   * host's default min-height (320) left the race squeezed in a short strip (owner, 6 Oct 2026).
+   */
+  function askForRoom() {
+    const height = Math.max(720, Math.min(1100, Math.round(window.innerHeight || 720)));
+    tellPlatform("resize", { height });
   }
 
   function showStatus(message, error) {
@@ -230,6 +239,7 @@
   async function boot() {
     // Before any await: the arena clears its loading overlay only on `ready`.
     tellPlatform("ready");
+    askForRoom();
 
     if (!token) {
       showStatus("", "Missing launch token.");
@@ -263,11 +273,14 @@
       showStatus("Joining the grid\u2026");
       await connect(api, session);
       hideStatus();
+      askForRoom();
       watchForRaceEnd(api);
     } catch (error) {
       showStatus("", (error && error.message) || "Could not join the race.");
     }
   }
+
+  window.addEventListener("resize", askForRoom);
 
   window.__voltVelocityLoaded = true;
 

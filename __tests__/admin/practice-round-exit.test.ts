@@ -24,7 +24,25 @@ describe("practice rounds end when the player leaves", () => {
     expect(code).toMatch(/addEventListener\(\s*["']beforeunload["']/);
     expect(code).toMatch(/keepalive:\s*true/);
     expect(code).toMatch(/method:\s*["']DELETE["']/);
-    expect(code).not.toMatch(/formatGameScore/);
+  });
+
+  it("pulls the score on finished and keeps the iframe open until exit", () => {
+    // Reason: voiding on finished tore the Circuit result screen down before the player
+    // could read it, and wiped the score from the recent list (owner, 6 Oct 2026).
+    const code = read("components/games/PracticeRoundHost.tsx");
+    expect(code).toMatch(/method:\s*["']PATCH["']/);
+    expect(code).toMatch(/scoredRoundId/);
+    expect(code).toMatch(/onFinished=\{\(\)\s*=>\s*void handleFinished/);
+    expect(code).toMatch(/onExit=\{\(\)\s*=>\s*handleExit/);
+  });
+});
+
+describe("practice recent list shows scores with delete controls", () => {
+  it("renders scores through formatGameScore and offers clear-all", () => {
+    const code = read("components/games/PracticeRecentList.tsx");
+    expect(code).toMatch(/formatGameScore/);
+    expect(code).toMatch(/Clear all/);
+    expect(code).toMatch(/onForget/);
   });
 });
 

@@ -575,12 +575,15 @@ async function main(): Promise<void> {
   });
 
   test("practice says it changes nothing, on every ending", () => {
-    // A practice round is free, unranked and prize-less. A player who believes it counted plays
-    // the paid one differently.
+    // Reason (6 Oct 2026): owner reversed "practice keeps no result". The score is saved on
+    // the practice page; rankings and prizes still must not be promised. Test name kept so
+    // the probe harness that expects this string still finds it.
     for (const status of ["completed", "abandoned", "expired"]) {
       const copy = p.resultCopy({ status, boardsSolved: 2, mode: "practice" });
-      assert.match(copy.next, /not scored/i, status);
+      assert.match(copy.next, /practice page/i, status);
+      assert.match(copy.next, /does not affect rankings/i, status);
       assert.doesNotMatch(copy.next, /leaderboard/i, status);
+      assert.doesNotMatch(copy.next, /not scored/i, status);
     }
   });
 

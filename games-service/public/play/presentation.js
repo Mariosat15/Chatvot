@@ -444,7 +444,9 @@ export function resultCopy(input) {
     // again and a player who opens a ticket.
     next = "This round was cancelled, so it was not scored. Your attempt has been given back.";
   } else if (practice) {
-    next = "Practice rounds are not scored and change nothing in the contest.";
+    // Reason (6 Oct 2026): owner reversed "practice keeps no result" — the host now pulls
+    // the score into Your recent practice rounds. Saying "not scored" was a false promise.
+    next = "This was practice — your score is saved on the practice page. It does not affect rankings or prizes.";
   } else if (solved === 0) {
     // Honest rather than encouraging. An unfinished board scores nothing under both titles'
     // rules, and a player told their result is "on its way" will go looking for it.

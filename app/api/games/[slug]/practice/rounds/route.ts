@@ -3,7 +3,10 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/better-auth/auth";
 import { getPublicName } from "@/lib/utils/user-lookup";
 import {
+  clearPracticeRounds,
+  deletePracticeRound,
   endPracticeRound,
+  finishPracticeRound,
   launchPracticeRound,
   listPracticeRounds,
   type PracticeRefusal,
@@ -12,9 +15,10 @@ import {
 /**
  * /api/games/[slug]/practice/rounds - the practice area for any game.
  *
- * GET reads the caller's own recent practice rounds and NEVER creates one - a prefetch or a
- * poll must not open a round at the provider. POST starts a practice round; DELETE closes the
- * one the player just left.
+ * GET reads the caller's own recent practice rounds (and pulls any finished leftover).
+ * POST starts a practice round.
+ * PATCH pulls the score after the frame posts `finished`.
+ * DELETE ends a live round, forgets one history row, or clears all history.
  * The user id always comes from the session, never from the request.
  */
 
@@ -43,6 +47,10 @@ function statusFor(refusal: PracticeRefusal): number {
 
 const unauthorized = () =>
   NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
+function readRoundId(body: { roundId?: unknown } | null): string {
+  return typeof body?.roundId === "string" ? body.roundId.trim() : "";
+}
 
 export async function GET(
   _request: Request,
@@ -102,8 +110,8 @@ export async function POST(
   }
 }
 
-/** DELETE closes the caller's own practice round when they leave it. Idempotent. */
-export async function DELETE(
+/** PATCH pulls the provider result after the game posts `finished`. */
+export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -112,7 +120,7 @@ export async function DELETE(
     if (!session?.user) return unauthorized();
 
     const body = (await request.json().catch(() => null)) as { roundId?: unknown } | null;
-    const roundId = typeof body?.roundId === "string" ? body.roundId.trim() : "";
+    const roundId = readRoundId(body);
     if (!roundId || roundId.length > 100) {
       return NextResponse.json(
         { success: false, error: "A round id is required." },
@@ -121,6 +129,74 @@ export async function DELETE(
     }
 
     const { slug } = await params;
+    const outcome = await finishPracticeRound(slug, session.user.id, roundId);
+    if (!outcome.found) {
+      return NextResponse.json({ success: false, error: "Game not found." }, { status: 404 });
+    }
+    return NextResponse.json({ success: true, round: outcome.round });
+  } catch (error) {
+    console.error("❌ Practice round finish route failed:", error);
+    return NextResponse.json(
+      { success: false, error: "Something went wrong. Please contact support." },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * DELETE ends a live round, forgets one history row, or clears all history.
+ *
+ * Body shapes:
+ * - `{ roundId }` — void a still-live round (leave / tab close).
+ * - `{ roundId, forget: true }` — delete one finished history row.
+ * - `{ clearAll: true }` — delete every non-live practice row for this game.
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ slug: string }> },
+) {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) return unauthorized();
+
+    const body = (await request.json().catch(() => null)) as {
+      roundId?: unknown;
+      forget?: unknown;
+      clearAll?: unknown;
+    } | null;
+
+    const { slug } = await params;
+
+    if (body?.clearAll === true) {
+      const outcome = await clearPracticeRounds(slug, session.user.id);
+      if (!outcome.found) {
+        return NextResponse.json({ success: false, error: "Game not found." }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, deleted: outcome.deleted });
+    }
+
+    const roundId = readRoundId(body);
+    if (!roundId || roundId.length > 100) {
+      return NextResponse.json(
+        { success: false, error: "A round id is required." },
+        { status: 400 },
+      );
+    }
+
+    if (body?.forget === true) {
+      const outcome = await deletePracticeRound(slug, session.user.id, roundId);
+      if (!outcome.found) {
+        return NextResponse.json({ success: false, error: "Game not found." }, { status: 404 });
+      }
+      if (!outcome.deleted) {
+        return NextResponse.json(
+          { success: false, error: outcome.reason ?? "Could not delete that round." },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ success: true, deleted: 1 });
+    }
+
     const outcome = await endPracticeRound(slug, session.user.id, roundId);
     if (!outcome.found) {
       return NextResponse.json({ success: false, error: "Game not found." }, { status: 404 });

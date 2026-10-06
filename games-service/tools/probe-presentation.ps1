@@ -185,13 +185,14 @@ $results += Invoke-Probe -Name 'an empty round is promised a score' `
   -Replace '  } else if (false) {' `
   -ExpectRed 'a round that finished nothing is told there is nothing to score'
 
-# A practice round is free, unranked and prize-less. A player who believes it counted plays the
-# paid one differently - and this is the same distinction the platform makes on its own pre-flight
-# panel, so the two must not disagree.
-$results += Invoke-Probe -Name 'practice stops saying it changes nothing' `
+# A practice round is free, unranked and prize-less, but the host now SAVES the score on the
+# practice page (owner, 6 Oct 2026). The wording must say so without promising rankings or prizes.
+$results += Invoke-Probe -Name 'practice stops saying the score is saved on the practice page' `
   -Suite $SuitePresentation -File $srcPresentation `
   -Find '  } else if (practice) {
-    next = "Practice rounds are not scored and change nothing in the contest.";' `
+    // Reason (6 Oct 2026): owner reversed "practice keeps no result" — the host now pulls
+    // the score into Your recent practice rounds. Saying "not scored" was a false promise.
+    next = "This was practice — your score is saved on the practice page. It does not affect rankings or prizes.";' `
   -Replace '  } else if (false) {
     next = "";' `
   -ExpectRed 'practice says it changes nothing, on every ending'

@@ -41,7 +41,10 @@
   // 590 left the frame ending well above the fold, so the request is now 720.
   const TARGET_BOARD_H = 720;
   const BOARD_ASPECT = 2;
-  const MAX_BOARD_H = 900;
+  // Reason (owner, 6 Oct 2026): fullscreen used to grow the well to fill the whole
+  // viewport, which stretched the neon frame (`background-size: 100% 100%`) and the
+  // playfield. Cap the board; letterbox leftover space instead of stretching pixels.
+  const MAX_BOARD_H = 720;
   const MAX_BOARD_W = MAX_BOARD_H / BOARD_ASPECT;
   // Minimum rail width + both gutters + shell side padding. Rails are
   // minmax(MIN_RAIL, 1fr) in CSS, so they take all leftover width.
@@ -120,12 +123,14 @@
       tellResize(Math.max(needed, 420));
     }
 
-    // Fill every vertical pixel the frame actually has, capped by width.
+    // Prefer the target well; only shrink when the frame is shorter or narrower.
+    // Never grow past MAX_BOARD_H just because fullscreen handed us a tall viewport.
     let framePad = 10;
-    let boardH = Math.max(
+    const roomForBoard = Math.max(
       MIN_BOARD_W * BOARD_ASPECT,
-      Math.min(MAX_BOARD_H, viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA),
+      viewH - chrome - SAFETY - framePad * 2 - FRAME_EXTRA,
     );
+    let boardH = Math.min(MAX_BOARD_H, TARGET_BOARD_H, roomForBoard);
     let boardW = Math.floor(boardH / BOARD_ASPECT);
     if (boardW > maxWFromWidth) boardW = maxWFromWidth;
     boardW = Math.max(MIN_BOARD_W, boardW);

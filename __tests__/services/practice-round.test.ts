@@ -7,6 +7,7 @@ import {
   ensureCollections,
 } from "../helpers/mongo-test-server";
 import GameRound from "../../database/models/games/game-round.model";
+import GameProvider from "../../database/models/games/game-provider.model";
 import ProviderGame from "../../database/models/games/provider-game.model";
 import { WhiteLabel } from "../../database/models/whitelabel.model";
 import {
@@ -15,7 +16,12 @@ import {
 } from "../../lib/services/game-providers/adapters/mock.adapter";
 import { getProviderAdapter } from "../../lib/services/game-providers/registry";
 import { createRound } from "../../lib/services/games/round.service";
-import { endLivePracticeRounds } from "../../lib/services/games/practice-round.service";
+import {
+  clearPracticeRounds,
+  deletePracticeRound,
+  endLivePracticeRounds,
+  pullLivePracticeResults,
+} from "../../lib/services/games/practice-round.service";
 
 /**
  * Practice rounds through `createRound`.
@@ -33,6 +39,7 @@ const keyOf = (code: string) => `provider:${MOCK_PROVIDER_KEY}:${code}`;
 
 beforeAll(async () => {
   const uri = await startTestMongo();
+  process.env.MONGODB_URI = uri;
   await mongoose.connect(uri);
 }, 120_000);
 
@@ -43,13 +50,29 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await clearTestMongo();
-  await ensureCollections(["game_round", "provider_game", "whitelabels"]);
+  await ensureCollections([
+    "game_round",
+    "provider_game",
+    "game_provider",
+    "whitelabels",
+    "game_catalogue_entry",
+  ]);
   const mock = getProviderAdapter(MOCK_PROVIDER_KEY) as MockProviderAdapter;
   mock.reset();
   mock.configure({ callbackSecret: "practice-secret" });
   await WhiteLabel.create({
     externalGamesEnabled: true,
     gameProviders: [{ providerKey: MOCK_PROVIDER_KEY, enabled: true }],
+  });
+  // Reason: getBrowsableGameBySlug / ensureCatalogueEntries join GameProvider.enabled —
+  // without this row finish / delete / clear-all refuse with "Game not found".
+  await GameProvider.create({
+    providerKey: MOCK_PROVIDER_KEY,
+    displayName: "Mock",
+    baseUrl: "https://mock.example",
+    enabled: true,
+    healthStatus: "healthy",
+    healthFailureStreak: 0,
   });
   for (const code of [GAME_A, GAME_B]) {
     await ProviderGame.create({
@@ -126,19 +149,51 @@ describe("practice rounds", () => {
 });
 
 /**
- * Leaving a practice round closes it, here and at the provider.
+ * Practice results are pulled, not pushed.
  *
- * Reason (history kept on purpose): until 28 Sep 2026 this block was "practice results are
- * pulled, not pushed" - a provider never pushes a practice result (requirements v1.10, `01`
- * s4.2), so `pullLivePracticeResults` fetched it back through `applyResult` and the screen
- * showed a score. The owner then decided practice keeps no result ("no need to calculate any
- * results just exit ... after leave the practice game close the round"), so the pull was
- * deleted and leaving VOIDS the round instead. The original hazard survives unchanged: a round
- * left `launched` makes the next Start RESUME it, because `createRound` is idempotent on the
- * live round - which is why the first test below still asserts a NEW round opens.
+ * A provider never pushes a practice result (requirements v1.10). The 28 Sep "keep no result"
+ * rule voided on leave; owner reversed that on 6 Oct 2026 - practice must show the score.
+ * Leaving MID-ROUND still voids. A finished round is pulled and kept.
  */
+describe("practice results are pulled, not pushed", () => {
+  it("a finished practice round is closed by the pull, so the next Start opens a new one", async () => {
+    const userId = new Types.ObjectId().toString();
+    const first = await practice(userId, GAME_A);
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+
+    await pullLivePracticeResults(userId, keyOf(GAME_A));
+    const stored = await GameRound.findOne({ roundId: first.roundId }).lean<{
+      status: string;
+      resultSource?: string;
+      rawScore?: number;
+    }>();
+    expect(stored?.status).toBe("completed");
+    expect(stored?.resultSource).toBe("poll");
+    expect(typeof stored?.rawScore).toBe("number");
+
+    const second = await practice(userId, GAME_A);
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+    expect(second.idempotent).toBe(false);
+    expect(second.roundId).not.toBe(first.roundId);
+  });
+
+  it("never touches another player's or another game's round", async () => {
+    const owner = new Types.ObjectId().toString();
+    const round = await practice(owner, GAME_A);
+    expect(round.success).toBe(true);
+    if (!round.success) return;
+
+    await pullLivePracticeResults(new Types.ObjectId().toString(), keyOf(GAME_A));
+    await pullLivePracticeResults(owner, keyOf(GAME_B));
+    const stored = await GameRound.findOne({ roundId: round.roundId }).lean<{ status: string }>();
+    expect(stored?.status).not.toBe("completed");
+  });
+});
+
 describe("leaving a practice round closes it", () => {
-  it("voids the round here and asks the provider to void it, so the next Start opens a new one", async () => {
+  it("voids a still-live round here and asks the provider to void it, so the next Start opens a new one", async () => {
     const mock = getProviderAdapter(MOCK_PROVIDER_KEY) as MockProviderAdapter;
     const voided = vi.spyOn(mock, "voidRound");
     const userId = new Types.ObjectId().toString();
@@ -165,36 +220,25 @@ describe("leaving a practice round closes it", () => {
     voided.mockRestore();
   });
 
-  it("voids a practice round the provider already finished, without warning", async () => {
-    const mock = getProviderAdapter(MOCK_PROVIDER_KEY) as MockProviderAdapter;
-    const voided = vi
-      .spyOn(mock, "voidRound")
-      .mockResolvedValue({
-        success: false,
-        error:
-          "Round 'cv_rnd_x' already finished as 'completed' and cannot be voided.",
-        retryable: false,
-      });
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  it("does not void a practice round that already has a scored result", async () => {
+    // Reason: the 28 Sep host DELETEd after finished and rewrote completed → voided, which
+    // emptied the recent list. Leaving must only close LIVE rounds.
     const userId = new Types.ObjectId().toString();
     const first = await practice(userId, GAME_A);
     expect(first.success).toBe(true);
     if (!first.success) return;
     await GameRound.updateOne(
       { roundId: first.roundId },
-      { $set: { status: "completed", rawScore: 0 } },
+      { $set: { status: "completed", rawScore: 42, resultSource: "poll" } },
     );
 
-    expect(await endLivePracticeRounds(userId, keyOf(GAME_A), first.roundId)).toBe(
-      1,
-    );
+    expect(await endLivePracticeRounds(userId, keyOf(GAME_A), first.roundId)).toBe(0);
     const stored = await GameRound.findOne({ roundId: first.roundId }).lean<{
       status: string;
+      rawScore?: number;
     }>();
-    expect(stored?.status).toBe("voided");
-    expect(warn.mock.calls.join(" ")).not.toMatch(/did not void practice/);
-    voided.mockRestore();
-    warn.mockRestore();
+    expect(stored?.status).toBe("completed");
+    expect(stored?.rawScore).toBe(42);
   });
 
   it("is idempotent: a round already closed ends nothing", async () => {
@@ -235,5 +279,49 @@ describe("leaving a practice round closes it", () => {
       status: string;
     }>();
     expect(stored?.status).not.toBe("voided");
+  });
+});
+
+describe("practice history delete and clear-all", () => {
+  it("refuses to delete a live round and deletes a finished one for the same player and game", async () => {
+    const userId = new Types.ObjectId().toString();
+    const live = await practice(userId, GAME_A);
+    expect(live.success).toBe(true);
+    if (!live.success) return;
+
+    const refused = await deletePracticeRound(GAME_A, userId, live.roundId);
+    expect(refused.found).toBe(true);
+    expect(refused.deleted).toBe(false);
+
+    await pullLivePracticeResults(userId, keyOf(GAME_A));
+    const forgotten = await deletePracticeRound(GAME_A, userId, live.roundId);
+    expect(forgotten.found).toBe(true);
+    expect(forgotten.deleted).toBe(true);
+    expect(await GameRound.countDocuments({ roundId: live.roundId })).toBe(0);
+  });
+
+  it("clear-all removes finished history and leaves a live round alone", async () => {
+    const userId = new Types.ObjectId().toString();
+    const first = await practice(userId, GAME_A);
+    expect(first.success).toBe(true);
+    if (!first.success) return;
+    await pullLivePracticeResults(userId, keyOf(GAME_A));
+
+    const second = await practice(userId, GAME_A);
+    expect(second.success).toBe(true);
+    if (!second.success) return;
+
+    const cleared = await clearPracticeRounds(GAME_A, userId);
+    expect(cleared.found).toBe(true);
+    expect(cleared.deleted).toBeGreaterThanOrEqual(1);
+    expect(await GameRound.countDocuments({ roundId: second.roundId })).toBe(1);
+    expect(
+      await GameRound.countDocuments({
+        userId,
+        contestType: "practice",
+        status: "completed",
+        gameKey: keyOf(GAME_A),
+      }),
+    ).toBe(0);
   });
 });
