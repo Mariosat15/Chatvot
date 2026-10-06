@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Game Performance Play-by-game layout CODE-COMPLETE 6 Oct (eng)** — Performance game cards match Overview Play by game (text left, cover art right), larger two-up grid; numbers: activity count, contests, best score (Trade ROI on Trading), avg play, period/last played. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Game Performance Image-1 cards CODE-COMPLETE 6 Oct (eng)** — Game Performance is hero artwork + identity + 2×2 metric tiles + sparkline footer; two cards visible, extra titles via carousel arrows. Play-by-game text-left/art-right is superseded. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
+- **Game Performance Play-by-game layout CODE-COMPLETE 6 Oct (eng)** — correct as history and stale as a present fact — **say which**. Owner then asked for Image 1 (hero cards), not Overview Play by game.
 - **Trading card Best score = Trade ROI CODE-COMPLETE 6 Oct (eng)** — Game Performance Trading card no longer shows wallet credit ROI as “Best score”; it shows Trade ROI (or `-` with no trades). Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Performance header border + no Competitions tab + Trade ROI CODE-COMPLETE 6 Oct (eng)** — Performance banner matches Wallet (magenta plate); Competitions removed from Header `NAV_ITEMS` (`?tab=contests` still works); Trade ROI no longer treats game seats as $10k capital. Tests: `performance-analytics.test.ts`, `games-first-nav.test.ts`. **Never verified by eye.**
 - **Game Performance logos + Trading card + bottom padding CODE-COMPLETE 6 Oct (eng)** — carousel art is `object-contain` with the title under the logo; Trading is the first card when chrome is on; extra bottom padding so 1v1/Competition/Holidays are not clipped. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
@@ -945,6 +946,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 6 October 2026 - Game Performance cards rebuilt to Image 1 (owner request)
+
+**Owner report:** Play-by-game (text left / thumbnail right) was the wrong structure. Target is full-width hero artwork, identity row, four metric cards, activity + sparkline, two cards at a time with arrows.
+
+**Fix:** `GamePerformanceCard` (hero `object-cover`, Active pill, View Details button, 2×2 tiles, sparkline); carousel `sm:w-[calc((100%-1.25rem)/2)]` + Previous/Next; Trading cyan, other titles hash an accent without naming a game (R29). Numbers still from the analytics payload.
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Game Performance cards match Play by game (owner request)
 

@@ -7,10 +7,13 @@ import {
   formatScore,
   gameKeyOf,
   inWindow,
+  percentChange,
+  previousWindow,
   toMs,
   type PerfInput,
   type PerfRange,
 } from "./performance-model";
+import { type PerfAccent } from "./performance-assets";
 import { trendBuckets } from "./performance-trend";
 
 export interface GameCardView {
@@ -31,6 +34,30 @@ export interface GameCardView {
   lastPlayedAt: string | null;
   spark: number[];
   periodRounds: number;
+  /** Period-over-period on activity in the selected window. Null when all-time. */
+  roundsTrend: number | null;
+  contestsTrend: number | null;
+  bestScoreTrend: number | null;
+  avgPlayTrend: number | null;
+  /** Trading cyan; other titles cycle without naming a game (R29). */
+  accent: PerfAccent;
+}
+
+const PROVIDER_ACCENTS = new Map<number, PerfAccent>([
+  [0, "orange"],
+  [1, "magenta"],
+  [2, "purple"],
+  [3, "gold"],
+]);
+
+/** Trading is cyan. Every other title hashes its key so no game is named (R29). */
+export function accentForGame(gameKey: string): PerfAccent {
+  if (gameKey === TRADING_KEY) return "cyan";
+  let n = 0;
+  for (let i = 0; i < gameKey.length; i += 1) {
+    n = (n + gameKey.charCodeAt(i) * (i + 1)) % PROVIDER_ACCENTS.size;
+  }
+  return PROVIDER_ACCENTS.get(n) ?? "orange";
 }
 
 function playMeta(
@@ -57,20 +84,32 @@ function tradingGameCard(
   now: number,
 ): GameCardView {
   const w = currentWindow(range, now);
+  const prev = previousWindow(range, now);
   const buckets = trendBuckets(range, now, input);
   const comps = input.competitions.completed.filter((c) => gameKeyOf(c) === TRADING_KEY);
   const chals = input.challenges.completed.filter((c) => gameKeyOf(c) === TRADING_KEY);
-  const spark = buckets.map(
-    (b) =>
-      comps.filter((c) => {
-        const ms = toMs(c.endTime);
-        return ms !== null && ms >= b.start && ms < b.end;
-      }).length +
-      chals.filter((c) => {
-        const ms = toMs(c.endTime);
-        return ms !== null && ms >= b.start && ms < b.end;
-      }).length,
+  const endedIn = (ms: number | null, start: number, end: number) =>
+    ms !== null && ms >= start && ms < end;
+  const spark = buckets.map((b) =>
+    input.charts.dailyPnL
+      .filter((d) => endedIn(toMs(d.date), b.start, b.end))
+      .reduce((s, d) => s + d.trades, 0),
   );
+  const periodContests =
+    comps.filter((c) => inWindow(toMs(c.endTime), w)).length +
+    chals.filter((c) => inWindow(toMs(c.endTime), w)).length;
+  const prevContests = prev
+    ? comps.filter((c) => inWindow(toMs(c.endTime), prev)).length +
+      chals.filter((c) => inWindow(toMs(c.endTime), prev)).length
+    : null;
+  const periodTrades = input.charts.dailyPnL
+    .filter((d) => inWindow(toMs(d.date), w))
+    .reduce((s, d) => s + d.trades, 0);
+  const prevTrades = prev
+    ? input.charts.dailyPnL
+        .filter((d) => inWindow(toMs(d.date), prev))
+        .reduce((s, d) => s + d.trades, 0)
+    : null;
   const stamps = [...comps, ...chals]
     .map((c) => toMs(c.endTime))
     .filter((ms): ms is number => ms !== null);
@@ -100,9 +139,12 @@ function tradingGameCard(
     avgPlayTime: "-",
     lastPlayedAt: stamps.length ? new Date(Math.max(...stamps)).toISOString() : null,
     spark,
-    periodRounds:
-      comps.filter((c) => inWindow(toMs(c.endTime), w)).length +
-      chals.filter((c) => inWindow(toMs(c.endTime), w)).length,
+    periodRounds: periodTrades,
+    roundsTrend: percentChange(periodTrades, prevTrades),
+    contestsTrend: percentChange(periodContests, prevContests),
+    bestScoreTrend: null,
+    avgPlayTrend: null,
+    accent: accentForGame(TRADING_KEY),
   };
 }
 
@@ -113,6 +155,7 @@ export function buildGameCards(
 ): GameCardView[] {
   const now = input.now ?? Date.now();
   const w = currentWindow(range, now);
+  const prev = previousWindow(range, now);
   const buckets = trendBuckets(range, now, input);
 
   const cards = filteredGames(input, gameFilter).map((g) => {
@@ -128,6 +171,28 @@ export function buildGameCards(
     const periodRounds = activity
       .filter((a) => inWindow(toMs(a.date), w))
       .reduce((s, a) => s + a.rounds, 0);
+    const prevRounds = prev
+      ? activity
+          .filter((a) => inWindow(toMs(a.date), prev))
+          .reduce((s, a) => s + a.rounds, 0)
+      : null;
+    const endedIn = (ms: number | null, window: { start: number | null; end: number }) =>
+      inWindow(ms, window);
+    const periodContests =
+      input.competitions.completed.filter(
+        (c) => gameKeyOf(c) === g.gameKey && endedIn(toMs(c.endTime), w),
+      ).length +
+      input.challenges.completed.filter(
+        (c) => gameKeyOf(c) === g.gameKey && endedIn(toMs(c.endTime), w),
+      ).length;
+    const prevContests = prev
+      ? input.competitions.completed.filter(
+          (c) => gameKeyOf(c) === g.gameKey && endedIn(toMs(c.endTime), prev),
+        ).length +
+        input.challenges.completed.filter(
+          (c) => gameKeyOf(c) === g.gameKey && endedIn(toMs(c.endTime), prev),
+        ).length
+      : null;
     const meta = playMeta(input, g.gameKey);
     return {
       gameKey: g.gameKey,
@@ -145,6 +210,11 @@ export function buildGameCards(
       lastPlayedAt: g.lastPlayedAt,
       spark,
       periodRounds,
+      roundsTrend: percentChange(periodRounds, prevRounds),
+      contestsTrend: percentChange(periodContests, prevContests),
+      bestScoreTrend: null,
+      avgPlayTrend: null,
+      accent: accentForGame(g.gameKey),
     };
   });
 

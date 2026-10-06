@@ -66,6 +66,9 @@ export const PERF_METRIC_ICON = {
   largestLoss: NEON_ICON("chart-bars-red"),
   gameFallback: NEON_ICON("games-orange"),
   crown: NEON_ICON("crown"),
+  contests: NEON_ICON("users"),
+  rounds: NEON_ICON("clock"),
+  trophy: NEON_ICON("trophy-green"),
 } as const;
 
 /** Every asset the page can request — the test asserts each file exists. */

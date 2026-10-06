@@ -303,19 +303,32 @@ describe("performance page structure", () => {
     expect(code).not.toMatch(/<select\b/);
   });
 
-  it("uses the Play-by-game card shape: text left, cover art right, bigger two-up grid", () => {
-    const code = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
-    expect(code).toMatch(/object-cover object-center/);
-    expect(code).toMatch(/lg:grid-cols-2/);
-    expect(code).toMatch(/min-h-\[200px\]/);
-    expect(code).toMatch(/Best score/);
-    expect(code).toMatch(/card\.scoredRounds/);
-    expect(code).toMatch(/card\.contests/);
-    expect(code).toMatch(/card\.avgPlayTime/);
-    expect(code).toMatch(/card\.activityLabel/);
-    expect(code).toMatch(/href=\{card\.href\}/);
-    expect(code).not.toMatch(/Sparkline/);
-    expect(code).not.toMatch(/ChevronLeft|Previous games/);
+  it("uses the Image-1 card: full-width hero, identity, 2x2 metrics, sparkline, two-up carousel", () => {
+    const section = stripComments(read(`${DIR}/GamePerformanceSection.tsx`));
+    const card = stripComments(read(`${DIR}/GamePerformanceCard.tsx`));
+    expect(card).toMatch(/game-hero/);
+    expect(card).toMatch(/h-\[220px\]/);
+    expect(card).toMatch(/object-cover object-center/);
+    expect(card).toMatch(/View Details/);
+    expect(card).toMatch(/Best score/);
+    expect(card).toMatch(/card\.scoredRounds/);
+    expect(card).toMatch(/card\.contests/);
+    expect(card).toMatch(/card\.avgPlayTime/);
+    expect(card).toMatch(/GameSparkline/);
+    expect(card).not.toMatch(/w-\[44%\]|w-\[42%\]/);
+    expect(card).not.toMatch(/lg:grid-cols-2/);
+    expect(section).toMatch(/sm:w-\[calc\(\(100%-1\.25rem\)\/2\)\]/);
+    expect(section).toMatch(/Previous games/);
+    expect(section).toMatch(/Next games/);
+    expect(section).toMatch(/ChevronLeft/);
+    expect(section).not.toMatch(/lg:grid-cols-2/);
+  });
+
+  it("Trading Game Performance card uses cyan; other titles never named (R29)", () => {
+    const model = stripComments(read(`${DIR}/performance-game-cards.ts`));
+    expect(model).toMatch(/if \(gameKey === TRADING_KEY\) return "cyan"/);
+    expect(model).toMatch(/new Map/);
+    expect(buildGameCards(fixture(), "30d", TRADING_KEY)[0].accent).toBe("cyan");
   });
 
   it("uses the shared two-tone headline (magenta here, cyan on Wallet)", () => {
