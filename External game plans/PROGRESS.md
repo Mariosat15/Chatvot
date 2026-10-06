@@ -973,6 +973,8 @@ Newest at the top.
 
 **Nothing was paid wrongly.** Existing Admin assignments stay until an operator reassigns. Tests: `support-handoff.test.ts`. Never verified by eye.
 
+**Follow-up same day:** `tools/users/report-full-admin-assignments.ts` — report-only by default; `--apply` reassigns Full Admin clients onto account managers and updates open support tickets. Not executed against Atlas from this workstation (IP whitelist).
+
 ### 6 October 2026 - Sticky Enter bar rotating slogans (owner request)
 
 **Owner report:** replace the fixed “BETTER TRADERS BRIGHTER TOMORROW” line on the game-page sticky Enter bar with a random pick each visit from the supplied competition slogans.
