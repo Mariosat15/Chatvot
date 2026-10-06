@@ -60,6 +60,7 @@ export function walletArtForKey(key: string): string {
     ["bonuses", WALLET_ART.giftCredits],
     ["prizes", WALLET_ART.prizes],
     ["refunds", WALLET_ART.giftCredits],
+    ["freeContests", WALLET_ART.gmSpend],
     ["other", WALLET_ART.insights],
     ["net", WALLET_ART.netMovement],
   ]);

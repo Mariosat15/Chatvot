@@ -941,6 +941,20 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 6 October 2026 - "Other" in the Credit Breakdown no longer double-counts free contests (owner request)
+
+**Owner report:** Credit Breakdown showed "Other 2,368 ⚡" with no explanation. **Cause:** `buildChartData` (`lib/actions/dashboard/charts.ts`) sends `platform_fee` and every type without a case of its own to `other`, using the **absolute** amount. Free private contests write `free_private_reserve` (−), `free_private_reserve_release` (+) and `free_private_gm_refund` (+). Summing those by size means a reserve that was returned in full counted as **twice its size**. Because `other` is `spendMetric: true`, that inflated Total Spend and the Spending side of Spending vs Earnings too. A sponsored player's `free_private_entry_sponsor` / `free_private_entry_payment` pair (balance unchanged) also showed up as a contest entry plus an "Other" credit.
+
+**Fix:**
+- The three reserve types go into a new **signed** bucket, `freeContests` (reserved minus returned), shown as the tile **Free Contest Funding**. It has `chart: false`, because a signed value cannot sit in a stacked area, and `spendMetric` / `earnMetric` false, because the money was set aside rather than spent.
+- The sponsored pair is skipped in both the breakdown and the Daily Credit Flow.
+- `other` now holds only `platform_fee` and unknown types.
+- Art: `walletArtForKey("freeContests")` uses the crown.
+
+**Behaviour change, stated:** a sponsored player's Contest Entries figure drops, because the payment half of the pair used to be counted there.
+
+**Nothing was computed wrongly in any wallet.** This is a reporting defect and nothing was backfilled. **Tests:** `__tests__/dashboard/wallet-free-contests.test.ts` (5, behavioural). One probe, restoring the old `other += amount`, turned exactly 1 red. **Never verified by eye.**
+
 ### 6 October 2026 - Performance Analytics page rebuilt (`/dashboard?tab=performance`)
 
 **Owner brief:** rebuild the page to `CHARTVOLT PERFORMANCE ANALYTICS PAGE` and its reference image, using the supplied neon icons (`design-reference/Menuitems`); the product ends at the Market Holidays row — the guide sidebar and reusable-components strip are **not** built.

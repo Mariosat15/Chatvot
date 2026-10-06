@@ -191,6 +191,9 @@ export async function buildChartData(
     const dateStr = toISODateStr(txDate);
     const entry = creditFlowMap.get(dateStr);
     if (!entry) continue; // outside 30-day window
+    const flowType = (tx as { transactionType?: string }).transactionType;
+    // Reason: sponsored-seat rows cancel out and never move the balance.
+    if (flowType === "free_private_entry_sponsor" || flowType === "free_private_entry_payment") continue;
     const amount = tx.amount || 0;
     if (amount > 0) entry.inflow += amount;
     else if (amount < 0) entry.outflow += Math.abs(amount);
@@ -228,6 +231,12 @@ export async function buildChartData(
       giftCredits: number;
       giftCreditsOut: number;
       gmSpend: number;
+      /**
+       * SIGNED net a Game Master put into free contests: reserved minus returned.
+       * Reason: owner 6 Oct 2026 — reserve and release used to land in "Other" by
+       * absolute size, so a fully returned reserve read as twice its value spent.
+       */
+      freeContests: number;
       other: number;
     }
   >();
@@ -237,7 +246,7 @@ export async function buildChartData(
     breakdownMap.set(toISODateStr(date), {
       deposits: 0, wins: 0, gmEarnings: 0, refunds: 0,
       entries: 0, withdrawals: 0, marketplace: 0,
-      giftCredits: 0, giftCreditsOut: 0, gmSpend: 0, other: 0,
+      giftCredits: 0, giftCreditsOut: 0, gmSpend: 0, freeContests: 0, other: 0,
     });
   }
   for (const tx of walletTransactions) {
@@ -271,8 +280,18 @@ export async function buildChartData(
         entry.refunds += amount; break;
       case "competition_entry":
       case "challenge_entry":
-      case "free_private_entry_payment":
         entry.entries += amount; break;
+      case "free_private_entry_sponsor":
+      case "free_private_entry_payment":
+        // Reason: a sponsored seat writes +fee and -fee with an unchanged balance
+        // (free-private-reserve.ts) — the player spent nothing, so neither counts.
+        break;
+      case "free_private_reserve":
+      case "free_private_reserve_release":
+      case "free_private_gm_refund":
+        // Reason: signed — reserve is negative, returns positive — so the net is
+        // what the Game Master actually used.
+        entry.freeContests -= signed; break;
       case "withdrawal":
       case "withdrawal_fee":
       case "chargeback_clawback":
@@ -307,6 +326,7 @@ export async function buildChartData(
     giftCredits: Number(d.giftCredits.toFixed(2)),
     giftCreditsOut: Number(d.giftCreditsOut.toFixed(2)),
     gmSpend: Number(d.gmSpend.toFixed(2)),
+    freeContests: Number(d.freeContests.toFixed(2)),
     other: Number(d.other.toFixed(2)),
   }));
 

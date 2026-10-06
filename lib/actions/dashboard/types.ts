@@ -97,6 +97,8 @@ export interface ComprehensiveDashboardData {
       giftCredits: number;
       giftCreditsOut: number;
       gmSpend: number;
+      /** Signed net reserved minus returned for free contests (Game Masters). */
+      freeContests: number;
       other: number;
     }[];
     // Reason: All-time totals from getUserFinancialSummary() — single source of truth.

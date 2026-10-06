@@ -187,6 +187,22 @@ export const WALLET_CATEGORIES: readonly WalletCategoryDef[] = [
     earnMetric: false,
   },
   {
+    key: "freeContests",
+    sourceKey: "freeContests",
+    label: "Free Contest Funding",
+    color: "#A3E635",
+    flow: "out",
+    // Reason: owner 6 Oct 2026 — the value is SIGNED (reserved minus returned), so a
+    // day with a return is negative and cannot sit in the stacked area. It is also
+    // money set aside rather than spent, so it stays out of every spending total.
+    chart: false,
+    summary: true,
+    spend: false,
+    insight: false,
+    spendMetric: false,
+    earnMetric: false,
+  },
+  {
     key: "other",
     sourceKey: "other",
     label: "Other",
