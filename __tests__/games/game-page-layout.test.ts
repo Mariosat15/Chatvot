@@ -42,6 +42,21 @@ describe("player game page layout", () => {
     expect(view).toMatch(/Enter Now/i);
   });
 
+  it("sends Enter Competition / Enter Now to the competitions hub, not a single contest", () => {
+    // Reason (6 Oct 2026, owner): those labels promised the competitions list;
+    // resolvePlayNowHref jumped into one live contest or practice instead.
+    for (const file of [hero, sidebar, view]) {
+      expect(file).toContain("competitionBrowseHref");
+      expect(file).not.toContain("resolvePlayNowHref");
+    }
+  });
+
+  it("shows the branding app logo on the sticky enter bar, not a CV placeholder", () => {
+    expect(view).toContain("useWhiteLabelImages");
+    expect(view).toContain("images.appLogo");
+    expect(view).not.toMatch(/>\s*CV\s*</);
+  });
+
   it("does not render the Ready to Play CTA panel on overview", () => {
     expect(overview).not.toMatch(/Ready to Play/i);
     expect(overview).not.toContain("PlayNowButton");

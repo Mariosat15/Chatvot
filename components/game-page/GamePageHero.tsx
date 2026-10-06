@@ -15,7 +15,6 @@ import {
   challengeCreateHref,
   competitionBrowseHref,
   practiceHref,
-  resolvePlayNowHref,
 } from "@/lib/services/games/game-page-helpers";
 import { GP_CTA_PRIMARY, GP_CTA_SECONDARY } from "./GamePageChrome";
 import { gpDisplay, gpSans } from "./game-page-fonts";
@@ -41,9 +40,9 @@ function heroChips(game: GamePageData) {
 export function GamePageHero({ game }: { game: GamePageData }) {
   const chips = heroChips(game);
   const comingSoon = Boolean(game.comingSoon);
-  const enterHref =
-    resolvePlayNowHref(game, game.joinableContests) ??
-    competitionBrowseHref(game.slug);
+  // Reason (6 Oct 2026, owner): Enter Competition opens the competitions hub
+  // (all contests), not a single live contest or practice.
+  const enterHref = competitionBrowseHref(game.slug);
   const challengeHref =
     !comingSoon && game.formats.challenge
       ? challengeCreateHref(game.slug)

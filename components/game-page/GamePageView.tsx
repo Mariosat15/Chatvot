@@ -6,10 +6,10 @@ import { Zap } from "lucide-react";
 import {
   challengeCreateHref,
   competitionBrowseHref,
-  resolvePlayNowHref,
 } from "@/lib/services/games/game-page-helpers";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
 import { themeCssVariables } from "@/lib/services/games/game-page-themes";
+import { useWhiteLabelImages } from "@/hooks/useWhiteLabelImages";
 import { GamePageTabs } from "./GamePageTabs";
 import { GamePageOverview } from "./GamePageOverview";
 import { GamePageHero } from "./GamePageHero";
@@ -88,6 +88,7 @@ function GalleryTab({ game }: { game: GamePageData }) {
 }
 
 function StickyEnterBar({ game }: { game: GamePageData }) {
+  const { images } = useWhiteLabelImages();
   if (game.comingSoon) {
     return (
       <div className="sticky bottom-3 z-40 mt-6 overflow-hidden rounded-[12px] border border-sky-500/30 bg-[var(--gp-panel,#07152c)]/95 px-4 py-3 shadow-[0_0_40px_rgba(0,0,0,.5)] backdrop-blur">
@@ -97,15 +98,19 @@ function StickyEnterBar({ game }: { game: GamePageData }) {
       </div>
     );
   }
-  const href =
-    resolvePlayNowHref(game, game.joinableContests) ??
-    competitionBrowseHref(game.slug);
+  // Reason (6 Oct 2026, owner): Enter Now → competitions hub; mark from branding, not "CV".
+  const href = competitionBrowseHref(game.slug);
   return (
     <div className="sticky bottom-3 z-40 mt-6 overflow-hidden rounded-[12px] border border-[var(--gp-card-border,rgba(40,130,255,.35))] bg-[var(--gp-panel,#07152c)]/95 px-4 py-3 shadow-[0_0_40px_rgba(0,0,0,.5)] backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--gp-accent)] to-[var(--gp-accent-2)] text-sm font-black text-[#021018]">
-            CV
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--gp-border)] bg-black/40">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={images.appLogo}
+              alt=""
+              className="h-full w-full object-contain p-0.5"
+            />
           </div>
           <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[var(--gp-muted)]">
             <span className="text-[var(--gp-gold,#ffd33d)]">Better traders</span>{" "}

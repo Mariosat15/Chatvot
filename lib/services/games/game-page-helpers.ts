@@ -39,10 +39,10 @@ export function formatRoundTimeLabel(
 }
 
 /**
- * Where Play Now should send the player.
+ * One-click "play this contest now" target (live → upcoming → practice → challenge).
  *
- * Prefer a live contest, then an upcoming one, then practice, then challenge create.
- * Returns null when nothing is available — the UI shows a proper empty message.
+ * Not used by Enter Competition / Enter Now on the game page — those open the
+ * competitions hub via `competitionBrowseHref` (owner, 6 Oct 2026).
  */
 export function resolvePlayNowHref(
   game: Pick<GamePageData, "slug" | "formats">,
@@ -70,6 +70,10 @@ export function resolvePlayNowHref(
   return null;
 }
 
+/**
+ * Competitions hub — every Enter Competition / Enter Now CTA lands here.
+ * Slug kept for callers and a future filter; the list page shows all contests today.
+ */
 export function competitionBrowseHref(slug: string): string {
   return `/competitions?game=${encodeURIComponent(slug)}`;
 }

@@ -19,7 +19,6 @@ import {
   competitionBrowseHref,
   getGameModes,
   practiceHref,
-  resolvePlayNowHref,
 } from "@/lib/services/games/game-page-helpers";
 import type { GamePageData } from "@/lib/services/games/game-page.types";
 import { GamePagePanel, GP_CTA_GREEN } from "./GamePageChrome";
@@ -39,9 +38,8 @@ function marketsLabel(game: GamePageData): string {
 
 export function GamePageInfoSidebar({ game }: { game: GamePageData }) {
   const modes = getGameModes(game);
-  const enterHref =
-    resolvePlayNowHref(game, game.joinableContests) ??
-    competitionBrowseHref(game.slug);
+  // Reason (6 Oct 2026, owner): Enter Now opens the competitions hub.
+  const enterHref = competitionBrowseHref(game.slug);
   const devices = game.supportedDevices ?? {
     desktop: true,
     tablet: true,
