@@ -5,12 +5,11 @@ import { formatVolts } from "@/lib/utils/format-volts";
 import { WALLET_ART, walletArtForKey } from "@/lib/services/games/wallet-assets";
 import { Sparkline } from "../AnalyticsCard";
 import type { InsightItem } from "../WalletInsights";
-import { MOBILE_CAROUSEL } from "@/components/dashboard/mobile/MobileSection";
 
 /**
- * Swipeable insight cards — ~70% viewport width, snap scrolling.
- * Reason: colours and art resolve from each InsightItem / walletArtForKey so
- * a new catalog bucket needs no edit here.
+ * Mobile insight tiles — fill the row width; more items shrink / wrap.
+ * Reason: owner 6 Oct 2026 — carousel left empty space; equal `1fr` columns
+ * match desktop and stay data-agnostic.
  */
 export default function MobileWalletInsights({ items }: { items: InsightItem[] }) {
   return (
@@ -25,14 +24,15 @@ export default function MobileWalletInsights({ items }: { items: InsightItem[] }
         />
         Wallet Insights
       </h2>
-      <div className={MOBILE_CAROUSEL}>
+      <div className="flex w-full flex-wrap gap-2">
         {items.map((item) => {
           const color = item.color;
           const up = (item.deltaPct ?? 0) >= 0;
           return (
             <article
               key={item.key}
-              className="w-[72%] shrink-0 snap-start rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-4 shadow-[0_0_16px_rgba(0,229,255,0.08)]"
+              // Reason: two-up on phones; flex-1 fills leftover space on a short last row.
+              className="min-w-[calc(50%-0.25rem)] flex-1 basis-[calc(50%-0.25rem)] rounded-[18px] border border-[#1E2A4D] bg-[linear-gradient(160deg,rgba(12,22,44,0.92)_0%,rgba(5,10,22,0.96)_100%)] p-3.5 shadow-[0_0_16px_rgba(0,229,255,0.08)]"
               style={{ borderColor: `${color}55` }}
             >
               <div className="flex items-center gap-2">
@@ -41,19 +41,19 @@ export default function MobileWalletInsights({ items }: { items: InsightItem[] }
                   alt=""
                   width={22}
                   height={22}
-                  className="h-[22px] w-[22px] object-contain"
+                  className="h-[22px] w-[22px] shrink-0 object-contain"
                 />
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-300">
                   {item.label}
                 </p>
               </div>
               <p className="mt-2.5 truncate text-xl font-bold tabular-nums text-white">
                 {formatVolts(item.value)}
               </p>
-              <div className="mt-2 flex items-end justify-between gap-2">
+              <div className="mt-2 flex min-w-0 items-end justify-between gap-2">
                 {item.deltaPct != null && Number.isFinite(item.deltaPct) ? (
                   <span
-                    className={`text-xs tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}
+                    className={`shrink-0 text-xs tabular-nums ${up ? "text-emerald-300" : "text-rose-300"}`}
                   >
                     {up ? "+" : ""}
                     {item.deltaPct.toFixed(1)}%
@@ -61,7 +61,7 @@ export default function MobileWalletInsights({ items }: { items: InsightItem[] }
                 ) : (
                   <span className="text-xs text-slate-500">—</span>
                 )}
-                <Sparkline points={item.spark} color={color} width={80} height={28} />
+                <Sparkline points={item.spark} color={color} width={72} height={28} />
               </div>
             </article>
           );

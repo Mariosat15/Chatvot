@@ -128,7 +128,23 @@ describe("Wallet Analytics page wiring", () => {
     expect(model).toMatch(/label:\s*"Net Movement"/);
     expect(model).toMatch(/resolveCategories/);
     expect(insights).toMatch(/item\.color/);
-    expect(insights).toMatch(/auto-fill/);
+    // Reason: flipped 6 Oct 2026 — auto-fill left empty tracks; equal 1fr columns fill the row.
+    expect(insights).toMatch(/repeat\(\$\{cols\}, minmax\(0, 1fr\)\)/);
+    expect(insights).not.toMatch(/auto-fill/);
+  });
+
+  it("Wallet Balance Trend chart grows to fill the card instead of leaving a dead band", () => {
+    const trend = readCode(
+      "components/dashboard/wallet/WalletBalanceTrend.tsx",
+    );
+    const mobile = readCode(
+      "components/dashboard/wallet/mobile/MobileWalletTrend.tsx",
+    );
+    expect(trend).toMatch(/flex-1/);
+    expect(trend).toMatch(/min-h-\[200px\]/);
+    expect(trend).not.toMatch(/h-\[240px\]|h-\[260px\]/);
+    expect(mobile).toMatch(/h-\[200px\]/);
+    expect(mobile).not.toMatch(/h-\[260px\]/);
   });
 
   it("KPI / insights / header use neon WALLET_ART tiles like Overview — not Lucide chips", () => {

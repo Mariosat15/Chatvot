@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Wallet Insights fill + balance chart gap CODE-COMPLETE 6 Oct (eng)** — insight tiles use equal `1fr` columns (no auto-fill dead space); balance trend / daily flow grow with `flex-1`; mobile trend 200px. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Wallet Analytics data-agnostic CODE-COMPLETE 6 Oct (eng)** — `wallet-categories.ts` is the single catalog; charts/tiles/insights/spend resolve from it plus unknown numeric keys; desktop + mobile share the model. Tests: `wallet-analytics.test.ts` (17). **Never verified by eye.**
 - **Daily Credit Flow desktop-only CODE-COMPLETE 6 Oct (eng)** — removed from mobile; desktop uses composed area/line instead of bars. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Wallet Analytics chart polish CODE-COMPLETE 6 Oct (eng)** — Credit Breakdown → stacked area; Spending vs Earnings donut glow no longer clipped; mobile uses the same two panels. Tests: `wallet-analytics.test.ts` (14). **Never verified by eye.**
@@ -944,6 +945,15 @@ Newest at the top.
 - Desktop `DailyCreditFlowPanel` is a `ComposedChart` (teal/rose area fills + cyan net line around zero).
 - Mobile no longer mounts `MobileDailyFlow`.
 - Tests flipped in `wallet-analytics.test.ts`. **Never verified by eye.**
+
+### 6 October 2026 - Wallet Insights fill row; balance chart gap removed
+
+**Owner report:** insight tiles left a large empty gap on the right; balance trend chart had a big empty band under the axis (desktop + mobile).
+
+- Insights: `repeat(n, minmax(0, 1fr))` so tiles share the full width; more buckets shrink existing ones.
+- Mobile insights: flex two-up that fills leftover space (carousel removed).
+- Balance trend + daily flow: chart area is `flex-1` / `min-h-[200px]` so a taller sibling row no longer leaves a dead band; mobile trend height 260 → 200.
+- Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 
 ### 6 October 2026 - Wallet Analytics data-agnostic catalog
 

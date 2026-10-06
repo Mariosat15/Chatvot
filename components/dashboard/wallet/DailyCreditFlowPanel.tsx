@@ -65,18 +65,19 @@ export default function DailyCreditFlowPanel({
       }
       accent="cyan"
       controls={<ChartRangeSelector value={range} onChange={onRangeChange} />}
-      bodyClassName="pt-2"
+      // Reason: same stretch gap as Wallet Balance Trend — grow into the row.
+      bodyClassName="min-h-0 flex-1 pt-2"
     >
       {data.length < 1 ? (
-        <div className="flex h-[240px] items-center justify-center text-sm text-slate-500">
+        <div className="flex min-h-[200px] flex-1 items-center justify-center text-sm text-slate-500">
           Daily credit flow will appear once you have activity
         </div>
       ) : (
-        <div className="h-[240px] w-full sm:h-[260px]">
+        <div className="min-h-[200px] w-full flex-1 sm:min-h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={chartData}
-              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+              margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="wallet-flow-gain" x1="0" y1="0" x2="0" y2="1">

@@ -19,10 +19,13 @@ export type InsightItem = {
 
 /**
  * Wallet Insights — neon tiles driven by the shared model / catalog.
- * Reason: owner 6 Oct 2026 — tile count follows insight-flagged categories
- * plus Net Movement; no hard-coded key union.
+ * Reason: owner 6 Oct 2026 — tiles share the full row (`1fr` each) so the
+ * strip never leaves a dead gap; more buckets shrink existing tiles rather
+ * than leaving empty track space (auto-fill's failure mode).
  */
 export default function WalletInsights({ items }: { items: InsightItem[] }) {
+  const cols = Math.max(items.length, 1);
+
   return (
     <section className="rounded-[16px] border border-cyan-400/30 bg-[linear-gradient(135deg,rgba(9,22,45,0.68)_0%,rgba(3,10,25,0.76)_100%)] p-4 shadow-[0_0_22px_rgba(0,229,255,0.1)] backdrop-blur-md sm:p-5">
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
@@ -50,9 +53,9 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
       </div>
 
       <div
-        className="grid gap-2"
+        className="grid w-full gap-2"
         style={{
-          gridTemplateColumns: "repeat(auto-fill, minmax(7.5rem, 1fr))",
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
         }}
       >
         {items.map((item) => {
@@ -61,7 +64,7 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
           return (
             <div
               key={item.key}
-              className="rounded-xl border bg-black/40 px-2.5 py-2.5 shadow-[0_0_12px_rgba(0,0,0,0.25)]"
+              className="min-w-0 rounded-xl border bg-black/40 px-2 py-2.5 shadow-[0_0_12px_rgba(0,0,0,0.25)] sm:px-2.5"
               style={{ borderColor: `${color}66` }}
             >
               <div className="mb-1.5 flex items-center gap-1.5">
@@ -75,14 +78,14 @@ export default function WalletInsights({ items }: { items: InsightItem[] }) {
                   {item.label}
                 </span>
               </div>
-              <p className="text-sm font-bold tabular-nums text-white">
+              <p className="truncate text-sm font-bold tabular-nums text-white">
                 {formatVolts(item.value)}
               </p>
-              <div className="mt-1 flex items-center justify-between gap-1">
+              <div className="mt-1 flex min-w-0 items-center justify-between gap-1">
                 {item.deltaPct != null ? (
                   <span
                     className={cn(
-                      "text-[10px] font-semibold",
+                      "shrink-0 text-[10px] font-semibold",
                       up ? "text-emerald-400" : "text-rose-400",
                     )}
                   >

@@ -69,15 +69,16 @@ export default function MobileWalletTrend({
       </div>
 
       {data.length < 2 ? (
-        <div className="flex h-[250px] items-center justify-center text-sm text-slate-500">
+        <div className="flex h-[200px] items-center justify-center text-sm text-slate-500">
           Make a deposit to start tracking your wallet balance
         </div>
       ) : (
-        <div className="h-[260px] w-full">
+        // Reason: owner 6 Oct 2026 — 260px left a dead band under the axis.
+        <div className="h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
-              margin={{ top: 10, right: 4, left: 0, bottom: 0 }}
+              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="mwGoldFill" x1="0" y1="0" x2="0" y2="1">
@@ -106,13 +107,14 @@ export default function MobileWalletTrend({
                 tickLine={false}
                 minTickGap={28}
                 interval="preserveStartEnd"
+                height={28}
               />
               <YAxis
                 orientation="right"
                 tick={{ fill: "#94A3B8", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                width={44}
+                width={40}
                 tickFormatter={(v: number) =>
                   v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))
                 }

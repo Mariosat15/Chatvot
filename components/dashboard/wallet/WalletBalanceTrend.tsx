@@ -59,18 +59,20 @@ export default function WalletBalanceTrend({
       }
       accent="gold"
       controls={<ChartRangeSelector value={range} onChange={onRangeChange} />}
-      bodyClassName="pt-2"
+      // Reason: owner 6 Oct 2026 — fixed chart height left a dead band when the
+      // grid row stretched beside Credit Breakdown; flex-1 fills that gap.
+      bodyClassName="min-h-0 flex-1 pt-2"
     >
       {data.length < 2 ? (
-        <div className="flex h-[240px] items-center justify-center text-sm text-slate-500">
+        <div className="flex min-h-[200px] flex-1 items-center justify-center text-sm text-slate-500">
           Make a deposit to start tracking your wallet balance
         </div>
       ) : (
-        <div className="h-[240px] w-full sm:h-[260px]">
+        <div className="min-h-[200px] w-full flex-1 sm:min-h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
-              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+              margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
             >
               <defs>
                 <linearGradient id="walletGoldFill" x1="0" y1="0" x2="0" y2="1">
@@ -98,13 +100,14 @@ export default function WalletBalanceTrend({
                 axisLine={false}
                 tickLine={false}
                 minTickGap={28}
+                height={28}
               />
               <YAxis
                 orientation="right"
                 tick={{ fill: "#94A3B8", fontSize: 11 }}
                 axisLine={false}
                 tickLine={false}
-                width={48}
+                width={44}
                 tickFormatter={(v: number) =>
                   v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(Math.round(v))
                 }
