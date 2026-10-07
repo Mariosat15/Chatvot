@@ -128,10 +128,7 @@ export class MessagingService {
       lastActivityAt: new Date(),
     });
 
-    console.log(
-      `📝 [createConversation] Created: ${conversation._id}, type: ${params.type}, isAIHandled: ${params.isAIHandled}, assignedEmployee: ${params.assignedEmployeeName || "none"}`,
-    );
-
+    // Reason (7 Oct 2026): happy-path create log flooded PM2 on every support ticket.
     return conversation;
   }
 
@@ -184,18 +181,9 @@ export class MessagingService {
       query.deletedByUsers = { $nin: [participantId] };
     }
 
-    const conv = await Conversation.findOne(query).lean() as IConversation | null;
-
-    // Debug logging for production troubleshooting
-    if (!conv) {
-      console.log(`⚠️ [getConversationById] No conversation found:`, {
-        conversationId,
-        participantId,
-        isAdmin,
-      });
-    }
-
-    return conv;
+    // Reason (7 Oct 2026): missing-conversation is a normal 404 path; logging
+    // every miss flooded PM2. Callers already return 404 to the client.
+    return (await Conversation.findOne(query).lean()) as IConversation | null;
   }
 
   static async findOrCreateDirectConversation(
@@ -213,7 +201,8 @@ export class MessagingService {
     });
 
     if (conversation) {
-      console.log(`🔍 [DM] Found existing conversation ${conversation._id}`);
+      // Reason (7 Oct 2026): DM find/restore success logs flooded PM2 on every
+      // open-chat; keep behaviour, drop happy-path console.log.
 
       // Always ensure the conversation is active and both users can access it
       // This handles: deleted conversations, cleared conversations, closed conversations
@@ -246,15 +235,8 @@ export class MessagingService {
         },
         { new: true },
       );
-
-      console.log(
-        `♻️ [DM] Restored/activated conversation ${conversation!._id} for users ${user1.id} and ${user2.id}`,
-      );
     } else {
       // Create new conversation
-      console.log(
-        `➕ [DM] Creating new conversation for users ${user1.id} and ${user2.id}`,
-      );
       conversation = await this.createConversation({
         type: "user-to-user",
         participants: [

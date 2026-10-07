@@ -63,4 +63,45 @@ describe("messaging poll log silence", () => {
     expect(code).not.toMatch(/\[SendMsg\] From:/);
     expect(code).not.toMatch(/console\.log\s*\(/);
   });
+
+  it("createConversation, DM open, and CustomerAI do not dump happy-path chatter", () => {
+    const messaging = read("lib/services/messaging/messaging.service.ts");
+    const createStart = messaging.indexOf("static async createConversation");
+    const createEnd = messaging.indexOf(
+      "static async getUserConversations",
+      createStart,
+    );
+    const createBody = messaging.slice(createStart, createEnd);
+    expect(createEnd).toBeGreaterThan(createStart);
+    expect(createBody).not.toMatch(/\[createConversation\]/);
+    expect(createBody).not.toMatch(/console\.log\s*\(/);
+
+    const dmStart = messaging.indexOf("static async findOrCreateDirectConversation");
+    const dmEnd = messaging.indexOf(
+      "static async getOrCreateSupportConversation",
+      dmStart,
+    );
+    const dmBody = messaging.slice(dmStart, dmEnd);
+    expect(dmEnd).toBeGreaterThan(dmStart);
+    expect(dmBody).not.toMatch(/\[DM\]/);
+    expect(dmBody).not.toMatch(/console\.log\s*\(/);
+
+    const lookupStart = messaging.indexOf("static async getConversationById");
+    const lookupEnd = messaging.indexOf(
+      "static async findOrCreateDirectConversation",
+      lookupStart,
+    );
+    const lookupBody = messaging.slice(lookupStart, lookupEnd);
+    expect(lookupBody).not.toMatch(/No conversation found/);
+    expect(lookupBody).not.toMatch(/console\.log\s*\(/);
+
+    const ai = read("lib/services/customer-ai.service.ts");
+    expect(ai).not.toMatch(/Searching knowledge base for/);
+    expect(ai).not.toMatch(/Query expansions/);
+    expect(ai).not.toMatch(/Key terms:/);
+    expect(ai).not.toMatch(/Top result section/);
+    expect(ai).not.toMatch(/Calling OpenAI with/);
+    expect(ai).toMatch(/console\.error/);
+    expect(ai).toMatch(/console\.warn/);
+  });
 });

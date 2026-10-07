@@ -231,13 +231,15 @@ async function searchKnowledgeBase(
       .toArray();
 
     if (chunks.length === 0) {
-      console.log(
-        "[CustomerAI] ⚠️ No knowledge chunks available - please index knowledge base!",
+      // Reason: operator action needed; keep as warn, not a per-message dump.
+      console.warn(
+        "[CustomerAI] No knowledge chunks available - please index knowledge base!",
       );
       return [];
     }
 
-    console.log(`[CustomerAI] Searching ${chunks.length} knowledge chunks...`);
+    // Reason (7 Oct 2026, owner): every support reply logged search/expansions/
+    // OpenAI steps into PM2. Keep console.error / embedding warn only.
 
     // Get sources for reference
     const sourceIds = [...new Set(chunks.map((c) => c.sourceId?.toString()))];
@@ -253,9 +255,6 @@ async function searchKnowledgeBase(
 
     // Strategy 1: Semantic search with query expansion
     const expandedQueries = expandQuery(query);
-    console.log(
-      `[CustomerAI] Query expansions: ${expandedQueries.slice(0, 3).join(", ")}...`,
-    );
 
     let allResults: SearchResult[] = [];
 
@@ -283,7 +282,6 @@ async function searchKnowledgeBase(
 
     // Strategy 2: Keyword-based fallback search
     const keyTerms = extractKeyTerms(query);
-    console.log(`[CustomerAI] Key terms: ${keyTerms.join(", ")}`);
 
     if (keyTerms.length > 0) {
       const keywordResults = chunks
@@ -334,17 +332,6 @@ async function searchKnowledgeBase(
     const finalResults = Array.from(uniqueResults.values())
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, maxResults);
-
-    console.log(
-      `[CustomerAI] Found ${finalResults.length} unique results (top similarity: ${finalResults[0]?.similarity?.toFixed(3) || "N/A"})`,
-    );
-
-    // Log top results for debugging
-    if (finalResults.length > 0) {
-      console.log(
-        `[CustomerAI] Top result section: ${finalResults[0].section || "N/A"}`,
-      );
-    }
 
     return finalResults;
   } catch (error) {
@@ -402,24 +389,13 @@ export async function generateCustomerSupportResponse(
     throw new Error("OpenAI API key not configured");
   }
 
-  console.log(
-    `🤖 [CustomerAI] Searching knowledge base for: "${userMessage.substring(0, 100)}..."`,
-  );
-
   // Step 1: Search vector database for relevant knowledge (lower threshold to catch more)
   const searchResults = await searchKnowledgeBase(userMessage, 5, 0.5);
   const context = buildContext(searchResults);
   const sourcesUsed = [...new Set(searchResults.map((r) => r.source))];
 
-  console.log(
-    `🤖 [CustomerAI] Found ${searchResults.length} results, sources: ${sourcesUsed.join(", ") || "none"}`,
-  );
-
   // STRICT RAG: If no knowledge found, return a canned response - DO NOT let GPT make up answers
   if (searchResults.length === 0) {
-    console.log(
-      `🤖 [CustomerAI] NO KNOWLEDGE FOUND - returning strict no-knowledge response`,
-    );
     return {
       content: `I apologize, but I don't have specific information about that in my knowledge base. 
 
@@ -455,10 +431,6 @@ ${context}
 IMPORTANT: The customer is asking a question. Look through the KNOWLEDGE BASE above and answer based on what you find. Be helpful!`;
 
   // Step 3: Call OpenAI with STRICT RAG-constrained prompt
-  console.log(
-    `🤖 [CustomerAI] Calling OpenAI with ${searchResults.length} knowledge chunks...`,
-  );
-
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
