@@ -6,9 +6,17 @@ import DynamicFavicon from "@/components/DynamicFavicon";
 import SiteTracker from "@/components/tracking/SiteTracker";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import Script from "next/script";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
 import MobileViewportLock from "@/components/MobileViewportLock";
 import "./globals.css";
+
+/**
+ * Reason (7 Oct 2026): client useEffect runs after first paint, so a stuck
+ * Safari zoom is visible for a flash (and sometimes sticks). Run the unlock →
+ * re-lock dance before hydration. Keep in sync with MobileViewportLock.tsx.
+ */
+const VIEWPORT_BOOT = `(function(){try{var m=document.querySelector('meta[name="viewport"]');if(!m){m=document.createElement("meta");m.setAttribute("name","viewport");document.head.appendChild(m);}var unlock="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=10,user-scalable=yes,viewport-fit=cover";var lock="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover";m.setAttribute("content",unlock);requestAnimationFrame(function(){m.setAttribute("content",lock);});}catch(e){}})();`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -93,21 +101,21 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Reason: owner 6 Oct 2026 — phones should feel like a native app, so pinch-zoom
- * cannot stretch Wallet / Performance until taps miss SignOut. iOS may still
- * honour a system accessibility zoom; this is the platform maximumScale lock
- * (same shape as the play iframe). Landing pages inherit it on purpose.
+ * cannot stretch Wallet / Performance until taps miss SignOut.
  *
- * Reason (7 Oct 2026): minimumScale: 1 + MobileViewportLock — Safari can keep a
- * visual zoom from an earlier pinch while maximumScale blocks zooming out, so
- * the player app opened already magnified. The client lock re-applies this meta
- * on load / bfcache restore.
+ * Amended 7 Oct 2026 (second report): do NOT emit maximumScale:1 from Next's
+ * viewport export. Safari ships that meta on first paint and then refuses to
+ * honour a later initial-scale=1 reset while a visual zoom is stuck. Boot script
+ * + MobileViewportLock unlock briefly, then re-lock pinch. Landing inherits the
+ * same dance on purpose.
  */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   minimumScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Reason: temporary ceiling only — lock re-applies maximum-scale=1 in JS.
+  maximumScale: 10,
+  userScalable: true,
   viewportFit: "cover",
 };
 
@@ -121,6 +129,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Script id="cv-viewport-boot" strategy="beforeInteractive">
+          {VIEWPORT_BOOT}
+        </Script>
         <AppSettingsProvider>
           <MobileViewportLock />
           <DynamicFavicon />

@@ -70,12 +70,17 @@ function TileLink({ tile, height }: { tile: Tile; height: string }) {
   );
 }
 
-/** Deposit / Withdraw / Compete / Play — four large thumb targets (spec s8). */
+/**
+ * Deposit / Withdraw / Compete / Play.
+ * Reason (7 Oct 2026, owner screenshot): four-across clipped the right edge
+ * under a stuck Safari zoom / narrow phone. Two-by-two keeps every tile on
+ * screen the same way Quick Access already does.
+ */
 export function MobileQuickActions() {
   return (
-    <div className="grid grid-cols-4 gap-2.5">
+    <div className="grid grid-cols-2 gap-2.5">
       {QUICK_ACTIONS.map((t) => (
-        <TileLink key={t.label} tile={t} height="min-h-[76px]" />
+        <TileLink key={t.label} tile={t} height="min-h-[72px]" />
       ))}
     </div>
   );

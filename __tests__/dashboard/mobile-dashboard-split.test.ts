@@ -319,28 +319,54 @@ describe("mobile dashboard split", () => {
   it("locks phone pinch-zoom and hides inactive dashboard tabs so they cannot steal taps", () => {
     // Reason: owner 6 Oct 2026 — pinch-zoom broke the view; SignOut only worked
     // on Overview because a still-flex inactive tab sat over the chrome.
+    // Amended 7 Oct 2026: Next viewport export stays at maximumScale 10 so the
+    // first paint can reset a stuck scale; JS re-locks to maximum-scale=1.
     const layout = read("app/layout.tsx");
     expect(layout).toMatch(/export const viewport/);
-    expect(layout).toMatch(/maximumScale:\s*1/);
+    expect(layout).toMatch(/maximumScale:\s*10/);
     expect(layout).toMatch(/minimumScale:\s*1/);
-    expect(layout).toMatch(/userScalable:\s*false/);
+    expect(layout).toMatch(/userScalable:\s*true/);
     expect(layout).toMatch(/MobileViewportLock/);
+    const lock = read("components/MobileViewportLock.tsx");
+    expect(lock).toMatch(/maximum-scale=1/);
+    expect(lock).toMatch(/user-scalable=no/);
     const tabs = read("components/ui/tabs.tsx");
     expect(tabs).toMatch(/data-\[state=inactive\]:hidden/);
   });
 
-  it("resets a stuck Safari visual zoom without re-enabling pinch", () => {
+  it("resets a stuck Safari visual zoom without leaving pinch unlocked", () => {
     // Reason (7 Oct 2026, owner): phones opened already magnified because
     // maximum-scale=1 blocked zooming out of a persisted visual-viewport scale.
+    // Amended same day after a second screenshot still clipped on the right:
+    // unlock → re-lock before paint, flex min-w-0, Quick Actions 2×2.
     const lock = read("components/MobileViewportLock.tsx");
     expect(lock).toMatch(/"use client"/);
     expect(lock).toMatch(/meta\[name="viewport"\]/);
-    expect(lock).toMatch(/initial-scale=1\.0001/);
+    expect(lock).toMatch(/maximum-scale=10/);
     expect(lock).toMatch(/maximum-scale=1/);
     expect(lock).toMatch(/user-scalable=no/);
     expect(lock).toMatch(/pageshow/);
+    expect(lock).toMatch(/orientationchange/);
+    const layout = read("app/layout.tsx");
+    expect(layout).toMatch(/cv-viewport-boot/);
+    expect(layout).toMatch(/beforeInteractive/);
+    expect(layout).toMatch(/maximum-scale=10/);
+    // Reason: the HTML meta must not ship locked — that is what trapped Safari.
+    expect(layout).not.toMatch(/maximumScale:\s*1\b/);
+    expect(layout).not.toMatch(/userScalable:\s*false/);
+    const root = read("app/(root)/layout.tsx");
+    expect(root).toMatch(/min-w-0/);
+    expect(root).toMatch(/w-full min-w-0/);
+    expect(root).toMatch(/max-w-full overflow-x-clip/);
+    const actions = read(`${MOBILE_DIR}/MobileActions.tsx`);
+    const quickActions = actions.slice(
+      actions.indexOf("export function MobileQuickActions"),
+      actions.indexOf("export function MobileQuickAccess"),
+    );
+    expect(quickActions).toMatch(/grid-cols-2/);
+    expect(quickActions).not.toMatch(/grid-cols-4/);
     const css = read("app/globals.css");
-    expect(css).toMatch(/overflow-x:\s*clip/);
+    expect(css).toMatch(/overflow-x:\s*hidden/);
     expect(css).toMatch(/-webkit-text-size-adjust:\s*100%/);
   });
 });

@@ -29,7 +29,7 @@ export default function MobileDashboard({
 }) {
   return (
     <div
-      className="mx-auto w-full max-w-[430px] space-y-5"
+      className="mx-auto w-full min-w-0 max-w-[430px] space-y-5 overflow-x-clip px-1"
       // Reason: keep the last card clear of the iOS home indicator.
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >

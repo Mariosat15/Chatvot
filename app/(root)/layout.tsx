@@ -84,7 +84,13 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
             Shown from the stored state on every entry until answered (`External game plans/24` s5.6). */}
         <AffiliateTermsModal />
 
-        <div className="min-h-screen bg-gray-950 text-gray-400 flex">
+        {/*
+          Reason (7 Oct 2026): flex children default to min-width:auto, so a wide
+          descendant can grow the page past the phone width and Safari treats that
+          as a zoomed layout under maximum-scale=1. min-w-0 lets the main column
+          shrink; overflow clips any leftover.
+        */}
+        <div className="flex min-h-screen w-full min-w-0 overflow-x-clip bg-gray-950 text-gray-400">
           {/* Sidebar Navigation - Desktop Only */}
           <UserSidebar user={user} />
 
@@ -94,7 +100,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
             without pt-16 the first 64px of every page sat under it (the owner's
             "account status hidden under the logo", 29 Sep 2026).
           */}
-          <main className="flex-1 min-h-screen overflow-x-clip pt-16 lg:pt-0">
+          <main className="min-h-screen min-w-0 flex-1 overflow-x-clip pt-16 lg:pt-0">
             {/*
               Reason: Overview mock Header — Overview/Wallet/Performance/Competitions/
               Tutorials. Games/Challenges/Marketplace stay on the sidebar (recorded
@@ -107,7 +113,13 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
               Reason: no phone bottom nav (owner, 29 Sep 2026) - the logo bar's
               menu already carries every route, so no bottom clearance is needed.
             */}
-            <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-5 lg:px-6 pb-6">
+            {/*
+              Reason (7 Oct 2026): min-w-0 + overflow-x-clip stop a wide child
+              (negative-margin carousels, 4-up action grids) from growing the
+              layout past the phone width — Safari then looks permanently zoomed
+              under maximum-scale=1.
+            */}
+            <div className="min-w-0 max-w-full overflow-x-clip px-3 py-3 pb-6 sm:px-4 sm:py-4 md:px-5 lg:px-6">
               <AnnouncementBanner />
               {children}
             </div>

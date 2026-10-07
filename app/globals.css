@@ -117,15 +117,21 @@
  * Horizontal overflow wider than the device width makes Safari fit-to-content
  * at a scale that then cannot be pinched out under maximum-scale=1. Clip X on
  * the root, and stop iOS auto-text inflation that also reads as zoom.
+ * Amended same day: `hidden` is the reliable Safari spelling; also pin width
+ * so a flex child cannot grow the layout viewport past the device.
  */
 html {
-  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 body {
-  overflow-x: clip;
+  width: 100%;
   max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 /* === CUSTOM COLOR THEME === */
