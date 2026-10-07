@@ -9,6 +9,7 @@ import {
   ALL_GAMES,
   TRADING_KEY,
   buildChallengeSummary,
+  buildCompetitionSummary,
   buildHighlights,
   buildTradingMetrics,
   gameOptions,
@@ -124,6 +125,32 @@ describe("performance model", () => {
     expect(buildChallengeSummary(labelled, "30d", TRADING_KEY).played).toBe(0);
     const unlabelled = buildChallengeSummary(fixture(), "30d", TRADING_KEY);
     expect(unlabelled.played).toBe(1);
+  });
+
+  it("fills the 1v1 summary as a 2×2 like competitions, with shared tile chrome", () => {
+    // Reason: owner 7 Oct 2026 — three challenge tiles left an empty corner.
+    const challenge = buildChallengeSummary(fixture(), "30d", ALL_GAMES);
+    const competition = buildCompetitionSummary(fixture(), "30d", ALL_GAMES);
+    expect(challenge.rows).toHaveLength(4);
+    expect(competition.rows).toHaveLength(4);
+    expect(challenge.rows.map((r) => r.label)).toEqual([
+      "Played",
+      "Wins",
+      "Losses",
+      "Win rate",
+    ]);
+    const chrome = stripComments(read(`${DIR}/PerformanceChrome.tsx`));
+    const desktop = stripComments(read(`${DIR}/PerformanceSummaryPanel.tsx`));
+    const mobile = stripComments(
+      read(`${DIR}/mobile/MobilePerformanceSummaryCard.tsx`),
+    );
+    expect(chrome).toMatch(/export function PerfMetricGrid/);
+    expect(chrome).toMatch(/grid-cols-2/);
+    expect(desktop).toMatch(/<PerfMetricGrid\b/);
+    expect(mobile).toMatch(/<PerfMetricGrid\b/);
+    // Reason: negative half — panels must not hand-roll flat tiles beside the shared grid.
+    expect(desktop).not.toMatch(/bg-white\/\[0\.04\]/);
+    expect(mobile).not.toMatch(/bg-white\/\[0\.04\]/);
   });
 
   it("scopes competitions to the selected game", () => {

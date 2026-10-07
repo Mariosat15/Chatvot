@@ -171,3 +171,44 @@ export function PerfBar({
     </div>
   );
 }
+
+/**
+ * 2×2 metric tiles for 1v1 / Competition summary panels.
+ * Reason (7 Oct 2026, owner): one chrome for desktop + mobile so the boxes
+ * match each other and Competition's filled grid; a bare `bg-white/[0.04]`
+ * looked unfinished next to the accented card shell.
+ */
+export function PerfMetricGrid({
+  rows,
+  accent,
+  empty = false,
+}: {
+  rows: { label: string; value: string }[];
+  accent: PerfAccent;
+  empty?: boolean;
+}) {
+  const hex = accentHex(accent);
+  return (
+    <dl className="grid grid-cols-2 gap-2.5">
+      {rows.map((r) => (
+        <div
+          key={r.label}
+          className="min-h-[72px] rounded-xl border px-3 py-3"
+          style={{
+            background:
+              "linear-gradient(160deg, rgba(14,28,56,0.92) 0%, rgba(6,14,30,0.96) 100%)",
+            borderColor: `${hex}40`,
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05), 0 0 14px ${hex}18`,
+          }}
+        >
+          <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8ea4c5]">
+            {r.label}
+          </dt>
+          <dd className="mt-1.5 truncate text-xl font-black tabular-nums leading-none text-white sm:text-[22px]">
+            {empty ? "-" : r.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}

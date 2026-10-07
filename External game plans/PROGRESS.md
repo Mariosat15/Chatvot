@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **1v1 / Competition summary tiles CODE-COMPLETE 7 Oct (eng)** — 1v1 now fills a 2×2 (Played / Wins / Losses / Win rate) like Competition; shared `PerfMetricGrid` + accent hero chrome on desktop and mobile. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Mobile Wallet Analytics denser CODE-COMPLETE 7 Oct (eng)** — Wallet Insights removed on phones only (desktop unchanged); Volt Breakdown summary tiles are `grid-cols-2` below `sm` and keep auto-fill from `sm` up. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Player mobile opens already zoomed CODE-COMPLETE 7 Oct (eng)** — Safari kept a visual-viewport scale while `maximumScale: 1` blocked pinching out. Root viewport now also sets `minimumScale: 1`; `MobileViewportLock` re-applies the meta on load / bfcache; `html`/`body` clip horizontal overflow and pin text-size-adjust. Pinch stays locked. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **GM contact-us always named Andy.A CODE-COMPLETE 6 Oct (eng)** — escalate loaded only `status: "active"` admins, so assignees with an unset status were invisible and handoff fell through to the first Support/Backoffice (often Andy.A); `isAvailableForChat: false` also stole the client. Assigned manager now always wins unless locked out. Tests: `support-handoff.test.ts`. Never verified by eye.
@@ -965,6 +966,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 7 October 2026 - 1v1 summary tiles match Competition 2×2 (owner report)
+
+**Owner report:** 1v1 Performance boxes looked unfinished next to Competition's filled 2×2; polish both for phone and desktop.
+
+**Shipped:** challenge summary adds a Win rate tile (four rows); shared `PerfMetricGrid` with accent borders + win-rate hero wash on `PerformanceSummaryPanel` and `MobilePerformanceSummaryCard`.
+
+**Nothing was paid wrongly.** Tests: `performance-analytics.test.ts`. Never verified by eye.
 
 ### 7 October 2026 - Mobile Wallet Analytics: two-up tiles, no Insights (owner report)
 

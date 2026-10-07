@@ -413,6 +413,8 @@ export function buildChallengeSummary(
   const f = windowFacts(input, currentWindow(range, now), gameFilter);
   const decided = f.challengeWins + f.challengeLosses;
   const winRate = rate(f.challengeWins, decided);
+  // Reason (7 Oct 2026, owner): four tiles so the 1v1 grid matches Competition's
+  // 2×2 — three cells left an empty corner that read as unfinished layout.
   return {
     played: f.challengesPlayed,
     headline: winRate,
@@ -420,6 +422,7 @@ export function buildChallengeSummary(
       { label: "Played", value: String(f.challengesPlayed) },
       { label: "Wins", value: String(f.challengeWins) },
       { label: "Losses", value: String(f.challengeLosses) },
+      { label: "Win rate", value: pct(winRate, 0) },
     ],
     bars: [
       {

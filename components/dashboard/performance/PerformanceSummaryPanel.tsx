@@ -2,7 +2,14 @@
 
 import { formatVolts } from "@/lib/utils/format-volts";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
-import { NeonIcon, PerfBar, PerfCard, PerfSection, accentHex } from "./PerformanceChrome";
+import {
+  NeonIcon,
+  PerfBar,
+  PerfCard,
+  PerfMetricGrid,
+  PerfSection,
+  accentHex,
+} from "./PerformanceChrome";
 import { PERF_METRIC_ICON, PERF_SECTION_ICON, type PerfAccent } from "./performance-assets";
 import type { SummaryPanelView } from "./performance-model";
 
@@ -60,7 +67,14 @@ export default function PerformanceSummaryPanel({
                 : meta.empty}
             </p>
           ) : null}
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 rounded-2xl border px-3.5 py-3"
+            style={{
+              borderColor: `${hex}35`,
+              background: `linear-gradient(120deg, ${hex}14 0%, rgba(0,0,0,0.2) 70%)`,
+              boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 20px ${hex}12`,
+            }}
+          >
             <NeonIcon src={PERF_METRIC_ICON.crown} size={48} />
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-[#8ea4c5]">
@@ -71,18 +85,7 @@ export default function PerformanceSummaryPanel({
               </div>
             </div>
           </div>
-          <dl className="grid grid-cols-2 gap-2.5">
-            {summary.rows.map((r) => (
-              <div key={r.label} className="rounded-xl bg-white/[0.04] px-3 py-2.5">
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c5]">
-                  {r.label}
-                </dt>
-                <dd className="text-lg font-black tabular-nums text-white">
-                  {empty ? "-" : r.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <PerfMetricGrid rows={summary.rows} accent={meta.accent} empty={empty} />
           <div className="space-y-3">
             {summary.bars.map((b) => (
               <div key={b.label}>

@@ -2,7 +2,7 @@
 
 import { formatVolts } from "@/lib/utils/format-volts";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
-import { NeonIcon, PerfBar, accentHex } from "../PerformanceChrome";
+import { NeonIcon, PerfBar, PerfMetricGrid, accentHex } from "../PerformanceChrome";
 import { PERF_METRIC_ICON, PERF_SECTION_ICON, type PerfAccent } from "../performance-assets";
 import type { SummaryPanelView } from "../performance-model";
 import { MobilePerfHeading, MobilePerfPlate } from "./mobile-perf-shell";
@@ -53,7 +53,14 @@ export default function MobilePerformanceSummaryCard({
       <MobilePerfHeading title={meta.title} subtitle={meta.subtitle} icon={meta.icon} />
       <MobilePerfPlate accent={meta.accent}>
         {empty ? <p className="mb-3 text-sm text-[#8ea4c5]">{meta.empty}</p> : null}
-        <div className="mb-3 flex items-center gap-3">
+        <div
+          className="mb-3 flex items-center gap-3 rounded-2xl border px-3 py-2.5"
+          style={{
+            borderColor: `${hex}35`,
+            background: `linear-gradient(120deg, ${hex}14 0%, rgba(0,0,0,0.2) 70%)`,
+            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 0 18px ${hex}12`,
+          }}
+        >
           <NeonIcon src={PERF_METRIC_ICON.crown} size={36} />
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c5]">Win rate</div>
@@ -62,14 +69,7 @@ export default function MobilePerformanceSummaryCard({
             </div>
           </div>
         </div>
-        <dl className="grid grid-cols-2 gap-2">
-          {summary.rows.map((row) => (
-            <div key={row.label} className="rounded-xl bg-white/[0.04] px-3 py-2.5">
-              <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ea4c5]">{row.label}</dt>
-              <dd className="text-lg font-black tabular-nums text-white">{empty ? "-" : row.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <PerfMetricGrid rows={summary.rows} accent={meta.accent} empty={empty} />
         <div className="mt-4 space-y-3">
           {summary.bars.map((bar) => (
             <div key={bar.label}>
