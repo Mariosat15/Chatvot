@@ -7,6 +7,7 @@ import SiteTracker from "@/components/tracking/SiteTracker";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
+import MobileViewportLock from "@/components/MobileViewportLock";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -95,10 +96,16 @@ export async function generateMetadata(): Promise<Metadata> {
  * cannot stretch Wallet / Performance until taps miss SignOut. iOS may still
  * honour a system accessibility zoom; this is the platform maximumScale lock
  * (same shape as the play iframe). Landing pages inherit it on purpose.
+ *
+ * Reason (7 Oct 2026): minimumScale: 1 + MobileViewportLock — Safari can keep a
+ * visual zoom from an earlier pinch while maximumScale blocks zooming out, so
+ * the player app opened already magnified. The client lock re-applies this meta
+ * on load / bfcache restore.
  */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  minimumScale: 1,
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
@@ -115,6 +122,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AppSettingsProvider>
+          <MobileViewportLock />
           <DynamicFavicon />
           <SiteTracker />
           {children}

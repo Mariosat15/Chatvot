@@ -112,6 +112,22 @@
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
+/*
+ * Reason (7 Oct 2026, owner): phones opened the player app already zoomed.
+ * Horizontal overflow wider than the device width makes Safari fit-to-content
+ * at a scale that then cannot be pinched out under maximum-scale=1. Clip X on
+ * the root, and stop iOS auto-text inflation that also reads as zoom.
+ */
+html {
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 /* === CUSTOM COLOR THEME === */
 @theme {
   /* Extended Gray Scale */

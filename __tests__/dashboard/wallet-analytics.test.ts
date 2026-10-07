@@ -276,10 +276,11 @@ describe("Wallet Analytics page wiring", () => {
     expect(idx("<MobileWalletOverview")).toBeLessThan(idx("<MobileWalletTrend"));
     expect(idx("<MobileWalletTrend")).toBeLessThan(idx("<CreditBreakdownPanel"));
     expect(idx("<CreditBreakdownPanel")).toBeLessThan(idx("<SpendingVsEarnings"));
-    expect(idx("<SpendingVsEarnings")).toBeLessThan(idx("<MobileWalletInsights"));
-    expect(idx("<MobileWalletInsights")).toBeLessThan(
+    expect(idx("<SpendingVsEarnings")).toBeLessThan(
       idx("<MobileRecentTransactions"),
     );
+    // Reason: flipped 7 Oct 2026 — Wallet Insights removed from mobile only.
+    expect(mobile).not.toMatch(/MobileWalletInsights/);
     expect(mobile).toMatch(/useWalletAnalyticsModel/);
     expect(actions).toMatch(/Deposit/);
     expect(actions).toMatch(/Withdraw/);
@@ -327,7 +328,9 @@ describe("Wallet Analytics page wiring", () => {
       "components/dashboard/wallet/wallet-categories.ts",
     );
     // Reason: flipped 6 Oct 2026 (agnostic) — fixed grid-cols-3 cannot grow with
-    // new buckets; auto-fill keeps desktop + mobile balanced.
+    // new buckets; auto-fill keeps desktop + tablet balanced.
+    // Amended 7 Oct 2026 — phones force grid-cols-2 (owner: two tiles per row).
+    expect(breakdown).toMatch(/grid-cols-2/);
     expect(breakdown).toMatch(/auto-fill/);
     expect(breakdown).toMatch(/resolveCategories/);
     expect(breakdown).toMatch(/sm:text-base/);
@@ -337,6 +340,18 @@ describe("Wallet Analytics page wiring", () => {
     expect(gift).toBeGreaterThan(-1);
     expect(prizes).toBeGreaterThan(gift);
     expect(gm).toBeGreaterThan(prizes);
+  });
+
+  it("mobile Wallet Analytics omits insights and keeps desktop insights", () => {
+    // Reason: owner 7 Oct 2026 — remove Wallet Insights on phones only.
+    const mobile = readCode(
+      "components/dashboard/wallet/mobile/MobileWallet.tsx",
+    );
+    const desktop = readCode(
+      "components/dashboard/wallet/DesktopWalletAnalytics.tsx",
+    );
+    expect(mobile).not.toMatch(/WalletInsights|MobileWalletInsights/);
+    expect(desktop).toMatch(/<WalletInsights\b/);
   });
 
   it("Wallet category catalog is the single series source and discovers unknown keys", () => {

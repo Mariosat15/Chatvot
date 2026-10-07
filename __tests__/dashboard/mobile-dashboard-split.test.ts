@@ -322,8 +322,25 @@ describe("mobile dashboard split", () => {
     const layout = read("app/layout.tsx");
     expect(layout).toMatch(/export const viewport/);
     expect(layout).toMatch(/maximumScale:\s*1/);
+    expect(layout).toMatch(/minimumScale:\s*1/);
     expect(layout).toMatch(/userScalable:\s*false/);
+    expect(layout).toMatch(/MobileViewportLock/);
     const tabs = read("components/ui/tabs.tsx");
     expect(tabs).toMatch(/data-\[state=inactive\]:hidden/);
+  });
+
+  it("resets a stuck Safari visual zoom without re-enabling pinch", () => {
+    // Reason (7 Oct 2026, owner): phones opened already magnified because
+    // maximum-scale=1 blocked zooming out of a persisted visual-viewport scale.
+    const lock = read("components/MobileViewportLock.tsx");
+    expect(lock).toMatch(/"use client"/);
+    expect(lock).toMatch(/meta\[name="viewport"\]/);
+    expect(lock).toMatch(/initial-scale=1\.0001/);
+    expect(lock).toMatch(/maximum-scale=1/);
+    expect(lock).toMatch(/user-scalable=no/);
+    expect(lock).toMatch(/pageshow/);
+    const css = read("app/globals.css");
+    expect(css).toMatch(/overflow-x:\s*clip/);
+    expect(css).toMatch(/-webkit-text-size-adjust:\s*100%/);
   });
 });

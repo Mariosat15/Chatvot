@@ -9,7 +9,6 @@ import MobileWalletBalanceCard from "./MobileWalletBalanceCard";
 import MobileWalletActions from "./MobileWalletActions";
 import MobileWalletOverview from "./MobileWalletOverview";
 import MobileWalletTrend from "./MobileWalletTrend";
-import MobileWalletInsights from "./MobileWalletInsights";
 import MobileRecentTransactions from "./MobileRecentTransactions";
 
 type Props = {
@@ -59,7 +58,7 @@ export default function MobileWallet({ overview, charts }: Props) {
         earnSlices={model.earnSlices}
       />
       {/* Reason: owner 6 Oct 2026 — Daily Credit Flow is desktop-only. */}
-      <MobileWalletInsights items={model.insights} />
+      {/* Reason: owner 7 Oct 2026 — Wallet Insights is desktop-only (reduce phone scroll). */}
       <MobileRecentTransactions />
     </div>
   );

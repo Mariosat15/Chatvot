@@ -201,11 +201,10 @@ export default function CreditBreakdownPanel({
       )}
 
       <div
-        className="grid gap-2.5 sm:gap-3"
-        // Reason: auto-fill keeps a balanced grid when a 7th/8th bucket appears.
-        style={{
-          gridTemplateColumns: "repeat(auto-fill, minmax(9.5rem, 1fr))",
-        }}
+        // Reason (7 Oct 2026, owner): phones stacked one tile per row and scrolled
+        // forever — force two-up below `sm`. From `sm` up, auto-fill still grows with
+        // new catalog buckets (desktop / tablet).
+        className="grid grid-cols-2 gap-2.5 sm:gap-3 sm:[grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))]"
       >
         {summary.map((row) => (
           <div

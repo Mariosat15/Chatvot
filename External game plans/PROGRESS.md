@@ -322,6 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Mobile Wallet Analytics denser CODE-COMPLETE 7 Oct (eng)** — Wallet Insights removed on phones only (desktop unchanged); Volt Breakdown summary tiles are `grid-cols-2` below `sm` and keep auto-fill from `sm` up. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
+- **Player mobile opens already zoomed CODE-COMPLETE 7 Oct (eng)** — Safari kept a visual-viewport scale while `maximumScale: 1` blocked pinching out. Root viewport now also sets `minimumScale: 1`; `MobileViewportLock` re-applies the meta on load / bfcache; `html`/`body` clip horizontal overflow and pin text-size-adjust. Pinch stays locked. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye.**
 - **GM contact-us always named Andy.A CODE-COMPLETE 6 Oct (eng)** — escalate loaded only `status: "active"` admins, so assignees with an unset status were invisible and handoff fell through to the first Support/Backoffice (often Andy.A); `isAvailableForChat: false` also stole the client. Assigned manager now always wins unless locked out. Tests: `support-handoff.test.ts`. Never verified by eye.
 - **Full Admin assignment cleanup tool CODE-COMPLETE 6 Oct (eng)** — report-only `tools/users/report-full-admin-assignments.ts` lists active `customer_assignments` on Full Admin; `--apply` spreads them onto Backoffice / Support Agent by least_customers and retargets open support tickets (skips temporary redirects). Not run against production from eng (Atlas IP). Never verified by eye.
 - **AI support handoff vs customer assignment CODE-COMPLETE 6 Oct (eng)** — AI escalate preferred a stale ticket `assignedEmployeeId` over `customer_assignments`, and the unassigned fallback took the first Full Admin in the collection (often named Admin). Handoff now follows the admin assignment badge; temporary chat redirects still win; Full Admin is excluded from auto-assign. Tests: `support-handoff.test.ts`. Existing Admin rows: run the cleanup tool above (report first). **Amended same day** by the Andy.A row above — say which. Never verified by eye.
@@ -963,6 +965,24 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 7 October 2026 - Mobile Wallet Analytics: two-up tiles, no Insights (owner report)
+
+**Owner report:** on phone Wallet Analytics the category number cards stacked one per row (too much scroll), and Wallet Insights should go.
+
+**Shipped:** `CreditBreakdownPanel` summary is `grid-cols-2` below `sm`, auto-fill from `sm` up (desktop unchanged); `MobileWalletInsights` removed from the mobile tree; desktop `WalletInsights` kept.
+
+**Nothing was paid wrongly.** Tests: `wallet-analytics.test.ts`. Never verified by eye.
+
+### 7 October 2026 - Player mobile opens already zoomed (owner report)
+
+**Owner report:** opening the ChartVolt player app on a phone shows the user side already zoomed in.
+
+**Cause:** the 6 Oct pinch lock (`maximumScale: 1`, `userScalable: false`) is correct for taps, but Safari can keep a visual-viewport scale from an earlier pinch or from focusing a small field — and with max-scale locked the user cannot pinch back out. Horizontal overflow can also leave the layout wider than the device so the page reads magnified.
+
+**Shipped:** `minimumScale: 1` on the root viewport; `MobileViewportLock` re-applies the meta tag on load and bfcache restore (nudge `initial-scale` then restore); `html`/`body` `overflow-x: clip` plus `text-size-adjust: 100%`. Pinch stays disabled.
+
+**Nothing was paid wrongly.** Tests: `mobile-dashboard-split.test.ts`. Never verified by eye.
 
 ### 6 October 2026 - GM contact-us handoff always named Andy.A (owner report)
 
