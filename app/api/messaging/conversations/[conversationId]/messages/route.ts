@@ -3,7 +3,8 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import MessagingService from "@/lib/services/messaging/messaging.service";
 import { wsNotifier } from "@/lib/services/messaging/websocket-notifier";
-import { getPublicName } from "@/lib/utils/user-lookup";
+import { getUserById } from "@/lib/utils/user-lookup";
+import { resolvePublicName } from "@/lib/utils/username";
 
 /**
  * POST /api/messaging/conversations/[conversationId]/messages
@@ -46,10 +47,18 @@ export async function POST(
 
     // Reason: in a chat with another player the sender is shown by username only; a
     // support ticket is read by staff, who are entitled to the real name.
+    // Reason: Better Auth session.image is often empty while the upload lives in
+    // profileImage — using session alone stored blank senderAvatar forever.
+    const sender = await getUserById(currentUserId);
     const currentUserName =
       conversation.type === "user-to-support"
         ? session.user.name || "User"
-        : await getPublicName(currentUserId);
+        : resolvePublicName({
+            username: sender?.username,
+            id: currentUserId,
+          });
+    const senderAvatar =
+      sender?.profileImage || session.user.image || undefined;
 
     const { message, conversation: updatedConversation } =
       await MessagingService.sendMessage({
@@ -57,7 +66,7 @@ export async function POST(
         senderId: currentUserId,
         senderType: "user",
         senderName: currentUserName,
-        senderAvatar: session.user.image ?? undefined,
+        senderAvatar,
         content: content || "",
         messageType: messageType || "text",
         attachments,

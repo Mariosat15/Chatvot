@@ -217,6 +217,17 @@ export class MessagingService {
         },
       );
 
+      // Reason: restore also refreshes name/avatar from the caller so a face
+      // uploaded after the first DM no longer stays a letter forever in storage.
+      const refreshFields: Record<string, unknown> = {
+        status: "active",
+        lastActivityAt: new Date(),
+      };
+      if (user1.name) refreshFields["participants.$[u1].name"] = user1.name;
+      if (user1.avatar) refreshFields["participants.$[u1].avatar"] = user1.avatar;
+      if (user2.name) refreshFields["participants.$[u2].name"] = user2.name;
+      if (user2.avatar) refreshFields["participants.$[u2].avatar"] = user2.avatar;
+
       // Also unset the timestamp fields and set status to active in a second update
       // (MongoDB doesn't allow $pull and $unset on same field in one operation)
       conversation = await Conversation.findOneAndUpdate(
@@ -228,12 +239,12 @@ export class MessagingService {
             [`userClearedAt.${user1.id}`]: 1,
             [`userClearedAt.${user2.id}`]: 1,
           },
-          $set: {
-            status: "active",
-            lastActivityAt: new Date(),
-          },
+          $set: refreshFields,
         },
-        { new: true },
+        {
+          new: true,
+          arrayFilters: [{ "u1.id": user1.id }, { "u2.id": user2.id }],
+        },
       );
     } else {
       // Create new conversation

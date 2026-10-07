@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import MessagingService from "@/lib/services/messaging/messaging.service";
+import { getUserById } from "@/lib/utils/user-lookup";
 
 /**
  * GET /api/messaging/support
@@ -18,10 +19,14 @@ export async function GET(_request: NextRequest) {
     // Happy-path console.log (user id, every message count) flooded PM2 the same
     // way as [ConvAPI]. Keep console.error on the catch path only.
 
+    // Reason: profile uploads live in profileImage; session.image is often blank.
+    const me = await getUserById(session.user.id);
+    const myAvatar = me?.profileImage || session.user.image || undefined;
+
     const conversation = await MessagingService.getOrCreateSupportConversation(
       session.user.id,
       session.user.name || "User",
-      session.user.image ?? undefined,
+      myAvatar,
     );
 
     // Get recent messages
@@ -110,11 +115,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reason: profile uploads live in profileImage; session.image is often blank.
+    const me = await getUserById(session.user.id);
+    const myAvatar = me?.profileImage || session.user.image || undefined;
+
     // Get or create support conversation
     const conversation = await MessagingService.getOrCreateSupportConversation(
       session.user.id,
       session.user.name || "User",
-      session.user.image ?? undefined,
+      myAvatar,
     );
 
     const { message } = await MessagingService.sendMessage({
@@ -122,7 +131,7 @@ export async function POST(request: NextRequest) {
       senderId: session.user.id,
       senderType: "user",
       senderName: session.user.name || "User",
-      senderAvatar: session.user.image ?? undefined,
+      senderAvatar: myAvatar,
       content: content || "",
       messageType: "text",
       attachments,

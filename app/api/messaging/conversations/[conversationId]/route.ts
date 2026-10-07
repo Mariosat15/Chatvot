@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import MessagingService, {
   unreadFromCounts,
 } from "@/lib/services/messaging/messaging.service";
+import { getUsersByIds } from "@/lib/utils/user-lookup";
 
 /**
  * GET /api/messaging/conversations/[conversationId]
@@ -64,12 +65,35 @@ export async function GET(
       session.user.id,
     );
 
+    // Reason: same live-avatar overlay as the conversation list — bubbles fall
+    // back to participant.avatar when an old message has no senderAvatar.
+    const otherUserIds = conversation.participants
+      .filter((p) => p.isActive && p.type === "user" && p.id !== session.user.id)
+      .map((p) => p.id);
+    const liveUsers = await getUsersByIds(otherUserIds);
+    const participants = conversation.participants
+      .filter((p) => p.isActive)
+      .map((p) => {
+        if (p.id === session.user.id || p.type !== "user") return p;
+        const liveAvatar = liveUsers.get(p.id)?.profileImage?.trim();
+        if (!liveAvatar) return p;
+        return { ...p, avatar: liveAvatar };
+      });
+
+    // Reason: fill blank message snapshots from the live participant face so a
+    // correctly-profiled user is not stuck as a letter inside the thread.
+    const avatarBySender = new Map(
+      participants
+        .filter((p) => p.avatar)
+        .map((p) => [p.id, p.avatar as string]),
+    );
+
     return NextResponse.json({
       conversation: {
         id: conversation._id.toString(),
         type: conversation.type,
         status: conversation.status,
-        participants: conversation.participants.filter((p) => p.isActive),
+        participants,
         lastMessage: conversation.lastMessage,
         unreadCount,
         isAIHandled: conversation.isAIHandled,
@@ -90,7 +114,8 @@ export async function GET(
         senderId: msg.senderId,
         senderType: msg.senderType,
         senderName: msg.senderName,
-        senderAvatar: msg.senderAvatar,
+        senderAvatar:
+          msg.senderAvatar || avatarBySender.get(msg.senderId) || undefined,
         content: msg.content,
         messageType: msg.messageType,
         attachments: msg.attachments,

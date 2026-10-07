@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
 import MessagingService from "@/lib/services/messaging/messaging.service";
-import { getPublicName } from "@/lib/utils/user-lookup";
+import { getUserById, getUsersByIds } from "@/lib/utils/user-lookup";
 import { resolvePublicName } from "@/lib/utils/username";
 
 /**
@@ -45,22 +45,34 @@ export async function GET(request: NextRequest) {
       { type: type || undefined, limit, offset },
     );
 
-    // Get online status for participants
+    // Reason: participant.avatar is a create-time snapshot. Users who set a
+    // profile picture later (or whose face lived only in profileImage) showed a
+    // letter in the list while their profile had a real image. Overlay live
+    // faces on read; do not write back here — profile-sync owns persistence.
     const allParticipantIds = new Set<string>();
     for (const conv of conversations) {
       for (const p of conv.participants) {
-        if (p.id !== session.user.id) {
+        if (p.id !== session.user.id && p.type === "user") {
           allParticipantIds.add(p.id);
         }
       }
     }
+    const liveUsers = await getUsersByIds([...allParticipantIds]);
 
     return NextResponse.json({
       conversations: conversations.map((conv) => ({
         id: conv._id.toString(),
         type: conv.type,
         status: conv.status,
-        participants: conv.participants.filter((p) => p.isActive),
+        participants: conv.participants
+          .filter((p) => p.isActive)
+          .map((p) => {
+            if (p.id === session.user.id || p.type !== "user") return p;
+            const live = liveUsers.get(p.id);
+            const liveAvatar = live?.profileImage?.trim();
+            if (!liveAvatar) return p;
+            return { ...p, avatar: liveAvatar };
+          }),
         lastMessage: conv.lastMessage,
         unreadCount: typeof conv.unreadCounts?.get === "function"
           ? conv.unreadCounts.get(session.user.id) || 0
@@ -163,11 +175,14 @@ export async function POST(request: NextRequest) {
     const participantAvatar =
       participantUser.profileImage || participantUser.image;
 
+    // Reason: session.user.image often misses uploads stored as profileImage.
+    const me = await getUserById(session.user.id);
+
     const conversation = await MessagingService.findOrCreateDirectConversation(
       {
         id: session.user.id,
-        name: await getPublicName(session.user.id),
-        avatar: session.user.image ?? undefined,
+        name: me?.publicName || resolvePublicName({ id: session.user.id }),
+        avatar: me?.profileImage || session.user.image || undefined,
       },
       {
         id: participantId,

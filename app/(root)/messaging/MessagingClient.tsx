@@ -36,6 +36,7 @@ import EmojiPicker from "@/components/chat/EmojiPicker";
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { resolveChatAvatar } from "@/lib/utils/chat-avatar";
 
 interface Session {
   user: {
@@ -660,6 +661,15 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         if (response.ok) {
           const data = await response.json();
           setMessages(data.messages || []);
+          // Reason: keep the open chat's participant faces in sync with the
+          // live overlay returned by GET (list snapshot can be older).
+          if (data.conversation?.participants) {
+            setSelectedConversation((prev) =>
+              prev && prev.id === conversationId
+                ? { ...prev, participants: data.conversation.participants }
+                : prev,
+            );
+          }
 
           // Only scroll to bottom on initial conversation load, not on refresh/poll
           if (isInitial) {
@@ -2061,6 +2071,16 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                     !isOwn &&
                     (index === 0 ||
                       messages[index - 1].senderId !== msg.senderId);
+                  // Reason: bubbles used to paint only the name initial even when
+                  // senderAvatar / the conversation participant avatar existed —
+                  // list and header showed the face, the thread did not.
+                  const participantAvatar = selectedConversation?.participants.find(
+                    (p) => p.id === msg.senderId,
+                  )?.avatar;
+                  const bubbleAvatar = resolveChatAvatar({
+                    senderAvatar: msg.senderAvatar,
+                    participantAvatar,
+                  });
 
                   if (isSystem) {
                     return (
@@ -2079,14 +2099,22 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                     >
                       {!isOwn && showAvatar && (
                         <div
-                          className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center ${
+                          className={`w-8 h-8 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center ${
                             isAI
                               ? "bg-gradient-to-br from-purple-500 to-pink-600"
-                              : "bg-gradient-to-br from-cyan-500 to-blue-600"
+                              : bubbleAvatar
+                                ? "bg-transparent"
+                                : "bg-gradient-to-br from-cyan-500 to-blue-600"
                           }`}
                         >
                           {isAI ? (
                             <Sparkles className="w-4 h-4 text-white" />
+                          ) : bubbleAvatar ? (
+                            <img
+                              src={bubbleAvatar}
+                              alt=""
+                              className="w-8 h-8 rounded-xl object-cover"
+                            />
                           ) : (
                             <span className="text-white text-xs font-medium">
                               {msg.senderName?.charAt(0)}
