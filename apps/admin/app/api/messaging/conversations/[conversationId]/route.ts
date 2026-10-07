@@ -46,7 +46,7 @@ export async function GET(
     }
 
     // Get messages
-    const messageQuery: any = {
+    const messageQuery: Record<string, unknown> = {
       conversationId: new Types.ObjectId(conversationId),
       isDeleted: { $ne: true },
     };
@@ -59,34 +59,50 @@ export async function GET(
       .sort({ createdAt: -1 })
       .limit(limit);
 
-    // Mark messages as read for this employee
-    await Message.updateMany(
-      {
-        conversationId: new Types.ObjectId(conversationId),
-        senderId: { $ne: guard.admin.id },
-        "readBy.participantId": { $ne: guard.admin.id },
-      },
-      {
-        $push: {
-          readBy: {
-            participantId: guard.admin.id,
-            participantName: guard.admin.name || guard.admin.email,
-            readAt: new Date(),
-          },
-        },
-        $set: { status: "read" },
-      },
-    );
+    // Reason: only write when this employee still has unread — poll fallback
+    // must not updateMany + $set on every tick when the badge is already 0.
+    const counts = conversation.unreadCounts as
+      | Map<string, number>
+      | Record<string, number>
+      | undefined;
+    let priorUnread = 0;
+    if (counts) {
+      if (typeof (counts as Map<string, number>).get === "function") {
+        priorUnread = (counts as Map<string, number>).get(guard.admin.id) || 0;
+      } else {
+        priorUnread =
+          new Map(Object.entries(counts as Record<string, number>)).get(
+            guard.admin.id,
+          ) || 0;
+      }
+    }
 
-    // Reset unread count - handle both Map and plain object
-    const db = mongoose.connection.db;
-    if (db) {
-      await db
-        .collection("conversations")
-        .updateOne(
+    if (priorUnread > 0) {
+      await Message.updateMany(
+        {
+          conversationId: new Types.ObjectId(conversationId),
+          senderId: { $ne: guard.admin.id },
+          "readBy.participantId": { $ne: guard.admin.id },
+        },
+        {
+          $push: {
+            readBy: {
+              participantId: guard.admin.id,
+              participantName: guard.admin.name || guard.admin.email,
+              readAt: new Date(),
+            },
+          },
+          $set: { status: "read" },
+        },
+      );
+
+      const db = mongoose.connection.db;
+      if (db) {
+        await db.collection("conversations").updateOne(
           { _id: new Types.ObjectId(conversationId) },
           { $set: { [`unreadCounts.${guard.admin.id}`]: 0 } },
         );
+      }
     }
 
     return NextResponse.json({
@@ -95,7 +111,11 @@ export async function GET(
         type: conversation.type,
         status: conversation.status,
         participants:
-          conversation.participants?.filter((p: any) => p.isActive) || [],
+          (
+            conversation.participants as
+              | Array<{ isActive?: boolean }>
+              | undefined
+          )?.filter((p) => p.isActive) || [],
         lastMessage: conversation.lastMessage,
         unreadCount: 0,
         isAIHandled: conversation.isAIHandled,
@@ -116,7 +136,7 @@ export async function GET(
         createdAt: conversation.createdAt,
         lastActivityAt: conversation.lastActivityAt,
       },
-      messages: messages.reverse().map((msg: any) => ({
+      messages: messages.reverse().map((msg) => ({
         id: msg._id.toString(),
         senderId: msg.senderId,
         senderType: msg.senderType,

@@ -325,6 +325,7 @@ project low risk.
 - **1v1 / Competition summary tiles CODE-COMPLETE 7 Oct (eng)** — 1v1 now fills a 2×2 (Played / Wins / Losses / Win rate) like Competition; shared `PerfMetricGrid` + accent hero chrome on desktop and mobile. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Mobile Wallet Analytics denser CODE-COMPLETE 7 Oct (eng)** — Wallet Insights removed on phones only (desktop unchanged); Volt Breakdown summary tiles are `grid-cols-2` below `sm` and keep auto-fill from `sm` up. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Messaging poll logs flooding PM2 CODE-COMPLETE 7 Oct (eng)** — open chats polled conversation GET ~once/minute and dumped every message body as `[ConvAPI]`; support GET, admin list, employees picker, and send-message content dumps silenced (errors stay). Tests: `poll-log-silence.test.ts`. **Needs deploy + pm2 restart.**
+- **Messaging scale for 1k+ clients CODE-COMPLETE 7 Oct (eng)** — unread badge poll 10s→30s + lean `unreadCounts`-only read; conversation GET no longer marks read (POST `/read` only when opening or unread &gt; 0); `markMessagesAsRead` no-ops when already zero; send rate limit prefers Redis with memory fallback. Tests: `messaging-scale.test.ts`. **Needs deploy + pm2 restart.**
 - **Player mobile opens already zoomed CODE-COMPLETE 7 Oct (eng)** — second pass after owner screenshot still clipped ~20% on the right. Next viewport export no longer ships `maximumScale: 1` (that trapped Safari before JS could reset); boot `beforeInteractive` + `MobileViewportLock` unlock → re-lock pinch; root flex/`main`/page pad get `min-w-0` + overflow clip; Quick Actions are 2×2. Tests: `mobile-dashboard-split.test.ts`. **Never verified by eye — needs deploy + hard refresh.**
 - **GM contact-us always named Andy.A CODE-COMPLETE 6 Oct (eng)** — escalate loaded only `status: "active"` admins, so assignees with an unset status were invisible and handoff fell through to the first Support/Backoffice (often Andy.A); `isAvailableForChat: false` also stole the client. Assigned manager now always wins unless locked out. Tests: `support-handoff.test.ts`. Never verified by eye.
 - **Full Admin assignment cleanup tool CODE-COMPLETE 6 Oct (eng)** — report-only `tools/users/report-full-admin-assignments.ts` lists active `customer_assignments` on Full Admin; `--apply` spreads them onto Backoffice / Support Agent by least_customers and retargets open support tickets (skips temporary redirects). Not run against production from eng (Atlas IP). Never verified by eye.
@@ -983,6 +984,19 @@ Newest at the top.
 **Shipped:** `CreditBreakdownPanel` summary is `grid-cols-2` below `sm`, auto-fill from `sm` up (desktop unchanged); `MobileWalletInsights` removed from the mobile tree; desktop `WalletInsights` kept.
 
 **Nothing was paid wrongly.** Tests: `wallet-analytics.test.ts`. Never verified by eye.
+
+### 7 October 2026 - Messaging scale for 1k+ clients (owner ask)
+
+**Owner ask:** after silencing ConvAPI spam, confirm messaging will not be heavy at 1000+ clients messaging.
+
+**Shipped (careful, additive):**
+1. Sidebar unread poll `10s` → `30s`; `getUnreadCount` selects only `unreadCounts` (lean).
+2. Player conversation GET is read-only — mark-read is `POST /read`, fired only on open or when server unread &gt; 0.
+3. `markMessagesAsRead` returns early when unread is already 0; resets via `updateOne` not `save()`.
+4. Admin conversation GET skips `updateMany` when that employee’s unread is already 0.
+5. Send rate limit uses Redis when available, in-memory fallback when not.
+
+Pinned by `__tests__/messaging/messaging-scale.test.ts`. Nothing paid wrongly. Needs deploy + restart.
 
 ### 7 October 2026 - Messaging poll logs flooding PM2 (owner report)
 

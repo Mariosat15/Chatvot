@@ -666,22 +666,30 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             setTimeout(() => scrollToBottom(), 100);
           }
 
-          // Reason: The GET endpoint already marks messages as read server-side.
-          // We also fire the /read POST for any edge-case, then zero the local
-          // unread count immediately so the UI reflects the read state.
-          fetch(`/api/messaging/conversations/${conversationId}/read`, {
-            method: "POST",
-          });
+          // Reason: GET is read-only; POST /read only when opening or when there
+          // is something to clear — polls must not write every 8 seconds.
+          const serverUnread = data.conversation?.unreadCount ?? 0;
+          if (isInitial || serverUnread > 0) {
+            fetch(`/api/messaging/conversations/${conversationId}/read`, {
+              method: "POST",
+            });
+          }
 
-          setConversations((prev) => {
-            const updated = prev.map((c) =>
-              c.id === conversationId ? { ...c, unreadCount: 0 } : c,
-            );
-            const newTotal = updated.reduce((sum, c) => sum + c.unreadCount, 0);
-            setUnreadTotal(newTotal);
-            try { unreadBroadcastRef.current?.postMessage({ unreadCount: newTotal }); } catch {}
-            return updated;
-          });
+          if (serverUnread > 0 || isInitial) {
+            setConversations((prev) => {
+              const updated = prev.map((c) =>
+                c.id === conversationId ? { ...c, unreadCount: 0 } : c,
+              );
+              const newTotal = updated.reduce((sum, c) => sum + c.unreadCount, 0);
+              setUnreadTotal(newTotal);
+              try {
+                unreadBroadcastRef.current?.postMessage({ unreadCount: newTotal });
+              } catch {
+                /* BroadcastChannel unsupported */
+              }
+              return updated;
+            });
+          }
         }
       } catch {
         // Silent fail

@@ -20,9 +20,29 @@ import {
 } from "@/database/models/messaging";
 import { resolvePublicName } from "@/lib/utils/username";
 import { resolveSupportHandoffEmployee } from "@/lib/services/messaging/resolve-support-handoff";
+import {
+  checkRateLimit as checkRedisRateLimit,
+  getRedis,
+} from "@/lib/services/redis.service";
 
-// Rate limiting map (in production, use Redis)
+// Reason: in-memory fallback when Redis is down; Redis is preferred across instances.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+/** Read one participant's unread from a Map or plain object without prototype lookup. */
+export function unreadFromCounts(
+  counts: Map<string, number> | Record<string, number> | null | undefined,
+  participantId: string,
+): number {
+  if (!counts) return 0;
+  if (typeof (counts as Map<string, number>).get === "function") {
+    return (counts as Map<string, number>).get(participantId) || 0;
+  }
+  return (
+    new Map(Object.entries(counts as Record<string, number>)).get(
+      participantId,
+    ) || 0
+  );
+}
 
 // WebSocket server URL for internal API
 const WS_SERVER_URL =
@@ -462,22 +482,34 @@ export class MessagingService {
 
     const settings = await (MessagingSettings as any).getSettings();
 
-    // Rate limiting check
-    const rateLimitKey = `msg:${params.senderId}`;
-    const rateLimit = rateLimitMap.get(rateLimitKey);
-    const now = Date.now();
-
-    if (rateLimit) {
-      if (now < rateLimit.resetAt) {
-        if (rateLimit.count >= settings.messagesPerMinuteLimit) {
-          throw new Error("Rate limit exceeded. Please slow down.");
+    // Rate limiting — Redis when available (shared across PM2 workers), else memory.
+    const perMinute = settings.messagesPerMinuteLimit as number;
+    const redis = await getRedis();
+    if (redis) {
+      const rl = await checkRedisRateLimit(
+        `messaging:send:${params.senderId}`,
+        perMinute,
+        60,
+      );
+      if (!rl.allowed) {
+        throw new Error("Rate limit exceeded. Please slow down.");
+      }
+    } else {
+      const rateLimitKey = `msg:${params.senderId}`;
+      const rateLimit = rateLimitMap.get(rateLimitKey);
+      const now = Date.now();
+      if (rateLimit) {
+        if (now < rateLimit.resetAt) {
+          if (rateLimit.count >= perMinute) {
+            throw new Error("Rate limit exceeded. Please slow down.");
+          }
+          rateLimit.count++;
+        } else {
+          rateLimitMap.set(rateLimitKey, { count: 1, resetAt: now + 60000 });
         }
-        rateLimit.count++;
       } else {
         rateLimitMap.set(rateLimitKey, { count: 1, resetAt: now + 60000 });
       }
-    } else {
-      rateLimitMap.set(rateLimitKey, { count: 1, resetAt: now + 60000 });
     }
 
     // Content moderation
@@ -635,7 +667,15 @@ export class MessagingService {
   ): Promise<void> {
     await connectToDatabase();
 
-    // Mark all unread messages as read
+    // Reason: skip writes when already read — GET/poll used to hit this every time.
+    const conversation = await Conversation.findById(conversationId)
+      .select("unreadCounts")
+      .lean<{ unreadCounts?: Map<string, number> | Record<string, number> }>();
+    if (!conversation) return;
+    if (unreadFromCounts(conversation.unreadCounts, participantId) === 0) {
+      return;
+    }
+
     await Message.updateMany(
       {
         conversationId: new Types.ObjectId(conversationId),
@@ -654,12 +694,11 @@ export class MessagingService {
       },
     );
 
-    // Reset unread count in conversation
-    const conversation = await Conversation.findById(conversationId);
-    if (conversation) {
-      conversation.unreadCounts.set(participantId, 0);
-      await conversation.save();
-    }
+    // Reason: atomic $set avoids load-modify-save of the whole conversation doc.
+    await Conversation.updateOne(
+      { _id: new Types.ObjectId(conversationId) },
+      { $set: { [`unreadCounts.${participantId}`]: 0 } },
+    );
   }
 
   // ==========================================
@@ -1278,15 +1317,18 @@ export class MessagingService {
   static async getUnreadCount(participantId: string): Promise<number> {
     await connectToDatabase();
 
+    // Reason: badge polls often; only pull unreadCounts, never full conversation docs.
     const conversations = await Conversation.find({
       "participants.id": participantId,
       "participants.isActive": true,
       status: { $ne: "closed" },
-    });
+    })
+      .select({ unreadCounts: 1 })
+      .lean<{ unreadCounts?: Map<string, number> | Record<string, number> }[]>();
 
     let totalUnread = 0;
     for (const conv of conversations) {
-      totalUnread += conv.unreadCounts.get(participantId) || 0;
+      totalUnread += unreadFromCounts(conv.unreadCounts, participantId);
     }
 
     return totalUnread;

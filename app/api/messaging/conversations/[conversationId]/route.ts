@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
-import MessagingService from "@/lib/services/messaging/messaging.service";
-import { getPublicName } from "@/lib/utils/user-lookup";
+import MessagingService, {
+  unreadFromCounts,
+} from "@/lib/services/messaging/messaging.service";
 
 /**
  * GET /api/messaging/conversations/[conversationId]
@@ -38,18 +39,13 @@ export async function GET(
     // Reason (7 Oct 2026, owner): never log happy-path polls — this GET is
     // hit about once a minute per open chat and was flooding PM2 with every
     // message body. Keep console.error on the catch path only.
+    // Reason (7 Oct 2026): GET is read-only. Marking read is POST /read so
+    // polls cannot write the conversation on every tick.
     const messages = await MessagingService.getMessages(conversationId, {
       limit,
       before: before ? new Date(before) : undefined,
       userId: session.user.id, // Filter out messages cleared by this user
     });
-
-    // Mark messages as read
-    await MessagingService.markMessagesAsRead(
-      conversationId,
-      session.user.id,
-      await getPublicName(session.user.id),
-    );
 
     const ticketFields = conversation as unknown as {
       isArchived?: boolean;
@@ -60,6 +56,14 @@ export async function GET(
       ticketNumber?: string;
     };
 
+    const unreadCount = unreadFromCounts(
+      conversation.unreadCounts as
+        | Map<string, number>
+        | Record<string, number>
+        | undefined,
+      session.user.id,
+    );
+
     return NextResponse.json({
       conversation: {
         id: conversation._id.toString(),
@@ -67,7 +71,7 @@ export async function GET(
         status: conversation.status,
         participants: conversation.participants.filter((p) => p.isActive),
         lastMessage: conversation.lastMessage,
-        unreadCount: 0, // We just marked as read
+        unreadCount,
         isAIHandled: conversation.isAIHandled,
         assignedEmployeeName: conversation.assignedEmployeeName,
         // Include archived/resolved fields

@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const POLL_INTERVAL = 10000; // 10 seconds for faster responsiveness
+// Reason (7 Oct 2026): sidebar mounts this for every signed-in user. 10s was
+// ~6k Mongo reads/min at 1k online; 30s plus visibility/BroadcastChannel is enough.
+const POLL_INTERVAL = 30000;
 
 /**
  * Hook that polls /api/messaging/unread for the current user's unread message count.
