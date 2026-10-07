@@ -267,12 +267,8 @@ export class MessagingService {
     const settings = await (MessagingSettings as any).getSettings();
     const db = mongoose.connection.db;
 
-    console.log(
-      `🔍 [MessagingService] getOrCreateSupportConversation for user: ${userName} (${userId})`,
-    );
-    console.log(
-      `🔍 [MessagingService] AI Support enabled: ${settings.enableAISupport}`,
-    );
+    // Reason (7 Oct 2026, owner): this runs on every support poll. Happy-path
+    // console.log flooded PM2; keep console.error only.
 
     // First, check if user has an assigned employee (account manager)
     let assignedEmployee: { id: string; name: string; avatar?: string } | null =
@@ -283,10 +279,6 @@ export class MessagingService {
           customerId: userId,
           isActive: true,
         });
-
-        console.log(
-          `🔍 [MessagingService] Assignment found: ${assignment ? "Yes" : "No"}`,
-        );
 
         if (assignment?.employeeId) {
           // Reason: status:"active" only matches a STORED value. Accounts created
@@ -305,9 +297,6 @@ export class MessagingService {
               name: employee.name || employee.email.split("@")[0],
               avatar: employee.profileImage,
             };
-            console.log(
-              `🔍 [MessagingService] Assigned employee: ${assignedEmployee.name}`,
-            );
           }
         }
       }
@@ -329,10 +318,6 @@ export class MessagingService {
     });
 
     if (conversation) {
-      console.log(
-        `📦 [MessagingService] Found existing ACTIVE conversation: ${conversation._id}`,
-      );
-
       // Reason: keep the ticket stamp aligned with customer_assignments unless
       // this chat is on a temporary redirect — otherwise AI handoff reads a
       // stale employee while the admin badge shows someone else.
@@ -348,9 +333,6 @@ export class MessagingService {
           );
           conversation.assignedEmployeeName = assignedEmployee.name;
           await conversation.save();
-          console.log(
-            `📦 [MessagingService] Synced assigned employee to ${assignedEmployee.name} (AI still handling)`,
-          );
         }
       }
 
@@ -370,10 +352,6 @@ export class MessagingService {
       });
       ticketNumber = ticketCount + 1;
     }
-
-    console.log(
-      `🆕 [MessagingService] Creating NEW support ticket #${ticketNumber} for user ${userName}`,
-    );
 
     // IMPORTANT: AI ALWAYS handles first if enabled, regardless of assigned employee
     // The assigned employee will take over when customer requests human assistance
@@ -419,16 +397,6 @@ export class MessagingService {
         content: settings.aiGreetingMessage,
         messageType: "ai-response",
       });
-      console.log(
-        `✅ [MessagingService] AI Support enabled - AI greeting sent`,
-      );
-
-      // If there's an assigned employee, mention they're available
-      if (assignedEmployee) {
-        console.log(
-          `📝 [MessagingService] Assigned employee ${assignedEmployee.name} ready for escalation`,
-        );
-      }
     }
     // If AI is disabled but has assigned employee, add employee directly
     else if (assignedEmployee) {
@@ -452,16 +420,8 @@ export class MessagingService {
         content: `Hello ${userName}! I'm ${assignedEmployee.name}, your dedicated account manager. How can I help you today?`,
         messageType: "system",
       });
-      console.log(
-        `✅ [MessagingService] AI disabled - Employee handling directly`,
-      );
     }
-    // No AI and no employee - just create empty conversation (waiting for support)
-    else {
-      console.log(
-        `⚠️ [MessagingService] No AI and no assigned employee - customer waiting for support`,
-      );
-    }
+    // No AI and no employee - empty conversation waits for support.
 
     return conversation;
   }

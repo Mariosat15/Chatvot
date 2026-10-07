@@ -3,6 +3,14 @@ import mongoose, { Types } from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
 
+type ParticipantRow = {
+  id?: string;
+  type?: string;
+  name?: string;
+  avatar?: string;
+  isActive?: boolean;
+};
+
 /**
  * GET /api/messaging/conversations
  * Get conversations for admin/employees with proper access control:
@@ -18,15 +26,13 @@ export async function GET(request: NextRequest) {
     const guard = await guardSection("messaging");
     if (!guard.ok) return guard.response;
 
-    const { id: adminId, email } = guard.admin;
+    const { id: adminId } = guard.admin;
     // Reason: GuardedAdmin.role is only "super_admin" | "admin". Treating "admin" as
     // full-visibility would let every messaging employee see all conversations.
     const isFullAdmin = guard.admin.role === "super_admin";
 
-    console.log(
-      `📥 [GetConv] Request from: ${email} (${guard.admin.role}), isFullAdmin: ${isFullAdmin}`,
-    );
-
+    // Reason (7 Oct 2026, owner): admin messaging list is polled; happy-path
+    // logs (including full query dumps) flooded PM2. Errors stay on console.error.
     await connectToDatabase();
 
     const db = mongoose.connection.db;
@@ -40,7 +46,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all"; // 'support', 'internal', 'all'
     const status = searchParams.get("status") || "all"; // 'active', 'archived', 'all'
-    const includeArchived = searchParams.get("includeArchived") !== "false"; // Default: include archived
+    // Reason: status filter below is the archive gate; query param kept for API compat.
+    void (searchParams.get("includeArchived") !== "false");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
 
@@ -57,13 +64,10 @@ export async function GET(request: NextRequest) {
       assignedCustomerIds = assignments
         .map((a) => a.customerId?.toString())
         .filter(Boolean);
-      console.log(
-        `📥 [GetConv] Employee ${email} has ${assignedCustomerIds.length} assigned customers`,
-      );
     }
 
     // Build query based on user type and filter
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
     if (type === "support") {
       query.type = "user-to-support";
@@ -104,20 +108,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by status
+    const andClauses = (query.$and as Record<string, unknown>[] | undefined) || [];
     if (status === "active") {
-      query.$and = query.$and || [];
-      query.$and.push({
+      andClauses.push({
         $or: [{ status: "active" }, { isArchived: { $ne: true } }],
       });
+      query.$and = andClauses;
     } else if (status === "archived") {
-      query.$and = query.$and || [];
-      query.$and.push({
+      andClauses.push({
         $or: [{ status: "archived" }, { isArchived: true }],
       });
+      query.$and = andClauses;
     }
     // If status is 'all', no filter is applied
-
-    console.log(`📥 [GetConv] Query:`, JSON.stringify(query, null, 2));
 
     const conversations = await db
       .collection("conversations")
@@ -129,23 +132,57 @@ export async function GET(request: NextRequest) {
 
     const total = await db.collection("conversations").countDocuments(query);
 
-    console.log(
-      `📥 [GetConv] Found ${conversations.length} conversations (total: ${total})`,
-    );
+    type ConversationRow = {
+      _id: { toString(): string };
+      type?: string;
+      status?: string;
+      ticketNumber?: string | null;
+      customerId?: string | null;
+      customerName?: string | null;
+      isArchived?: boolean;
+      archivedAt?: Date;
+      participants?: ParticipantRow[];
+      lastMessage?: unknown;
+      unreadCounts?: Map<string, number> | Record<string, number>;
+      isAIHandled?: boolean;
+      isResolved?: boolean;
+      resolvedAt?: Date;
+      resolvedByName?: string;
+      assignedEmployeeId?: { toString(): string };
+      assignedEmployeeName?: string;
+      originalEmployeeId?: { toString(): string };
+      originalEmployeeName?: string;
+      isChatTransferred?: boolean;
+      chatTransferredTo?: { toString(): string };
+      chatTransferredToName?: string;
+      chatTransferredFrom?: { toString(): string };
+      chatTransferredFromName?: string;
+      temporarilyRedirected?: boolean;
+      redirectedAt?: unknown;
+      metadata?: unknown;
+      createdAt?: unknown;
+      lastActivityAt?: unknown;
+    };
 
     // Map conversations with proper unread counts
-    const mappedConversations = conversations.map((conv: any) => {
+    const mappedConversations = conversations.map((raw) => {
+      const conv = raw as ConversationRow;
       let unreadCount = 0;
       if (conv.unreadCounts) {
-        if (typeof conv.unreadCounts.get === "function") {
-          unreadCount = conv.unreadCounts.get(adminId) || 0;
-        } else if (typeof conv.unreadCounts === "object") {
-          unreadCount = conv.unreadCounts[adminId] || 0;
+        if (typeof (conv.unreadCounts as Map<string, number>).get === "function") {
+          unreadCount =
+            (conv.unreadCounts as Map<string, number>).get(adminId) || 0;
+        } else {
+          // Reason: Map lookup avoids prototype-chain object indexing.
+          unreadCount =
+            new Map(
+              Object.entries(conv.unreadCounts as Record<string, number>),
+            ).get(adminId) || 0;
         }
       }
 
       // Find the customer in participants (for support conversations)
-      const customer = conv.participants?.find((p: any) => p.type === "user");
+      const customer = conv.participants?.find((p) => p.type === "user");
 
       return {
         id: conv._id.toString(),
@@ -158,7 +195,7 @@ export async function GET(request: NextRequest) {
         isArchived: conv.isArchived || false,
         archivedAt: conv.archivedAt?.toISOString() || null,
         // Participants
-        participants: conv.participants?.filter((p: any) => p.isActive) || [],
+        participants: conv.participants?.filter((p) => p.isActive) || [],
         customer: customer
           ? {
               id: customer.id,
@@ -255,9 +292,9 @@ export async function POST(request: NextRequest) {
 
       if (conversation) {
         // Add employee as participant if not already
-        const hasEmployee = conversation.participants?.some(
-          (p: any) => p.id === adminId,
-        );
+        const hasEmployee = (
+          conversation.participants as ParticipantRow[] | undefined
+        )?.some((p) => p.id === adminId);
         if (!hasEmployee) {
           await db.collection("conversations").updateOne(
             { _id: conversation._id },
@@ -387,13 +424,18 @@ export async function POST(request: NextRequest) {
         joinedAt: new Date(),
         isActive: true,
       },
-      ...participantIds.map((id: string, index: number) => ({
-        id,
-        type: "employee",
-        name: participantNames?.[index] || "Employee",
-        joinedAt: new Date(),
-        isActive: true,
-      })),
+      ...participantIds.map((id: string, index: number) => {
+        const names = Array.isArray(participantNames)
+          ? (participantNames as string[])
+          : [];
+        return {
+          id,
+          type: "employee",
+          name: names.at(index) || "Employee",
+          joinedAt: new Date(),
+          isActive: true,
+        };
+      }),
     ];
 
     const result = await db.collection("conversations").insertOne({

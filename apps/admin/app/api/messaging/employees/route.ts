@@ -7,21 +7,18 @@ import { guardSection } from "@/lib/admin/section-route-guard";
  * GET /api/messaging/employees
  * Get list of employees for internal messaging
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Reason: Messaging screen owns the employee picker; section grant is the auth answer.
     const guard = await guardSection("messaging");
     if (!guard.ok) return guard.response;
 
-    console.log(
-      `📧 [Employees] Request from: ${guard.admin.email}, adminId: ${guard.admin.id}`,
-    );
-
+    // Reason (7 Oct 2026, owner): this list is polled; dumping every admin
+    // email on each hit flooded production. Keep console.error only.
     await connectToDatabase();
 
     const db = mongoose.connection.db;
     if (!db) {
-      console.log("❌ [Employees] Database not connected");
       return NextResponse.json(
         { error: "Database not connected" },
         { status: 500 },
@@ -33,20 +30,8 @@ export async function GET(request: NextRequest) {
     try {
       currentUserId = new mongoose.Types.ObjectId(guard.admin.id);
     } catch {
-      console.log(`❌ [Employees] Invalid adminId: ${guard.admin.id}`);
       return NextResponse.json({ error: "Invalid admin ID" }, { status: 400 });
     }
-
-    console.log(`📧 [Employees] Current user ObjectId: ${currentUserId}`);
-
-    // Use raw collection for more reliable query
-    const allAdmins = await db.collection("admins").find({}).toArray();
-    console.log(`📧 [Employees] Total admins in DB: ${allAdmins.length}`);
-    allAdmins.forEach((admin: any) => {
-      console.log(
-        `   - ${admin.email} (${admin._id}) status: ${admin.status}, role: ${admin.role}, isSuperAdmin: ${admin.isSuperAdmin}`,
-      );
-    });
 
     // Get ALL active employees/admins (including super admin) - exclude only current user
     const employees = await db
@@ -61,23 +46,15 @@ export async function GET(request: NextRequest) {
       })
       .toArray();
 
-    console.log(
-      `📧 [Employees] Found ${employees.length} team members (excluding current user)`,
-    );
-    employees.forEach((emp: any) => {
-      console.log(
-        `   ✓ ${emp.email} (${emp.role}${emp.isSuperAdmin ? " - SUPER ADMIN" : ""})`,
-      );
-    });
-
-    console.log(
-      `📧 [Employees] Fetched ${employees.length} employees for internal chat (excluding ${guard.admin.email})`,
-    );
-
     // Get online status from presence collection
-    const employeeIds = employees.map((e: any) => e._id.toString());
+    const employeeIds = employees.map((e: { _id: mongoose.Types.ObjectId }) =>
+      e._id.toString(),
+    );
 
-    let presenceMap = new Map();
+    let presenceMap = new Map<
+      string,
+      { status?: string; lastSeen?: Date }
+    >();
     try {
       const presences = await db
         .collection("user_presence")
@@ -88,34 +65,42 @@ export async function GET(request: NextRequest) {
         .toArray();
 
       presenceMap = new Map(
-        presences.map((p: any) => [
+        presences.map((p: { participantId: string; status?: string; lastSeen?: Date }) => [
           p.participantId,
           { status: p.status, lastSeen: p.lastSeen },
         ]),
       );
-    } catch (e) {
-      console.log("📧 [Employees] No presence data found");
+    } catch {
+      // Presence is optional — offline is fine.
     }
 
-    const result = employees.map((emp: any) => {
-      const presence = presenceMap.get(emp._id.toString());
-      return {
-        id: emp._id.toString(),
-        name: emp.name || emp.email?.split("@")[0] || "Employee",
-        email: emp.email,
-        role: emp.isSuperAdmin ? "Super Admin" : emp.role || "Employee",
-        isSuperAdmin: emp.isSuperAdmin || false,
-        avatar: emp.profileImage || emp.avatar,
-        status: presence?.status || (emp.isOnline ? "online" : "offline"),
-        lastSeen: presence?.lastSeen,
-        lastLoginAt: emp.lastLoginAt,
-        isAvailableForChat: emp.isAvailableForChat !== false,
-      };
-    });
-
-    console.log(
-      `📧 [Employees] Returning ${result.length} employees:`,
-      result.map((e) => e.email),
+    const result = employees.map(
+      (emp: {
+        _id: mongoose.Types.ObjectId;
+        name?: string;
+        email?: string;
+        role?: string;
+        isSuperAdmin?: boolean;
+        profileImage?: string;
+        avatar?: string;
+        isOnline?: boolean;
+        lastLoginAt?: Date;
+        isAvailableForChat?: boolean;
+      }) => {
+        const presence = presenceMap.get(emp._id.toString());
+        return {
+          id: emp._id.toString(),
+          name: emp.name || emp.email?.split("@")[0] || "Employee",
+          email: emp.email,
+          role: emp.isSuperAdmin ? "Super Admin" : emp.role || "Employee",
+          isSuperAdmin: emp.isSuperAdmin || false,
+          avatar: emp.profileImage || emp.avatar,
+          status: presence?.status || (emp.isOnline ? "online" : "offline"),
+          lastSeen: presence?.lastSeen,
+          lastLoginAt: emp.lastLoginAt,
+          isAvailableForChat: emp.isAvailableForChat !== false,
+        };
+      },
     );
 
     return NextResponse.json({

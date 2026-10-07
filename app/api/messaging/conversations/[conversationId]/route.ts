@@ -35,21 +35,13 @@ export async function GET(
       );
     }
 
-    console.log(
-      `📩 [ConvAPI] Fetching messages for conv: ${conversationId}, user: ${session.user.id}`,
-    );
-
+    // Reason (7 Oct 2026, owner): never log happy-path polls — this GET is
+    // hit about once a minute per open chat and was flooding PM2 with every
+    // message body. Keep console.error on the catch path only.
     const messages = await MessagingService.getMessages(conversationId, {
       limit,
       before: before ? new Date(before) : undefined,
       userId: session.user.id, // Filter out messages cleared by this user
-    });
-
-    console.log("📩 [ConvAPI] Got messages:", messages.length);
-    messages.forEach((m: { senderType?: string; senderId?: string; content?: string }, i: number) => {
-      console.log(
-        `   ${i + 1}. ${m.senderType}/${m.senderId}: "${m.content?.slice(0, 30)}..."`,
-      );
     });
 
     // Mark messages as read

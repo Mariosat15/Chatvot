@@ -20,10 +20,7 @@ export async function POST(
     const body = await request.json();
     const { content, messageType, attachments, replyTo } = body;
 
-    console.log(
-      `📤 [SendMsg] From: ${guard.admin.email} (${guard.admin.id}) to conv: ${conversationId}`,
-    );
-    console.log(`📤 [SendMsg] Content: "${content?.substring(0, 50)}..."`);
+    // Reason (7 Oct 2026, owner): do not log message bodies or per-send chatter.
 
     if (!content && (!attachments || attachments.length === 0)) {
       return NextResponse.json(
@@ -47,7 +44,6 @@ export async function POST(
     try {
       convObjectId = new Types.ObjectId(conversationId);
     } catch {
-      console.log(`❌ [SendMsg] Invalid conversationId: ${conversationId}`);
       return NextResponse.json(
         { error: "Invalid conversation ID" },
         { status: 400 },
@@ -59,16 +55,11 @@ export async function POST(
       .findOne({ _id: convObjectId });
 
     if (!conversation) {
-      console.log(`❌ [SendMsg] Conversation not found: ${conversationId}`);
       return NextResponse.json(
         { error: "Conversation not found" },
         { status: 404 },
       );
     }
-
-    console.log(
-      `📤 [SendMsg] Conversation type: ${conversation.type}, participants: ${conversation.participants?.length}`,
-    );
 
     // Create message
     const messageDoc = {
@@ -95,7 +86,6 @@ export async function POST(
     };
 
     const msgResult = await db.collection("messages").insertOne(messageDoc);
-    console.log(`📤 [SendMsg] Message created: ${msgResult.insertedId}`);
 
     // Build unread counts update - use object notation for MongoDB
     const unreadCountsUpdate: Record<string, number> = {};
@@ -103,40 +93,39 @@ export async function POST(
       if (participant.id !== guard.admin.id && participant.isActive) {
         const currentCount = conversation.unreadCounts?.[participant.id] || 0;
         unreadCountsUpdate[`unreadCounts.${participant.id}`] = currentCount + 1;
-        console.log(
-          `📤 [SendMsg] Incrementing unread for ${participant.name} (${participant.id}): ${currentCount} -> ${currentCount + 1}`,
-        );
       }
     }
 
     // Update conversation
-    const updateDoc: any = {
-      $set: {
-        lastMessage: {
-          messageId: msgResult.insertedId,
-          content: content?.substring(0, 100) || "[Attachment]",
-          senderId: guard.admin.id,
-          senderName: guard.admin.name || guard.admin.email,
-          senderType: "employee",
-          timestamp: new Date(),
-        },
-        lastActivityAt: new Date(),
-        updatedAt: new Date(),
-        ...unreadCountsUpdate,
+    const setFields: Record<string, unknown> = {
+      lastMessage: {
+        messageId: msgResult.insertedId,
+        content: content?.substring(0, 100) || "[Attachment]",
+        senderId: guard.admin.id,
+        senderName: guard.admin.name || guard.admin.email,
+        senderType: "employee",
+        timestamp: new Date(),
       },
+      lastActivityAt: new Date(),
+      updatedAt: new Date(),
+      ...unreadCountsUpdate,
     };
+    const updateDoc: {
+      $set: Record<string, unknown>;
+      $push?: Record<string, unknown>;
+    } = { $set: setFields };
 
     // If AI was handling support chat, take over
     if (conversation.isAIHandled && conversation.type === "user-to-support") {
-      updateDoc.$set.isAIHandled = false;
-      updateDoc.$set.aiHandledUntil = new Date();
-      updateDoc.$set.assignedEmployeeId = new Types.ObjectId(guard.admin.id);
-      updateDoc.$set.assignedEmployeeName = guard.admin.name || guard.admin.email;
+      setFields.isAIHandled = false;
+      setFields.aiHandledUntil = new Date();
+      setFields.assignedEmployeeId = new Types.ObjectId(guard.admin.id);
+      setFields.assignedEmployeeName = guard.admin.name || guard.admin.email;
 
       // Add employee to participants if not present
-      const existingParticipant = conversation.participants?.find(
-        (p: any) => p.id === guard.admin.id,
-      );
+      const existingParticipant = (
+        conversation.participants as Array<{ id?: string }> | undefined
+      )?.find((p) => p.id === guard.admin.id);
       if (!existingParticipant) {
         updateDoc.$push = {
           participants: {
@@ -153,7 +142,6 @@ export async function POST(
     await db
       .collection("conversations")
       .updateOne({ _id: convObjectId }, updateDoc);
-    console.log(`📤 [SendMsg] Conversation updated successfully`);
 
     // Build message object for response
     const messageResponse = {

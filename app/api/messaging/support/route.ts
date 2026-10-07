@@ -11,13 +11,12 @@ export async function GET(_request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      console.log("❌ [Support GET] No session");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log(
-      `📨 [Support GET] User: ${session.user.name} (${session.user.id})`,
-    );
+    // Reason (7 Oct 2026, owner): support GET is polled while a chat is open.
+    // Happy-path console.log (user id, every message count) flooded PM2 the same
+    // way as [ConvAPI]. Keep console.error on the catch path only.
 
     const conversation = await MessagingService.getOrCreateSupportConversation(
       session.user.id,
@@ -25,20 +24,11 @@ export async function GET(_request: NextRequest) {
       session.user.image ?? undefined,
     );
 
-    console.log(
-      `📨 [Support GET] Conversation: ${conversation._id}, participants: ${conversation.participants?.length}`,
-    );
-    console.log(
-      `📨 [Support GET] isAIHandled: ${conversation.isAIHandled}, assignedEmployee: ${conversation.assignedEmployeeName}`,
-    );
-
     // Get recent messages
     const messages = await MessagingService.getMessages(
       conversation._id.toString(),
       { limit: 50 },
     );
-
-    console.log("📨 [Support GET] Messages:", messages.length);
 
     // Mark as read
     await MessagingService.markMessagesAsRead(
@@ -107,17 +97,11 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      console.log("❌ [Support POST] No session");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
     const { content, attachments } = body;
-
-    console.log(
-      `📤 [Support POST] From: ${session.user.name} (${session.user.id})`,
-    );
-    console.log("📤 [Support POST] Content:", content?.substring(0, 50));
 
     if (!content && (!attachments || attachments.length === 0)) {
       return NextResponse.json(
@@ -133,10 +117,6 @@ export async function POST(request: NextRequest) {
       session.user.image ?? undefined,
     );
 
-    console.log(
-      `📤 [Support POST] Conversation: ${conversation._id}, isAIHandled: ${conversation.isAIHandled}, assignedEmployee: ${conversation.assignedEmployeeName}`,
-    );
-
     const { message } = await MessagingService.sendMessage({
       conversationId: conversation._id.toString(),
       senderId: session.user.id,
@@ -148,8 +128,6 @@ export async function POST(request: NextRequest) {
       attachments,
     });
 
-    console.log("📤 [Support POST] Message sent:", message._id);
-
     // Broadcast via WebSocket
     const { wsNotifier } =
       await import("@/lib/services/messaging/websocket-notifier");
@@ -157,12 +135,8 @@ export async function POST(request: NextRequest) {
 
     // Handle AI response if conversation is AI-handled
     let aiResponse = null;
-    console.log(
-      `🤖 [Support POST] Checking AI handling... isAIHandled: ${conversation.isAIHandled}`,
-    );
 
     if (conversation.isAIHandled) {
-      console.log(`🤖 [Support POST] AI is handling, generating response...`);
       try {
         aiResponse = await handleAIResponse(
           conversation._id.toString(),
@@ -171,13 +145,8 @@ export async function POST(request: NextRequest) {
           content,
         );
 
-        console.log(
-          `🤖 [Support POST] AI response result: ${aiResponse ? "Generated" : "NULL"}`,
-        );
-
         if (aiResponse) {
           wsNotifier.notifyNewMessage(conversation._id.toString(), aiResponse);
-          console.log(`🤖 [Support POST] AI response sent via WebSocket`);
         }
       } catch (aiError) {
         console.error(
@@ -185,8 +154,6 @@ export async function POST(request: NextRequest) {
           aiError,
         );
       }
-    } else {
-      console.log(`🤖 [Support POST] AI NOT handling this conversation`);
     }
 
     return NextResponse.json({
@@ -243,9 +210,6 @@ async function handleAIResponse(
   userName: string,
   userMessage: string,
 ) {
-  console.log("🤖 [AI] Starting AI response for conv:", conversationId);
-  console.log("🤖 [AI] User message:", userMessage);
-
   const { connectToDatabase } = await import("@/database/mongoose");
   const mongoose = await import("mongoose");
 
@@ -253,7 +217,7 @@ async function handleAIResponse(
 
   const db = mongoose.default.connection.db;
   if (!db) {
-    console.log(`🤖 [AI] ERROR: Database not connected`);
+    console.error("🤖 [AI] Database not connected");
     return null;
   }
 
@@ -264,10 +228,7 @@ async function handleAIResponse(
     maxAIResponsesBeforeEscalation?: number;
   };
 
-  console.log("🤖 [AI] Settings enableAISupport:", settings.enableAISupport);
-
   if (!settings.enableAISupport) {
-    console.log(`🤖 [AI] AI Support disabled in settings`);
     return null;
   }
 
@@ -288,15 +249,11 @@ async function handleAIResponse(
   // If conversation was previously resolved, only count AI messages after that time
   if (conversation.lastResolvedAt) {
     aiMessageQuery.createdAt = { $gt: conversation.lastResolvedAt };
-    console.log(
-      `🤖 [AI] Counting AI messages after lastResolvedAt: ${conversation.lastResolvedAt}`,
-    );
   }
 
   const aiMessageCount = await db
     .collection("messages")
     .countDocuments(aiMessageQuery);
-  console.log("🤖 [AI] AI message count for this session:", aiMessageCount);
 
   // Check for escalation keywords
   const escalationKeywords = (settings as { aiEscalationKeywords?: string[] })
@@ -349,12 +306,9 @@ async function handleAIResponse(
   // Generate AI response using RAG-only service (NO company data access)
   try {
     const openaiApiKey = process.env.OPENAI_API_KEY;
-    console.log(
-      `🤖 [AI] OpenAI API key configured: ${openaiApiKey ? "YES" : "NO"}`,
-    );
 
     if (!openaiApiKey) {
-      console.error("🤖 [AI] ERROR: OpenAI API key not configured");
+      console.error("🤖 [AI] OpenAI API key not configured");
       return null;
     }
 
@@ -381,8 +335,6 @@ async function handleAIResponse(
       (settings as unknown as { platformName?: string }).platformName ||
       "ChartVolt";
 
-    console.log(`🤖 [AI] Using RAG-only customer support AI...`);
-
     const aiResult = await generateCustomerSupportResponse(
       userMessage,
       conversationHistory,
@@ -391,21 +343,14 @@ async function handleAIResponse(
 
     const aiContent = aiResult.content;
 
-    console.log(
-      `🤖 [AI] RAG response: usedRAG=${aiResult.usedRAG}, noKnowledge=${aiResult.noKnowledge}, sources=[${aiResult.sourcesUsed.join(", ")}]`,
-    );
-
     if (aiResult.noKnowledge) {
-      console.log(
-        `⚠️ [AI] WARNING: No knowledge base content found! Customer getting fallback response.`,
-      );
-      console.log(
-        `⚠️ [AI] Make sure to index knowledge in Admin Panel → AI & Automation → AI Database`,
+      console.warn(
+        "⚠️ [AI] No knowledge-base content — customer received the fallback reply",
       );
     }
 
     if (!aiContent) {
-      console.log(`🤖 [AI] ERROR: No content in AI response`);
+      console.error("🤖 [AI] No content in AI response");
       return null;
     }
 
