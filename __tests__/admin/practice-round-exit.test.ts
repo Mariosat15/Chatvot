@@ -142,7 +142,9 @@ describe("practice area matches the cyber HUD lobby", () => {
     expect(mobile).toMatch(/m-practice-cta/);
     expect(mobile).toMatch(/Solo practice is free/);
     expect(css).toMatch(/grid-template-columns:\s*repeat\(2/);
-    expect(css).toMatch(/clip-path:\s*polygon/);
+    // Reason (8 Oct 2026, owner): hex clip-path chips looked cut off; match desktop pills.
+    expect(css).toMatch(/\.m-practice-chip[\s\S]*?border-radius:\s*999px/);
+    expect(css).not.toMatch(/clip-path\s*:/);
     expect(history).toMatch(/PREVIEW_LIMIT\s*=\s*3/);
     expect(history).toMatch(/View all rounds/);
     expect(css).toMatch(/min-height:\s*44px/);
