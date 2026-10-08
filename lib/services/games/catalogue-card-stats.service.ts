@@ -16,7 +16,10 @@ import { TRADING_GAME_TYPE } from "@/lib/games";
 export interface CatalogueCardStats {
   playerCount: number;
   contestCount: number;
-  /** 0–100 inclusive when we have scored seats; absent when none. */
+  /**
+   * 0–100 inclusive when we have scored seats; absent when none.
+   * Share of scored seats with score > 0 or pnl > 0 — not a star / review rating.
+   */
   positiveRate?: number;
 }
 

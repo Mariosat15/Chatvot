@@ -1,12 +1,14 @@
 # Rebuild the Game Area — Games Catalogue
 
-> **BUILT 8 October 2026 (code-complete).** Live code:
+> **BUILT 8 October 2026 (code-complete); polished same day.** Live code:
 > `app/(root)/games/page.tsx`, `components/games/catalogue/*`,
 > `lib/services/games/catalogue-card-stats.service.ts`,
-> `public/assets/neon/games-catalogue-arena-r1.webp` (from Menuitems
-> `Neon Cyberpunk Trophy Arena.png`). Wide `min(1420px)` shell, full-bleed arena,
-> large 3-column launcher cards with per-game accents, Menuitems neon stat icons,
-> real players/contests/positive when data exists (zeros omitted), 56px CTA.
+> `public/assets/neon/games-catalogue-arena-r1.webp` (Menuitems arena),
+> `games-catalogue-title-r1.png` (owner GAMES wordmark),
+> `catalogue-stat-players-r1.png` (owner players plate). Wide `min(1420px)` shell,
+> **fixed viewport** arena + navy floor (filter/short/long lists never expose a hard
+> edge), lighter card rims, `aspect-[16/9]` artwork, larger inline stats, 56px CTA.
+> Positive % = share of scored seats with score > 0 or pnl > 0 (not a review rating).
 > No separate Featured hero — featured stays a badge. **Never verified by eye.**
 > Routing, filters (`?category=`), and catalogue data paths unchanged.
 

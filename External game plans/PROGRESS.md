@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Games catalogue launcher rebuild CODE-COMPLETE 8 Oct (eng)** — `/games` matches Rebuild theGame Area Image 1: full-bleed Menuitems arena, `min(1420px)` content, large 3-column cards, per-game accents, Menuitems neon stats (real counts; zeros omitted), 56px CTA, no Featured hero section. Spec: `External game plans/Rebuild theGame Area`. Tests: `games-catalogue-routes.test.ts`, `catalogue-card-accent.test.ts`. **Never verified by eye.**
+- **Games catalogue polish CODE-COMPLETE 8 Oct (eng)** — fixed viewport arena + navy floor (filters/long lists no longer expose a hard edge); owner GAMES wordmark + players plate; lighter card rims; `aspect-[16/9]` art; larger inline stats. Positive % = scored seats with score/pnl > 0. Spec BUILT note in `Rebuild theGame Area`. Tests: `games-catalogue-routes.test.ts`. **Never verified by eye.**
+- **Games catalogue launcher rebuild CODE-COMPLETE 8 Oct (eng)** — `/games` matches Rebuild theGame Area Image 1: full-bleed Menuitems arena, `min(1420px)` content, large 3-column cards, per-game accents, Menuitems neon stats (real counts; zeros omitted), 56px CTA, no Featured hero section. Spec: `External game plans/Rebuild theGame Area`. Tests: `games-catalogue-routes.test.ts`, `catalogue-card-accent.test.ts`. **Polish row above is the present fact — say which.**
 - **1v1 / Competition summary tiles CODE-COMPLETE 7 Oct (eng)** — 1v1 now fills a 2×2 (Played / Wins / Losses / Win rate) like Competition; shared `PerfMetricGrid` + accent hero chrome on desktop and mobile. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Mobile Wallet Analytics denser CODE-COMPLETE 7 Oct (eng)** — Wallet Insights removed on phones only (desktop unchanged); Volt Breakdown summary tiles are `grid-cols-2` below `sm` and keep auto-fill from `sm` up. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Messaging poll logs flooding PM2 CODE-COMPLETE 7 Oct (eng)** — open chats polled conversation GET ~once/minute and dumped every message body as `[ConvAPI]`; support GET, admin list, employees picker, and send-message content dumps silenced (errors stay). Tests: `poll-log-silence.test.ts`. **Needs deploy + pm2 restart.**
@@ -970,6 +971,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 8 October 2026 - Games catalogue polish (owner visual pass)
+
+**Owner report:** filter/short lists showed the arena edge; long lists would scroll off it; page felt heavy; players icon wrong; stats too small with empty space; card art cropped; GAMES title not production; asked what Positive % means.
+
+**Shipped:** `fixed inset-0` arena + `#020B1A` floor; owner `games-catalogue-title-r1.png` wordmark; `catalogue-stat-players-r1.png` on stats; lighter borders/glows; `aspect-[16/9]` art; larger inline value+label stats. Positive % documented as share of scored seats with score > 0 or pnl > 0.
+
+**Nothing was paid wrongly.** Tests: `games-catalogue-routes.test.ts`. Never verified by eye.
 
 ### 8 October 2026 - Rebuild Games catalogue to Image 1 launcher (owner task)
 

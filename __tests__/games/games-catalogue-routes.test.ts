@@ -31,14 +31,32 @@ describe("games catalogue routes", () => {
     expect(existsSync(join(ROOT, GAME_PAGE))).toBe(true);
   });
 
-  it("hub uses a wide content shell over a full-bleed arena, not a narrow dark column", () => {
+  it("hub uses a wide content shell over a fixed viewport arena, not a narrow dark column", () => {
     const hub = readCode(HUB);
     // Reason (8 Oct 2026): Image 1 scale — min(1420px) content, arena plate, no Featured hero.
+    // Polish same day: fixed inset-0 plate + navy floor so filter/short/long lists never
+    // expose a hard edge under the artwork.
     expect(hub).toMatch(/min\(1420px/);
     expect(hub).toMatch(/games-catalogue-arena-r1\.webp/);
+    expect(hub).toMatch(/fixed inset-0/);
+    expect(hub).toMatch(/bg-\[#020B1A\]/);
     expect(hub).toMatch(/loadCatalogueCardStats/);
     expect(hub).not.toMatch(/Featured Game/);
     expect(hub).not.toMatch(/max-w-\[1000px\]|max-w-\[1100px\]/);
+  });
+
+  it("hero uses the owner GAMES wordmark asset, not CSS-gradient text alone", () => {
+    const hero = readCode("components/games/catalogue/GamesHero.tsx");
+    expect(hero).toMatch(/games-catalogue-title-r1\.png/);
+    expect(hero).toMatch(/sr-only/);
+    expect(hero).toMatch(/Games/);
+  });
+
+  it("stats strip uses the owner players plate and larger inline labels", () => {
+    const stats = readCode("components/games/catalogue/GameStatistics.tsx");
+    expect(stats).toMatch(/catalogue-stat-players-r1\.png/);
+    expect(stats).not.toMatch(/NEON_ICON\("users"\)/);
+    expect(stats).toMatch(/text-\[18px\]|text-\[20px\]/);
   });
 
   it("assigns per-game accents by code, never by nth-child", () => {
@@ -94,10 +112,11 @@ describe("games catalogue routes", () => {
   it("catalogue card artwork fills a tall launcher box edge to edge", () => {
     const card = readCode(CARD);
     // Reason (history): until 28 Sep 2026 this asserted object-contain alone (empty
-    // bands); then cover in a 16/8.5 box; then 16/11 for logo-safe cover (3 Oct).
-    // Flipped 8 Oct 2026 for Rebuild theGame Area Image 1: artwork ~190px (~60% of
-    // card), object-position from per-game accent (trading uses center 42%).
-    expect(card).toMatch(/h-\[190px\]/);
+    // bands); then cover in a 16/8.5 box; then 16/11 for logo-safe cover (3 Oct);
+    // then fixed 190px (8 Oct Image 1). Flipped same-day polish to aspect-[16/9]
+    // cinematic frame (Image 4) so wide banners are less centre-cropped.
+    expect(card).toMatch(/aspect-\[16\/9\]/);
+    expect(card).not.toMatch(/h-\[190px\]/);
     expect(card).not.toMatch(/aspect-\[16\/8\.5\]/);
     expect(card).not.toMatch(/aspect-\[16\/11\]/);
     const images = card.match(/<Image[\s\S]*?\/>/g) ?? [];
@@ -108,7 +127,7 @@ describe("games catalogue routes", () => {
     expect(art).toMatch(/alt=\{banner\.alt\}/);
     expect(card).toMatch(/resolveGameCardAccent/);
     expect(card).toMatch(/GameStatistics/);
-    expect(card).toMatch(/h-14 w-14/);
+    expect(card).toMatch(/h-12 w-12|h-14 w-14/);
   });
 
   it("empty game page is designed, not a blank return", () => {
