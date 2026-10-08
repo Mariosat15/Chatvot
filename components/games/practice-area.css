@@ -1,7 +1,7 @@
 /**
- * Practice Area — cyber HUD lobby.
- * Reason (8 Oct 2026, owner): Image 1 was a flat dashboard; Image 2 is the pixel reference.
- * Background must stay visible around the panels — no giant opaque outer shell.
+ * Practice Area — cyber HUD lobby (owner target Image 1, 8 Oct 2026).
+ * Reason: chamfered clip-path cards looked like cut-off boxes; target uses rounded glass
+ * panels with a cyan→magenta neon rim, pill badges, and a drag/arrow history (no scrollbar).
  */
 
 .practice-page {
@@ -12,7 +12,7 @@
   overflow-x: hidden;
   background-color: #02091b;
   background-image:
-    linear-gradient(rgba(1, 8, 27, 0.22), rgba(1, 7, 24, 0.38)),
+    linear-gradient(rgba(1, 8, 27, 0.2), rgba(1, 7, 24, 0.36)),
     url("/assets/practice/practice-background.png");
   background-size: cover;
   background-position: center top;
@@ -43,6 +43,7 @@
   font-weight: 700;
   letter-spacing: 0.42em;
   text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(19, 223, 255, 0.55);
 }
 
 .practice-header__eyebrow::before,
@@ -54,10 +55,10 @@
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(19, 223, 255, 0.85),
+    rgba(19, 223, 255, 0.9),
     transparent
   );
-  box-shadow: 0 0 8px rgba(19, 223, 255, 0.45);
+  box-shadow: 0 0 10px rgba(19, 223, 255, 0.55);
 }
 
 .practice-header__title {
@@ -66,134 +67,156 @@
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: 0.02em;
-  background: linear-gradient(90deg, #ffffff 10%, #b8f7ff 48%, #c9a6ff 92%);
+  background: linear-gradient(90deg, #ffffff 8%, #b8f7ff 48%, #d4b4ff 92%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-/* ─── Shared HUD frame ─────────────────────────────────────────────── */
+/* ─── Rounded glass HUD frame (no clip-path cutoffs) ───────────────── */
 
 .practice-hud {
   position: relative;
-  border: 1px solid rgba(34, 190, 255, 0.62);
-  background:
-    radial-gradient(circle at 50% 12%, rgba(18, 76, 155, 0.22), transparent 42%),
-    radial-gradient(circle at 8% 92%, rgba(152, 92, 255, 0.14), transparent 36%),
-    radial-gradient(circle at 94% 8%, rgba(218, 77, 255, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(6, 26, 65, 0.9), rgba(3, 15, 42, 0.94));
-  box-shadow:
-    0 0 34px rgba(0, 151, 255, 0.16),
-    0 0 0 1px rgba(152, 92, 255, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  clip-path: polygon(
-    14px 0,
-    calc(100% - 14px) 0,
-    100% 14px,
-    100% calc(100% - 14px),
-    calc(100% - 14px) 100%,
-    14px 100%,
-    0 calc(100% - 14px),
-    0 14px
-  );
+  border-radius: 22px;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(40, 140, 255, 0.16), transparent 45%),
+    radial-gradient(circle at 100% 100%, rgba(218, 77, 255, 0.14), transparent 42%),
+    radial-gradient(circle at 0% 100%, rgba(19, 223, 255, 0.1), transparent 40%),
+    linear-gradient(165deg, rgba(8, 28, 72, 0.72), rgba(3, 12, 36, 0.82));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 0 40px rgba(0, 170, 255, 0.18),
+    0 0 60px rgba(152, 92, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.practice-hud::before,
+/* Gradient neon rim via padded background on a wrapper layer */
+.practice-hud::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    #13dfff 0%,
+    #3aa7ff 28%,
+    #985cff 68%,
+    #da4dff 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.95;
+  box-shadow: 0 0 24px rgba(19, 223, 255, 0.35);
+}
+
+/* Corner bracket accents */
 .practice-hud::after {
   content: "";
   position: absolute;
-  width: 54px;
-  height: 54px;
+  inset: 10px;
+  border-radius: 14px;
   pointer-events: none;
-  z-index: 0;
-}
-
-.practice-hud::before {
-  top: -1px;
-  right: -1px;
-  border-top: 2px solid #da4dff;
-  border-right: 2px solid #da4dff;
-  box-shadow: 0 0 18px rgba(218, 77, 255, 0.55);
-}
-
-.practice-hud::after {
-  bottom: -1px;
-  left: -1px;
-  border-bottom: 2px solid #13dfff;
-  border-left: 2px solid #13dfff;
-  box-shadow: 0 0 18px rgba(19, 223, 255, 0.45);
+  z-index: 2;
+  background:
+    linear-gradient(#13dfff, #13dfff) top left / 28px 2px no-repeat,
+    linear-gradient(#13dfff, #13dfff) top left / 2px 28px no-repeat,
+    linear-gradient(#da4dff, #da4dff) top right / 28px 2px no-repeat,
+    linear-gradient(#da4dff, #da4dff) top right / 2px 28px no-repeat,
+    linear-gradient(#13dfff, #13dfff) bottom left / 28px 2px no-repeat,
+    linear-gradient(#13dfff, #13dfff) bottom left / 2px 28px no-repeat,
+    linear-gradient(#da4dff, #da4dff) bottom right / 28px 2px no-repeat,
+    linear-gradient(#da4dff, #da4dff) bottom right / 2px 28px no-repeat;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 6px rgba(19, 223, 255, 0.55));
 }
 
 .practice-hud__glow {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.09;
+  z-index: 0;
+  opacity: 0.12;
   background-image:
-    linear-gradient(rgba(19, 223, 255, 0.35) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(152, 92, 255, 0.28) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at 50% 40%, black 20%, transparent 75%);
+    radial-gradient(circle at 20% 30%, rgba(19, 223, 255, 0.35), transparent 28%),
+    radial-gradient(circle at 80% 70%, rgba(218, 77, 255, 0.28), transparent 30%),
+    linear-gradient(rgba(19, 223, 255, 0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(152, 92, 255, 0.16) 1px, transparent 1px);
+  background-size: auto, auto, 42px 42px, 42px 42px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 25%, transparent 78%);
 }
 
 /* ─── Hero ─────────────────────────────────────────────────────────── */
 
 .practice-hero {
-  padding: 34px 28px 30px;
+  position: relative;
+  z-index: 1;
+  padding: 36px 32px 32px;
   text-align: center;
-  min-height: 390px;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
 }
 
 .practice-hero__icon-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 20px;
   margin-bottom: 18px;
 }
 
 .practice-hero__icon-row::before,
 .practice-hero__icon-row::after {
   content: "";
-  width: 72px;
-  height: 1px;
+  width: 78px;
+  height: 2px;
+  border-radius: 2px;
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(19, 223, 255, 0.7),
+    rgba(19, 223, 255, 0.85),
     transparent
   );
-  box-shadow: 0 0 10px rgba(19, 223, 255, 0.35);
+  box-shadow: 0 0 12px rgba(19, 223, 255, 0.5);
 }
 
 .practice-hero__icon {
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: 76px;
+  height: 76px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background:
-    radial-gradient(circle at 40% 30%, rgba(80, 180, 255, 0.35), transparent 55%),
-    linear-gradient(145deg, rgba(22, 70, 160, 0.85), rgba(72, 30, 140, 0.9));
-  border: 2px solid rgba(19, 223, 255, 0.75);
+    radial-gradient(circle at 35% 28%, rgba(120, 210, 255, 0.45), transparent 50%),
+    radial-gradient(circle at 70% 75%, rgba(180, 90, 255, 0.4), transparent 48%),
+    linear-gradient(145deg, rgba(18, 80, 180, 0.95), rgba(90, 30, 160, 0.95));
+  border: 2px solid rgba(19, 223, 255, 0.9);
   box-shadow:
-    0 0 28px rgba(19, 223, 255, 0.45),
-    0 0 40px rgba(152, 92, 255, 0.35),
-    inset 0 0 18px rgba(255, 255, 255, 0.12);
+    0 0 0 4px rgba(19, 223, 255, 0.12),
+    0 0 32px rgba(19, 223, 255, 0.55),
+    0 0 48px rgba(152, 92, 255, 0.4),
+    inset 0 0 20px rgba(255, 255, 255, 0.15);
 }
 
 .practice-hero__icon svg {
   width: 38px;
   height: 38px;
-  color: #e8f7ff;
-  filter: drop-shadow(0 0 6px rgba(19, 223, 255, 0.7));
+  color: #f2fbff;
+  filter: drop-shadow(0 0 8px rgba(19, 223, 255, 0.85));
 }
 
 .practice-hero__title {
@@ -202,6 +225,7 @@
   font-weight: 800;
   color: #ffffff;
   letter-spacing: 0.01em;
+  text-shadow: 0 0 24px rgba(120, 200, 255, 0.25);
 }
 
 .practice-hero__desc {
@@ -209,89 +233,95 @@
   max-width: 680px;
   font-size: 16.5px;
   line-height: 1.55;
-  color: #c8d3e8;
+  color: #d5e0f2;
 }
 
 .practice-features {
-  margin: 22px 0 0;
+  margin: 24px 0 0;
   padding: 0;
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 190px));
+  grid-template-columns: repeat(4, minmax(0, 200px));
   justify-content: center;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
 }
 
+/* Pill badges — rounded glass capsules, not hex/chamfer cutoffs */
 .practice-feature {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 54px;
-  padding: 0 16px;
-  color: #e8f2ff;
+  min-height: 52px;
+  padding: 0 20px 0 12px;
+  border-radius: 999px;
+  color: #eef6ff;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   background: linear-gradient(
     180deg,
-    rgba(10, 36, 84, 0.92),
-    rgba(5, 18, 48, 0.95)
+    rgba(18, 52, 110, 0.92),
+    rgba(6, 18, 48, 0.94)
   );
-  border: 1px solid rgba(19, 223, 255, 0.45);
-  clip-path: polygon(
-    10px 0,
-    calc(100% - 10px) 0,
-    100% 50%,
-    calc(100% - 10px) 100%,
-    10px 100%,
-    0 50%
-  );
-  box-shadow: inset 0 0 18px rgba(19, 223, 255, 0.08);
+  border: 1.5px solid rgba(19, 223, 255, 0.7);
+  box-shadow:
+    0 0 18px rgba(19, 223, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .practice-feature--cyan {
-  border-color: rgba(19, 223, 255, 0.7);
+  border-color: rgba(19, 223, 255, 0.95);
+  color: #b8f5ff;
   box-shadow:
-    0 0 14px rgba(19, 223, 255, 0.18),
-    inset 0 0 18px rgba(19, 223, 255, 0.08);
+    0 0 20px rgba(19, 223, 255, 0.35),
+    inset 0 0 14px rgba(19, 223, 255, 0.1);
 }
 
 .practice-feature--purple {
-  border-color: rgba(152, 92, 255, 0.75);
+  border-color: rgba(198, 120, 255, 0.95);
+  color: #ebcfff;
   box-shadow:
-    0 0 14px rgba(152, 92, 255, 0.22),
-    inset 0 0 18px rgba(152, 92, 255, 0.1);
+    0 0 20px rgba(198, 120, 255, 0.38),
+    inset 0 0 14px rgba(152, 92, 255, 0.12);
 }
 
 .practice-feature--blue {
-  border-color: rgba(22, 119, 255, 0.75);
+  border-color: rgba(80, 190, 255, 0.95);
+  color: #c8e8ff;
   box-shadow:
-    0 0 14px rgba(22, 119, 255, 0.22),
-    inset 0 0 18px rgba(22, 119, 255, 0.1);
+    0 0 20px rgba(80, 190, 255, 0.32),
+    inset 0 0 14px rgba(64, 170, 255, 0.1);
 }
 
 .practice-feature--magenta {
-  border-color: rgba(218, 77, 255, 0.75);
+  border-color: rgba(230, 90, 255, 0.95);
+  color: #f5d0ff;
   box-shadow:
-    0 0 14px rgba(218, 77, 255, 0.22),
-    inset 0 0 18px rgba(218, 77, 255, 0.1);
+    0 0 20px rgba(230, 90, 255, 0.38),
+    inset 0 0 14px rgba(218, 77, 255, 0.12);
 }
 
-.practice-feature__icon {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 6px rgba(19, 223, 255, 0.55));
+.practice-feature__glyph {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
+  background: rgba(8, 24, 56, 0.7);
+  border: 1px solid currentColor;
+  box-shadow: 0 0 10px currentColor;
 }
 
-.practice-feature__icon--lucide {
-  color: #da4dff;
-  filter: drop-shadow(0 0 6px rgba(218, 77, 255, 0.65));
+.practice-feature__glyph svg {
+  width: 15px;
+  height: 15px;
+  color: currentColor;
+  filter: drop-shadow(0 0 4px currentColor);
 }
 
 .practice-hero__refusal {
@@ -300,74 +330,72 @@
   font-size: 14px;
 }
 
+.practice-cta-wrap {
+  position: relative;
+  margin-top: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: min(440px, 100%);
+}
+
+.practice-cta-wrap__chevron {
+  flex-shrink: 0;
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1;
+  color: #13dfff;
+  text-shadow: 0 0 12px rgba(19, 223, 255, 0.7);
+  user-select: none;
+}
+
 .practice-cta {
   position: relative;
-  margin-top: 24px;
-  width: min(400px, 100%);
-  min-height: 68px;
+  flex: 1;
+  min-height: 64px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   padding: 0 28px;
-  border: 1px solid #7fefff;
+  border: 0;
+  border-radius: 14px;
   color: #03141f;
   font-size: 18px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  background: linear-gradient(180deg, #19e8ff 0%, #03bde8 100%);
-  clip-path: polygon(
-    16px 0,
-    calc(100% - 16px) 0,
-    100% 50%,
-    calc(100% - 16px) 100%,
-    16px 100%,
-    0 50%
-  );
+  background: linear-gradient(180deg, #3ef0ff 0%, #0ac4ef 55%, #009fd4 100%);
   box-shadow:
-    0 0 22px rgba(0, 220, 255, 0.45),
-    inset 0 1px rgba(255, 255, 255, 0.4);
+    0 0 28px rgba(0, 220, 255, 0.55),
+    0 0 0 1px rgba(180, 255, 255, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -2px 0 rgba(0, 80, 120, 0.2);
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 
 .practice-cta:hover:not(:disabled) {
-  filter: brightness(1.06);
+  filter: brightness(1.07);
   transform: translateY(-1px);
 }
 
 .practice-cta:disabled {
-  opacity: 0.7;
+  opacity: 0.72;
   cursor: wait;
 }
 
-.practice-cta__chevron {
-  position: absolute;
-  top: 50%;
-  font-size: 22px;
-  font-weight: 300;
-  color: rgba(3, 20, 31, 0.55);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.practice-cta__chevron--left {
-  left: 18px;
-}
-
-.practice-cta__chevron--right {
-  right: 18px;
-}
-
-/* ─── Recent rounds ────────────────────────────────────────────────── */
+/* ─── Recent rounds — arrow + drag, no scrollbar ───────────────────── */
 
 .practice-history {
   margin-top: 18px;
-  padding: 18px 20px 16px;
+  padding: 18px 20px 14px;
 }
 
 .practice-history__head {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -380,7 +408,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  color: #9fe9ff;
+  color: #b8f0ff;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -397,7 +425,7 @@
 .practice-history__clear {
   background: transparent;
   border: 0;
-  color: rgba(255, 120, 140, 0.75);
+  color: rgba(255, 120, 140, 0.7);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -414,15 +442,62 @@
   cursor: not-allowed;
 }
 
+.practice-history__body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.practice-history__arrow {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 44px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(19, 223, 255, 0.45);
+  background: rgba(8, 28, 64, 0.75);
+  color: #13dfff;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(19, 223, 255, 0.2);
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.practice-history__arrow:hover:not(:disabled) {
+  background: rgba(19, 223, 255, 0.15);
+  border-color: #13dfff;
+}
+
+.practice-history__arrow:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.practice-history__viewport {
+  position: relative;
+  max-height: 210px;
+  overflow: hidden;
+  border-radius: 14px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.practice-history__viewport.is-dragging {
+  cursor: grabbing;
+}
+
 .practice-history__list {
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 220px;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  will-change: transform;
 }
 
 .practice-history__row {
@@ -431,14 +506,15 @@
   justify-content: space-between;
   gap: 12px;
   min-height: 62px;
-  padding: 0 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(70, 130, 255, 0.25);
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(70, 150, 255, 0.28);
   background: linear-gradient(
     90deg,
-    rgba(14, 36, 79, 0.72),
-    rgba(7, 25, 59, 0.6)
+    rgba(14, 40, 88, 0.78),
+    rgba(8, 24, 58, 0.68)
   );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .practice-history__meta {
@@ -494,6 +570,8 @@
 }
 
 .practice-unavailable {
+  position: relative;
+  z-index: 1;
   padding: 40px 28px;
   text-align: center;
 }
@@ -572,20 +650,28 @@
     margin-right: auto;
   }
 
-  .practice-cta {
+  .practice-cta-wrap {
     width: 100%;
+  }
+
+  .practice-cta {
     font-size: 16px;
-    min-height: 60px;
+    min-height: 58px;
   }
 
   .practice-hero__icon-row::before,
   .practice-hero__icon-row::after {
     width: 36px;
   }
+
 }
 
 @media (prefers-reduced-motion: reduce) {
   .practice-cta {
     transition: none;
+  }
+
+  .practice-history__list {
+    transition: none !important;
   }
 }

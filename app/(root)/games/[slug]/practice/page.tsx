@@ -20,8 +20,8 @@ export const dynamic = "force-dynamic";
  * Reason: rendering this page creates nothing. The round is created by the Start button's POST,
  * because Next.js prefetches `<Link>` targets and a round created on GET would be created on hover.
  *
- * Visual (8 Oct 2026): full-bleed cyber background with centered HUD panels — no giant opaque
- * outer rectangle over the artwork (owner reference Image 2).
+ * Visual (8 Oct 2026): full-bleed cyber background with rounded glass HUD panels — no clip-path
+ * cutoffs and no giant opaque outer rectangle over the artwork (owner target).
  */
 export default async function GamePracticePage({
   params,

@@ -70,12 +70,27 @@ describe("practice recent list shows scores with delete controls", () => {
     expect(code).toMatch(/Clear all/);
     expect(code).toMatch(/onForget/);
     expect(code).toMatch(/practice-history__list/);
-    expect(code).toMatch(/max-height:\s*220px|practice-history__list/);
+    expect(code).toMatch(/VIEWPORT_MAX|practice-history__viewport/);
+  });
+
+  it("slides with arrows and mouse drag, never a native scrollbar", () => {
+    // Reason (8 Oct 2026, owner): native scrollbar looked wrong on the HUD; drag + arrows.
+    const code = read("components/games/PracticeRecentList.tsx");
+    const css = read("components/games/practice-area.css");
+    expect(code).toMatch(/practice-history__arrow/);
+    expect(code).toMatch(/ChevronUp/);
+    expect(code).toMatch(/ChevronDown/);
+    expect(code).toMatch(/onPointerDown/);
+    expect(code).toMatch(/pointermove/);
+    expect(code).toMatch(/translateY/);
+    expect(code).not.toMatch(/overflow-y:\s*auto|overflow-y-auto/);
+    expect(css).toMatch(/\.practice-history__viewport[\s\S]*?overflow:\s*hidden/);
+    expect(css).not.toMatch(/practice-history__list[\s\S]*?overflow-y:\s*auto/);
   });
 });
 
 describe("practice area matches the cyber HUD lobby", () => {
-  it("uses the practice background shell without a giant opaque outer panel", () => {
+  it("uses rounded glass panels without clip-path cutoffs", () => {
     const page = read("app/(root)/games/[slug]/practice/page.tsx");
     const host = read("components/games/PracticeRoundHost.tsx");
     const css = read("components/games/practice-area.css");
@@ -85,22 +100,30 @@ describe("practice area matches the cyber HUD lobby", () => {
     expect(host).toMatch(/practice-hero/);
     expect(host).toMatch(/practice-features/);
     expect(host).toMatch(/practice-cta/);
-    expect(host).toMatch(/grid-template-columns:\s*repeat\(4|practice-features/);
     expect(css).toContain("practice-background.png");
+    expect(css).toMatch(/border-radius:\s*22px/);
     expect(css).toMatch(/grid-template-columns:\s*repeat\(4/);
     expect(css).not.toMatch(/NEON_PANEL/);
+    // Reason: chamfered clip-path cards read as cut-off boxes on the live build.
+    expect(css).not.toMatch(/clip-path\s*:/);
   });
 
-  it("keeps four feature badges and a custom Start Practice CTA", () => {
+  it("keeps four pill badges and a custom Start Practice CTA", () => {
     const host = read("components/games/PracticeRoundHost.tsx");
+    const css = read("components/games/practice-area.css");
     expect(host).toContain("Solo Mode");
     expect(host).toContain("Free to Play");
     expect(host).toContain("No Ranking Impact");
     expect(host).toContain("Unlimited Practice");
     expect(host).toMatch(/Start practice/);
-    expect(host).toContain("badge-solo.png");
-    expect(host).toContain("badge-gift.png");
-    expect(host).toContain("badge-rank.png");
+    expect(host).toMatch(/practice-feature__glyph/);
+    expect(host).toMatch(/UserRound/);
+    expect(host).toMatch(/Gift/);
+    expect(host).toMatch(/ChartNoAxesColumn/);
+    expect(host).toMatch(/InfinityIcon/);
+    expect(host).not.toMatch(/badge-solo\.png|badge-gift\.png|badge-rank\.png/);
+    expect(css).toMatch(/\.practice-feature[\s\S]*?border-radius:\s*999px/);
+    expect(host).toMatch(/practice-cta-wrap/);
   });
 });
 

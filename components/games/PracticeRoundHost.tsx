@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  ChartNoAxesColumn,
+  Gift,
   GraduationCap,
   Infinity as InfinityIcon,
   Loader2,
   Play,
+  UserRound,
+  type LucideIcon,
 } from "lucide-react";
 import { ProviderGameFrame } from "./ProviderGameFrame";
 import { PracticeRecentList } from "./PracticeRecentList";
@@ -23,8 +27,8 @@ import "./practice-area.css";
  * posts `exit` itself after a short hand-off so practice is not stuck on "being confirmed"
  * (owner, 6 Oct 2026). Leaving mid-round voids the attempt. Nothing here names a game.
  *
- * Visual shell (8 Oct 2026): cyber HUD lobby matching the design-reference screenshot —
- * translucent navy panels, cyan/purple corners, four badges on one row, custom CTA.
+ * Visual shell (8 Oct 2026): rounded glass HUD panels with cyan→magenta rims and pill badges
+ * (owner target). Chamfered clip-path cards were rejected as looking like cut-off boxes.
  */
 
 type Phase =
@@ -39,28 +43,16 @@ interface PracticeRoundHostProps {
   initialRounds: PracticeRoundView[];
 }
 
-const FEATURES = [
-  {
-    label: "Solo Mode",
-    tone: "practice-feature--cyan",
-    iconSrc: "/assets/practice/badge-solo.png",
-  },
-  {
-    label: "Free to Play",
-    tone: "practice-feature--purple",
-    iconSrc: "/assets/practice/badge-gift.png",
-  },
-  {
-    label: "No Ranking Impact",
-    tone: "practice-feature--blue",
-    iconSrc: "/assets/practice/badge-rank.png",
-  },
-  {
-    label: "Unlimited Practice",
-    tone: "practice-feature--magenta",
-    iconSrc: null as string | null,
-  },
-] as const;
+const FEATURES: ReadonlyArray<{
+  label: string;
+  tone: string;
+  Icon: LucideIcon;
+}> = [
+  { label: "Solo Mode", tone: "practice-feature--cyan", Icon: UserRound },
+  { label: "Free to Play", tone: "practice-feature--purple", Icon: Gift },
+  { label: "No Ranking Impact", tone: "practice-feature--blue", Icon: ChartNoAxesColumn },
+  { label: "Unlimited Practice", tone: "practice-feature--magenta", Icon: InfinityIcon },
+];
 
 /** Race-server result can lag the frame's `finished` by a beat; retry before giving up. */
 const FINISH_PULL_ATTEMPTS = 6;
@@ -325,14 +317,11 @@ export function PracticeRoundHost({
           and there is no prize. Play as many practice rounds as you like.
         </p>
         <ul className="practice-features">
-          {FEATURES.map(({ label, tone, iconSrc }) => (
+          {FEATURES.map(({ label, tone, Icon }) => (
             <li key={label} className={`practice-feature ${tone}`}>
-              {iconSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={iconSrc} alt="" className="practice-feature__icon" />
-              ) : (
-                <InfinityIcon className="practice-feature__icon practice-feature__icon--lucide" aria-hidden />
-              )}
+              <span className="practice-feature__glyph" aria-hidden>
+                <Icon />
+              </span>
               <span>{label}</span>
             </li>
           ))}
@@ -342,25 +331,27 @@ export function PracticeRoundHost({
             {refusal}
           </p>
         ) : null}
-        <button
-          type="button"
-          onClick={launch}
-          disabled={launching}
-          className="practice-cta"
-        >
-          <span className="practice-cta__chevron practice-cta__chevron--left" aria-hidden>
-            &lt;
+        <div className="practice-cta-wrap">
+          <span className="practice-cta-wrap__chevron" aria-hidden>
+            ‹
           </span>
-          {launching ? (
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-          ) : (
-            <Play className="h-5 w-5 fill-current" aria-hidden />
-          )}
-          {launching ? "Starting…" : "Start practice"}
-          <span className="practice-cta__chevron practice-cta__chevron--right" aria-hidden>
-            &gt;
+          <button
+            type="button"
+            onClick={launch}
+            disabled={launching}
+            className="practice-cta"
+          >
+            {launching ? (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+            ) : (
+              <Play className="h-5 w-5 fill-current" aria-hidden />
+            )}
+            {launching ? "Starting…" : "Start practice"}
+          </button>
+          <span className="practice-cta-wrap__chevron" aria-hidden>
+            ›
           </span>
-        </button>
+        </div>
       </section>
 
       <PracticeRecentList
