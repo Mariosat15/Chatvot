@@ -7,8 +7,11 @@ import {
 } from "../format-catalogue-stat";
 
 /**
- * Mobile metrics row — icon + stacked value/label in up to three columns.
+ * Mobile metrics row — icon + value and label on one line (e.g. "4 Players").
  * Real data only; zeros / missing rates omitted (spec §19–20).
+ *
+ * Reason (8 Oct polish): stacked value-over-label read as two rows; match desktop
+ * GameStatistics inline layout.
  */
 
 const PLAYERS_ICON = "/assets/neon/catalogue-stat-players-r1.png";
@@ -65,19 +68,19 @@ export function MobileGameStats({ stats }: { stats?: CatalogueCardStats | null }
 
   return (
     <ul
-      className="m-0 grid list-none grid-cols-3 gap-2 p-0"
+      className="m-0 flex list-none flex-wrap items-center gap-x-3.5 gap-y-2 p-0"
       aria-label="Game statistics"
     >
       {items.map((item) => (
-        <li key={item.key} className="flex min-w-0 flex-col items-start gap-1">
-          <span className="relative h-7 w-7 shrink-0" aria-hidden>
-            <Image src={item.icon} alt="" fill sizes="28px" className="object-contain" />
+        <li key={item.key} className="flex min-w-0 items-center gap-1.5">
+          <span className="relative h-8 w-8 shrink-0" aria-hidden>
+            <Image src={item.icon} alt="" fill sizes="32px" className="object-contain" />
           </span>
-          <span className={`text-[16px] font-extrabold tabular-nums leading-none ${item.tone}`}>
-            {item.value}
-          </span>
-          <span className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-gray-400">
-            {item.label}
+          <span className={`flex min-w-0 items-baseline gap-1 leading-none ${item.tone}`}>
+            <span className="text-[17px] font-extrabold tabular-nums">{item.value}</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-gray-300">
+              {item.label}
+            </span>
           </span>
         </li>
       ))}

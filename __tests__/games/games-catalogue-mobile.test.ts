@@ -52,10 +52,12 @@ describe("games catalogue mobile launcher", () => {
     expect(readCode(MOBILE_CARD)).toMatch(/FEATURED|Featured/);
   });
 
-  it("mobile cards are full-width launcher tiles with cover art and View Game CTA", () => {
+  it("mobile cards are full-width launcher tiles with contain art and View Game CTA", () => {
     const card = readCode(MOBILE_CARD);
-    expect(card).toMatch(/aspect-\[16\/9\]/);
-    expect(card).toMatch(/object-cover/);
+    // Reason: same desktop fix — contain in 16/11, never cover (crops sides).
+    expect(card).toMatch(/aspect-\[16\/11\]/);
+    expect(card).toMatch(/object-contain/);
+    expect(card).not.toMatch(/object-cover/);
     expect(card).toMatch(/View Game/);
     expect(card).toMatch(/\/games\/\$\{game\.slug\}/);
     expect(card).not.toMatch(/href=\{?["'`]\/play/);
@@ -64,12 +66,25 @@ describe("games catalogue mobile launcher", () => {
     expect(card).not.toMatch(/nth-child/);
   });
 
-  it("mobile hero is CATALOGUE + GAMES wordmark with short copy", () => {
+  it("mobile hero matches desktop Games Catalog + gamepad plate", () => {
     const header = readCode(MOBILE_HEADER);
-    expect(header).toMatch(/Catalogue/);
-    expect(header).toMatch(/games-catalogue-title-r1\.png/);
+    expect(header).toMatch(/AnalyticsPageHeadline/);
+    expect(header).toMatch(/Games/);
+    expect(header).toMatch(/Catalog/);
+    expect(header).toMatch(/games-catalogue-header-r1\.png/);
     expect(header).toMatch(/jump into the action/i);
-    expect(header).not.toMatch(/AnalyticsPageHeadline/);
+    expect(header).not.toMatch(/games-catalogue-title-r1\.png/);
+  });
+
+  it("mobile stats put value beside label on one line", () => {
+    const stats = readCode(
+      "components/games/catalogue/mobile/MobileGameStats.tsx",
+    );
+    expect(stats).toMatch(/items-baseline/);
+    expect(stats).toMatch(/item\.value/);
+    expect(stats).toMatch(/item\.label/);
+    // Reason: stacked flex-col was the defect (4 above, Players below).
+    expect(stats).not.toMatch(/flex-col items-start/);
   });
 
   it("desktop shell still mounts the Games Catalog headline and 3-column grid", () => {

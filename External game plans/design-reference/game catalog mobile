@@ -3,10 +3,10 @@
 > `components/games/catalogue/DesktopGamesCatalogue.tsx` (desktop unchanged),
 > `components/games/catalogue/mobile/*` (`MobileGamesCatalogue`, header, filters,
 > card, stats). Shared arena bg + `loadCatalogueCardStats` / `?category=` filters.
-> Featured first on mobile; full-width **View Game** CTA; `aspect-[16/9]` cover art;
-> per-game accents; real metrics (zeros omitted). No phone bottom nav — safe-area
-> padding only (layout removed the bar 29 Sep). Tests:
-> `__tests__/games/games-catalogue-mobile.test.ts`. **Never verified by eye.**
+> Featured first on mobile; full-width **View Game** CTA; `aspect-[16/11]` +
+> `object-contain` (same desktop crop fix); Games Catalog headline + gamepad
+> (not the 3D wordmark); stats inline (`4 Players`). No phone bottom nav —
+> safe-area only. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 
 ---
 

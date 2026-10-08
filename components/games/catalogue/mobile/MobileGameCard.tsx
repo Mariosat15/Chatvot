@@ -12,7 +12,9 @@ import { MobileGameStats } from "./MobileGameStats";
 /**
  * One full-width mobile launcher tile — not the desktop card stacked.
  *
- * Links to `/games/[slug]` only. Featured variant bumps image height + glow (spec §10–21).
+ * Links to `/games/[slug]` only. Featured variant bumps glow (spec §10–21).
+ * Reason (8 Oct polish): `object-contain` in a fixed 16/11 frame — same fix as
+ * desktop pass 2 so banners show whole, not centre-cropped.
  */
 
 export function MobileGameCard({
@@ -52,21 +54,19 @@ export function MobileGameCard({
         } as CSSProperties
       }
     >
-      <div
-        className={`relative w-full overflow-hidden bg-[#07101F] ${
-          featured ? "aspect-[16/9] min-h-[200px]" : "aspect-[16/9] min-h-[180px]"
-        }`}
-      >
+      {/*
+        Reason: fixed 16/11 + object-contain matches desktop — cover was cropping sides.
+      */}
+      <div className="relative aspect-[16/11] w-full overflow-hidden bg-[#07101F]">
         <Image
           src={banner.src}
           alt={banner.alt}
           fill
           priority={priority}
           sizes="(max-width: 768px) 100vw, 430px"
-          className="object-cover object-center"
-          style={{ objectPosition: accent.objectPosition }}
+          className="object-contain object-center"
         />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_50%,rgba(3,10,25,.65))]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_62%,rgba(3,10,25,.4))]" />
         {game.category ? (
           <div className="absolute left-3 top-3">
             <GameCategoryBadge slug={game.categorySlug} label={game.category} />
