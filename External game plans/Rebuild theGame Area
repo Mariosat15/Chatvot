@@ -1,0 +1,1019 @@
+# Rebuild the Game Area — Games Catalogue
+
+> **BUILT 8 October 2026 (code-complete).** Live code:
+> `app/(root)/games/page.tsx`, `components/games/catalogue/*`,
+> `lib/services/games/catalogue-card-stats.service.ts`,
+> `public/assets/neon/games-catalogue-arena-r1.webp` (from Menuitems
+> `Neon Cyberpunk Trophy Arena.png`). Wide `min(1420px)` shell, full-bleed arena,
+> large 3-column launcher cards with per-game accents, Menuitems neon stat icons,
+> real players/contests/positive when data exists (zeros omitted), 56px CTA.
+> No separate Featured hero — featured stays a badge. **Never verified by eye.**
+> Routing, filters (`?category=`), and catalogue data paths unchanged.
+
+---
+
+- All boxes showing games must have the same size and all images inside looking full like we have them now 
+TASK: REBUILD THE CURRENT GAMES CATALOGUE TO MATCH TARGET IMAGE 1
+
+REFERENCE RULE:
+
+IMAGE 1 = TARGET DESIGN
+IMAGE 2 = CURRENT / WRONG IMPLEMENTATION
+USE THE GRAPHICS PROVIDED 
+
+Do NOT redesign this in your own style.
+Do NOT simply improve Image 2.
+Do NOT keep the current narrow card grid.
+
+Rebuild the visual layout so it closely matches IMAGE 1.
+
+Keep all existing:
+- routes
+- links
+- game IDs
+- game data
+- category filters
+- navigation logic
+- backend/API functionality
+
+Only rebuild the UI/UX and presentation.
+
+==================================================
+1. BIGGEST DIFFERENCE
+==================================================
+
+The current page (Image 2) is:
+
+- too narrow
+- too small
+- too flat
+- too dark
+- cards look like generic website cards
+- game artwork is too small
+- too much empty black space
+- header has very little visual impact
+- cards have almost no useful game statistics
+- everything is concentrated in a small central column
+
+IMAGE 1 is the required target:
+
+- much wider
+- much more cinematic
+- larger cards
+- much larger artwork
+- richer cyber background
+- more neon edge lighting
+- stronger category filters
+- statistics inside each game card
+- larger game titles
+- larger CTA
+- different accent color per game
+- much less wasted space
+
+==================================================
+2. PAGE WIDTH
+==================================================
+
+This is one of the biggest problems.
+
+CURRENT:
+The entire catalogue uses a narrow centered content area.
+
+TARGET:
+Content should occupy much more of the viewport.
+
+Use approximately:
+
+.games-page-content {
+    width: min(1420px, calc(100% - 64px));
+    margin: 0 auto;
+}
+
+For a 1600px-wide desktop screenshot,
+the content should occupy roughly 1350–1450px.
+
+DO NOT use the current narrow ~1000px content width.
+
+==================================================
+3. PAGE BACKGROUND
+==================================================
+
+Image 1 uses the environment as part of the page.
+
+The background should cover the ENTIRE screen.
+
+Use the supplied ChartVolt games background:
+
+- dark futuristic arena
+- cyan / blue / purple lighting
+- trophy on upper right
+- displays / charts
+- audience
+- glowing cyber floor
+- blue mist / atmospheric fog
+
+The background must continue behind the game cards.
+
+Do NOT:
+
+- make the lower section plain #020817
+- stop the background after the hero
+- replace it with a flat dark rectangle
+
+Add a controlled dark overlay only for readability.
+
+Example:
+
+.games-page::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(1, 8, 25, .12),
+        rgba(1, 8, 25, .28)
+      );
+    pointer-events: none;
+}
+
+IMAGE 1 remains colorful and alive.
+Do not darken it excessively.
+
+==================================================
+4. TOP HERO AREA
+==================================================
+
+Rebuild the top area to match Image 1.
+
+LEFT SIDE:
+
+CATALOGUE
+GAMES
+
+Description
+
+Filters
+
+RIGHT SIDE:
+
+The background artwork naturally shows:
+
+- trophy
+- gaming displays
+- trading displays
+- cyber arena
+
+Do not create a separate solid right-side panel.
+
+The background itself creates this visual division.
+
+==================================================
+5. HERO POSITIONING
+==================================================
+
+Target approximate desktop:
+
+top padding: 20–25px
+left content position: ~150px from viewport left
+hero width: ~650–700px
+
+Use:
+
+CATALOGUE
+
+font-size: 14–16px
+letter-spacing: 3px
+cyan
+uppercase
+
+Add the small decorative cyan line shown in target.
+
+==================================================
+6. GAMES TITLE
+==================================================
+
+Current title is flat white.
+
+Target:
+
+GAMES
+
+font-size approximately:
+56–64px
+
+font-weight:
+800–900
+
+Use a premium gradient:
+
+white
+→ light cyan
+→ blue
+→ subtle magenta on the final edge
+
+Example:
+
+background:
+linear-gradient(
+  100deg,
+  #FFFFFF 0%,
+  #C9F8FF 45%,
+  #6BD8FF 72%,
+  #E65BFF 100%
+);
+
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+
+Add very subtle glow.
+
+Do NOT over-glow the title.
+
+==================================================
+7. HERO DESCRIPTION
+==================================================
+
+Target text is larger and easier to read.
+
+Use roughly:
+
+font-size: 15–17px;
+line-height: 1.5;
+max-width: 620px;
+
+Current text is too small.
+
+Use:
+
+Pick a game, read the rules, and join a contest from its page.
+Competitions stay available when you want everything starting soon in one list.
+
+or preserve the existing copy if required.
+
+==================================================
+8. FILTER BUTTONS
+==================================================
+
+Image 1 filters are much larger and more substantial.
+
+Create:
+
+[ ▦ All ]
+[ 🎮 Arcade ]
+[ ✚ Puzzle ]
+[ 🏁 Racing ]
+[ ▥ Trading ]
+
+Use real icons, NOT emoji.
+
+Approximate target:
+
+height: 44px
+padding-inline: 22–26px
+gap: 14px
+
+Border:
+1px solid rgba(70,170,255,.6)
+
+Inactive:
+dark navy translucent surface
+
+Selected All:
+cyan border
+cyan glow
+cyan icon/text
+
+Selected:
+
+box-shadow:
+0 0 16px rgba(0,210,255,.35);
+
+Do not use the tiny pill controls from Image 2.
+
+==================================================
+9. FILTER SPACING
+==================================================
+
+Filters should sit immediately under description.
+
+Hero layout:
+
+CATALOGUE
+GAMES
+Description
+[filters]
+
+Then approximately:
+
+36–44px
+
+before game cards.
+
+Do not create huge empty hero height.
+
+==================================================
+10. GAME GRID
+==================================================
+
+THIS IS CRITICAL.
+
+Target desktop:
+
+THREE LARGE CARDS PER ROW.
+
+Use:
+
+.games-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+Each card should be approximately:
+
+460–480px wide
+300–320px tall
+
+depending viewport.
+
+Current cards are too small.
+
+==================================================
+11. SECOND ROW
+==================================================
+
+Trading appears naturally below the first card.
+
+Do NOT stretch it across the full row.
+
+The grid simply continues:
+
+ROW 1:
+Volt Velocity | Volt Stack | Circuit Sprint
+
+ROW 2:
+Trading | future game | future game
+
+When more games are added,
+the same grid automatically fills them.
+
+==================================================
+12. GAME CARD STRUCTURE
+==================================================
+
+Image 1 cards use this hierarchy:
+
+┌─────────────────────────────────────┐
+│ [CATEGORY]               [FEATURED] │
+│                                     │
+│       LARGE GAME ARTWORK            │
+│                                     │
+├─────────────────────────────────────┤
+│ GAME TITLE                          │
+│ short description                   │
+│                                     │
+│ players    contests     performance │
+│                                     │
+│                              [ → ]  │
+└─────────────────────────────────────┘
+
+Rebuild the cards this way.
+
+==================================================
+13. ARTWORK HEIGHT
+==================================================
+
+Current artwork is too compressed.
+
+Target card artwork should occupy approximately:
+
+58–62% of card height.
+
+Example:
+
+card height:
+315px
+
+artwork:
+190px
+
+content:
+125px
+
+Use:
+
+.game-card-image {
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+}
+
+Do NOT use square or overly tall images.
+
+==================================================
+14. GAME ARTWORK
+==================================================
+
+Use the existing high-resolution branded game artwork:
+
+Volt Velocity
+Volt Stack
+Circuit Sprint
+Trading
+
+Make sure each image is positioned well.
+
+Example:
+
+Volt Velocity:
+object-position: center center;
+
+Volt Stack:
+object-position: center center;
+
+Circuit Sprint:
+object-position: center center;
+
+Trading:
+object-position: center 42%;
+
+DO NOT distort the images.
+
+==================================================
+15. CARD BORDERS PER GAME
+==================================================
+
+Image 1 uses DIFFERENT identity per game.
+
+Volt Velocity:
+cyan / icy blue
+
+Volt Stack:
+purple / magenta
+
+Circuit Sprint:
+orange / gold
+
+Trading:
+cyan / turquoise
+
+Store this as metadata.
+
+Example:
+
+{
+  id: "volt-velocity",
+  accent: "#55C8FF",
+  accentSecondary: "#85E8FF"
+}
+
+Do NOT hardcode styling based on nth-child.
+
+==================================================
+16. CARD SURFACE
+==================================================
+
+Use:
+
+background:
+linear-gradient(
+  180deg,
+  rgba(7,20,50,.96),
+  rgba(2,12,32,.98)
+);
+
+border-radius:
+16–18px;
+
+border:
+1px solid var(--game-accent);
+
+box-shadow:
+0 0 14px color-mix(
+  in srgb,
+  var(--game-accent) 25%,
+  transparent
+);
+
+Do not make cards flat.
+
+==================================================
+17. CARD CATEGORY BADGE
+==================================================
+
+Place category badge OVER the artwork in top-left.
+
+Examples:
+
+🏁 RACING
+🎮 ARCADE
+✚ PUZZLE
+▥ TRADING
+
+Use actual icons.
+
+Target height:
+
+28–32px
+
+Dark translucent background
++
+accent border
++
+subtle glow.
+
+==================================================
+18. FEATURED BADGE
+==================================================
+
+For featured game only:
+
+FEATURED
+
+upper-right.
+
+Use gold:
+
+#FFD447
+
+dark navy/gold surface.
+
+Do NOT show Featured on every card.
+
+This must come from:
+
+game.featured === true
+
+==================================================
+19. CARD TITLE
+==================================================
+
+Current card title is too small.
+
+Target:
+
+font-size:
+20–23px
+
+font-weight:
+800
+
+letter-spacing:
+1px
+
+uppercase.
+
+Example:
+
+VOLT VELOCITY
+
+Use white/light cyan depending accent.
+
+==================================================
+20. DESCRIPTION
+==================================================
+
+Target:
+
+font-size:
+13–14px
+
+Example:
+
+Volt Velocity:
+Up to 16 pilots. One start. Three laps.
+
+Volt Stack:
+Stack higher. Clear brighter. Soft drop never fails.
+
+Circuit Sprint:
+Connect the paths, beat the clock!
+
+Trading:
+Compete on live forex markets with virtual capital.
+
+Keep each to 1 line where possible.
+
+==================================================
+21. ADD THE MISSING STATISTICS
+==================================================
+
+This is one of the largest differences between Image 1 and Image 2.
+
+Image 2 only has title + description.
+
+Image 1 has:
+
+players
+contests
+performance
+
+Example:
+
+12.4K
+PLAYERS
+
+320
+CONTESTS
+
+96%
+POSITIVE
+
+These values must use REAL data if available.
+
+Do NOT hardcode the example values.
+
+If no backend metric exists yet:
+
+hide that metric gracefully.
+
+Do not invent numbers.
+
+==================================================
+22. STAT LAYOUT
+==================================================
+
+Use three compact stat groups:
+
+[players icon]
+12.4K
+PLAYERS
+
+[trophy icon]
+320
+CONTESTS
+
+[lightning icon]
+96%
+POSITIVE
+
+Layout:
+
+display: flex;
+gap: 26–32px;
+
+font value:
+16–19px
+font-weight: 800
+
+label:
+9–10px
+uppercase
+letter-spacing: .8px
+
+==================================================
+23. STAT COLORS
+==================================================
+
+Players:
+cyan / blue
+
+Contests:
+gold / orange
+
+Positive:
+green / cyan
+
+Use your ChartVolt neon icons.
+
+Do not make every statistic the same color.
+
+==================================================
+24. CTA CIRCLE
+==================================================
+
+Image 1 has a much larger arrow button.
+
+Current arrow in Image 2 is too small.
+
+Target approximately:
+
+56px × 56px
+
+border-radius:
+50%
+
+right side of bottom card section.
+
+Use game accent.
+
+Example:
+
+border:
+2px solid var(--game-accent);
+
+box-shadow:
+0 0 18px var(--game-glow);
+
+arrow:
+white / accent
+24px
+
+On hover:
+
+translateY(-2px)
+scale(1.04)
+
+On press:
+
+scale(.96)
+
+==================================================
+25. CARD CONTENT LAYOUT
+==================================================
+
+Use:
+
+top:
+artwork
+
+middle:
+title + description
+
+bottom:
+stats on left
+large circular CTA on right
+
+Example:
+
+.game-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+Do NOT put the CTA beside the description as in current version.
+
+==================================================
+26. CARD HEIGHT CONSISTENCY
+==================================================
+
+All cards must have equal height.
+
+Even if descriptions differ.
+
+Use:
+
+display:flex;
+flex-direction:column;
+
+card body:
+flex:1;
+
+This keeps CTA and stats aligned across the row.
+
+==================================================
+27. TRADING CARD
+==================================================
+
+Trading must look exactly as premium as the games.
+
+Do not treat it as a secondary link.
+
+Use:
+
+TRADING artwork
+category = Trading
+cyan/turquoise border
+
+Include relevant metrics where available.
+
+Trading belongs to the same catalogue.
+
+==================================================
+28. BACKGROUND AROUND SECOND ROW
+==================================================
+
+Image 1 keeps the beautiful cyber floor/environment visible.
+
+Do not fill unused grid space with a solid section background.
+
+This is important.
+
+The large open area on the right of Trading is intentional because:
+
+the cyber background remains visible.
+
+That is very different from plain black empty space.
+
+==================================================
+29. ATMOSPHERIC DEPTH
+==================================================
+
+Target has:
+
+foreground game cards
+midground cyber environment
+background arena/trophy
+
+Use subtle:
+
+blue fog
+radial glow
+floor reflection
+particle dots
+purple highlights
+
+Do not use giant opaque gradients that erase the artwork.
+
+==================================================
+30. REMOVE CURRENT BORING LOOK
+==================================================
+
+Specifically remove:
+
+- narrow 1000px wrapper
+- tiny game cards
+- plain flat black/navy page
+- tiny typography
+- tiny CTA circles
+- weak borders
+- excessive unused black background
+- square-looking catalogue composition
+- cards with only title/description
+
+==================================================
+31. RESPONSIVE GRID
+==================================================
+
+Desktop >= 1200:
+3 columns
+
+Tablet:
+2 columns
+
+Mobile:
+1 column
+
+Example:
+
+grid-template-columns:
+repeat(3,minmax(0,1fr));
+
+@media (max-width: 1100px) {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+}
+
+@media (max-width: 720px) {
+  grid-template-columns: 1fr;
+}
+
+==================================================
+32. DO NOT HARD-CODE FOUR CARDS
+==================================================
+
+Render from existing game data:
+
+games
+  .filter(...)
+  .map(game => (
+      <GameCatalogueCard
+         key={game.id}
+         game={game}
+      />
+  ));
+
+When game #5 or #10 is added,
+the layout must automatically support it.
+
+==================================================
+33. COMPONENTS
+==================================================
+
+Create/rework:
+
+GamesCataloguePage
+
+GamesHero
+
+GameCategoryFilters
+
+GamesGrid
+
+GameCatalogueCard
+
+GameCategoryBadge
+
+GameStatistics
+
+GameLaunchButton
+
+Keep game data separated from presentation.
+
+==================================================
+34. EXACT VISUAL PRIORITY
+==================================================
+
+The user's eyes should see this order:
+
+1. GAMES
+2. vibrant ChartVolt environment
+3. category filters
+4. large game artwork
+5. game name
+6. short description
+7. player/contest/performance metrics
+8. large arrow action
+
+The current page gives too much priority to empty dark space.
+
+==================================================
+35. TARGET CARD FEEL
+==================================================
+
+Cards should feel like:
+
+premium game launcher tiles
+
+NOT:
+
+website blog cards
+
+NOT:
+
+admin dashboard cards
+
+NOT:
+
+basic catalogue products
+
+Think:
+
+ChartVolt esports launcher.
+
+==================================================
+36. KEEP THE IMAGE 1 PROPORTIONS
+==================================================
+
+Do not make your own interpretation of card dimensions.
+
+Use Image 1 as the visual proportion reference.
+
+IMAGE 1:
+
+- hero uses roughly top 250px
+- game row begins around 270px
+- first row cards are wide and substantial
+- card artwork dominates upper half
+- game details are clearly readable
+- lower stats are visibly separated
+- CTA is large
+
+IMAGE 2:
+
+- is too compressed
+- is NOT the target
+
+==================================================
+37. FINAL ACCEPTANCE CHECK
+==================================================
+
+Before saying complete compare against Image 1.
+
+PASS ONLY IF:
+
+[ ] page uses significantly more horizontal space
+[ ] GAMES heading has strong gradient treatment
+[ ] top environment/trophy remains highly visible
+[ ] whole background continues behind catalogue
+[ ] filters are larger and more premium
+[ ] cards are dramatically larger than current ones
+[ ] 3 cards fit the first desktop row
+[ ] game artwork is approximately 60% of card
+[ ] each game has its own neon accent
+[ ] category badge overlays artwork
+[ ] featured badge exists when applicable
+[ ] titles are larger
+[ ] descriptions remain short
+[ ] three useful statistics appear when data exists
+[ ] stats use proper colored ChartVolt icons
+[ ] CTA circle is approximately 56px
+[ ] trading uses same premium card style
+[ ] lower-page empty area shows cyber environment, not plain black
+[ ] grid automatically supports future games
+[ ] existing routing and filters still work
+[ ] no existing business logic was removed
+
+==================================================
+MOST IMPORTANT INSTRUCTION
+==================================================
+
+DO NOT USE IMAGE 2 AS THE DESIGN BASE.
+
+IMAGE 2 IS WHAT WE ARE REPLACING.
+
+IMAGE 1 IS THE TARGET.
+
+The task is not:
+"make the existing catalogue slightly nicer."
+
+The task is:
+"rebuild the visual presentation so it closely matches Image 1 while
+preserving the existing application logic."
+
+If the finished page still looks structurally like Image 2,
+the task is NOT complete.
+The biggest thing Cursor is currently misunderstanding is scale. In the target, the game cards are not just slightly prettier—they are a completely different level of visual importance. The artwork is large, the cards fill the usable width, the statistics give them substance, and the arena background makes the whole screen feel like part of ChartVolt rather than a dark webpage with four links.
+Also tell Cursor one extra sentence separately:
+Do not put a new separate “Featured Game” hero card above the grid for this version. In the supplied target, Volt Velocity is simply the first large catalogue card with a FEATURED badge. Match that structure exactly.

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Suspense } from "react";
 import { Gamepad2 } from "lucide-react";
 import { NEON_HEADING } from "@/components/neon/tokens";
@@ -11,6 +12,7 @@ import {
   listBrowsableGames,
   type BrowsableGame,
 } from "@/lib/services/games/player-catalogue.service";
+import { loadCatalogueCardStats } from "@/lib/services/games/catalogue-card-stats.service";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +21,14 @@ export const dynamic = "force-dynamic";
  *
  * Server component only — listing is a read. Never launches a round.
  * Order / featured / coming-soon come from `game_catalogue_entry`. One grid in catalogue order:
- * featured is a badge on the card, not a separate section, so the order an operator sets is the
- * order a player sees.
- * Genre filter is `?category=<slug>` — withheld when fewer than two genres are present.
+ * featured is a badge on the card, not a separate section (owner, Rebuild theGame Area).
+ *
+ * Reason (8 Oct 2026): full-bleed arena + wide content so the page matches Image 1 scale,
+ * not the previous narrow dark column.
  */
+
+/** Cache-busted arena plate from Menuitems `Neon Cyberpunk Trophy Arena.png`. */
+const ARENA_BG = "/assets/neon/games-catalogue-arena-r1.webp";
 
 interface GamesCataloguePageProps {
   searchParams: Promise<{ category?: string }>;
@@ -59,39 +65,49 @@ export default async function GamesCataloguePage({
   const filtered = activeSlug
     ? games.filter((g) => g.categorySlug === activeSlug)
     : games;
+
+  const statsByKey = await loadCatalogueCardStats(filtered.map((g) => g.gameKey));
+
   return (
-    <div className="relative isolate overflow-hidden rounded-2xl bg-[#020817]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_40%_at_85%_0%,rgba(0,190,255,.16),transparent_70%),radial-gradient(50%_40%_at_10%_60%,rgba(0,110,255,.10),transparent_70%),radial-gradient(40%_30%_at_60%_100%,rgba(0,216,255,.08),transparent_70%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.06] bg-[linear-gradient(rgba(120,243,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(120,243,255,.6)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:linear-gradient(180deg,#000,transparent_85%)]"
-      />
+    <div className="games-catalogue-page relative isolate -mx-3 min-h-[70vh] sm:-mx-4 md:-mx-5 lg:-mx-6">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
+        <Image
+          src={ARENA_BG}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[center_35%]"
+        />
+        {/* Reason: light wash only — Image 1 stays colourful; do not flatten to #020817. */}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(1,8,25,.18),rgba(1,8,25,.34))]" />
+        <div className="absolute inset-0 bg-[radial-gradient(55%_45%_at_88%_8%,rgba(0,190,255,.14),transparent_70%),radial-gradient(40%_35%_at_12%_70%,rgba(152,92,255,.10),transparent_70%)]" />
+      </div>
 
-      <GamesHero>
-        <Suspense fallback={null}>
-          <GameCatalogueFilters options={filterOptions} activeSlug={activeSlug} />
-        </Suspense>
-      </GamesHero>
+      <div className="games-page-content relative mx-auto w-[min(1420px,calc(100%-32px))] px-2 pb-12 sm:w-[min(1420px,calc(100%-48px))] sm:px-3 lg:w-[min(1420px,calc(100%-64px))]">
+        <GamesHero>
+          <Suspense fallback={null}>
+            <GameCatalogueFilters options={filterOptions} activeSlug={activeSlug} />
+          </Suspense>
+        </GamesHero>
 
-      <div className="mx-auto w-full max-w-[1400px] px-4 pb-10 sm:px-6 lg:px-8">
-        {filtered.length === 0 ? (
-          <div className="space-y-3 rounded-[18px] border border-[rgba(38,171,255,.30)] bg-[rgba(6,16,36,.85)] p-8 text-center">
-            <Gamepad2 className="mx-auto h-8 w-8 text-gray-500" />
-            <p className={`${NEON_HEADING} text-lg`}>
-              {activeSlug ? "No games in this genre" : "No games available yet"}
-            </p>
-            <p className="text-sm text-gray-400">
-              {activeSlug
-                ? "Try another genre, or clear the filter to see every game."
-                : "Check back soon, or open Competitions for contests that are already live."}
-            </p>
-          </div>
-        ) : (
-          <GamesGrid games={filtered} />
-        )}
+        <div className="mt-9 sm:mt-10">
+          {filtered.length === 0 ? (
+            <div className="space-y-3 rounded-[18px] border border-[rgba(38,171,255,.30)] bg-[rgba(6,16,36,.85)] p-8 text-center backdrop-blur-md">
+              <Gamepad2 className="mx-auto h-8 w-8 text-gray-500" />
+              <p className={`${NEON_HEADING} text-lg`}>
+                {activeSlug ? "No games in this genre" : "No games available yet"}
+              </p>
+              <p className="text-sm text-gray-400">
+                {activeSlug
+                  ? "Try another genre, or clear the filter to see every game."
+                  : "Check back soon, or open Competitions for contests that are already live."}
+              </p>
+            </div>
+          ) : (
+            <GamesGrid games={filtered} statsByKey={statsByKey} />
+          )}
+        </div>
       </div>
     </div>
   );

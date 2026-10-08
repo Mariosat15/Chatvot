@@ -11,6 +11,7 @@ export type GameCardData = Pick<
   | "slug"
   | "gameKey"
   | "gameCode"
+  | "kind"
   | "displayName"
   | "tagline"
   | "description"

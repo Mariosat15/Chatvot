@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Games catalogue launcher rebuild CODE-COMPLETE 8 Oct (eng)** — `/games` matches Rebuild theGame Area Image 1: full-bleed Menuitems arena, `min(1420px)` content, large 3-column cards, per-game accents, Menuitems neon stats (real counts; zeros omitted), 56px CTA, no Featured hero section. Spec: `External game plans/Rebuild theGame Area`. Tests: `games-catalogue-routes.test.ts`, `catalogue-card-accent.test.ts`. **Never verified by eye.**
 - **1v1 / Competition summary tiles CODE-COMPLETE 7 Oct (eng)** — 1v1 now fills a 2×2 (Played / Wins / Losses / Win rate) like Competition; shared `PerfMetricGrid` + accent hero chrome on desktop and mobile. Tests: `performance-analytics.test.ts`. **Never verified by eye.**
 - **Mobile Wallet Analytics denser CODE-COMPLETE 7 Oct (eng)** — Wallet Insights removed on phones only (desktop unchanged); Volt Breakdown summary tiles are `grid-cols-2` below `sm` and keep auto-fill from `sm` up. Tests: `wallet-analytics.test.ts`. **Never verified by eye.**
 - **Messaging poll logs flooding PM2 CODE-COMPLETE 7 Oct (eng)** — open chats polled conversation GET ~once/minute and dumped every message body as `[ConvAPI]`; support GET, admin list, employees picker, and send-message content dumps silenced (errors stay). Tests: `poll-log-silence.test.ts`. **Needs deploy + pm2 restart.**
@@ -969,6 +970,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 8 October 2026 - Rebuild Games catalogue to Image 1 launcher (owner task)
+
+**Owner task:** `External game plans/Rebuild theGame Area` + Menuitems graphics — replace the narrow flat catalogue with the cinematic launcher.
+
+**Shipped:** full-bleed `games-catalogue-arena-r1.webp` (from Menuitems Neon Cyberpunk Trophy Arena), wide `min(1420px)` shell, hero eyebrow + gradient GAMES, larger filter chips with Menuitems icons, equal-height 3-column cards with 190px artwork, per-game accent borders (velocity/stack/sprint/trading), Featured badge only, `GameStatistics` from real seat/contest aggregates (hide zeros), 56px accent CTA. No separate Featured Game hero.
+
+**Nothing was paid wrongly.** Tests: `games-catalogue-routes.test.ts`, `catalogue-card-accent.test.ts`, `catalogue-genre-filter.test.ts`. Never verified by eye.
 
 ### 7 October 2026 - 1v1 summary tiles match Competition 2×2 (owner report)
 

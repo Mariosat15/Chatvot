@@ -41,9 +41,10 @@ const GENRE_ICONS: ReadonlyMap<string, LucideIcon> = new Map<string, LucideIcon>
 
 const CYAN_TONE =
   "border-[rgba(0,220,255,.45)] text-[#78f3ff] [&_svg]:text-[#00d8ff]";
-/** Puzzle is magenta in the reference; every other genre is cyan. */
+/** Puzzle magenta / racing gold in Image 1; every other genre is cyan. */
 const GENRE_TONES: ReadonlyMap<string, string> = new Map([
   ["puzzle", "border-[rgba(236,72,255,.55)] text-[#f5a8ff] [&_svg]:text-[#e879f9]"],
+  ["racing", "border-[rgba(255,176,64,.6)] text-[#ffd447] [&_svg]:text-[#ffb040]"],
 ]);
 
 export function GameCategoryBadge({
