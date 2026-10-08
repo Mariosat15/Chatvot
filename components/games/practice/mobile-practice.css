@@ -1,0 +1,505 @@
+/**
+ * Mobile Practice Area (&lt; md). Touch-first game lobby — not a shrink of desktop.
+ * Plan: External game plans/PRACTICE AREA FOR MOBILE (8 Oct 2026).
+ */
+
+.m-practice {
+  width: 100%;
+  max-width: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+
+.m-practice__header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.m-practice__eyebrow {
+  margin: 0;
+  color: #13dfff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(19, 223, 255, 0.45);
+}
+
+.m-practice__game {
+  margin: 8px 0 0;
+  font-size: clamp(26px, 7vw, 30px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  background: linear-gradient(90deg, #ffffff 10%, #b8f7ff 55%, #d4b4ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ─── Main card ─────────────────────────────────────────────────────── */
+
+.m-practice-card {
+  position: relative;
+  width: 100%;
+  padding: 22px 16px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 210, 255, 0.52);
+  background:
+    radial-gradient(circle at 50% 10%, rgba(20, 100, 200, 0.16), transparent 40%),
+    linear-gradient(180deg, rgba(5, 25, 63, 0.94), rgba(3, 12, 34, 0.97));
+  box-shadow:
+    0 0 24px rgba(0, 180, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  text-align: center;
+  overflow: hidden;
+}
+
+.m-practice-card::before,
+.m-practice-card::after {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.m-practice-card::before {
+  top: 10px;
+  left: 10px;
+  border-top: 2px solid #13dfff;
+  border-left: 2px solid #13dfff;
+  border-top-left-radius: 4px;
+  box-shadow: -2px -2px 10px rgba(19, 223, 255, 0.35);
+}
+
+.m-practice-card::after {
+  bottom: 10px;
+  right: 10px;
+  border-bottom: 2px solid #da4dff;
+  border-right: 2px solid #da4dff;
+  border-bottom-right-radius: 4px;
+  box-shadow: 2px 2px 10px rgba(218, 77, 255, 0.3);
+}
+
+.m-practice-card__icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.m-practice-card__icon-row::before,
+.m-practice-card__icon-row::after {
+  content: "";
+  width: 36px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(19, 223, 255, 0.8),
+    transparent
+  );
+  box-shadow: 0 0 8px rgba(19, 223, 255, 0.4);
+}
+
+.m-practice-card__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(120, 210, 255, 0.4), transparent 50%),
+    linear-gradient(145deg, rgba(18, 80, 180, 0.95), rgba(90, 30, 160, 0.95));
+  border: 2px solid rgba(19, 223, 255, 0.85);
+  box-shadow:
+    0 0 0 3px rgba(19, 223, 255, 0.1),
+    0 0 22px rgba(19, 223, 255, 0.4),
+    0 0 28px rgba(152, 92, 255, 0.28);
+}
+
+.m-practice-card__icon svg {
+  width: 32px;
+  height: 32px;
+  color: #f2fbff;
+  filter: drop-shadow(0 0 6px rgba(19, 223, 255, 0.7));
+}
+
+.m-practice-card__title {
+  margin: 0;
+  font-size: clamp(20px, 5.5vw, 23px);
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.01em;
+}
+
+.m-practice-card__desc {
+  margin: 12px auto 0;
+  max-width: 34ch;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #c7d3e8;
+}
+
+.m-practice-card__refusal {
+  margin: 12px 0 0;
+  color: #ff8fa8;
+  font-size: 13px;
+}
+
+/* ─── 2×2 HUD chips ─────────────────────────────────────────────────── */
+
+.m-practice-features {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.m-practice-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 10px;
+  color: #e8f2ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 36, 84, 0.92),
+    rgba(5, 18, 48, 0.95)
+  );
+  border: 1px solid rgba(19, 223, 255, 0.45);
+  /* Reason: mobile plan asks for compact HUD shapes; desktop keeps rounded pills. */
+  clip-path: polygon(
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 50%,
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 50%
+  );
+}
+
+.m-practice-chip--cyan {
+  border-color: rgba(19, 223, 255, 0.85);
+  color: #b8f5ff;
+  box-shadow: 0 0 12px rgba(19, 223, 255, 0.18);
+}
+
+.m-practice-chip--purple {
+  border-color: rgba(198, 120, 255, 0.9);
+  color: #ebcfff;
+  box-shadow: 0 0 12px rgba(198, 120, 255, 0.2);
+}
+
+.m-practice-chip--blue {
+  border-color: rgba(80, 190, 255, 0.9);
+  color: #c8e8ff;
+  box-shadow: 0 0 12px rgba(80, 190, 255, 0.18);
+}
+
+.m-practice-chip--magenta {
+  border-color: rgba(230, 90, 255, 0.9);
+  color: #f5d0ff;
+  box-shadow: 0 0 12px rgba(230, 90, 255, 0.2);
+}
+
+.m-practice-chip__glyph {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.m-practice-chip__glyph svg {
+  width: 15px;
+  height: 15px;
+  color: currentColor;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* ─── Full-width CTA ────────────────────────────────────────────────── */
+
+.m-practice-cta {
+  margin-top: 18px;
+  width: 100%;
+  min-height: 60px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  border: 1px solid rgba(127, 239, 255, 0.85);
+  border-radius: 12px;
+  color: #03141f;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: linear-gradient(180deg, #24e7ff 0%, #06b9e8 100%);
+  box-shadow: 0 0 20px rgba(0, 220, 255, 0.32);
+  transition: transform 150ms ease, filter 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m-practice-cta:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.m-practice-cta:disabled {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+.m-practice-cta__play {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.m-practice-cta__spin {
+  width: 18px;
+  height: 18px;
+  animation: m-practice-spin 0.8s linear infinite;
+}
+
+@keyframes m-practice-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─── History card ──────────────────────────────────────────────────── */
+
+.m-practice-history {
+  margin-top: 16px;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(20, 210, 255, 0.4);
+  background: linear-gradient(
+    180deg,
+    rgba(5, 25, 63, 0.9),
+    rgba(3, 12, 34, 0.94)
+  );
+  box-shadow: 0 0 18px rgba(0, 180, 255, 0.08);
+}
+
+.m-practice-history__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.m-practice-history__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #9fe9ff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.m-practice-history__title svg {
+  width: 14px;
+  height: 14px;
+  color: #13dfff;
+}
+
+.m-practice-history__menu {
+  position: relative;
+}
+
+.m-practice-history__menu-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -8px -8px 0 0;
+  border: 0;
+  background: transparent;
+  color: rgba(180, 210, 240, 0.7);
+  cursor: pointer;
+}
+
+.m-practice-history__menu-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.m-practice-history__clear {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 3;
+  min-height: 44px;
+  padding: 0 14px;
+  white-space: nowrap;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 120, 140, 0.35);
+  background: rgba(12, 20, 40, 0.96);
+  color: #ff9aab;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.m-practice-history__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m-practice-history__row {
+  display: grid;
+  grid-template-columns: 1fr auto 44px;
+  align-items: center;
+  gap: 8px;
+  min-height: 58px;
+  padding: 0 8px 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(60, 125, 220, 0.25);
+  background: linear-gradient(
+    90deg,
+    rgba(13, 38, 80, 0.72),
+    rgba(6, 22, 51, 0.68)
+  );
+}
+
+.m-practice-history__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #d7e4f7;
+  font-size: 13.5px;
+}
+
+.m-practice-history__meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-practice-history__meta svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: rgba(127, 230, 255, 0.75);
+}
+
+.m-practice-history__score {
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.m-practice-history__delete {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: #8191ae;
+  cursor: pointer;
+}
+
+.m-practice-history__delete svg {
+  width: 16px;
+  height: 16px;
+}
+
+.m-practice-history__delete:active:not(:disabled) {
+  color: #ff9aab;
+}
+
+.m-practice-history__delete:disabled {
+  opacity: 0.5;
+}
+
+.m-practice-history__delete-spacer {
+  width: 44px;
+  height: 44px;
+}
+
+.m-practice-history__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  border: 0;
+  background: transparent;
+  color: #13dfff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-shadow: 0 0 8px rgba(19, 223, 255, 0.3);
+}
+
+.m-practice__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 20px;
+  color: #13dfff;
+  font-size: 14px;
+  text-decoration: none;
+  text-shadow: 0 0 8px rgba(19, 223, 255, 0.3);
+}
+
+.m-practice__back:active {
+  color: #7fefff;
+}
+
+@media (max-width: 360px) {
+  .m-practice {
+    padding-left: max(14px, env(safe-area-inset-left, 0px));
+    padding-right: max(14px, env(safe-area-inset-right, 0px));
+  }
+
+  .m-practice-chip {
+    font-size: 10.5px;
+    gap: 6px;
+    padding: 0 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-practice-cta {
+    transition: none;
+  }
+
+  .m-practice-cta__spin {
+    animation: none;
+  }
+}

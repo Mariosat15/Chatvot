@@ -1,0 +1,1208 @@
+TASK: REBUILD CHARTVOLT PRACTICE AREA FOR MOBILE
+
+IMPORTANT
+
+We already have a desktop Practice Area page.
+
+DO NOT simply shrink the desktop Practice Area.
+DO NOT stack the desktop containers and call it mobile.
+DO NOT reduce everything until it fits.
+
+Create a dedicated MOBILE Practice Area experience that feels like a proper
+ChartVolt game screen.
+
+The desktop layout must remain unchanged.
+
+This mobile design must work for:
+
+- Circuit Sprint
+- Volt Velocity
+- Volt Stack
+- future ChartVolt games
+
+Only the game name / game identity / optional accent artwork should change.
+
+Existing practice functionality, routing, APIs, history, delete functionality
+and game-launch logic MUST remain unchanged.
+
+==================================================
+1. MAIN OBJECTIVE
+==================================================
+
+For screens below approximately 768px create a dedicated mobile Practice Area.
+
+Target feeling:
+
+ChartVolt
++
+premium mobile game lobby
++
+cyber HUD
++
+clean competitive gaming interface.
+
+It must NOT feel like:
+
+- desktop shrunk to phone width
+- admin panel
+- website form
+- giant vertical dashboard
+- generic Bootstrap card
+- plain dark boxes
+
+The mobile page should immediately answer:
+
+1. What game am I practicing?
+2. What does practice mean?
+3. Is it free?
+4. Does it affect rankings?
+5. Can I practice unlimited times?
+6. How do I start?
+7. What were my recent practice rounds?
+
+==================================================
+2. BREAKPOINTS
+==================================================
+
+Primary mobile target:
+
+375px – 430px
+
+Also support:
+
+360px minimum
+390px
+393px
+412px
+430px
+
+Tablet can begin around 768px.
+
+Recommended structure:
+
+<div className="hidden md:block">
+    <DesktopPracticeArea />
+</div>
+
+<div className="block md:hidden">
+    <MobilePracticeArea />
+</div>
+
+Share:
+
+- hooks
+- API calls
+- practice game creation
+- history
+- delete logic
+- game metadata
+
+DO NOT share the desktop layout structure.
+
+==================================================
+3. MOBILE PAGE STRUCTURE
+==================================================
+
+Use this exact order:
+
+1. Compact Practice Area header
+2. Game title
+3. Main Practice card
+4. Practice feature chips
+5. Large Start Practice CTA
+6. Recent Practice Rounds
+7. Back to Game
+8. optional fixed/mobile app navigation if globally used
+
+The mobile page should be SHORT and focused.
+
+Do not put unnecessary information on this screen.
+
+==================================================
+4. FULL-PAGE BACKGROUND
+==================================================
+
+Keep the dedicated ChartVolt cyber practice background.
+
+It must remain visible around the content.
+
+Mobile background should use:
+
+- very dark navy center
+- cyan circuits
+- purple accents
+- subtle stars / particles
+- digital floor or horizon glow
+- controlled atmospheric fog
+
+IMPORTANT:
+
+Do NOT put a giant opaque blue rectangle over the entire screen.
+
+The background is part of the design.
+
+Suggested:
+
+.mobile-practice-page {
+    min-height: 100dvh;
+    background:
+        linear-gradient(
+            rgba(1, 7, 24, .20),
+            rgba(1, 7, 24, .35)
+        ),
+        url('/assets/practice-background.webp');
+
+    background-size: cover;
+    background-position: center;
+    overflow-x: hidden;
+}
+
+On mobile, avoid background-attachment: fixed if it causes performance issues.
+
+==================================================
+5. MOBILE PAGE WIDTH
+==================================================
+
+Use:
+
+width: 100%;
+max-width: 100%;
+padding-inline:
+    max(16px, env(safe-area-inset-left));
+
+Do NOT use desktop widths.
+
+Content width must adapt naturally to phone width.
+
+Outer horizontal padding:
+
+16px
+
+At 360px:
+14px is acceptable if necessary.
+
+==================================================
+6. SAFE AREA SUPPORT
+==================================================
+
+Support modern iPhones / Android devices.
+
+Use:
+
+padding-top:
+max(12px, env(safe-area-inset-top));
+
+padding-bottom:
+calc(24px + env(safe-area-inset-bottom));
+
+If there is a fixed global bottom nav:
+
+padding-bottom:
+calc(90px + env(safe-area-inset-bottom));
+
+Nothing should sit behind the notch or bottom navigation.
+
+==================================================
+7. PRACTICE HEADER
+==================================================
+
+Desktop currently uses:
+
+PRACTICE AREA
+Circuit Sprint
+
+For mobile keep the same hierarchy but make it compact.
+
+Visual:
+
+        PRACTICE AREA
+       Circuit Sprint
+
+PRACTICE AREA:
+
+font-size: 10–12px
+letter-spacing: 4–5px
+uppercase
+cyan
+
+Game title:
+
+font-size: 26–30px
+font-weight: 800
+white with subtle cyan gradient
+
+Spacing between title and card:
+
+14–18px
+
+Do not waste a large amount of vertical space above the card.
+
+==================================================
+8. MAIN PRACTICE CARD
+==================================================
+
+This is the main focal component.
+
+Mobile target:
+
+width: 100%
+padding: 20–22px 16px
+dark transparent navy
+cyan + purple HUD edge
+controlled glow
+angular/cut-corner styling
+
+Do NOT reuse the desktop card height.
+
+Allow content to determine height.
+
+Target approximately:
+
+340–410px depending screen width.
+
+Card structure:
+
+        practice icon
+
+   Practice Circuit Sprint
+
+   short explanation
+
+   [feature chips]
+
+     START PRACTICE
+
+==================================================
+9. HUD CARD STYLE
+==================================================
+
+Do NOT use a plain:
+
+border-radius: 20px;
+background: #123;
+
+Use layered HUD styling.
+
+Example:
+
+.mobile-practice-card {
+    position: relative;
+
+    background:
+      radial-gradient(
+        circle at 50% 10%,
+        rgba(20,100,200,.16),
+        transparent 40%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(5,25,63,.94),
+        rgba(3,12,34,.97)
+      );
+
+    border:
+      1px solid rgba(20,210,255,.52);
+
+    border-radius:
+      18px;
+
+    box-shadow:
+      0 0 24px rgba(0,180,255,.10),
+      inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+Add purple accent corners using ::before / ::after.
+
+Keep the center dark.
+
+Do not over-glow.
+
+==================================================
+10. PRACTICE ICON
+==================================================
+
+The graduation-cap icon should remain a focal point.
+
+Desktop icon can be simplified slightly for mobile.
+
+Target:
+
+60–68px circular energy container
+
+Icon:
+30–34px
+
+Use:
+
+cyan → purple gradient ring
+soft outer glow
+
+Decorative horizontal tech lines may remain,
+but shorten them for mobile.
+
+Do not let decoration touch the card edges.
+
+==================================================
+11. PRACTICE TITLE
+==================================================
+
+Example:
+
+Practice Circuit Sprint
+
+or
+
+Practice Volt Velocity
+
+Use dynamic game name.
+
+font-size:
+20–23px
+
+font-weight:
+750–800
+
+Center aligned.
+
+Spacing below icon:
+14–16px
+
+==================================================
+12. PRACTICE DESCRIPTION
+==================================================
+
+Use shorter mobile wording.
+
+Recommended:
+
+Solo practice is free, does not affect your ranking,
+and has no prize. Play as many rounds as you like.
+
+Do not use a long paragraph.
+
+Maximum:
+
+2–3 lines on normal phones.
+
+font-size:
+13–14px
+
+line-height:
+1.45–1.55
+
+color:
+#C7D3E8
+
+center aligned.
+
+==================================================
+13. FEATURE CHIPS
+==================================================
+
+The desktop currently uses:
+
+SOLO MODE
+FREE TO PLAY
+NO RANKING IMPACT
+UNLIMITED PRACTICE
+
+Keep all four.
+
+But on mobile DO NOT squeeze four into one row.
+
+Use a 2 × 2 grid.
+
+Example:
+
+┌─────────────┐ ┌─────────────┐
+│ 👤 SOLO     │ │ 🎁 FREE     │
+└─────────────┘ └─────────────┘
+
+┌─────────────┐ ┌─────────────┐
+│ 📊 NO RANK  │ │ ∞ UNLIMITED │
+└─────────────┘ └─────────────┘
+
+Use actual ChartVolt icons, not emoji.
+
+CSS:
+
+display: grid;
+grid-template-columns: repeat(2, minmax(0, 1fr));
+gap: 10px;
+
+Chip height:
+
+48–54px
+
+Text:
+
+11–12px
+uppercase
+font-weight: 700
+
+==================================================
+14. FEATURE CHIP COLORS
+==================================================
+
+Maintain the target colors:
+
+Solo Mode:
+cyan / electric blue
+
+Free to Play:
+purple
+
+No Ranking Impact:
+blue / cyan
+
+Unlimited Practice:
+magenta / purple
+
+Do not use random colors.
+
+Keep the same meaning on every Practice page.
+
+==================================================
+15. FEATURE CHIP SHAPE
+==================================================
+
+Do NOT use generic rounded pills.
+
+Use compact mobile HUD shapes.
+
+Example:
+
+clip-path:
+polygon(
+  8px 0,
+  calc(100% - 8px) 0,
+  100% 50%,
+  calc(100% - 8px) 100%,
+  8px 100%,
+  0 50%
+);
+
+If clip-path causes accessibility/touch issues,
+use rounded rectangles with angular pseudo-elements.
+
+Touch target must remain at least 44px high.
+
+==================================================
+16. START PRACTICE BUTTON
+==================================================
+
+This must be the strongest mobile CTA.
+
+Desktop style should translate into a mobile gaming CTA.
+
+Use:
+
+width: 100%
+height: 58–64px
+
+Maximum width:
+100%
+
+Do not make a tiny centered desktop button.
+
+Structure:
+
+▶ START PRACTICE
+
+Use:
+
+cyan gradient
+dark navy text
+strong font
+bright cyan border
+controlled outer glow
+pressed state
+
+Example:
+
+background:
+linear-gradient(
+  180deg,
+  #24E7FF,
+  #06B9E8
+);
+
+box-shadow:
+0 0 20px rgba(0,220,255,.32);
+
+font-size:
+15–17px
+
+font-weight:
+800
+
+Mobile press:
+
+active: scale(.97)
+
+transition:
+150ms
+
+Do not rely on hover.
+
+==================================================
+17. CTA POSITION
+==================================================
+
+CTA should appear immediately after the 2×2 feature grid.
+
+Spacing:
+
+feature grid → CTA:
+16–18px
+
+No large empty gap.
+
+The user should understand immediately:
+
+"This is practice"
+then
+"Start Practice"
+
+==================================================
+18. RECENT PRACTICE ROUNDS
+==================================================
+
+Under the main card create:
+
+YOUR RECENT PRACTICE ROUNDS
+
+This should be a second HUD card.
+
+Do NOT turn it into a huge table.
+
+Mobile structure:
+
+┌──────────────────────────────┐
+│ ◷ RECENT PRACTICE ROUNDS    │
+│                              │
+│ ⚑ Left early      1,040   🗑 │
+│ ⚑ Ended              -    🗑 │
+│ ⚑ Ended              -    🗑 │
+│                              │
+│       View all rounds        │
+└──────────────────────────────┘
+
+==================================================
+19. RECENT ROUNDS LIMIT
+==================================================
+
+Show:
+
+maximum 3 recent rounds by default.
+
+If more exist:
+
+View all rounds (5)
+
+or expandable:
+
+Show more
+
+Do NOT render an endless history list on the Practice page.
+
+This is especially important on mobile.
+
+==================================================
+20. RECENT ROUND ROW
+==================================================
+
+Each row:
+
+height:
+56–62px
+
+padding:
+12–14px
+
+Use:
+
+left:
+small flag/status icon
+
+middle:
+status
+
+right:
+score / result
+
+far right:
+delete icon if existing functionality requires it
+
+Example:
+
+⚑ Left early        1,040      🗑
+
+Do not make the delete icon visually dominant.
+
+==================================================
+21. HISTORY ROW VISUAL STYLE
+==================================================
+
+Use:
+
+background:
+linear-gradient(
+  90deg,
+  rgba(13,38,80,.72),
+  rgba(6,22,51,.68)
+);
+
+border:
+1px solid rgba(60,125,220,.25);
+
+border-radius:
+12px;
+
+Keep rows readable.
+
+Do not make every row glow.
+
+==================================================
+22. CLEAR ALL
+==================================================
+
+Current desktop version includes CLEAR ALL.
+
+Keep the functionality if it already exists.
+
+On mobile:
+
+do not put a large dangerous action near the title.
+
+Use:
+
+small text button
+"Clear"
+
+or overflow menu:
+
+⋯
+
+Then:
+Clear practice history
+
+Require confirmation if existing behaviour supports it.
+
+==================================================
+23. DELETE BUTTONS
+==================================================
+
+Delete actions must be touch-friendly.
+
+Visual button can be compact,
+but tap target must be at least:
+
+44 × 44px
+
+Use an invisible larger hitbox if necessary.
+
+Do not make trash icon only 16px clickable.
+
+==================================================
+24. BACK TO GAME
+==================================================
+
+At bottom:
+
+← Back to Circuit Sprint
+
+or
+
+← Back to game
+
+Prefer dynamic:
+
+← Back to Circuit Sprint
+
+Use cyan text.
+
+Touch target:
+
+minimum 44px high
+
+Centered.
+
+Spacing:
+
+24px after history.
+
+==================================================
+25. MOBILE SPACING
+==================================================
+
+Recommended:
+
+page horizontal padding:
+16px
+
+header → hero:
+16px
+
+card internal padding:
+16–20px
+
+feature gap:
+10px
+
+section gap:
+16–20px
+
+history row gap:
+8px
+
+bottom space:
+24px+
+
+Do not use giant desktop spacing.
+
+==================================================
+26. MOBILE TYPOGRAPHY
+==================================================
+
+Do NOT shrink desktop typography until it fits.
+
+Use:
+
+Practice Area label:
+10–12px
+
+Game title:
+26–30px
+
+Practice card title:
+20–23px
+
+Description:
+13–14px
+
+Feature chip:
+11–12px
+
+CTA:
+15–17px
+
+History title:
+12–14px
+
+History rows:
+13–14px
+
+Back link:
+13–14px
+
+Everything must remain readable at 360px.
+
+==================================================
+27. MOBILE GRAPHIC STYLE
+==================================================
+
+Maintain ChartVolt design:
+
+Background:
+#020817
+#031029
+
+Cards:
+dark navy / transparent glass
+
+Primary accents:
+cyan
+electric blue
+purple
+magenta
+
+Use gradients.
+
+Do NOT fill cards with bright medium blue.
+
+The target page works because:
+
+dark surfaces dominate
++
+neon edge lighting provides hierarchy.
+
+==================================================
+28. GLOW RULES
+==================================================
+
+Use glow only for:
+
+- title accent
+- practice icon
+- card edge
+- selected feature icons
+- Start Practice
+- active controls
+
+Do NOT glow:
+
+- every history row
+- every word
+- every border
+- secondary descriptions
+
+Mobile should actually use slightly LESS glow than desktop.
+
+==================================================
+29. MOBILE BACKGROUND PERFORMANCE
+==================================================
+
+Do not load a massive raw PNG unnecessarily.
+
+Prefer:
+
+WebP / AVIF
+
+Use a mobile-specific crop if necessary.
+
+Example:
+
+practice-background-mobile.webp
+
+Keep focus in the center.
+
+Do not crop away all circuit details.
+
+==================================================
+30. RETINA ASSETS
+==================================================
+
+All game icons and decorative graphics must remain sharp.
+
+Prefer SVG for:
+
+- graduation cap
+- clock
+- flag
+- trash
+- infinity
+- solo
+- gift
+- ranking icon
+- play icon
+
+If PNG is required:
+
+render at 2x or 3x display resolution.
+
+Never enlarge low-resolution screenshot assets.
+
+==================================================
+31. TOUCH INTERACTION
+==================================================
+
+Every interactive control:
+
+minimum:
+44 × 44px
+
+Preferred:
+48px+
+
+This includes:
+
+Start Practice
+feature controls if interactive
+delete
+Clear
+View All
+Back
+expand/collapse
+
+Use:
+
+active states
+
+not hover-only interaction.
+
+==================================================
+32. MOBILE HISTORY EXPANSION
+==================================================
+
+If the history contains more than 3 records:
+
+preferred:
+
+[ View all rounds ]
+
+Tap opens:
+
+- expanded accordion
+or
+- dedicated practice history screen
+or
+- bottom sheet
+
+Do not make the Practice Area itself endlessly long.
+
+==================================================
+33. RESPONSIVE DIFFERENCES
+==================================================
+
+360–430px:
+
+2×2 feature chips
+
+Tablet:
+
+four chips may return to one row if space allows
+
+Desktop:
+
+keep existing desktop structure unchanged.
+
+Do not change desktop to solve mobile issues.
+
+==================================================
+34. DATA MUST REMAIN REAL
+==================================================
+
+Do not hardcode any example shown in the design.
+
+Use actual:
+
+game name
+practice history
+score
+status
+date/time if available
+practice creation result
+
+Existing data/API hooks must remain the source of truth.
+
+Image/reference values are visual examples only.
+
+==================================================
+35. REUSABLE COMPONENT
+==================================================
+
+Create something like:
+
+<MobilePracticeArea
+    game={game}
+    history={practiceHistory}
+    onStart={startPractice}
+    onDeleteRound={deleteRound}
+    onClearHistory={clearHistory}
+/>
+
+Game metadata:
+
+game.name
+game.slug
+game.icon
+game.accentPrimary
+game.accentSecondary
+
+Do NOT build a separate duplicated page for every game.
+
+==================================================
+36. COMPONENT STRUCTURE
+==================================================
+
+Recommended:
+
+components/
+practice/
+
+desktop/
+    DesktopPracticeArea.tsx
+
+mobile/
+    MobilePracticeArea.tsx
+    MobilePracticeHeader.tsx
+    MobilePracticeHero.tsx
+    MobilePracticeFeatures.tsx
+    MobilePracticeCTA.tsx
+    MobilePracticeHistory.tsx
+    MobilePracticeHistoryRow.tsx
+
+shared/
+    PracticeIcon.tsx
+    practiceTypes.ts
+
+Reuse existing hooks:
+
+usePracticeGame()
+usePracticeHistory()
+
+or current equivalent.
+
+DO NOT duplicate backend requests.
+
+==================================================
+37. MOBILE VISUAL HIERARCHY
+==================================================
+
+Before scrolling much, user should see:
+
+PRACTICE AREA
+Circuit Sprint
+
+[ Practice card ]
+[ feature grid ]
+[ START PRACTICE ]
+
+The CTA should be visible very quickly.
+
+History is secondary.
+
+Do not let history dominate the screen.
+
+==================================================
+38. TARGET MOBILE WIREFRAME
+==================================================
+
+            PRACTICE AREA
+
+           Circuit Sprint
+
+
+╭────────────────────────────────╮
+│                                │
+│              🎓                │
+│                                │
+│     Practice Circuit Sprint    │
+│                                │
+│ Solo practice is free and      │
+│ does not affect your ranking.  │
+│                                │
+│ ┌───────────┐ ┌───────────┐    │
+│ │ SOLO MODE │ │ FREE PLAY │    │
+│ └───────────┘ └───────────┘    │
+│                                │
+│ ┌───────────┐ ┌───────────┐    │
+│ │ NO RANK   │ │ UNLIMITED │    │
+│ └───────────┘ └───────────┘    │
+│                                │
+│ ┌──────────────────────────┐   │
+│ │   ▶ START PRACTICE       │   │
+│ └──────────────────────────┘   │
+│                                │
+╰────────────────────────────────╯
+
+
+╭────────────────────────────────╮
+│ ◷ RECENT PRACTICE ROUNDS       │
+│                            ... │
+│                                │
+│ ⚑ Left early       1,040    🗑 │
+│ ⚑ Ended                -    🗑 │
+│ ⚑ Ended                -    🗑 │
+│                                │
+│        View all rounds         │
+╰────────────────────────────────╯
+
+
+       ← Back to Circuit Sprint
+
+==================================================
+39. VERY IMPORTANT: DO NOT COPY DESKTOP
+==================================================
+
+STRICT RULE:
+
+Do not take this:
+
+desktop title
+desktop giant hero
+desktop chips
+desktop history
+
+and simply stack them vertically.
+
+That is NOT the requested mobile version.
+
+DESKTOP:
+large cyber game lobby
+
+MOBILE:
+focused touch-first game launch screen.
+
+Same style.
+Same data.
+Different UX.
+
+==================================================
+40. WHAT IS WRONG IF CURSOR PRODUCES THIS
+==================================================
+
+Reject the result if:
+
+- text becomes tiny
+- cards stretch far beyond necessary height
+- four badges are squeezed into one row
+- huge empty areas appear
+- history becomes a tall table
+- background disappears behind opaque rectangles
+- Start Practice remains a desktop-sized button
+- the page horizontally scrolls
+- delete icons are difficult to tap
+- desktop changes
+- every component glows heavily
+- game title is too small
+- Practice card does not feel like a game screen
+
+==================================================
+41. MOBILE ACCEPTANCE TEST
+==================================================
+
+Before marking complete test at:
+
+360 × 800
+375 × 812
+390 × 844
+393 × 852
+412 × 915
+430 × 932
+
+Verify:
+
+[ ] no horizontal overflow
+[ ] no clipped text
+[ ] no clipped neon glow
+[ ] all content fits naturally
+[ ] background remains visible
+[ ] Start Practice is prominent
+[ ] feature chips use 2×2 mobile grid
+[ ] text remains readable
+[ ] history shows max 3 records initially
+[ ] delete tap areas are >= 44px
+[ ] Back to Game is easy to tap
+[ ] safe areas work
+[ ] existing practice launch works
+[ ] delete/history functionality works
+[ ] game name is dynamic
+[ ] desktop layout is unchanged
+[ ] same component works with all games
+
+==================================================
+42. FINAL DESIGN REQUIREMENT
+==================================================
+
+The mobile Practice page should feel like opening a game lobby inside
+ChartVolt.
+
+It must have:
+
+- strong game identity
+- clean hierarchy
+- very easy Start Practice action
+- minimal cognitive load
+- neon ChartVolt styling
+- dark premium surfaces
+- touch-first interactions
+- compact recent history
+- excellent readability
+
+The desktop screenshot is the VISUAL LANGUAGE reference.
+
+Do not reproduce its desktop proportions on a phone.
+
+Reinterpret the same design as a native-feeling mobile ChartVolt interface.

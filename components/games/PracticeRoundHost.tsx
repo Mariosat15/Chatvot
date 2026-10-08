@@ -1,19 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import {
-  ChartNoAxesColumn,
-  Gift,
-  GraduationCap,
-  Infinity as InfinityIcon,
-  Loader2,
-  Play,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react";
 import { ProviderGameFrame } from "./ProviderGameFrame";
-import { PracticeRecentList } from "./PracticeRecentList";
+import { DesktopPracticeLobby } from "./practice/DesktopPracticeLobby";
+import { MobilePracticeArea } from "./practice/MobilePracticeArea";
 import type { GameScoreType } from "@/lib/utils/format-game-score";
 import type { PracticeRoundView } from "./practice-state";
 import "./practice-area.css";
@@ -27,8 +17,8 @@ import "./practice-area.css";
  * posts `exit` itself after a short hand-off so practice is not stuck on "being confirmed"
  * (owner, 6 Oct 2026). Leaving mid-round voids the attempt. Nothing here names a game.
  *
- * Visual shell (8 Oct 2026): rounded glass HUD panels with cyan→magenta rims and pill badges
- * (owner target). Chamfered clip-path cards were rejected as looking like cut-off boxes.
+ * Idle UI (8 Oct 2026): desktop cyber HUD lobby and a separate touch-first mobile lobby
+ * share this controller — APIs and history only, not layout (owner mobile plan).
  */
 
 type Phase =
@@ -42,17 +32,6 @@ interface PracticeRoundHostProps {
   scoreType?: GameScoreType;
   initialRounds: PracticeRoundView[];
 }
-
-const FEATURES: ReadonlyArray<{
-  label: string;
-  tone: string;
-  Icon: LucideIcon;
-}> = [
-  { label: "Solo Mode", tone: "practice-feature--cyan", Icon: UserRound },
-  { label: "Free to Play", tone: "practice-feature--purple", Icon: Gift },
-  { label: "No Ranking Impact", tone: "practice-feature--blue", Icon: ChartNoAxesColumn },
-  { label: "Unlimited Practice", tone: "practice-feature--magenta", Icon: InfinityIcon },
-];
 
 /** Race-server result can lag the frame's `finished` by a beat; retry before giving up. */
 const FINISH_PULL_ATTEMPTS = 6;
@@ -301,70 +280,28 @@ export function PracticeRoundHost({
   }
 
   const launching = phase.name === "launching";
+  const lobbyProps = {
+    slug,
+    gameName,
+    scoreType,
+    rounds,
+    launching,
+    refusal,
+    historyBusy,
+    onLaunch: () => void launch(),
+    onForget: (roundId: string) => void forgetRound(roundId),
+    onClearAll: () => void clearAll(),
+  };
 
   return (
-    <div>
-      <section className="practice-hud practice-hero" aria-label={`Practice ${gameName}`}>
-        <div className="practice-hud__glow" aria-hidden />
-        <div className="practice-hero__icon-row">
-          <div className="practice-hero__icon">
-            <GraduationCap aria-hidden />
-          </div>
-        </div>
-        <h2 className="practice-hero__title">{`Practice ${gameName}`}</h2>
-        <p className="practice-hero__desc">
-          This is solo practice. It&apos;s free to play, does not count towards any ranking,
-          and there is no prize. Play as many practice rounds as you like.
-        </p>
-        <ul className="practice-features">
-          {FEATURES.map(({ label, tone, Icon }) => (
-            <li key={label} className={`practice-feature ${tone}`}>
-              <span className="practice-feature__glyph" aria-hidden>
-                <Icon />
-              </span>
-              <span>{label}</span>
-            </li>
-          ))}
-        </ul>
-        {refusal ? (
-          <p role="alert" className="practice-hero__refusal">
-            {refusal}
-          </p>
-        ) : null}
-        <div className="practice-cta-wrap">
-          <span className="practice-cta-wrap__chevron" aria-hidden>
-            ‹
-          </span>
-          <button
-            type="button"
-            onClick={launch}
-            disabled={launching}
-            className="practice-cta"
-          >
-            {launching ? (
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-            ) : (
-              <Play className="h-5 w-5 fill-current" aria-hidden />
-            )}
-            {launching ? "Starting…" : "Start practice"}
-          </button>
-          <span className="practice-cta-wrap__chevron" aria-hidden>
-            ›
-          </span>
-        </div>
-      </section>
-
-      <PracticeRecentList
-        rounds={rounds}
-        scoreType={scoreType}
-        onForget={forgetRound}
-        onClearAll={clearAll}
-        busy={historyBusy}
-      />
-
-      <Link href={`/games/${slug}`} className="practice-back">
-        ← Back to the game page
-      </Link>
-    </div>
+    <>
+      {/* Reason: desktop and mobile are separate trees — share APIs only (mobile plan s2). */}
+      <div className="hidden md:block">
+        <DesktopPracticeLobby {...lobbyProps} />
+      </div>
+      <div className="block md:hidden">
+        <MobilePracticeArea {...lobbyProps} />
+      </div>
+    </>
   );
 }

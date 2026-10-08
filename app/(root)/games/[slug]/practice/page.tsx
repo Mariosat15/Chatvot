@@ -20,8 +20,8 @@ export const dynamic = "force-dynamic";
  * Reason: rendering this page creates nothing. The round is created by the Start button's POST,
  * because Next.js prefetches `<Link>` targets and a round created on GET would be created on hover.
  *
- * Visual (8 Oct 2026): full-bleed cyber background with rounded glass HUD panels — no clip-path
- * cutoffs and no giant opaque outer rectangle over the artwork (owner target).
+ * Visual (8 Oct 2026): full-bleed cyber background. Desktop and mobile lobbies are separate
+ * trees inside PracticeRoundHost — desktop proportions stay; mobile is touch-first.
  */
 export default async function GamePracticePage({
   params,
@@ -61,11 +61,7 @@ export default async function GamePracticePage({
 
   return (
     <div className="practice-page">
-      <div className="practice-page__inner">
-        <header className="practice-header">
-          <p className="practice-header__eyebrow">Practice area</p>
-          <h1 className="practice-header__title">{availability.gameName}</h1>
-        </header>
+      <div className="practice-page__inner practice-page__inner--host">
         <PracticeRoundHost
           slug={slug}
           gameName={availability.gameName}

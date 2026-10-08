@@ -29,6 +29,20 @@
   margin: 0 auto;
 }
 
+/* Reason: mobile lobby owns its gutters/safe-area; desktop keeps the centered shell. */
+@media (max-width: 767px) {
+  .practice-page {
+    background-attachment: scroll;
+    padding: 0;
+    min-height: 100dvh;
+  }
+
+  .practice-page__inner--host {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 .practice-header {
   text-align: center;
   margin-bottom: 22px;

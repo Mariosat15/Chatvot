@@ -90,40 +90,63 @@ describe("practice recent list shows scores with delete controls", () => {
 });
 
 describe("practice area matches the cyber HUD lobby", () => {
-  it("uses rounded glass panels without clip-path cutoffs", () => {
+  it("uses rounded glass panels without clip-path cutoffs on desktop", () => {
     const page = read("app/(root)/games/[slug]/practice/page.tsx");
     const host = read("components/games/PracticeRoundHost.tsx");
+    const desktop = read("components/games/practice/DesktopPracticeLobby.tsx");
     const css = read("components/games/practice-area.css");
     expect(page).toContain("practice-page");
     expect(page).not.toMatch(/DashboardBackdrop/);
     expect(page).not.toMatch(/NEON_PANEL_LIT/);
-    expect(host).toMatch(/practice-hero/);
-    expect(host).toMatch(/practice-features/);
-    expect(host).toMatch(/practice-cta/);
+    expect(host).toMatch(/DesktopPracticeLobby/);
+    expect(host).toMatch(/MobilePracticeArea/);
+    expect(host).toMatch(/hidden md:block/);
+    expect(host).toMatch(/block md:hidden/);
+    expect(desktop).toMatch(/practice-hero/);
+    expect(desktop).toMatch(/practice-features/);
+    expect(desktop).toMatch(/practice-cta/);
     expect(css).toContain("practice-background.png");
     expect(css).toMatch(/border-radius:\s*22px/);
     expect(css).toMatch(/grid-template-columns:\s*repeat\(4/);
     expect(css).not.toMatch(/NEON_PANEL/);
-    // Reason: chamfered clip-path cards read as cut-off boxes on the live build.
+    // Reason: chamfered clip-path cards read as cut-off boxes on the desktop build.
     expect(css).not.toMatch(/clip-path\s*:/);
   });
 
-  it("keeps four pill badges and a custom Start Practice CTA", () => {
-    const host = read("components/games/PracticeRoundHost.tsx");
+  it("keeps four pill badges and a custom Start Practice CTA on desktop", () => {
+    const desktop = read("components/games/practice/DesktopPracticeLobby.tsx");
+    const features = read("components/games/practice/practice-features.ts");
     const css = read("components/games/practice-area.css");
-    expect(host).toContain("Solo Mode");
-    expect(host).toContain("Free to Play");
-    expect(host).toContain("No Ranking Impact");
-    expect(host).toContain("Unlimited Practice");
-    expect(host).toMatch(/Start practice/);
-    expect(host).toMatch(/practice-feature__glyph/);
-    expect(host).toMatch(/UserRound/);
-    expect(host).toMatch(/Gift/);
-    expect(host).toMatch(/ChartNoAxesColumn/);
-    expect(host).toMatch(/InfinityIcon/);
-    expect(host).not.toMatch(/badge-solo\.png|badge-gift\.png|badge-rank\.png/);
+    expect(features).toContain("Solo Mode");
+    expect(features).toContain("Free to Play");
+    expect(features).toContain("No Ranking Impact");
+    expect(features).toContain("Unlimited Practice");
+    expect(desktop).toMatch(/Start practice/);
+    expect(desktop).toMatch(/practice-feature__glyph/);
+    expect(features).toMatch(/UserRound/);
+    expect(features).toMatch(/Gift/);
+    expect(features).toMatch(/ChartNoAxesColumn/);
+    expect(features).toMatch(/InfinityIcon/);
+    expect(desktop).not.toMatch(/badge-solo\.png|badge-gift\.png|badge-rank\.png/);
     expect(css).toMatch(/\.practice-feature[\s\S]*?border-radius:\s*999px/);
-    expect(host).toMatch(/practice-cta-wrap/);
+    expect(desktop).toMatch(/practice-cta-wrap/);
+  });
+
+  it("ships a separate touch-first mobile lobby under md", () => {
+    // Reason (8 Oct 2026): mobile plan forbids shrinking the desktop lobby.
+    const mobile = read("components/games/practice/MobilePracticeArea.tsx");
+    const history = read("components/games/practice/MobilePracticeHistory.tsx");
+    const css = read("components/games/practice/mobile-practice.css");
+    expect(mobile).toMatch(/m-practice-card/);
+    expect(mobile).toMatch(/m-practice-features/);
+    expect(mobile).toMatch(/m-practice-cta/);
+    expect(mobile).toMatch(/Solo practice is free/);
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(2/);
+    expect(css).toMatch(/clip-path:\s*polygon/);
+    expect(history).toMatch(/PREVIEW_LIMIT\s*=\s*3/);
+    expect(history).toMatch(/View all rounds/);
+    expect(css).toMatch(/min-height:\s*44px/);
+    expect(css).toMatch(/safe-area-inset/);
   });
 });
 
@@ -174,6 +197,8 @@ describe("Volt Velocity practice hangar is not squeezed", () => {
     expect(page).toContain("practice-page");
     expect(page).not.toMatch(/DashboardBackdrop/);
     expect(page).not.toMatch(/max-w-5xl/);
+    // Header moved into DesktopPracticeLobby so mobile can own its compact header.
+    expect(page).not.toMatch(/practice-header/);
   });
 
   it("keeps mute/pause/settings clear of the ship panel in fullscreen", () => {
