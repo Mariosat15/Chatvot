@@ -3,7 +3,7 @@ import { Gamepad2 } from "lucide-react";
 import type { CatalogueFilterOption } from "../GameCatalogueFilters";
 import type { GameCardData } from "../catalogue-types";
 import type { CatalogueCardStats } from "@/lib/services/games/catalogue-card-stats.service";
-import { MobileGamesHeader } from "./MobileGamesHeader";
+import { GamesHero } from "../GamesHero";
 import { MobileGamesFilters } from "./MobileGamesFilters";
 import { MobileGameCard } from "./MobileGameCard";
 
@@ -12,7 +12,7 @@ import { MobileGameCard } from "./MobileGameCard";
  *
  * Reason (8 Oct 2026): owner design-reference/game catalog mobile — one card per
  * row, featured first, swipe filters, full-width CTA. Not the desktop grid stacked.
- * Desktop tree is separate; this file must not be imported there.
+ * Title is the same GamesHero as desktop (`compact`) so the headline cannot drift.
  */
 
 function orderForMobile(games: GameCardData[]): GameCardData[] {
@@ -45,13 +45,11 @@ export function MobileGamesCatalogue({
         paddingBottom: "max(28px, env(safe-area-inset-bottom))",
       }}
     >
-      <MobileGamesHeader />
-
-      <div className="mt-4">
+      <GamesHero compact>
         <Suspense fallback={null}>
           <MobileGamesFilters options={filterOptions} activeSlug={activeSlug} />
         </Suspense>
-      </div>
+      </GamesHero>
 
       <div className="mt-5 flex flex-col gap-4">
         {ordered.length === 0 ? (

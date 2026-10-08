@@ -5,9 +5,9 @@ import { ArrowRight } from "lucide-react";
 import { providerBanner } from "@/components/neon/banners";
 import type { CatalogueCardStats } from "@/lib/services/games/catalogue-card-stats.service";
 import { GameCategoryBadge } from "../GameCategoryBadge";
+import { GameStatistics } from "../GameStatistics";
 import { resolveGameCardAccent } from "../game-card-accent";
 import type { GameCardData } from "../catalogue-types";
-import { MobileGameStats } from "./MobileGameStats";
 
 /**
  * One full-width mobile launcher tile — not the desktop card stacked.
@@ -98,7 +98,8 @@ export function MobileGameCard({
           </p>
         </div>
 
-        <MobileGameStats stats={stats} />
+        {/* Reason: same strip as desktop — value beside label, compact K/M counts. */}
+        <GameStatistics stats={stats} />
 
         <Link
           href={`/games/${game.slug}`}

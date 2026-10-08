@@ -1,12 +1,10 @@
-> **BUILT 8 October 2026 (code-complete).** Live code:
-> `app/(root)/games/page.tsx` (`hidden md:block` / `md:hidden`),
-> `components/games/catalogue/DesktopGamesCatalogue.tsx` (desktop unchanged),
-> `components/games/catalogue/mobile/*` (`MobileGamesCatalogue`, header, filters,
-> card, stats). Shared arena bg + `loadCatalogueCardStats` / `?category=` filters.
-> Featured first on mobile; full-width **View Game** CTA; `aspect-[16/11]` +
-> `object-contain` (same desktop crop fix); Games Catalog headline + gamepad
-> (not the 3D wordmark); stats inline (`4 Players`). No phone bottom nav —
-> safe-area only. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
+> **BUILT 8 October 2026 (code-complete); polished same day.** Live code:
+> `app/(root)/games/page.tsx` (`md` split), `DesktopGamesCatalogue`,
+> `mobile/MobileGamesCatalogue` (+ filters, card). Mobile title is shared
+> `GamesHero compact` (Games Catalog + gamepad). Card art `aspect-[16/11]` +
+> `object-contain`. Metrics via shared `GameStatistics` (`4 Players`; `1K` not
+> `1000`). Featured first; **View Game** CTA; safe-area only. Tests:
+> `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 
 ---
 

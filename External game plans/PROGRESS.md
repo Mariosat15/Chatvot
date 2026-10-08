@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue polish pass 2 CODE-COMPLETE 8 Oct (eng)** — Wallet-style **Games Catalog** + gamepad icon; card art back to `object-contain` in `aspect-[16/11]` (no crop). Tests: `games-catalogue-routes.test.ts`. **Never verified by eye.**
 - **Games catalogue polish CODE-COMPLETE 8 Oct (eng)** — fixed viewport arena + navy floor; players plate; lighter rims; larger stats. Wordmark/`16/9` cover half superseded by pass 2 — **say which**. Spec: `Rebuild theGame Area`.

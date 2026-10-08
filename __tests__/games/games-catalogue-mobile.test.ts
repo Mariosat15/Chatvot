@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { formatCatalogueCount } from "@/components/games/catalogue/format-catalogue-stat";
 
 /**
  * Mobile Games Catalogue launcher (8 Oct 2026).
@@ -20,9 +21,10 @@ function readCode(relativePath: string): string {
 const HUB = "app/(root)/games/page.tsx";
 const MOBILE = "components/games/catalogue/mobile/MobileGamesCatalogue.tsx";
 const MOBILE_CARD = "components/games/catalogue/mobile/MobileGameCard.tsx";
-const MOBILE_HEADER = "components/games/catalogue/mobile/MobileGamesHeader.tsx";
 const DESKTOP = "components/games/catalogue/DesktopGamesCatalogue.tsx";
 const DESKTOP_CARD = "components/games/catalogue/GameCatalogueCard.tsx";
+const HERO = "components/games/catalogue/GamesHero.tsx";
+const STATS = "components/games/catalogue/GameStatistics.tsx";
 
 describe("games catalogue mobile launcher", () => {
   it("splits desktop and mobile trees at md without sharing the desktop card", () => {
@@ -66,25 +68,42 @@ describe("games catalogue mobile launcher", () => {
     expect(card).not.toMatch(/nth-child/);
   });
 
-  it("mobile hero matches desktop Games Catalog + gamepad plate", () => {
-    const header = readCode(MOBILE_HEADER);
-    expect(header).toMatch(/AnalyticsPageHeadline/);
-    expect(header).toMatch(/Games/);
-    expect(header).toMatch(/Catalog/);
-    expect(header).toMatch(/games-catalogue-header-r1\.png/);
-    expect(header).toMatch(/jump into the action/i);
-    expect(header).not.toMatch(/games-catalogue-title-r1\.png/);
+  it("mobile hero uses the same GamesHero Games Catalog chrome as desktop", () => {
+    const mobile = readCode(MOBILE);
+    const hero = readCode(HERO);
+    expect(mobile).toMatch(/GamesHero/);
+    expect(mobile).toMatch(/compact/);
+    expect(hero).toMatch(/AnalyticsPageHeadline/);
+    expect(hero).toMatch(/lead=["']Games["']/);
+    expect(hero).toMatch(/accentWord=["']Catalog["']/);
+    expect(hero).toMatch(/games-catalogue-header-r1\.png/);
+    expect(hero).not.toMatch(/games-catalogue-title-r1\.png/);
+    // Reason: a second mobile-only header file is how the title drifted before.
+    expect(existsSync(join(ROOT, "components/games/catalogue/mobile/MobileGamesHeader.tsx"))).toBe(
+      false,
+    );
   });
 
-  it("mobile stats put value beside label on one line", () => {
-    const stats = readCode(
-      "components/games/catalogue/mobile/MobileGameStats.tsx",
-    );
+  it("mobile stats reuse GameStatistics so value sits beside the label", () => {
+    const card = readCode(MOBILE_CARD);
+    const stats = readCode(STATS);
+    expect(card).toMatch(/GameStatistics/);
+    expect(card).not.toMatch(/MobileGameStats/);
     expect(stats).toMatch(/items-baseline/);
     expect(stats).toMatch(/item\.value/);
     expect(stats).toMatch(/item\.label/);
     // Reason: stacked flex-col was the defect (4 above, Players below).
     expect(stats).not.toMatch(/flex-col items-start/);
+    expect(
+      existsSync(join(ROOT, "components/games/catalogue/mobile/MobileGameStats.tsx")),
+    ).toBe(false);
+  });
+
+  it("formats growing counts as K/M rather than full thousands", () => {
+    expect(formatCatalogueCount(4)).toBe("4");
+    expect(formatCatalogueCount(999)).toBe("999");
+    expect(formatCatalogueCount(1000)).toBe("1K");
+    expect(formatCatalogueCount(12400)).toBe("12.4K");
   });
 
   it("desktop shell still mounts the Games Catalog headline and 3-column grid", () => {
@@ -93,8 +112,6 @@ describe("games catalogue mobile launcher", () => {
     expect(desktop).toMatch(/GamesGrid/);
     expect(desktop).toMatch(/GameCatalogueFilters/);
     expect(readCode(DESKTOP_CARD)).toMatch(/object-contain/);
-    expect(readCode("components/games/catalogue/GamesHero.tsx")).toMatch(
-      /AnalyticsPageHeadline/,
-    );
+    expect(readCode(HERO)).toMatch(/AnalyticsPageHeadline/);
   });
 });
