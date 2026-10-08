@@ -14,8 +14,9 @@ import type { GameCardData } from "./catalogue-types";
  *
  * Links to `/games/[slug]` only — never a round-launch URL (13 s1.1a).
  * Reason (8 Oct 2026, Rebuild theGame Area): large artwork, per-game accent, stats, CTA.
- * Reason (polish): taller 16/9 art so banners are less cropped; lighter rim/glow so the
- * grid does not feel heavy; tighter body padding so stats fill the footer.
+ * Reason (polish pass 2): `object-contain` in a fixed 16/11 frame — same fit as the
+ * pre-rebuild catalogue so banners show whole, not centre-cropped. Equal card height
+ * stays from the fixed aspect box.
  */
 
 export function GameCard({
@@ -59,19 +60,18 @@ export function GameCard({
         }}
       >
         {/*
-          Reason: 16/9 cinematic frame (Image 4) — taller than the old 190px box so
-          wide banners show more of the plate instead of a tight centre crop.
+          Reason: fixed 16/11 box keeps equal cards; object-contain shows the whole
+          banner (owner: "auto adjust… like we had before"). Cover was cropping sides.
         */}
-        <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-[#07101F]">
+        <div className="relative aspect-[16/11] w-full shrink-0 overflow-hidden bg-[#07101F]">
           <Image
             src={banner.src}
             alt={banner.alt}
             fill
             sizes="(max-width: 767px) 100vw, (max-width: 1100px) 50vw, 460px"
-            className="object-cover transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-            style={{ objectPosition: accent.objectPosition }}
+            className="object-contain object-center transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
           />
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_58%,rgba(3,10,25,.55))]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent_62%,rgba(3,10,25,.4))]" />
           {game.category ? (
             <div className="absolute left-3 top-3">
               <GameCategoryBadge slug={game.categorySlug} label={game.category} />

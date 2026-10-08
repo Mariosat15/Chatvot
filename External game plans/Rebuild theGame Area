@@ -1,14 +1,14 @@
 # Rebuild the Game Area — Games Catalogue
 
-> **BUILT 8 October 2026 (code-complete); polished same day.** Live code:
+> **BUILT 8 October 2026 (code-complete); polished same day (pass 2).** Live code:
 > `app/(root)/games/page.tsx`, `components/games/catalogue/*`,
 > `lib/services/games/catalogue-card-stats.service.ts`,
 > `public/assets/neon/games-catalogue-arena-r1.webp` (Menuitems arena),
-> `games-catalogue-title-r1.png` (owner GAMES wordmark),
-> `catalogue-stat-players-r1.png` (owner players plate). Wide `min(1420px)` shell,
-> **fixed viewport** arena + navy floor (filter/short/long lists never expose a hard
-> edge), lighter card rims, `aspect-[16/9]` artwork, larger inline stats, 56px CTA.
-> Positive % = share of scored seats with score > 0 or pnl > 0 (not a review rating).
+> `games-catalogue-header-r1.png` (gamepad), `catalogue-stat-players-r1.png`.
+> Hero is Wallet-style **Games Catalog** via `AnalyticsPageHeadline` (not the 3D
+> wordmark). Wide `min(1420px)` shell, **fixed viewport** arena + navy floor,
+> lighter card rims, **`aspect-[16/11]` + `object-contain`** so banners show whole,
+> larger inline stats, 56px CTA. Positive % = scored seats with score/pnl > 0.
 > No separate Featured hero — featured stays a badge. **Never verified by eye.**
 > Routing, filters (`?category=`), and catalogue data paths unchanged.
 

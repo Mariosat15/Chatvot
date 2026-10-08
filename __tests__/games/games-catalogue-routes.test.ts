@@ -45,11 +45,15 @@ describe("games catalogue routes", () => {
     expect(hub).not.toMatch(/max-w-\[1000px\]|max-w-\[1100px\]/);
   });
 
-  it("hero uses the owner GAMES wordmark asset, not CSS-gradient text alone", () => {
+  it("hero matches Wallet Analytics: Games Catalog + owner gamepad plate", () => {
     const hero = readCode("components/games/catalogue/GamesHero.tsx");
-    expect(hero).toMatch(/games-catalogue-title-r1\.png/);
-    expect(hero).toMatch(/sr-only/);
-    expect(hero).toMatch(/Games/);
+    // Reason: flipped from the 3D GAMES wordmark — owner asked for the same two-tone
+    // theme as Wallet Analytics, titled Games Catalog, with the supplied gamepad icon.
+    expect(hero).toMatch(/AnalyticsPageHeadline/);
+    expect(hero).toMatch(/lead=["']Games["']/);
+    expect(hero).toMatch(/accentWord=["']Catalog["']/);
+    expect(hero).toMatch(/games-catalogue-header-r1\.png/);
+    expect(hero).not.toMatch(/games-catalogue-title-r1\.png/);
   });
 
   it("stats strip uses the owner players plate and larger inline labels", () => {
@@ -109,21 +113,20 @@ describe("games catalogue routes", () => {
     expect(card).toMatch(/line-clamp-2/);
   });
 
-  it("catalogue card artwork fills a tall launcher box edge to edge", () => {
+  it("catalogue card artwork fits whole inside a fixed equal-height frame", () => {
     const card = readCode(CARD);
-    // Reason (history): until 28 Sep 2026 this asserted object-contain alone (empty
-    // bands); then cover in a 16/8.5 box; then 16/11 for logo-safe cover (3 Oct);
-    // then fixed 190px (8 Oct Image 1). Flipped same-day polish to aspect-[16/9]
-    // cinematic frame (Image 4) so wide banners are less centre-cropped.
-    expect(card).toMatch(/aspect-\[16\/9\]/);
+    // Reason (history): contain → cover 16/8.5 → cover 16/11 → 190px cover → 16/9 cover.
+    // Flipped 8 Oct polish pass 2: owner rejected cropping — restore contain in 16/11
+    // so every banner shows in full while cards stay equal height.
+    expect(card).toMatch(/aspect-\[16\/11\]/);
+    expect(card).not.toMatch(/aspect-\[16\/9\]/);
     expect(card).not.toMatch(/h-\[190px\]/);
     expect(card).not.toMatch(/aspect-\[16\/8\.5\]/);
-    expect(card).not.toMatch(/aspect-\[16\/11\]/);
     const images = card.match(/<Image[\s\S]*?\/>/g) ?? [];
     expect(images).toHaveLength(1);
     const [art] = images;
-    expect(art).toMatch(/object-cover/);
-    expect(art).not.toMatch(/object-contain|blur-/);
+    expect(art).toMatch(/object-contain/);
+    expect(art).not.toMatch(/object-cover|blur-/);
     expect(art).toMatch(/alt=\{banner\.alt\}/);
     expect(card).toMatch(/resolveGameCardAccent/);
     expect(card).toMatch(/GameStatistics/);
