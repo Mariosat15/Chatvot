@@ -277,12 +277,16 @@
 
   // Leave from the shell → Circuit `exit` (ProviderGameFrame has no `leave` type).
   // Mid-run Leave is abandoned (partial score); game_over finalize uses /complete instead.
+  //
+  // Reason (8 Oct 2026, owner): practice must post `finished` BEFORE `exit`. Exit first
+  // made the practice host void the round while the score pull never ran, so every early
+  // leave and every "Back to practice" from the result panel landed as Ended / "-".
   window.addEventListener("chartvolt:host", (event) => {
     const detail = event.detail;
     if (!detail || detail.type !== "leave" || leaving) return;
     leaving = true;
-    tellPlatform("exit");
     if (hostState && hostState.mode === "ranked") {
+      tellPlatform("exit");
       api("POST", "/play/api/leave", { t: token })
         .then((state) => {
           hostState = state;
@@ -292,7 +296,22 @@
           tellPlatform("finished");
         });
     } else {
-      tellPlatform("finished");
+      // Practice: abandon (or re-announce a finished run) BEFORE exit so the host can pull
+      // a real score instead of voiding to Ended / "-".
+      const handBack = () => {
+        tellPlatform("finished");
+        window.setTimeout(() => tellPlatform("exit"), 800);
+      };
+      if (hostState && hostState.finished) {
+        handBack();
+      } else {
+        api("POST", "/play/api/leave", { t: token })
+          .then((state) => {
+            hostState = state;
+            handBack();
+          })
+          .catch(handBack);
+      }
     }
   });
 

@@ -22,6 +22,14 @@
   function motion(){document.body.classList.toggle('reduced-motion',$('motion').checked);if($('motion').checked)api.setQuality('low');else api.setQuality($('quality').value);}
   $('motion').onchange=motion;motion();api.setMusicVolume(1);api.setEffectsVolume?.(1);
   $('retryResult').onclick=async()=>{try{await bridge.retryFinalize()}catch{}};
+  // Reason (8 Oct 2026, owner): result panel had Play Again / Retry only — no way back to
+  // the practice lobby without hunting the header Leave control.
+  const backBtn=$('backToPracticeBtn');
+  if(backBtn){
+    backBtn.onclick=()=>{
+      window.dispatchEvent(new CustomEvent('chartvolt:host',{detail:{type:'leave'}}));
+    };
+  }
   new ResizeObserver(()=>window.dispatchEvent(new Event('resize'))).observe(document.querySelector('.board-wrap'));
   bridge.notify('ready',{game:'neon-stack',engineVersion:'9.4'});
 })();

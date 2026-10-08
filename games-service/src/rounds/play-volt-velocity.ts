@@ -30,6 +30,8 @@ export interface VelocitySession {
   roundId: string;
   gameCode: string;
   status: RoundDocument["status"];
+  /** Practice vs ranked — the host result screen must not say "being confirmed" for practice. */
+  mode: RoundDocument["mode"];
   parentOrigin?: string;
   returnUrl?: string;
   finished?: { status: RoundDocument["status"] };
@@ -47,6 +49,7 @@ function baseState(round: RoundDocument): VelocitySession {
     roundId: round.roundId,
     gameCode: round.gameCode,
     status: round.status,
+    mode: round.mode,
     parentOrigin: round.parentOrigin,
     returnUrl: round.returnUrl,
   };

@@ -425,16 +425,20 @@ export function resultCopy(input) {
   const finishedEverything = target !== null && solved >= target;
 
   let heading;
-  if (status === "completed") {
+  if (practice && status === "completed") {
+    // Reason (8 Oct 2026, owner): practice result screens must show a clear result, not only
+    // contest-shaped "Time's up" copy that hides what was earned.
+    heading = finishedEverything ? "Practice complete" : "Practice result";
+  } else if (status === "completed") {
     heading = finishedEverything ? "Every board complete" : "Time's up";
   } else if (status === "abandoned") {
-    heading = "You left the round";
+    heading = practice ? "Practice ended" : "You left the round";
   } else if (status === "expired") {
-    heading = "The contest window closed";
+    heading = practice ? "Practice window closed" : "The contest window closed";
   } else if (status === "voided") {
     heading = "Round cancelled";
   } else {
-    heading = "Round ended";
+    heading = practice ? "Practice ended" : "Round ended";
   }
 
   let next;
@@ -446,7 +450,10 @@ export function resultCopy(input) {
   } else if (practice) {
     // Reason (6 Oct 2026): owner reversed "practice keeps no result" — the host now pulls
     // the score into Your recent practice rounds. Saying "not scored" was a false promise.
-    next = "This was practice — your score is saved on the practice page. It does not affect rankings or prizes.";
+    next =
+      solved > 0
+        ? "Your practice result is above. It is also saved on the practice page — it does not affect rankings or prizes."
+        : "No board was finished this round. Start another practice attempt whenever you like — practice does not affect rankings or prizes.";
   } else if (solved === 0) {
     // Honest rather than encouraging. An unfinished board scores nothing under both titles'
     // rules, and a player told their result is "on its way" will go looking for it.

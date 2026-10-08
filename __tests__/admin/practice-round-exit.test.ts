@@ -69,6 +69,54 @@ describe("practice recent list shows scores with delete controls", () => {
     expect(code).toMatch(/formatGameScore/);
     expect(code).toMatch(/Clear all/);
     expect(code).toMatch(/onForget/);
+    expect(code).toMatch(/practice-history__list/);
+    expect(code).toMatch(/max-height:\s*220px|practice-history__list/);
+  });
+});
+
+describe("practice area matches the cyber HUD lobby", () => {
+  it("uses the practice background shell without a giant opaque outer panel", () => {
+    const page = read("app/(root)/games/[slug]/practice/page.tsx");
+    const host = read("components/games/PracticeRoundHost.tsx");
+    const css = read("components/games/practice-area.css");
+    expect(page).toContain("practice-page");
+    expect(page).not.toMatch(/DashboardBackdrop/);
+    expect(page).not.toMatch(/NEON_PANEL_LIT/);
+    expect(host).toMatch(/practice-hero/);
+    expect(host).toMatch(/practice-features/);
+    expect(host).toMatch(/practice-cta/);
+    expect(host).toMatch(/grid-template-columns:\s*repeat\(4|practice-features/);
+    expect(css).toContain("practice-background.png");
+    expect(css).toMatch(/grid-template-columns:\s*repeat\(4/);
+    expect(css).not.toMatch(/NEON_PANEL/);
+  });
+
+  it("keeps four feature badges and a custom Start Practice CTA", () => {
+    const host = read("components/games/PracticeRoundHost.tsx");
+    expect(host).toContain("Solo Mode");
+    expect(host).toContain("Free to Play");
+    expect(host).toContain("No Ranking Impact");
+    expect(host).toContain("Unlimited Practice");
+    expect(host).toMatch(/Start practice/);
+    expect(host).toContain("badge-solo.png");
+    expect(host).toContain("badge-gift.png");
+    expect(host).toContain("badge-rank.png");
+  });
+});
+
+describe("Volt Stack practice result offers a way back", () => {
+  it("shows Back to practice beside Play Again and finishes before exit", () => {
+    // Reason (8 Oct 2026, owner): result panel had Retry/Play Again only; exit-before-finished
+    // voided practice scores so history showed Ended / "-".
+    const html = read("games-service/public/play/volt-stack/index.html");
+    const shell = read("games-service/public/play/volt-stack/shell.js");
+    const host = read("games-service/public/play/volt-stack/chartvolt-host.js");
+    expect(html).toContain('id="backToPracticeBtn"');
+    expect(html).toContain("Back to practice");
+    expect(shell).toMatch(/backToPracticeBtn/);
+    expect(host).toMatch(/tellPlatform\(\s*["']finished["']\s*\)/);
+    expect(host).toMatch(/setTimeout\(\s*\(\)\s*=>\s*tellPlatform\(\s*["']exit["']\s*\)/);
+    expect(host).toMatch(/\/play\/api\/leave/);
   });
 });
 
@@ -91,11 +139,17 @@ describe("Volt Velocity practice hangar is not squeezed", () => {
     expect(hangar).not.toMatch(
       /\.ship-picker\{[^}]*grid-template-columns:repeat\(8,minmax\(0,1fr\)\)/,
     );
-    const host = read("games-service/public/play/volt-velocity/index.html");
-    expect(host).toContain('id="loadbar"');
-    expect(host).toContain("@keyframes vv-load");
+    const velocityPage = read("games-service/public/play/volt-velocity/index.html");
+    expect(velocityPage).toContain('id="loadbar"');
+    expect(velocityPage).toContain("@keyframes vv-load");
+    // Reason (8 Oct 2026): idle lobby is a centered HUD (~1180px); hangar width lives on the
+    // playing-phase stage so Start Practice no longer stretches flat dashboard panels.
+    const practiceHost = read("components/games/PracticeRoundHost.tsx");
+    expect(practiceHost).toContain("88rem");
+    expect(practiceHost).toMatch(/phase\.name === ["']playing["']/);
     const page = read("app/(root)/games/[slug]/practice/page.tsx");
-    expect(page).toContain("88rem");
+    expect(page).toContain("practice-page");
+    expect(page).not.toMatch(/DashboardBackdrop/);
     expect(page).not.toMatch(/max-w-5xl/);
   });
 

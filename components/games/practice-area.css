@@ -1,0 +1,591 @@
+/**
+ * Practice Area — cyber HUD lobby.
+ * Reason (8 Oct 2026, owner): Image 1 was a flat dashboard; Image 2 is the pixel reference.
+ * Background must stay visible around the panels — no giant opaque outer shell.
+ */
+
+.practice-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+  background-color: #02091b;
+  background-image:
+    linear-gradient(rgba(1, 8, 27, 0.22), rgba(1, 7, 24, 0.38)),
+    url("/assets/practice/practice-background.png");
+  background-size: cover;
+  background-position: center top;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  padding: 28px 0 48px;
+}
+
+.practice-page__inner {
+  position: relative;
+  z-index: 1;
+  width: calc(100% - 48px);
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.practice-header {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.practice-header__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  color: #13dfff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+}
+
+.practice-header__eyebrow::before,
+.practice-header__eyebrow::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(19, 223, 255, 0.85),
+    transparent
+  );
+  box-shadow: 0 0 8px rgba(19, 223, 255, 0.45);
+}
+
+.practice-header__title {
+  margin-top: 10px;
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  background: linear-gradient(90deg, #ffffff 10%, #b8f7ff 48%, #c9a6ff 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ─── Shared HUD frame ─────────────────────────────────────────────── */
+
+.practice-hud {
+  position: relative;
+  border: 1px solid rgba(34, 190, 255, 0.62);
+  background:
+    radial-gradient(circle at 50% 12%, rgba(18, 76, 155, 0.22), transparent 42%),
+    radial-gradient(circle at 8% 92%, rgba(152, 92, 255, 0.14), transparent 36%),
+    radial-gradient(circle at 94% 8%, rgba(218, 77, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(6, 26, 65, 0.9), rgba(3, 15, 42, 0.94));
+  box-shadow:
+    0 0 34px rgba(0, 151, 255, 0.16),
+    0 0 0 1px rgba(152, 92, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 14px,
+    100% calc(100% - 14px),
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 calc(100% - 14px),
+    0 14px
+  );
+  overflow: hidden;
+}
+
+.practice-hud::before,
+.practice-hud::after {
+  content: "";
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.practice-hud::before {
+  top: -1px;
+  right: -1px;
+  border-top: 2px solid #da4dff;
+  border-right: 2px solid #da4dff;
+  box-shadow: 0 0 18px rgba(218, 77, 255, 0.55);
+}
+
+.practice-hud::after {
+  bottom: -1px;
+  left: -1px;
+  border-bottom: 2px solid #13dfff;
+  border-left: 2px solid #13dfff;
+  box-shadow: 0 0 18px rgba(19, 223, 255, 0.45);
+}
+
+.practice-hud__glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.09;
+  background-image:
+    linear-gradient(rgba(19, 223, 255, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(152, 92, 255, 0.28) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at 50% 40%, black 20%, transparent 75%);
+}
+
+/* ─── Hero ─────────────────────────────────────────────────────────── */
+
+.practice-hero {
+  padding: 34px 28px 30px;
+  text-align: center;
+  min-height: 390px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.practice-hero__icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.practice-hero__icon-row::before,
+.practice-hero__icon-row::after {
+  content: "";
+  width: 72px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(19, 223, 255, 0.7),
+    transparent
+  );
+  box-shadow: 0 0 10px rgba(19, 223, 255, 0.35);
+}
+
+.practice-hero__icon {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 40% 30%, rgba(80, 180, 255, 0.35), transparent 55%),
+    linear-gradient(145deg, rgba(22, 70, 160, 0.85), rgba(72, 30, 140, 0.9));
+  border: 2px solid rgba(19, 223, 255, 0.75);
+  box-shadow:
+    0 0 28px rgba(19, 223, 255, 0.45),
+    0 0 40px rgba(152, 92, 255, 0.35),
+    inset 0 0 18px rgba(255, 255, 255, 0.12);
+}
+
+.practice-hero__icon svg {
+  width: 38px;
+  height: 38px;
+  color: #e8f7ff;
+  filter: drop-shadow(0 0 6px rgba(19, 223, 255, 0.7));
+}
+
+.practice-hero__title {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 32px);
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.01em;
+}
+
+.practice-hero__desc {
+  margin: 14px auto 0;
+  max-width: 680px;
+  font-size: 16.5px;
+  line-height: 1.55;
+  color: #c8d3e8;
+}
+
+.practice-features {
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 190px));
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.practice-feature {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 0 16px;
+  color: #e8f2ff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 36, 84, 0.92),
+    rgba(5, 18, 48, 0.95)
+  );
+  border: 1px solid rgba(19, 223, 255, 0.45);
+  clip-path: polygon(
+    10px 0,
+    calc(100% - 10px) 0,
+    100% 50%,
+    calc(100% - 10px) 100%,
+    10px 100%,
+    0 50%
+  );
+  box-shadow: inset 0 0 18px rgba(19, 223, 255, 0.08);
+}
+
+.practice-feature--cyan {
+  border-color: rgba(19, 223, 255, 0.7);
+  box-shadow:
+    0 0 14px rgba(19, 223, 255, 0.18),
+    inset 0 0 18px rgba(19, 223, 255, 0.08);
+}
+
+.practice-feature--purple {
+  border-color: rgba(152, 92, 255, 0.75);
+  box-shadow:
+    0 0 14px rgba(152, 92, 255, 0.22),
+    inset 0 0 18px rgba(152, 92, 255, 0.1);
+}
+
+.practice-feature--blue {
+  border-color: rgba(22, 119, 255, 0.75);
+  box-shadow:
+    0 0 14px rgba(22, 119, 255, 0.22),
+    inset 0 0 18px rgba(22, 119, 255, 0.1);
+}
+
+.practice-feature--magenta {
+  border-color: rgba(218, 77, 255, 0.75);
+  box-shadow:
+    0 0 14px rgba(218, 77, 255, 0.22),
+    inset 0 0 18px rgba(218, 77, 255, 0.1);
+}
+
+.practice-feature__icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(19, 223, 255, 0.55));
+  flex-shrink: 0;
+}
+
+.practice-feature__icon--lucide {
+  color: #da4dff;
+  filter: drop-shadow(0 0 6px rgba(218, 77, 255, 0.65));
+}
+
+.practice-hero__refusal {
+  margin-top: 14px;
+  color: #ff8fa8;
+  font-size: 14px;
+}
+
+.practice-cta {
+  position: relative;
+  margin-top: 24px;
+  width: min(400px, 100%);
+  min-height: 68px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 28px;
+  border: 1px solid #7fefff;
+  color: #03141f;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: linear-gradient(180deg, #19e8ff 0%, #03bde8 100%);
+  clip-path: polygon(
+    16px 0,
+    calc(100% - 16px) 0,
+    100% 50%,
+    calc(100% - 16px) 100%,
+    16px 100%,
+    0 50%
+  );
+  box-shadow:
+    0 0 22px rgba(0, 220, 255, 0.45),
+    inset 0 1px rgba(255, 255, 255, 0.4);
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.practice-cta:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.practice-cta:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.practice-cta__chevron {
+  position: absolute;
+  top: 50%;
+  font-size: 22px;
+  font-weight: 300;
+  color: rgba(3, 20, 31, 0.55);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.practice-cta__chevron--left {
+  left: 18px;
+}
+
+.practice-cta__chevron--right {
+  right: 18px;
+}
+
+/* ─── Recent rounds ────────────────────────────────────────────────── */
+
+.practice-history {
+  margin-top: 18px;
+  padding: 18px 20px 16px;
+}
+
+.practice-history__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.practice-history__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #9fe9ff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.practice-history__marks {
+  color: rgba(19, 223, 255, 0.55);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  user-select: none;
+}
+
+.practice-history__clear {
+  background: transparent;
+  border: 0;
+  color: rgba(255, 120, 140, 0.75);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.practice-history__clear:hover:not(:disabled) {
+  color: #ff9aab;
+}
+
+.practice-history__clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.practice-history__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.practice-history__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 62px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(70, 130, 255, 0.25);
+  background: linear-gradient(
+    90deg,
+    rgba(14, 36, 79, 0.72),
+    rgba(7, 25, 59, 0.6)
+  );
+}
+
+.practice-history__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #d7e4f7;
+  font-size: 14px;
+}
+
+.practice-history__score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+}
+
+.practice-history__delete {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #8191ae;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.practice-history__delete:hover:not(:disabled) {
+  color: #ff9aab;
+  border-color: rgba(255, 120, 140, 0.45);
+}
+
+.practice-history__delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.practice-back {
+  display: block;
+  margin: 32px auto 0;
+  text-align: center;
+  color: #13dfff;
+  font-size: 14px;
+  text-decoration: none;
+  text-shadow: 0 0 10px rgba(19, 223, 255, 0.35);
+}
+
+.practice-back:hover {
+  color: #7fefff;
+}
+
+.practice-unavailable {
+  padding: 40px 28px;
+  text-align: center;
+}
+
+.practice-unavailable h1 {
+  margin: 14px 0 8px;
+  color: #fff;
+  font-size: 24px;
+}
+
+.practice-unavailable p {
+  color: #c8d3e8;
+  font-size: 14px;
+}
+
+.practice-unavailable__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.practice-unavailable__actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.practice-unavailable__actions a:first-child {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.practice-unavailable__actions a:last-child {
+  background: #7c3aed;
+  color: #fff;
+}
+
+@media (max-width: 1100px) {
+  .practice-features {
+    grid-template-columns: repeat(2, minmax(0, 220px));
+  }
+
+  .practice-hero {
+    min-height: 0;
+    padding: 28px 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .practice-page {
+    background-attachment: scroll;
+    padding: 20px 0 36px;
+  }
+
+  .practice-page__inner {
+    width: calc(100% - 24px);
+  }
+
+  .practice-header__eyebrow::before,
+  .practice-header__eyebrow::after {
+    width: 28px;
+  }
+
+  .practice-features {
+    grid-template-columns: 1fr;
+    max-width: 280px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .practice-cta {
+    width: 100%;
+    font-size: 16px;
+    min-height: 60px;
+  }
+
+  .practice-hero__icon-row::before,
+  .practice-hero__icon-row::after {
+    width: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .practice-cta {
+    transition: none;
+  }
+}

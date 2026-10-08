@@ -50,6 +50,8 @@
   let finishedSent = false;
   let exitSent = false;
   let handoffTimer = null;
+  // Reason (8 Oct 2026): practice result copy must say the score is saved, not "being confirmed".
+  let practiceMode = false;
 
   const frame = document.getElementById("race");
   const statusBox = document.getElementById("status");
@@ -232,11 +234,19 @@
         /* ignore */
       }
       if (done) {
-        showStatus("Race complete. Your result is being confirmed.", "", { done: true });
+        showStatus(
+          practiceMode
+            ? "Practice race complete. Your result is saved on the practice page."
+            : "Race complete. Your result is being confirmed.",
+          "",
+          { done: true },
+        );
         markFinished();
         scheduleHandBack();
       } else if (!finishedSent) {
-        showStatus("You left the race.", "", { done: true });
+        showStatus(practiceMode ? "Practice ended." : "You left the race.", "", {
+          done: true,
+        });
         handBackToPlatform();
       }
     }, END_POLL_MS);
@@ -292,11 +302,18 @@
 
     try {
       const session = await startSession();
+      practiceMode = session.mode === "practice";
       if (session.parentOrigin && /^https?:\/\/[^/]+$/.test(session.parentOrigin)) {
         parentOrigin = session.parentOrigin;
       }
       if (session.finished) {
-        showStatus("This race has finished.", "", { done: true });
+        showStatus(
+          practiceMode
+            ? "This practice race has finished. Your result is on the practice page."
+            : "This race has finished.",
+          "",
+          { done: true },
+        );
         markFinished();
         scheduleHandBack();
         return;
