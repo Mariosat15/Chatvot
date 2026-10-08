@@ -1,16 +1,12 @@
 # Rebuild the Game Area — Games Catalogue
 
-> **BUILT 8 October 2026 (code-complete); polished same day (pass 2).** Live code:
-> `app/(root)/games/page.tsx`, `components/games/catalogue/*`,
-> `lib/services/games/catalogue-card-stats.service.ts`,
-> `public/assets/neon/games-catalogue-arena-r1.webp` (Menuitems arena),
-> `games-catalogue-header-r1.png` (gamepad), `catalogue-stat-players-r1.png`.
-> Hero is Wallet-style **Games Catalog** via `AnalyticsPageHeadline` (not the 3D
-> wordmark). Wide `min(1420px)` shell, **fixed viewport** arena + navy floor,
-> lighter card rims, **`aspect-[16/11]` + `object-contain`** so banners show whole,
-> larger inline stats, 56px CTA. Positive % = scored seats with score/pnl > 0.
-> No separate Featured hero — featured stays a badge. **Never verified by eye.**
-> Routing, filters (`?category=`), and catalogue data paths unchanged.
+> **BUILT 8 October 2026 (code-complete); polished same day (pass 2); mobile
+> launcher same day.** Live code: `app/(root)/games/page.tsx` (`md` split),
+> `DesktopGamesCatalogue.tsx`, `mobile/*`, `catalogue-card-stats.service.ts`,
+> arena / gamepad / players assets under `public/assets/neon/`. Desktop: Wallet
+> **Games Catalog** headline, `min(1420px)`, contain art `16/11`. Mobile: dedicated
+> one-card launcher (spec `design-reference/game catalog mobile`) — not stacked
+> desktop. Shared arena, filters, stats. **Never verified by eye.**
 
 ---
 

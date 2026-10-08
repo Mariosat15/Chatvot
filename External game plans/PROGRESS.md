@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue polish pass 2 CODE-COMPLETE 8 Oct (eng)** — Wallet-style **Games Catalog** + gamepad icon; card art back to `object-contain` in `aspect-[16/11]` (no crop). Tests: `games-catalogue-routes.test.ts`. **Never verified by eye.**
 - **Games catalogue polish CODE-COMPLETE 8 Oct (eng)** — fixed viewport arena + navy floor; players plate; lighter rims; larger stats. Wordmark/`16/9` cover half superseded by pass 2 — **say which**. Spec: `Rebuild theGame Area`.
 - **Games catalogue launcher rebuild CODE-COMPLETE 8 Oct (eng)** — Image 1 launcher baseline. Spec: `External game plans/Rebuild theGame Area`. **Polish rows above are the present fact — say which.**
@@ -972,6 +973,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 8 October 2026 - Games catalogue mobile launcher (owner design-reference)
+
+**Owner task:** `External game plans/design-reference/game catalog mobile` — dedicated phone launcher, desktop unchanged.
+
+**Shipped:** `DesktopGamesCatalogue` / `mobile/MobileGamesCatalogue` split at `md`; compact CATALOGUE + GAMES wordmark; swipe filters; featured-first full-width cards with cover art, real stats, View Game CTA; shared arena + data. No bottom-nav clearance (bar removed 29 Sep).
+
+**Nothing was paid wrongly.** Tests: `games-catalogue-mobile.test.ts`, `games-catalogue-routes.test.ts`. Never verified by eye.
 
 ### 8 October 2026 - Games catalogue polish pass 2 (contain art + Games Catalog)
 

@@ -1,0 +1,733 @@
+> **BUILT 8 October 2026 (code-complete).** Live code:
+> `app/(root)/games/page.tsx` (`hidden md:block` / `md:hidden`),
+> `components/games/catalogue/DesktopGamesCatalogue.tsx` (desktop unchanged),
+> `components/games/catalogue/mobile/*` (`MobileGamesCatalogue`, header, filters,
+> card, stats). Shared arena bg + `loadCatalogueCardStats` / `?category=` filters.
+> Featured first on mobile; full-width **View Game** CTA; `aspect-[16/9]` cover art;
+> per-game accents; real metrics (zeros omitted). No phone bottom nav — safe-area
+> padding only (layout removed the bar 29 Sep). Tests:
+> `__tests__/games/games-catalogue-mobile.test.ts`. **Never verified by eye.**
+
+---
+
+TASK: REBUILD CHARTVOLT GAMES CATALOGUE FOR MOBILE
+IMPORTANT
+We already have a desktop Games Catalogue page.
+DO NOT simply shrink the desktop Games page.
+DO NOT stack the desktop cards vertically without redesigning them.
+DO NOT use CSS transform/scale to force the desktop layout onto a phone.
+DO NOT remove the cinematic ChartVolt identity.
+Create a dedicated MOBILE GAMES CATALOGUE experience for screens below 768px.
+The desktop Games page must remain unchanged.
+The mobile version must preserve all existing:
+- routes
+- game IDs
+- game data
+- category filters
+- featured state
+- game launch/navigation logic
+- backend/API data
+Only the mobile presentation and UX should be rebuilt.
+==================================================
+1. MAIN OBJECTIVE
+Build a mobile Games Catalogue that feels like a premium ChartVolt game launcher.
+It should feel like:
+ChartVolt
++
+esports game launcher
++
+mobile gaming app
++
+cinematic neon catalogue
+It must NOT feel like:
+- a desktop page squeezed into mobile
+- a generic card list
+- a basic website catalogue
+- an admin panel
+- a long boring vertical stack
+- a flat black page
+The mobile page should immediately answer:
+1. What games are available?
+2. What type of game is each one?
+3. Which game is featured?
+4. What does each game do?
+5. How popular/active is it?
+6. How do I open or play it?
+==================================================
+2. DESKTOP MUST REMAIN UNCHANGED
+==================================================
+Use separate layouts.
+Example:
+<div className="hidden md:block">
+    <DesktopGamesCatalogue />
+</div>
+
+<div className="md:hidden">
+    <MobileGamesCatalogue />
+</div>
+
+Share:
+- data
+- game metadata
+- filters
+- routing
+- hooks
+- API calls
+Do NOT share the desktop card layout.
+==================================================
+3. BREAKPOINTS
+==================================================
+Mobile:
+max-width: 768px
+Desktop:
+min-width: 769px
+Primary mobile widths:
+360px
+375px
+390px
+393px
+412px
+430px
+The design must work naturally across all of these.
+Do NOT use transform: scale().
+==================================================
+4. MOBILE PAGE ORDER
+==================================================
+Use this order:
+1. Compact Catalogue Header
+2. GAMES title
+3. Short description
+4. Swipeable category filter row
+5. Featured game card
+6. Remaining game cards
+7. Optional compact bottom navigation
+IMPORTANT:
+On mobile, do NOT use the exact 3-column desktop grid.
+The user should see one strong game at a time.
+==================================================
+5. MOBILE BACKGROUND
+==================================================
+Keep the same cinematic ChartVolt games background from the desktop target.
+The background should include:
+- futuristic arena
+- cyan / blue / purple lighting
+- trophy / competitive atmosphere
+- trading screens
+- gaming imagery
+- cyber floor
+- atmospheric blue mist
+- subtle particles
+Use a mobile-specific crop if needed.
+Recommended:
+games-catalogue-mobile.webp
+Use:
+background-size: cover;
+background-position: center top;
+Do NOT place a large opaque rectangle over the whole page.
+The environment must remain visible around cards.
+Use a subtle dark overlay for readability only.
+==================================================
+6. SAFE AREA
+==================================================
+Support iPhone/Android safe areas.
+Use:
+padding-top:
+max(12px, env(safe-area-inset-top));
+padding-inline:
+max(14px, env(safe-area-inset-left));
+padding-bottom:
+calc(88px + env(safe-area-inset-bottom));
+Nothing should sit behind a notch or bottom navigation.
+==================================================
+7. MOBILE CATALOGUE HEADER
+==================================================
+Desktop target uses:
+CATALOGUE
+GAMES
+For mobile keep the same identity but tighten the spacing.
+Recommended:
+CATALOGUE
+small uppercase
+cyan
+letter spacing: 3-4px
+font-size: 10-12px
+GAMES
+use the supplied high-resolution GAMES wordmark if available
+If rendered as text:
+font-size: 34-42px
+font-weight: 900
+gradient:
+white -> cyan -> purple/pink
+subtle glow
+Do not use a small flat white heading.
+==================================================
+8. MOBILE DESCRIPTION
+==================================================
+Use a shorter mobile version.
+Recommended:
+Pick a game, check the rules, and jump into the action.
+Optional second line:
+Browse competitions from each game page.
+Do NOT keep a long desktop paragraph.
+Target:
+13-14px
+line-height: 1.45
+Maximum 2-3 lines.
+==================================================
+9. CATEGORY FILTERS
+==================================================
+Current categories:
+All
+Arcade
+Puzzle
+Racing
+Trading
+On mobile DO NOT squeeze all buttons into the screen.
+Use a horizontally swipeable filter row.
+Example:
+[ All ] [ Arcade ] [ Puzzle ] [ Racing ] [ Trading ]
+CSS:
+display: flex;
+gap: 10px;
+overflow-x: auto;
+scroll-snap-type: x proximity;
+scrollbar-width: none;
+Each button:
+height: 42-46px
+padding-inline: 16-18px
+min-width: max-content
+Use real icons.
+Selected state:
+cyan border
+cyan glow
+dark translucent surface
+Inactive:
+dark navy glass
+low-opacity cyan/purple border
+==================================================
+10. FEATURED GAME FIRST
+==================================================
+The desktop target marks Volt Velocity as FEATURED.
+On mobile, if a game is featured:
+SHOW IT FIRST.
+Do NOT make a separate unrelated hero outside the catalogue.
+Use the same game card component with a featured variation.
+Featured card should be slightly more prominent:
+- larger image
+- brighter border
+- FEATURED badge
+- slightly stronger glow
+But it should still belong to the catalogue flow.
+==================================================
+11. MOBILE GAME CARD
+==================================================
+Each mobile game card should feel like a premium launcher tile.
+Structure:
+┌─────────────────────────────┐
+│ [CATEGORY]       [FEATURED] │
+│                             │
+│      GAME ARTWORK           │
+│                             │
+├─────────────────────────────┤
+│ GAME TITLE                  │
+│ short description           │
+│                             │
+│ stat      stat       stat   │
+│                             │
+│                 [ OPEN → ]  │
+└─────────────────────────────┘
+Target width:
+100%
+Target border radius:
+16-18px
+Target spacing:
+14-16px internal padding
+==================================================
+12. GAME ARTWORK
+==================================================
+Artwork is the main visual element.
+Target mobile image height:
+190-220px depending phone width.
+Use:
+width: 100%;
+aspect-ratio: 16 / 9;
+object-fit: cover;
+Do NOT use small square artwork.
+Do NOT stretch images.
+Do NOT crop logos badly.
+Use high-resolution images for:
+Volt Velocity
+Volt Stack
+Circuit Sprint
+Trading
+Retina-ready:
+use 2x image size where PNG/WebP is used.
+==================================================
+13. GAME-SPECIFIC ACCENTS
+==================================================
+Each game keeps its own accent.
+Volt Velocity:
+cyan / icy blue
+Volt Stack:
+purple / magenta
+Circuit Sprint:
+orange / gold
+Trading:
+cyan / turquoise
+Store colors in game metadata.
+Example:
+game.theme = {
+  primary: '#38DFFF',
+  secondary: '#6EA8FF',
+  glow: 'rgba(...)'
+}
+Do NOT style by nth-child.
+==================================================
+14. CARD SURFACE
+==================================================
+Use premium dark glass.
+Example:
+background:
+linear-gradient(
+  180deg,
+  rgba(5, 18, 45, .96),
+  rgba(2, 10, 26, .98)
+);
+border:
+1px solid var(--game-accent);
+box-shadow:
+0 0 18px color-mix(
+  in srgb,
+  var(--game-accent) 22%,
+  transparent
+);
+Do NOT use flat plain navy rectangles.
+==================================================
+15. CATEGORY BADGE
+==================================================
+Place category badge over the artwork, top-left.
+Examples:
+RACING
+ARCADE
+PUZZLE
+TRADING
+Use actual icons.
+Badge:
+height 28-30px
+small uppercase text
+dark translucent background
+accent border
+soft glow
+==================================================
+16. FEATURED BADGE
+==================================================
+If game.featured === true:
+show:
+FEATURED
+Top-right over artwork.
+Use:
+gold/yellow
+dark background
+high contrast
+Do not show it for every game.
+==================================================
+17. GAME TITLE
+==================================================
+Target:
+font-size: 20-22px
+font-weight: 800
+letter-spacing: .5px
+uppercase
+Examples:
+VOLT VELOCITY
+VOLT STACK
+CIRCUIT SPRINT
+TRADING
+Do not make titles tiny.
+==================================================
+18. GAME DESCRIPTION
+==================================================
+Use one short readable line.
+Examples:
+Volt Velocity
+Up to 16 pilots. One start. Three laps.
+Volt Stack
+Stack higher. Clear brighter. Chase the high score.
+Circuit Sprint
+Connect the paths. Beat the clock.
+Trading
+Compete on live forex markets with virtual capital.
+Target:
+13-14px
+line-height: 1.4
+Maximum 2 lines.
+==================================================
+19. GAME METRICS
+==================================================
+If real backend data exists, show:
+Players
+Contests
+Positive / Win Rate / Activity
+Example:
+12.4K
+PLAYERS
+320
+CONTESTS
+96%
+POSITIVE
+IMPORTANT:
+Use REAL DATA.
+Do not hardcode the design examples.
+If a metric is unavailable:
+hide it gracefully.
+Do not fabricate data.
+==================================================
+20. MOBILE METRIC LAYOUT
+==================================================
+Use a 3-column compact row.
+Each metric:
+icon
+large value
+small uppercase label
+Example:
+[users]
+12.4K
+PLAYERS
+[trophy]
+320
+CONTESTS
+[bolt]
+96%
+POSITIVE
+Target values:
+15-17px
+font-weight: 800
+Labels:
+9-10px
+uppercase
+letter spacing
+==================================================
+21. OPEN / PLAY CTA
+==================================================
+On mobile do NOT rely only on a tiny arrow circle.
+Use a clearer CTA.
+Preferred:
+[ VIEW GAME  → ]
+or
+[ PLAY / VIEW DETAILS → ]
+Recommended:
+height: 48-54px
+width: 100%
+Use game accent color.
+If you want to preserve the circular arrow design,
+place it inside a larger touch target.
+Minimum touch area:
+44x44px.
+==================================================
+22. MOBILE CARD SPACING
+==================================================
+Between game cards:
+16-18px
+Between artwork and title:
+12-14px
+Between title and description:
+4-6px
+Between description and stats:
+12-14px
+Between stats and CTA:
+14-16px
+Do NOT create giant empty spaces.
+==================================================
+23. MANY GAMES / FUTURE SCALABILITY
+==================================================
+This is important.
+Do NOT render every future game as one endless unstructured list.
+Recommended mobile flow:
+A. Featured game
+B. Remaining games grouped or filtered
+Use category filters to reduce visible content.
+Optional:
+"Recently played"
+or
+"Featured"
+only if real data supports it.
+Do NOT add fake sections just for decoration.
+The core page must remain easy to scan with 10, 20, or more games.
+==================================================
+24. OPTIONAL COMPACT CARD MODE
+==================================================
+If the catalogue later contains many games,
+after the featured card you may use a slightly shorter card style.
+But keep:
+- artwork
+- title
+- category
+- key metric
+- CTA
+Do NOT reduce cards to plain text rows.
+==================================================
+25. FILTER BEHAVIOUR
+==================================================
+Category filters must update the list instantly.
+Use current filter state.
+Example:
+const [category, setCategory] = useState('all');
+Do not create separate mobile-only data logic if the desktop already has the same source.
+Share the filter source, not the layout.
+==================================================
+26. GAME DATA
+==================================================
+Render from data.
+Example:
+games
+  .filter(...)
+  .map(game => (
+    <MobileGameCard
+      key={game.id}
+      game={game}
+    />
+  ));
+Do NOT hardcode four separate blocks.
+Future games must appear automatically.
+==================================================
+27. COMPONENT STRUCTURE
+==================================================
+Recommended:
+components/
+games/
+desktop/
+    DesktopGamesCatalogue.tsx
+mobile/
+    MobileGamesCatalogue.tsx
+    MobileGamesHeader.tsx
+    MobileGamesFilters.tsx
+    MobileFeaturedGameCard.tsx
+    MobileGameCard.tsx
+    MobileGameStats.tsx
+    MobileGameCTA.tsx
+shared/
+    GameCategoryBadge.tsx
+    gameTypes.ts
+    gameTheme.ts
+Share hooks and API logic.
+Do NOT duplicate backend requests.
+==================================================
+28. MOBILE PAGE VISUAL FLOW
+==================================================
+The user should see:
+CATALOGUE
+GAMES
+short description
+[ All ][ Arcade ][ Puzzle ][ Racing ][ Trading ]
+FEATURED GAME CARD
+GAME CARD
+GAME CARD
+GAME CARD
+bottom navigation
+This is the required hierarchy.
+==================================================
+29. MOBILE WIREFRAME
+==================================================
+    CATALOGUE
+
+      GAMES
+Pick a game and jump into the action.
+[ All ][ Arcade ][ Puzzle ][ Racing ] →
+╭──────────────────────────────╮
+│ RACING              FEATURED│
+│                              │
+│      VOLT VELOCITY ART       │
+│                              │
+├──────────────────────────────┤
+│ VOLT VELOCITY                │
+│ Up to 16 pilots. Three laps. │
+│                              │
+│ 12.4K    320       96%       │
+│ Players   Contests  Positive │
+│                              │
+│ [      VIEW GAME  →       ]  │
+╰──────────────────────────────╯
+╭──────────────────────────────╮
+│ ARCADE                       │
+│                              │
+│        VOLT STACK ART        │
+│                              │
+├──────────────────────────────┤
+│ VOLT STACK                   │
+│ Stack higher. Chase scores.  │
+│                              │
+│ 9.7K     215       94%       │
+│ Players   Contests  Positive │
+│                              │
+│ [      VIEW GAME  →       ]  │
+╰──────────────────────────────╯
+...etc
+==================================================
+30. MOBILE TYPOGRAPHY
+==================================================
+Catalogue label:
+10-12px
+GAMES:
+34-42px
+Description:
+13-14px
+Filter:
+12-13px
+Card title:
+20-22px
+Card description:
+13-14px
+Metric value:
+15-17px
+Metric label:
+9-10px
+CTA:
+14-16px
+Do NOT shrink text just to fit.
+==================================================
+31. MOBILE GRAPHIC STYLE
+==================================================
+Keep ChartVolt identity:
+dark navy:
+#020817
+#031029
+cyan:
+#00D8FF
+electric blue:
+#178BFF
+purple:
+#8F45FF
+magenta:
+#FF3CD9
+gold:
+#FFC928
+Cards:
+dark glass
+Use glow only for:
+- selected filter
+- card accent edge
+- Featured badge
+- CTA
+- active icon
+Do not glow every text element.
+==================================================
+32. BOTTOM NAVIGATION
+==================================================
+If ChartVolt global mobile navigation is present:
+Home
+Games
+Compete
+Wallet
+Profile
+Games should be active.
+Use cyan/blue glow.
+Ensure page content has:
+padding-bottom:
+calc(88px + env(safe-area-inset-bottom));
+==================================================
+33. LOADING STATES
+==================================================
+Use skeletons for:
+- header artwork if needed
+- game cards
+- stats
+Skeleton card should match final dimensions.
+Do not cause layout jumps.
+==================================================
+34. EMPTY STATE
+==================================================
+If a category has no games:
+show a proper ChartVolt empty state.
+Example:
+No games in this category yet.
+More challenges are coming soon.
+Do not show an empty black screen.
+==================================================
+35. ERROR STATE
+==================================================
+If catalogue data fails:
+We couldn't load the games right now.
+[ Retry ]
+Keep it compact and branded.
+==================================================
+36. ACCESSIBILITY
+==================================================
+Provide:
+- real buttons
+- aria-labels
+- readable contrast
+- keyboard support where applicable
+- clear selected filter state
+- minimum 44px touch targets
+- proper alt text for game artwork
+Do not rely on color alone.
+==================================================
+37. PERFORMANCE
+==================================================
+Use WebP/AVIF for large artwork/backgrounds where possible.
+Lazy-load game cards below the fold.
+Do not load giant desktop background files if a mobile crop exists.
+Do not load duplicate card images.
+Use current image optimization pipeline.
+==================================================
+38. RESPONSIVE TEST
+==================================================
+Test:
+360x800
+375x812
+390x844
+393x852
+412x915
+430x932
+Verify:
+[ ] no horizontal page overflow
+[ ] filter row scrolls naturally
+[ ] no cropped game titles
+[ ] artwork remains sharp
+[ ] category badges remain readable
+[ ] Featured badge fits
+[ ] stats remain visible
+[ ] CTA is easy to tap
+[ ] background remains visible
+[ ] bottom nav does not cover cards
+[ ] all filters work
+[ ] game navigation works
+[ ] real backend data is used
+[ ] desktop remains unchanged
+==================================================
+39. WHAT TO REJECT
+==================================================
+Reject the result if Cursor produces:
+- desktop 3-column grid squeezed onto mobile
+- 2 tiny cards side-by-side
+- square thumbnails with lots of text below
+- giant empty dark areas
+- tiny category filters
+- plain black background
+- generic website cards
+- all games with identical accent colors
+- hardcoded metrics
+- tiny circular arrow as the only CTA
+- low-resolution stretched images
+- horizontal overflow
+- desktop layout changed
+==================================================
+40. FINAL DESIGN REQUIREMENT
+==================================================
+The mobile Games page should feel like opening the ChartVolt game launcher.
+It should be:
+- cinematic
+- easy to scan
+- visually exciting
+- touch-first
+- highly readable
+- consistent with the desktop target
+- scalable to many future games
+- connected to the same real game data
+The desktop target image is the VISUAL LANGUAGE reference.
+Do NOT copy its desktop proportions directly onto mobile.
+Translate the same identity into a dedicated mobile-first experience.
+MOST IMPORTANT:
+Desktop Games Catalogue = keep unchanged.
+Mobile Games Catalogue = build a dedicated new layout.
+Do not modify any other ChartVolt page.

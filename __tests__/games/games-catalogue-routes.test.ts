@@ -33,14 +33,15 @@ describe("games catalogue routes", () => {
 
   it("hub uses a wide content shell over a fixed viewport arena, not a narrow dark column", () => {
     const hub = readCode(HUB);
+    const desktop = readCode("components/games/catalogue/DesktopGamesCatalogue.tsx");
     // Reason (8 Oct 2026): Image 1 scale — min(1420px) content, arena plate, no Featured hero.
-    // Polish same day: fixed inset-0 plate + navy floor so filter/short/long lists never
-    // expose a hard edge under the artwork.
-    expect(hub).toMatch(/min\(1420px/);
+    // Shell moved into DesktopGamesCatalogue when the mobile tree was split the same day.
+    expect(desktop).toMatch(/min\(1420px/);
     expect(hub).toMatch(/games-catalogue-arena-r1\.webp/);
     expect(hub).toMatch(/fixed inset-0/);
     expect(hub).toMatch(/bg-\[#020B1A\]/);
     expect(hub).toMatch(/loadCatalogueCardStats/);
+    expect(hub).toMatch(/DesktopGamesCatalogue/);
     expect(hub).not.toMatch(/Featured Game/);
     expect(hub).not.toMatch(/max-w-\[1000px\]|max-w-\[1100px\]/);
   });
