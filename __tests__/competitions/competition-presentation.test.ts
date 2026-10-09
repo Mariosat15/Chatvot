@@ -1,8 +1,11 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolveGameDefinition } from "@/lib/competitions/game-definitions";
 import { getCompetitionCTA } from "@/lib/competitions/competition-cta";
 import { buildCompetitionPresentation } from "@/lib/competitions/build-competition-presentation";
 import { describeCompetitionMode } from "@/lib/competitions/competition-mode-copy";
+import { COMPETITION_TYPE_RIBBON_ASSET } from "@/lib/competitions/game-artwork";
 import type { CompetitionListItem } from "@/lib/competitions/types";
 
 function base(overrides: Partial<CompetitionListItem> = {}): CompetitionListItem {
@@ -25,6 +28,15 @@ function base(overrides: Partial<CompetitionListItem> = {}): CompetitionListItem
 }
 
 describe("resolveGameDefinition", () => {
+  it("ships distinct competition-type ribbons for trading and games", () => {
+    expect(COMPETITION_TYPE_RIBBON_ASSET.trading).not.toBe(
+      COMPETITION_TYPE_RIBBON_ASSET.game,
+    );
+    for (const asset of Object.values(COMPETITION_TYPE_RIBBON_ASSET)) {
+      expect(existsSync(path.join(process.cwd(), "public", asset))).toBe(true);
+    }
+  });
+
   it("defaults absent labels to trading", () => {
     expect(resolveGameDefinition({}).id).toBe("trading");
   });

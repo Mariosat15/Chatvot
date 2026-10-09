@@ -1,8 +1,19 @@
+# BUILT 9 Oct 2026 (eng, seventeenth pass) — competition ribbons and exact grid-cell CTA placement
+
+- Every open competition now carries the supplied corner identity ribbon: green **TRADING** for Trading and gold **GAME** for every game competition. A cancelled/refunded ribbon takes precedence, so one card never displays two corner ribbons.
+- **Wide list row:** the CTA stretches to the full width and height of the metric box beside it.
+- **Grid card:** Host moved into the former one-cell CTA position. The CTA moved into the former two-column Host position below it and fills that whole red-box footprint. Other context follows after the CTA.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **23/23**.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, sixteenth pass) — CTA aligned inside the metric grid
+
+**Extended by the seventeenth pass above.** The CTA remains in the metric grid, but its final span and Host position now follow the owner's marked references.
 
 - The Join / View Results button is no longer in a separate column under the card. It is a cell in the same auto-fit metric grid as Prize Pool, Mode and Rounds, so it sits beside those boxes instead of floating below the open slot.
 - Both the wide list row and the grid card use that placement. The list row's third CTA column is removed.
-- Host and the other context boxes still follow after the CTA in the same grid, so a long Host name keeps its two-column span on the next track.
+- ~~Host and the other context boxes still follow after the CTA in the grid card.~~ **Superseded:** Host now comes first in one cell; the CTA takes the two-column row below it.
 
 **Never verified by eye.**
 

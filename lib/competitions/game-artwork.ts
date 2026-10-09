@@ -106,6 +106,12 @@ export const COMPETITION_CTA_ASSET = {
 export const COMPETITION_CANCELLED_RIBBON_ASSET =
   `${CTA_BASE}/ribbon-cancelled-refunded-r2.png`;
 
+/** Owner-supplied corner ribbons identifying trading versus every other game. */
+export const COMPETITION_TYPE_RIBBON_ASSET = {
+  game: `${CTA_BASE}/ribbon-game-r1.png`,
+  trading: `${CTA_BASE}/ribbon-trading-r1.png`,
+} as const;
+
 // Reason: Map — request-supplied / variant keys must not walk Object.prototype.
 const CTA_BY_VARIANT = new Map<CtaVariant, string>([
   ["join", COMPETITION_CTA_ASSET.join],

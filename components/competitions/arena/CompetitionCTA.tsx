@@ -18,11 +18,14 @@ import type { CompetitionCta } from "@/lib/competitions/types";
 export function CompetitionCTA({
   cta,
   glow,
+  fillCell = false,
   className = "",
 }: {
   cta: CompetitionCta;
   /** Game accent glow (rgba) behind the button */
   glow?: string;
+  /** Stretch the supplied artwork to the same footprint as a metric cell. */
+  fillCell?: boolean;
   className?: string;
 }) {
   const asset = resolveCtaAsset(cta.variant) ?? COMPETITION_CTA_ASSET.join;
@@ -30,7 +33,9 @@ export function CompetitionCTA({
   const greyed = unavailable && cta.variant !== "already_in";
   const caption = cta.reason || (greyed ? cta.label : "");
 
-  const shell = `competitionCta relative block aspect-[3/1] w-full max-w-[300px] ${
+  const shell = `competitionCta relative block w-full ${
+    fillCell ? "h-full min-h-[56px] max-w-none" : "aspect-[3/1] max-w-[300px]"
+  } ${
     greyed
       ? "cursor-not-allowed opacity-45 grayscale"
       : "transition hover:-translate-y-px hover:brightness-110"
@@ -43,7 +48,7 @@ export function CompetitionCTA({
         alt=""
         fill
         loading="lazy"
-        className="object-contain"
+        className={fillCell ? "object-fill" : "object-contain"}
         style={!greyed && glow ? { filter: `drop-shadow(0 0 10px ${glow})` } : undefined}
         sizes="300px"
       />
@@ -52,7 +57,11 @@ export function CompetitionCTA({
   );
 
   return (
-    <div className={`flex w-full flex-col items-center ${className}`}>
+    <div
+      className={`flex w-full flex-col items-center ${
+        fillCell ? "h-full" : ""
+      } ${className}`}
+    >
       {unavailable ? (
         <button type="button" disabled className={shell}>
           {inner}

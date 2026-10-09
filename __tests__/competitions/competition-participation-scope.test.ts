@@ -122,30 +122,45 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(header).not.toContain("CompetitionCountdown");
     expect(parts).toContain("<CompetitionInfoDataBlock");
     expect(parts).toContain("<CompetitionCountdownDataBlock");
-    expect(card).toContain('<CardContextDataBlocks presentation={p} layout="grid"');
+    expect(card).toContain("only=\"creator\"");
+    expect(card).toContain("only=\"other\"");
     expect(list).toContain('<CardContextDataBlocks presentation={p} layout="list"');
-    expect(parts).toContain('tag.tone === "creator" ? "col-span-2"');
+    expect(parts).toContain('tag.tone === "creator" && layout === "list"');
     expect(parts.indexOf('["private", 1]')).toBeLessThan(
       parts.indexOf('["creator", 4]'),
     );
     expect(parts.indexOf('["creator", 1]')).toBeLessThan(
       parts.indexOf('["private", 2]'),
     );
-    expect(card).toContain('className="w-full max-w-[220px]"');
-    expect(card).not.toContain("max-w-none");
-    // Reason: CTA must live inside the metric grid so it aligns with the boxes.
+    // Reason: CTA must fill a metric cell, not retain its shorter 3:1 artwork box.
+    expect(card).toContain("fillCell");
+    expect(list).toContain("fillCell");
+    expect(card).toContain('className="h-full w-full"');
+    expect(list).toContain('className="h-full w-full"');
+    // Grid order is metrics → one-cell Host → two-cell CTA → other context.
+    const cardGridStart = card.indexOf('mt-auto grid auto-rows-fr');
+    const creator = card.indexOf('only="creator"', cardGridStart);
+    const cardCta = card.indexOf("<CompetitionCTA", cardGridStart);
+    const other = card.indexOf('only="other"', cardGridStart);
+    expect(creator).toBeGreaterThan(cardGridStart);
+    expect(cardCta).toBeGreaterThan(creator);
+    expect(other).toBeGreaterThan(cardCta);
+    expect(card.slice(creator, other)).toContain("col-span-2");
+    expect(parts).toContain(
+      'tag.tone === "creator" && layout === "list"',
+    );
+
+    // CTA must live inside the metric grid so it aligns with the boxes.
     const listMetricsGrid = list.slice(
       list.indexOf('mt-auto grid auto-rows-fr'),
       list.indexOf("<CardContextDataBlocks"),
     );
-    const cardMetricsGrid = card.slice(
-      card.indexOf('mt-auto grid auto-rows-fr'),
-      card.indexOf("<CardContextDataBlocks"),
-    );
     expect(listMetricsGrid).toContain("<CompetitionCTA");
-    expect(cardMetricsGrid).toContain("<CompetitionCTA");
+    expect(card.slice(cardGridStart, other)).toContain("<CompetitionCTA");
     expect(list).not.toContain("@[1100px]:grid-cols-[230px_minmax(0,1fr)_220px]");
     expect(list).not.toContain("flex items-end justify-center");
+    expect(card).toContain("<CompetitionTypeRibbon");
+    expect(list).toContain("<CompetitionTypeRibbon");
     expect(infoBlock).toContain("<PopoverTrigger asChild>");
     expect(infoBlock).toContain("onPointerEnter={showForMouse}");
     expect(infoBlock).toContain("onPointerLeave={hideForMouse}");

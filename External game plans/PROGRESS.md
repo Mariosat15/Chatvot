@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, sixteenth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement, the live clock and every Mode value use shared data boxes with hover/touch help. Anytime and Scheduled receive specific explanations; future title-specific modes receive a generic explanation without a game-code branch. Host spans two columns; grid cards put Access in its former slot, while wide rows keep Access immediately after the widened Host. The Join / View Results CTA is a cell in the same metric grid as the data boxes (no separate column). Cancelled/refunded cards use a red frame/scrim and only the uploaded ribbon as their cancellation marker. The repeated game badge is gone and the CTA remains capped at 220px. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
+- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, seventeenth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement, the live clock and every Mode value use shared data boxes with hover/touch help. Anytime and Scheduled receive specific explanations; future title-specific modes receive a generic explanation without a game-code branch. Supplied corner ribbons identify open cards as **TRADING** or **GAME**; cancelled/refunded ribbons take precedence. Wide-row CTAs fill their metric cell. Grid cards put Host in one cell and the CTA in the two-column row below it. Cancelled/refunded cards retain the red frame/scrim. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -977,6 +977,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 9 October 2026 - Competition type ribbons and final Host/CTA placement
+
+**Owner correction:** open competition cards needed the supplied TRADING/GAME corner identity, the list CTA needed the exact footprint of its neighbouring box, and the grid card needed Host and CTA swapped.
+
+**Built:** green TRADING and gold GAME ribbon assets now resolve from the competition type, while cancelled/refunded cards retain only their cancellation ribbon. The list CTA fills its metric cell. In the grid card, Host occupies one cell in the former button position and the CTA occupies the two-column row below it. The shared CTA supports this full-cell treatment without changing other callers.
+
+Focused tests pass **23/23**. **Never verified by eye.**
 
 ### 9 October 2026 - Host/access slots corrected; list CTA lowered; cancelled cards red
 

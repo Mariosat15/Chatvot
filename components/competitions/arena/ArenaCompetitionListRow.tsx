@@ -7,6 +7,7 @@ import {
   CardBadgesRow,
   CardContextDataBlocks,
   CardHero,
+  CompetitionTypeRibbon,
   cardFrameStyle,
   hasMetricValue,
   isSettled,
@@ -41,6 +42,7 @@ export function ArenaCompetitionListRow({
     >
       <CardBackdrop presentation={p} />
       <CancelledRibbon presentation={p} />
+      <CompetitionTypeRibbon presentation={p} />
 
       <div className="relative z-10 grid grid-cols-1 gap-3 p-3 @[760px]:grid-cols-[220px_minmax(0,1fr)] @[760px]:p-3.5">
         <CardHero
@@ -75,11 +77,12 @@ export function ArenaCompetitionListRow({
             {metrics.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
             ))}
-            <div className="flex h-full min-h-[56px] items-center justify-center">
+            <div className="flex h-full min-h-[56px] items-stretch justify-stretch">
               <CompetitionCTA
                 cta={p.cta}
                 glow={settled ? undefined : p.theme.glow}
-                className="max-w-[220px]"
+                fillCell
+                className="h-full w-full"
               />
             </div>
             <CardContextDataBlocks presentation={p} layout="list" />

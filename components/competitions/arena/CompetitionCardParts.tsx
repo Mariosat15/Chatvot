@@ -1,7 +1,10 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
-import { COMPETITION_CANCELLED_RIBBON_ASSET } from "@/lib/competitions/game-artwork";
+import {
+  COMPETITION_CANCELLED_RIBBON_ASSET,
+  COMPETITION_TYPE_RIBBON_ASSET,
+} from "@/lib/competitions/game-artwork";
 import type {
   CompetitionMetric,
   CompetitionPresentation,
@@ -172,13 +175,20 @@ function contextExplanation(
 export function CardContextDataBlocks({
   presentation: p,
   layout,
+  only = "all",
 }: {
   presentation: CompetitionPresentation;
   layout: "grid" | "list";
+  only?: "all" | "creator" | "other";
 }) {
   const order = layout === "grid" ? GRID_CONTEXT_ORDER : LIST_CONTEXT_ORDER;
   const tags = p.tags
     .filter((tag) => tag.tone !== "game")
+    .filter((tag) => {
+      if (only === "creator") return tag.tone === "creator";
+      if (only === "other") return tag.tone !== "creator";
+      return true;
+    })
     .sort(
       (a, b) =>
         (order.get(a.tone) ?? Number.MAX_SAFE_INTEGER) -
@@ -198,11 +208,15 @@ export function CardContextDataBlocks({
             value={tag.label}
             explanation={contextExplanation(p, tag.tone, tag.label)}
             accent={p.gameAccent}
-            className={tag.tone === "creator" ? "col-span-2" : undefined}
+            className={
+              tag.tone === "creator" && layout === "list"
+                ? "col-span-2"
+                : undefined
+            }
           />
         );
       })}
-      {p.countdown ? (
+      {only !== "creator" && p.countdown ? (
         <CompetitionCountdownDataBlock
           kind={p.countdown.kind}
           target={p.countdown.target}
@@ -224,6 +238,30 @@ export function CancelledRibbon({
     <Image
       src={COMPETITION_CANCELLED_RIBBON_ASSET}
       alt={p.statusLabel}
+      width={112}
+      height={112}
+      className="pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]"
+      sizes="112px"
+    />
+  );
+}
+
+/** GAME / TRADING identity ribbon; cancellation takes precedence over identity. */
+export function CompetitionTypeRibbon({
+  presentation: p,
+}: {
+  presentation: CompetitionPresentation;
+}) {
+  if (isCancelled(p)) return null;
+  const trading = p.gameId === "trading";
+  return (
+    <Image
+      src={
+        trading
+          ? COMPETITION_TYPE_RIBBON_ASSET.trading
+          : COMPETITION_TYPE_RIBBON_ASSET.game
+      }
+      alt={trading ? "Trading competition" : "Game competition"}
       width={112}
       height={112}
       className="pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]"
