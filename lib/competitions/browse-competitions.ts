@@ -5,9 +5,11 @@
  * Indexes already cover status+startTime / gameKey+status (competition.model.ts).
  */
 
+import type { PipelineStage } from "mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
+import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
 import {
   annotatePrivateContests,
 } from "@/lib/services/gamemaster/private-contest-listing.service";
@@ -20,47 +22,71 @@ import {
   type BrowseSort,
 } from "./browse-types";
 
+function pickImage(banner: unknown, thumb: unknown): string {
+  if (typeof banner === "string" && banner.trim()) return banner.trim();
+  if (typeof thumb === "string" && thumb.trim()) return thumb.trim();
+  return "";
+}
+
 /**
- * Attach catalogue bannerUrl so cards use the same artwork as /games.
- * Reason: Games prefers operator/catalogue banner; play-* neon is the fallback.
+ * Attach the SAME artwork the /games catalogue card shows, plus the game code.
+ *
+ * Reason: a competition stores its title at `gameConfig.gameCode`, never at the top level,
+ * so the first version of this lookup (keyed on a top-level `gameCode`) matched nothing and
+ * every card fell back to generic art. The catalogue keys provider titles by `gameKey`
+ * (`player-catalogue.service.ts`) and trading by the trading page content — copied here.
  */
 async function attachCatalogueArtwork<T extends Record<string, unknown>>(
   rows: T[],
 ): Promise<T[]> {
-  const codes = new Set<string>();
+  const providerKeys = new Set<string>();
+  let needsTrading = false;
   for (const row of rows) {
-    const code =
-      typeof row.gameCode === "string" ? row.gameCode.trim().toLowerCase() : "";
-    if (code) codes.add(code);
+    const key = typeof row.gameKey === "string" ? row.gameKey : "";
+    if (key.startsWith("provider:")) providerKeys.add(key);
+    else needsTrading = true;
   }
-  if (codes.size === 0) return rows;
 
-  const titles = await ProviderGame.find({
-    gameCode: { $in: [...codes] },
-  })
-    .select("gameCode bannerUrl thumbnailUrl")
-    .lean();
+  const byKey = new Map<string, string>();
+  if (providerKeys.size > 0) {
+    const titles = await ProviderGame.find({ gameKey: { $in: [...providerKeys] } })
+      .select("gameKey bannerUrl thumbnailUrl")
+      .lean();
+    for (const t of titles) {
+      const img = pickImage(t.bannerUrl, t.thumbnailUrl);
+      if (img) byKey.set(String(t.gameKey), img);
+    }
+  }
 
-  const byCode = new Map<string, string>();
-  for (const t of titles) {
-    const code = String(t.gameCode || "")
-      .trim()
-      .toLowerCase();
-    if (!code) continue;
-    const banner =
-      (typeof t.bannerUrl === "string" && t.bannerUrl.trim()) ||
-      (typeof t.thumbnailUrl === "string" && t.thumbnailUrl.trim()) ||
-      "";
-    if (banner) byCode.set(code, banner);
+  let tradingImage = "";
+  if (needsTrading) {
+    try {
+      const content = await loadTradingPageContent();
+      tradingImage = pickImage(content.bannerUrl, content.thumbnailUrl);
+    } catch (error) {
+      console.warn("⚠️ Trading page artwork unavailable for competitions:", error);
+    }
   }
 
   return rows.map((row) => {
-    const code =
-      typeof row.gameCode === "string" ? row.gameCode.trim().toLowerCase() : "";
-    if (!code) return row;
-    const banner = byCode.get(code);
-    if (!banner) return row;
-    return { ...row, bannerUrl: banner };
+    const key = typeof row.gameKey === "string" ? row.gameKey : "";
+    const config = row.gameConfig as
+      | { gameCode?: unknown; settings?: unknown }
+      | undefined;
+    const gameSettings =
+      config?.settings && typeof config.settings === "object"
+        ? (config.settings as Record<string, unknown>)
+        : undefined;
+    const gameCode =
+      typeof row.gameCode === "string" && row.gameCode
+        ? row.gameCode
+        : typeof config?.gameCode === "string"
+          ? config.gameCode
+          : undefined;
+    const bannerUrl = key.startsWith("provider:")
+      ? byKey.get(key)
+      : tradingImage || undefined;
+    return { ...row, gameCode, gameSettings, bannerUrl: bannerUrl ?? null };
   });
 }
 
@@ -208,7 +234,7 @@ export async function browseCompetitions(
   let totalItems = 0;
 
   if (sort === "featured" || sort === "newest") {
-    const pipeline: Record<string, unknown>[] = [
+    const pipeline: PipelineStage[] = [
       { $match: mongoQuery },
       {
         $addFields: {

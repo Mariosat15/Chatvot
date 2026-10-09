@@ -54,10 +54,33 @@ function settingsString(
     const v = map.get(k);
     if (v == null || v === "") continue;
     if (typeof v === "number" && Number.isFinite(v)) return String(v);
-    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "string" && v.trim()) return humanize(v);
     if (typeof v === "boolean") return v ? "Yes" : "No";
   }
   return undefined;
+}
+
+/** "best_of_n" / "neon-loop" / "medium" → "Best Of N" / "Neon Loop" / "Medium". */
+function humanize(raw: string): string {
+  return raw
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function attemptsLabel(c: CompetitionListItem): string | undefined {
+  const n = Number(c.attemptsAllowed ?? 0);
+  if (c.attemptsPolicy === "single") return "1 Attempt";
+  if (c.attemptsPolicy === "best_of_n") return n > 1 ? `Best of ${n}` : "Best Of";
+  if (c.attemptsPolicy === "sum_of_n") return n > 1 ? `Sum of ${n}` : "Sum Of";
+  return undefined;
+}
+
+/** `provider:<providerKey>:<gameCode>` → gameCode. */
+function gameCodeOf(c: CompetitionListItem): string | undefined {
+  if (c.gameCode) return c.gameCode;
+  const parts = String(c.gameKey || "").split(":");
+  return parts.length >= 3 ? parts.slice(2).join(":") : undefined;
 }
 
 function resolveStatus(
@@ -206,7 +229,7 @@ function buildMetric(
     case "track":
       return metricOrNull(
         key,
-        settingsString(settings, ["track", "trackName", "map", "mapName"]),
+        settingsString(settings, ["track", "trackId", "trackName", "map", "mapName"]),
       );
     case "boardSize":
       return metricOrNull(
@@ -222,15 +245,14 @@ function buildMetric(
       return metricOrNull(
         key,
         settingsString(settings, ["mode", "playMode", "gameMode"]) ||
-          (c.playMode ? String(c.playMode).replace(/_/g, " ") : undefined) ||
-          (c.attemptsPolicy
-            ? String(c.attemptsPolicy).replace(/_/g, " ")
-            : undefined),
+          (c.playMode ? humanize(String(c.playMode)) : undefined) ||
+          attemptsLabel(c),
       );
     case "rounds":
       return metricOrNull(
         key,
-        settingsString(settings, ["rounds", "bestOf", "attempts"]),
+        settingsString(settings, ["rounds", "boardCount", "bestOf", "attempts"]) ||
+          attemptsLabel(c),
       );
     case "laps":
       return metricOrNull(key, settingsString(settings, ["laps", "lapCount"]));
@@ -259,10 +281,11 @@ export function buildCompetitionPresentation(
   competition: CompetitionListItem,
   opts: BuildPresentationOptions,
 ): CompetitionPresentation {
+  const gameCode = gameCodeOf(competition);
   const def = resolveGameDefinition({
     gameType: competition.gameType,
     gameKey: competition.gameKey,
-    gameCode: competition.gameCode,
+    gameCode,
     name: competition.name,
   });
 
@@ -339,7 +362,7 @@ export function buildCompetitionPresentation(
 
   const art = resolveCompetitionArtwork({
     gameId: def.id,
-    gameCode: competition.gameCode,
+    gameCode,
     bannerUrl: competition.bannerUrl,
     gameName: def.label,
   });
@@ -356,6 +379,7 @@ export function buildCompetitionPresentation(
     gameArtwork: art.src,
     artworkObjectPosition: art.objectPosition,
     gameAccent: def.accent,
+    gameIcon: def.icon,
     theme: def.theme,
     creatorName: creatorName || "Admin",
     creatorType: isGm ? "gm" : "admin",

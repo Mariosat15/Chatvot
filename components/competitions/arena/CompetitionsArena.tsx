@@ -280,7 +280,7 @@ export function CompetitionsArena({
           <div
             className={
               viewMode === "grid"
-                ? "grid grid-cols-1 gap-[14px] md:grid-cols-2"
+                ? "grid grid-cols-1 gap-[14px] 2xl:grid-cols-2"
                 : "flex flex-col gap-3"
             }
           >

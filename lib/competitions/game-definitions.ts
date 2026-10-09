@@ -70,7 +70,7 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     artwork: "/assets/neon/overview/play-trading.png",
     icon: `${ICON_BASE}/icon-chart.png`,
     primaryMetrics: ["prizePool", "players", "duration", "assets"],
-    secondaryMetrics: ["entryFee", "leverage", "difficulty", "startingCapital"],
+    secondaryMetrics: ["entryFee", "leverage", "difficulty"],
     filters: ["assets", "difficulty"],
   },
   circuitSprint: {
@@ -87,7 +87,7 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     artwork: "/assets/neon/overview/play-circuit-sprint.png",
     icon: `${ICON_BASE}/icon-games.png`,
     primaryMetrics: ["prizePool", "players", "duration", "boardSize"],
-    secondaryMetrics: ["entryFee", "rounds", "mode", "difficulty"],
+    secondaryMetrics: ["entryFee", "mode", "difficulty"],
     filters: ["difficulty", "mode"],
   },
   voltVelocity: {
@@ -103,8 +103,8 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     },
     artwork: "/assets/neon/overview/play-volt-velocity.png",
     icon: `${ICON_BASE}/icon-bolt.png`,
-    primaryMetrics: ["prizePool", "players", "duration", "track"],
-    secondaryMetrics: ["entryFee", "laps", "mode", "difficulty"],
+    primaryMetrics: ["prizePool", "players", "duration", "mode"],
+    secondaryMetrics: ["entryFee", "laps", "track"],
     filters: ["difficulty", "mode", "track"],
   },
   voltStack: {
@@ -120,8 +120,8 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     },
     artwork: "/assets/neon/overview/play-volt-stack.png",
     icon: `${ICON_BASE}/icon-prize.png`,
-    primaryMetrics: ["prizePool", "players", "duration", "boardSize"],
-    secondaryMetrics: ["entryFee", "rounds", "mode", "difficulty"],
+    primaryMetrics: ["prizePool", "players", "duration", "mode"],
+    secondaryMetrics: ["entryFee", "rounds", "difficulty"],
     filters: ["difficulty", "mode"],
   },
   provider: {

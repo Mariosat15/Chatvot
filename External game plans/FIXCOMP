@@ -1,3 +1,20 @@
+# BUILT 9 Oct 2026 (eng, second pass) — card anatomy rebuilt to the strict brief
+
+Supersedes the "card correction pass" block below (correct as history only — its `mix-blend-screen` ribbon is gone).
+
+- Layout: `grid-cols-[28%_72%]`, switching from the card's **own** width (container query `@[600px]`), not from the viewport; below that the art stacks on top at 150px
+- Fade: the brief's two gradients exactly at wide widths; a top-to-bottom fade when stacked
+- Badges 28px (`h-7`), 10–11px; game badge carries the game's own icon (`CompetitionPresentation.gameIcon`) and per-game accent
+- Primary row `repeat(4,minmax(0,1fr))` gap 8; boxes min-height 72px, `38px 1fr`, values wrap (`break-words`, no `truncate`, no "…")
+- Secondary row `repeat(3,minmax(0,1fr)) minmax(190px,1.3fr)` with the CTA bottom-right from `@[720px]`; below that the CTA sits full-width under the boxes so they are never squeezed
+- CTA and ribbon are the supplied PNGs with no blend mode (both are transparent); ribbon at `right:-5px; top:-2px`, z-20, sized to its measured artwork
+- Completed cards: artwork kept, desaturated, softer glow, View Results CTA. Private GM: "PRIVATE • GM ONLY" badge + Join GM CTA
+- Empty metrics ("", "-", "—") are dropped rather than rendered as empty boxes
+- **Deviation:** the arena grid is two cards per row only at `2xl` (was `md`), because a card under ~600px cannot hold the 28/72 layout
+- Skeletons rebuilt to the same anatomy
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng) — Competition Arena cards → Image 1 target
 
 **Target:** Image 1 (horizontal mini-dashboards with full faded game bg, boxed metrics, owner CTA PNGs). Image 2 was the incorrect prior build.

@@ -55,6 +55,8 @@ export interface CompetitionPresentation {
   /** CSS object-position for the hero so game logos stay visible */
   artworkObjectPosition: string;
   gameAccent: string;
+  /** Game badge icon (top-right of the card) */
+  gameIcon: string;
   theme: GameDefinition["theme"];
   creatorName: string;
   creatorType: "admin" | "gm" | "unknown";
@@ -120,6 +122,7 @@ export interface CompetitionListItem {
   gameMasterName?: string;
   gameSettings?: Record<string, unknown>;
   attemptsPolicy?: string;
+  attemptsAllowed?: number;
   playMode?: string;
   refunded?: boolean;
   cancellationReason?: string;

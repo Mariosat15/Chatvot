@@ -1,64 +1,40 @@
 import Link from "next/link";
 import Image from "next/image";
-import { resolveCtaAsset } from "@/lib/competitions/game-artwork";
+import {
+  COMPETITION_CTA_ASSET,
+  resolveCtaAsset,
+} from "@/lib/competitions/game-artwork";
 import type { CompetitionCta } from "@/lib/competitions/types";
 
 /**
- * Owner-supplied CTA PNGs — text/icons are baked into the asset.
- * Reason: Image 1 requires real Join / Reserve / Join GM / View Results / Already In
- * chrome, not CSS gradients tinting one Join pill.
+ * Owner-supplied CTA PNGs — text and icon are baked into the asset.
+ *
+ * Reason: every state uses the supplied artwork, never a CSS pill. The PNGs are
+ * RGBA with clear corners (checked 9 Oct 2026), so no blend mode is needed; the
+ * old `mix-blend-darken` was a workaround for an earlier white-canvas file.
+ * A state with no asset of its own (disabled) shows the Join artwork greyed out
+ * with the reason underneath, so the player still learns why it is unavailable.
  */
 export function CompetitionCTA({
   cta,
+  glow,
   className = "",
 }: {
   cta: CompetitionCta;
+  /** Game accent glow (rgba) behind the button */
+  glow?: string;
   className?: string;
 }) {
-  const asset = resolveCtaAsset(cta.variant);
-  const muted =
-    cta.variant === "disabled" ||
-    cta.variant === "details" ||
-    (cta.disabled && cta.variant !== "already_in");
+  const asset = resolveCtaAsset(cta.variant) ?? COMPETITION_CTA_ASSET.join;
+  const unavailable = cta.variant === "disabled" || cta.disabled;
+  const greyed = unavailable && cta.variant !== "already_in";
+  const caption = cta.reason || (greyed ? cta.label : "");
 
-  if (!asset || cta.variant === "disabled") {
-    const classes = `inline-flex h-[48px] w-full items-center justify-center rounded-full border border-white/15 bg-white/5 px-4 text-[13px] font-extrabold uppercase tracking-wide text-white/55 ${className}`;
-    if (cta.disabled) {
-      return (
-        <div>
-          <button type="button" disabled className={classes}>
-            {cta.label}
-          </button>
-          {cta.reason ? (
-            <p className="mt-1.5 text-center text-[12px] text-white/50">
-              {cta.reason}
-            </p>
-          ) : null}
-        </div>
-      );
-    }
-    return (
-      <div>
-        <Link href={cta.href} className={`${classes} hover:bg-white/10`}>
-          {cta.label}
-        </Link>
-        {cta.reason ? (
-          <p className="mt-1.5 text-center text-[12px] text-white/50">
-            {cta.reason}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
-  const shell = `competitionCta relative block h-[52px] w-full max-w-[300px] overflow-hidden ${muted ? "opacity-70 grayscale-[.25]" : "transition hover:brightness-110"} ${className}`;
-
-  // Reason: JoinComp PNG ships on a white canvas — darken knocks white out on the
-  // dark card. Black-canvas assets (Reserve / GM / Results / Already In) need no blend.
-  const blend =
-    cta.variant === "join" || cta.variant === "play"
-      ? "mix-blend-darken"
-      : "";
+  const shell = `competitionCta relative block aspect-[3/1] w-full max-w-[260px] ${
+    greyed
+      ? "cursor-not-allowed opacity-45 grayscale"
+      : "transition hover:-translate-y-px hover:brightness-110"
+  }`;
 
   const inner = (
     <>
@@ -66,18 +42,19 @@ export function CompetitionCTA({
         src={asset}
         alt=""
         fill
-        className={`object-contain object-center ${blend}`}
+        loading="lazy"
+        className="object-contain"
+        style={!greyed && glow ? { filter: `drop-shadow(0 0 10px ${glow})` } : undefined}
         sizes="300px"
-        priority={false}
       />
       <span className="sr-only">{cta.label}</span>
     </>
   );
 
   return (
-    <div className="flex flex-col items-end">
-      {cta.disabled ? (
-        <button type="button" disabled className={`${shell} cursor-not-allowed`}>
+    <div className={`flex w-full flex-col items-center ${className}`}>
+      {unavailable ? (
+        <button type="button" disabled className={shell}>
           {inner}
         </button>
       ) : (
@@ -85,9 +62,9 @@ export function CompetitionCTA({
           {inner}
         </Link>
       )}
-      {cta.reason ? (
-        <p className="mt-1.5 w-full text-center text-[12px] text-white/50 sm:text-right">
-          {cta.reason}
+      {caption ? (
+        <p className="mt-1 w-full max-w-[260px] text-center text-[11px] leading-tight text-white/55">
+          {caption}
         </p>
       ) : null}
     </div>

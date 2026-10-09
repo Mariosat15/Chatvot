@@ -44,15 +44,15 @@ export function ArenaCompetitionListRow({
 
       {p.showCancelledRibbon ? (
         <div
-          className="pointer-events-none absolute -right-1 -top-1 z-30 h-[120px] w-[120px]"
+          className="pointer-events-none absolute -right-[5px] -top-[2px] z-20 h-[100px] w-[150px]"
           aria-hidden
         >
           <Image
             src={COMPETITION_CTA_ASSET.cancelledRibbon}
             alt=""
             fill
-            className="object-contain object-right-top mix-blend-screen"
-            sizes="120px"
+            className="object-contain object-right-top"
+            sizes="150px"
           />
         </div>
       ) : null}
@@ -97,13 +97,13 @@ export function ArenaCompetitionListRow({
         {metrics.length > 0 ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {metrics.map((m) => (
-              <CompetitionDataBlock key={m.key} metric={m} compact />
+              <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
             ))}
           </div>
         ) : null}
 
         <div className="flex justify-end sm:w-[220px] sm:self-end">
-          <CompetitionCTA cta={p.cta} />
+          <CompetitionCTA cta={p.cta} glow={p.theme.glow} />
         </div>
       </div>
     </article>

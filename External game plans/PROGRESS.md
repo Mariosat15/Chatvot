@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng)** — Owner rejected vertical Image-1 cards; rebuilt to Image-2 horizontal mini-dashboards (`FIXCOMP`). Play-* artwork, Join CTA asset, cancelled ribbon, server pagination (pageSize 10), skeletons, debounce, prefetch. Join GM still lobby-only. Tests: `competition-presentation.test.ts` (10). **Never verified by eye.**
+- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng)** — Owner rejected vertical Image-1 cards; rebuilt to Image-2 horizontal mini-dashboards (`FIXCOMP`). Play-* artwork, Join CTA asset, cancelled ribbon, server pagination (pageSize 10), skeletons, debounce, prefetch. Join GM still lobby-only. Tests: `competition-presentation.test.ts` (10). **Never verified by eye.** *(Card anatomy rebuilt again 9 Oct to the strict Image-1 brief — see work log + `FIXCOMP` top block; tests now 11.)*
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -984,6 +984,8 @@ Newest at the top.
 **Shipped:** `public/assets/neon/competitions/cta/*` (Join, Reserve, Join GM, View Results, Already In, cancelled ribbon); `ArenaCompetitionCard` full-bleed faded art + left hero + all metrics in boxes; `CompetitionCTA` uses real assets (no tinted Join); browse attaches ProviderGame `bannerUrl`. Join GM still lobby-only. Difficulty soft-filters current page only.
 
 **Nothing was paid wrongly.** Tests: `competition-presentation.test.ts`. Never verified by eye.
+
+**Second pass, same day (strict brief):** card rebuilt to the exact anatomy in `FIXCOMP`'s top block — 28/72 grid by container query (600px wide, 720px CTA inline), boxed values that wrap with no ellipsis, 28px badges, per-game accent + game icon, ribbon/CTA PNGs without blend modes, softer settled glow. Deviation: arena grid two-up only at `2xl`. Also typed the browse aggregate as `PipelineStage[]` (tsc fix). Lint clean, 11/11 tests. **Never verified by eye.**
 
 ### 9 October 2026 - FIXCOMP Competition Arena rebuild (Image 2) — superseded same day
 
