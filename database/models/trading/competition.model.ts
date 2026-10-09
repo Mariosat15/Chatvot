@@ -210,7 +210,7 @@ export interface ICompetition extends Document {
   // Level Requirements
   levelRequirement: {
     enabled: boolean;
-    minLevel: number; // 1-10 (1=Novice, 10=Trading God)
+    minLevel: number; // rung on the configured level ladder (XPConfig), 1-100
     maxLevel?: number; // Optional max level (for beginner-only competitions)
   };
 
@@ -639,6 +639,9 @@ const CompetitionSchema = new Schema<ICompetition>(
         default: true,
       },
     },
+    // Reason: the ladder is operator-configured (XPConfig, R88) and ships with
+    // twenty rungs, so a cap of 10 refused every contest gated above rung 10
+    // with a validation error. 100 matches the Game Master defaults' bound.
     levelRequirement: {
       enabled: {
         type: Boolean,
@@ -648,13 +651,13 @@ const CompetitionSchema = new Schema<ICompetition>(
       minLevel: {
         type: Number,
         min: 1,
-        max: 10,
+        max: 100,
         default: 1,
       },
       maxLevel: {
         type: Number,
         min: 1,
-        max: 10,
+        max: 100,
       },
     },
     difficulty: {
