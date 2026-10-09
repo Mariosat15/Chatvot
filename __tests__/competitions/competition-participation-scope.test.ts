@@ -229,6 +229,13 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(service).toContain('status: { $ne: "refunded" }');
     expect(service).toContain("alreadyIn: joined.has(c._id.toString())");
     expect(card).toContain("COMPETITION_TYPE_RIBBON_ASSET.alreadyIn");
+    // Same corner mount and size as CompetitionTypeRibbon (not inside the cover).
+    expect(card).toContain(
+      "pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]",
+    );
+    expect(card.indexOf("COMPETITION_TYPE_RIBBON_ASSET.alreadyIn")).toBeLessThan(
+      card.indexOf("aspect-[16/11]"),
+    );
     expect(card).toContain('{c.alreadyIn ? "Already In" : "Join"}');
   });
 });

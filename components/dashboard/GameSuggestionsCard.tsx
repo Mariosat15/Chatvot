@@ -123,6 +123,23 @@ function SuggestionTile({
       aria-label={`Open ${c.name}`}
     >
       {/*
+        Reason: sit on the card (same as CompetitionTypeRibbon), not inside the
+        cover. The cover's overflow-hidden is a sharp rectangle, so a ribbon
+        mounted there had its folded ends cut off — the "edges show" look.
+        The card's rounded overflow clips the sash the way the arena does.
+      */}
+      {c.alreadyIn ? (
+        <Image
+          src={COMPETITION_TYPE_RIBBON_ASSET.alreadyIn}
+          alt="Already in"
+          width={112}
+          height={112}
+          unoptimized
+          className="pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]"
+          sizes="112px"
+        />
+      ) : null}
+      {/*
         1. Cover — the competition's own image, else its game's catalogue art
         (resolved server-side). Upcoming/Live pill top-left, entry fee top-right.
         Reason: the image must fill edge to edge (owner 3 Oct 2026, replacing the
@@ -155,16 +172,6 @@ function SuggestionTile({
           </span>
           {/* Reason: owner, 3 Oct 2026 - the entry-fee pill on the cover is removed. */}
         </div>
-        {c.alreadyIn ? (
-          <Image
-            src={COMPETITION_TYPE_RIBBON_ASSET.alreadyIn}
-            alt="Already in"
-            width={1024}
-            height={1024}
-            unoptimized
-            className="pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] sm:size-[104px]"
-          />
-        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
