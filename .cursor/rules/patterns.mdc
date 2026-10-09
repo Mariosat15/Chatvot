@@ -203,7 +203,9 @@ import type { ComprehensiveDashboardData } from "@/lib/actions/comprehensive-das
 - **Accent colors**: Purple (`#a855f7`) for XP, Amber (`#f59e0b`) for journey, Green for profit, Red for loss.
 - **Animations**: Define in `globals.css` as `@keyframes`, apply via Tailwind `animate-[]`.
 - **Fonts**: `var(--font-geist-mono)` for numbers/stats, `var(--font-geist-sans)` for text.
-- **Responsive**: Always mobile-first. Use `sm:`, `md:`, `lg:` breakpoints.
+- **Responsive**: Prefer mobile-first utilities (`sm:`, `md:`, `lg:`). When the
+  owner supplies a dedicated phone design-reference, use a separate `mobile/`
+  tree at `md` — see `player-mobile-ui.mdc`; do not only shrink the desktop layout.
 
 ---
 

@@ -22,6 +22,10 @@ description: React components, UI, hooks, and context rules for ChartVolt
 | `components/ui/` | Reusable primitives (Button, Dialog, Tabs, etc.) — Radix-based |
 | `components/trading/` | Trading-specific components (charts, order forms, positions) |
 | `components/dashboard/` | Dashboard cards and stats |
+| `components/dashboard/**/mobile/` | Dedicated phone trees for dashboard / wallet / performance |
+| `components/games/` | Player games catalogue, lobby, arena chrome |
+| `components/games/**/mobile/` | Dedicated phone trees for games surfaces |
+| `components/auth/mobile/` | Dedicated phone auth shells |
 | `components/leaderboard/` | Leaderboard displays |
 | `components/profile/` | User profile sections |
 | `components/landing/` | Public landing page sections |
@@ -30,6 +34,15 @@ description: React components, UI, hooks, and context rules for ChartVolt
 | `app/(root)/` | Authenticated page layouts |
 | `app/(auth)/` | Login/register page layouts |
 | `app/arena/` | Arena/broadcast page |
+
+## 📱 Responsive layout
+
+- Use Tailwind **mobile-first utilities** (`sm:`, `md:`, `lg:`) for ordinary
+  responsive tweaks inside one component.
+- When the owner supplies a **mobile design-reference** or a dedicated phone
+  rebuild, use a **separate `mobile/` tree** split at `md` — see
+  `.cursor/rules/player-mobile-ui.mdc`. Do not treat that brief as "add more
+  breakpoints to the desktop markup."
 
 ## 📐 Component Rules
 
@@ -89,3 +102,9 @@ description: React components, UI, hooks, and context rules for ChartVolt
 - **Price keys:** Normalize symbol keys (strip slashes: `"EUR/USD"` → `"EURUSD"`) when comparing with price data.
 - **Memory leaks:** Always clean up intervals, timeouts, event listeners, and ResizeObservers in `useEffect` return functions.
 - **Page Visibility API:** Pause polling/animations when the tab is hidden — resume when visible.
+- **Mobile as stacked desktop:** stacking or scaling the desktop grid for phones
+  after a design-reference brief — use a dedicated mobile tree instead
+  (`player-mobile-ui.mdc`).
+- **Forked titles/stats:** a mobile-only heading or metric strip that drifts from
+  desktop chrome — share `AnalyticsPageHeadline` / feature headers / stats
+  components instead.

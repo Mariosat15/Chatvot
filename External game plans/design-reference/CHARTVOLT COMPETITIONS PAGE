@@ -1,0 +1,30 @@
+# ChartVolt Competitions Page — Design Reference
+
+**Status:** BUILT (presentation layer) — desktop arena rebuild matching owner target imagery and Menuitems graphics.
+
+## Source
+
+Owner task brief (rebuild `/competitions` presentation only). Graphics from `design-reference/Menuitems/` copied to `public/assets/neon/competitions/`.
+
+## Built architecture
+
+| Piece | Path |
+|---|---|
+| Game definitions | `lib/competitions/game-definitions.ts` |
+| CTA engine | `lib/competitions/competition-cta.ts` |
+| Presentation mapper | `lib/competitions/build-competition-presentation.ts` |
+| Arena shell | `components/competitions/arena/CompetitionsArena.tsx` |
+| Page wiring | `app/(root)/competitions/page-content.tsx` |
+
+## Rules preserved
+
+- Backend join / lobby / Join GM unchanged — CTA links to lobby; `PrivateContestGate` still owns GM accept.
+- Poll, wallet refresh, stale-status transitions kept.
+- Filters persist in `localStorage` (`competition-filters`).
+- Game-agnostic cards via `gameDefinitions` + `buildCompetitionPresentation`.
+
+## Not in this slice
+
+- Mobile-specific competitions layout (uses same arena shell; responsive wrap).
+- New GM system (explicitly refused).
+- Hardcoded Trading-only metrics.
