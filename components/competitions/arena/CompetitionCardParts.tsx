@@ -197,18 +197,27 @@ export function CardContextDataBlocks({
         (order.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
     );
 
-  // Host and the countdown are two cells wide in both views (a GM name and a
-  // "1d 00:57:24" clock do not fit one cell).
-  // Reason: grid puts Funding beside Host (dense gap) and Starts In on the
-  // next row under Host at the same two-cell width; list keeps countdown
-  // first so Funding still sits beside the clock.
+  // Host is two cells (a GM name does not fit one). The countdown is two cells
+  // when a one-cell neighbour (Funding) can sit beside it; otherwise it spans
+  // the full row so the empty third cell / trailing gap is not left blank.
+  // Reason: grid densifies Funding into Host's gap, so the clock is alone on
+  // its row there and always expands; list keeps countdown first so Funding
+  // can still share that row.
+  const hasCountdownNeighbor = tags.some(
+    (tag) =>
+      tag.tone === "funded" ||
+      tag.tone === "skill" ||
+      tag.tone === "neutral",
+  );
+  const countdownSpan =
+    layout === "list" && hasCountdownNeighbor ? "col-span-2" : "col-span-full";
   const countdown =
     only !== "creator" && p.countdown ? (
       <CompetitionCountdownDataBlock
         kind={p.countdown.kind}
         target={p.countdown.target}
         accent={p.gameAccent}
-        className="col-span-2"
+        className={countdownSpan}
       />
     ) : null;
 

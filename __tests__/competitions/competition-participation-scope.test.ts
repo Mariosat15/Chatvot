@@ -132,9 +132,11 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     // Host spans two cells in both views; private access is a ribbon, not a box.
     expect(parts).toContain('tag.tone === "creator" ? "col-span-2"');
     expect(parts).toContain('tag.tone !== "private"');
-    // Grid: Funding then Starts In (beside Host / under Host). List: clock
-    // still leads so Funding sits beside it.
+    // Grid: Funding then Starts In; clock expands full-row when alone. List:
+    // clock leads, stays two cells when Funding can sit beside it.
     expect(parts).toContain('layout === "grid"');
+    expect(parts).toContain('layout === "list" && hasCountdownNeighbor');
+    expect(parts).toContain('col-span-full');
     expect(parts.indexOf("{tagBlocks}")).toBeGreaterThan(-1);
     expect(parts.indexOf("{countdown}")).toBeGreaterThan(-1);
     // CTA: grid and list share 68px height; no reason caption under fillCell.
