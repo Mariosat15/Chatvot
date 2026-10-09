@@ -389,6 +389,12 @@ export function buildCompetitionPresentation(
       competition.status === "upcoming"
         ? formatCountdown(competition.startTime, opts.now)
         : undefined,
+    countdown:
+      competition.status === "upcoming"
+        ? { kind: "starts", target: String(competition.startTime) }
+        : competition.status === "active"
+          ? { kind: "ends", target: String(competition.endTime) }
+          : undefined,
     showCancelledRibbon,
     cancelledRibbonLabel:
       status === "refunded" ? "CANCELLED / REFUNDED" : "CANCELLED",

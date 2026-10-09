@@ -7,44 +7,47 @@ import type {
 import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 import { CompetitionDataBlock } from "./CompetitionDataBlock";
 import { CompetitionCTA } from "./CompetitionCTA";
+import { CompetitionCountdown } from "./CompetitionCountdown";
 
 // Reason: Map lookup — object indexing trips security/detect-object-injection.
 const TAG_TONE = new Map<string, string>([
   ["neutral", "border-white/20 bg-white/10 text-slate-100"],
   ["game", "border-white/20 bg-white/10 text-slate-100"],
-  ["creator", "border-sky-300/35 bg-sky-500/15 text-sky-100"],
-  ["skill", "border-amber-400/30 bg-amber-500/10 text-amber-200"],
-  ["private", "border-fuchsia-400/35 bg-fuchsia-500/15 text-fuchsia-200"],
-  ["funded", "border-amber-400/40 bg-amber-500/15 text-amber-100"],
+  ["creator", "border-sky-300/40 bg-sky-500/15 text-sky-100"],
+  ["skill", "border-amber-400/40 bg-amber-500/15 text-amber-100"],
+  ["private", "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-100"],
+  ["funded", "border-amber-400/45 bg-amber-500/15 text-amber-100"],
 ]);
 
 /**
  * Reason: the blurred backdrop is ambience only — text sits on it, so it is
- * dimmed to near-solid behind the content column; any game's logo baked into its
+ * dimmed to near-solid behind the content; any game's logo baked into its
  * artwork otherwise shows through the copy and makes it unreadable.
  */
-const WIDE_SCRIM =
-  "linear-gradient(90deg, rgba(4,9,24,.55) 0%, rgba(4,9,24,.80) 26%, rgba(4,9,24,.92) 40%, rgba(4,9,24,.94) 100%)";
-const STACKED_SCRIM =
-  "linear-gradient(180deg, rgba(4,9,24,.55) 0%, rgba(4,9,24,.92) 40%, rgba(4,9,24,.94) 100%)";
-/** The hero's inner edge melts into the card instead of ending in a hard line. */
-const HERO_EDGE_MASK = "linear-gradient(90deg, #000 78%, transparent 100%)";
+const SCRIM =
+  "linear-gradient(90deg, rgba(4,9,24,.50) 0%, rgba(4,9,24,.82) 28%, rgba(4,9,24,.93) 42%, rgba(4,9,24,.94) 100%)";
+/** Soft edges so the hero melts into the card rather than ending in a hard box. */
+const HERO_MASK =
+  "radial-gradient(ellipse 72% 70% at 50% 50%, #000 62%, transparent 100%)";
 
 function hasValue(m: CompetitionMetric): boolean {
   return Boolean(m.value && m.value.trim() && m.value !== "-" && m.value !== "—");
 }
 
 /**
- * Competition Arena card — Image 1 anatomy.
+ * Competition Arena card — owner reference anatomy (design-reference target).
  *
- * One game artwork spans the whole card behind a fade (left ~28% clear, content
- * on the right 72%). Status badge top-left, game badge top-right, title + tags,
- * description, a row of four primary boxes, then three game-specific boxes with
- * the supplied CTA PNG bottom-right.
+ * Top: the game's artwork on the left, shown WHOLE (`object-contain`, so a
+ * title baked into any game's banner is never cropped) over the same artwork
+ * blurred and faded; on the right the title with the status badge, tags plus a
+ * ticking countdown, the description and four primary boxes. Bottom: a footer
+ * row across the FULL card width — three game-specific boxes and the supplied
+ * CTA PNG, vertically centred.
  *
- * Reason: the card is its own CSS container, so it switches between the wide
- * grid and the stacked phone layout by ITS width, not the viewport's — the
- * arena grid puts two cards per row only where each card is wide enough.
+ * Reason: the footer used to share the 72% content column with the CTA, which
+ * left ~45px of text per box and split values mid-word. Spanning the whole card
+ * (as the reference does) gives each box room for its label and value.
+ * The card is its own CSS container, so the layout follows ITS width.
  */
 export function ArenaCompetitionCard({
   presentation,
@@ -56,19 +59,20 @@ export function ArenaCompetitionCard({
     p.status === "completed" || p.status === "cancelled" || p.status === "refunded";
   const primary = p.primaryMetrics.filter(hasValue).slice(0, 4);
   const secondary = p.secondaryMetrics.filter(hasValue).slice(0, 3);
+  const accent = p.gameAccent;
 
   return (
     <article
-      className="@container relative overflow-hidden rounded-[18px] border"
+      className="@container relative overflow-hidden rounded-[20px] border-[1.5px]"
       style={{
-        borderColor: settled ? `${p.gameAccent}33` : `${p.gameAccent}66`,
+        borderColor: settled ? `${accent}80` : `${accent}d9`,
         boxShadow: settled
-          ? `0 0 10px ${p.gameAccent}1f`
-          : `0 0 22px ${p.theme.glow}, inset 0 0 0 1px ${p.gameAccent}14`,
+          ? `0 0 14px ${accent}33, inset 0 0 24px ${accent}12`
+          : `0 0 26px ${accent}66, 0 0 2px ${accent}, inset 0 0 32px ${accent}1f`,
         background: "#050b1c",
       }}
     >
-      {/* Backdrop: the same game artwork, blurred, faded and blended — not the hero */}
+      {/* Backdrop: the same game artwork, blurred, faded and blended */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <Image
           src={p.gameArtwork}
@@ -81,14 +85,7 @@ export function ArenaCompetitionCard({
           }`}
           sizes="(max-width: 1536px) 50vw, 25vw"
         />
-        <div
-          className="absolute inset-0 @[600px]:hidden"
-          style={{ background: STACKED_SCRIM }}
-        />
-        <div
-          className="absolute inset-0 hidden @[600px]:block"
-          style={{ background: WIDE_SCRIM }}
-        />
+        <div className="absolute inset-0" style={{ background: SCRIM }} />
       </div>
 
       {p.showCancelledRibbon ? (
@@ -111,102 +108,94 @@ export function ArenaCompetitionCard({
         <span className="sr-only">{p.cancelledRibbonLabel || "CANCELLED"}</span>
       ) : null}
 
-      <div className="relative z-10 grid grid-cols-1 @[600px]:grid-cols-[28%_72%]">
-        {/* Hero column — the game's artwork, crisp and centred in its own box */}
-        <div className="relative h-[170px] @[600px]:h-auto @[600px]:min-h-[260px]">
-          <div
-            className="absolute inset-0 overflow-hidden @[600px]:[mask-image:var(--hero-mask)]"
-            style={{ ["--hero-mask" as string]: HERO_EDGE_MASK }}
-          >
-            <Image
-              src={p.gameArtwork}
-              alt={p.gameName}
-              fill
-              loading="lazy"
-              decoding="async"
-              className={`object-cover ${settled ? "saturate-[.7]" : ""}`}
-              style={{ objectPosition: p.artworkObjectPosition }}
-              sizes="(max-width: 600px) 100vw, 260px"
-            />
+      <div className="relative z-10 flex flex-col gap-3 p-3.5 @[600px]:gap-3.5 @[600px]:p-4">
+        <div className="grid grid-cols-1 gap-3 @[600px]:grid-cols-[30%_minmax(0,1fr)] @[600px]:gap-4">
+          {/* Hero — whole game artwork, centred */}
+          <div className="relative aspect-video w-full @[600px]:aspect-auto @[600px]:h-full @[600px]:min-h-[190px]">
+            <div
+              className="absolute inset-0 [mask-image:var(--hero-mask)]"
+              style={{ ["--hero-mask" as string]: HERO_MASK }}
+            >
+              <Image
+                src={p.gameArtwork}
+                alt={p.gameName}
+                fill
+                loading="lazy"
+                decoding="async"
+                className={`object-contain object-center ${settled ? "saturate-[.7]" : ""}`}
+                sizes="(max-width: 600px) 100vw, 320px"
+              />
+            </div>
           </div>
-          <div className="relative p-3">
-            <CompetitionStatusBadge
-              status={p.status}
-              label={p.statusLabel}
-              countdown={p.countdownLabel}
-            />
+
+          {/* Content */}
+          <div className="flex min-w-0 flex-col gap-2.5">
+            <div
+              className={`flex items-start justify-between gap-3 ${
+                p.showCancelledRibbon ? "pr-[84px]" : ""
+              }`}
+            >
+              <h3
+                className="line-clamp-2 min-w-0 text-[18px] font-black leading-tight text-white @[600px]:text-[21px]"
+                style={{ textShadow: "0 1px 8px rgba(0,0,0,.6)" }}
+              >
+                {p.title}
+              </h3>
+              <div className="shrink-0">
+                <CompetitionStatusBadge status={p.status} label={p.statusLabel} size="lg" />
+              </div>
+            </div>
+
+            {p.tags.length > 0 || p.countdown ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {p.tags.map((tag) => (
+                  <span
+                    key={`${tag.tone}-${tag.label}`}
+                    className={`inline-flex h-[24px] items-center gap-1 rounded-full border px-2.5 text-[11px] font-bold leading-none ${
+                      TAG_TONE.get(tag.tone) ?? TAG_TONE.get("neutral")
+                    }`}
+                  >
+                    {tag.tone === "game" ? (
+                      <Image
+                        src={p.gameIcon}
+                        alt=""
+                        width={14}
+                        height={14}
+                        className="size-3.5 object-contain"
+                      />
+                    ) : null}
+                    {tag.label}
+                  </span>
+                ))}
+                {p.countdown ? (
+                  <CompetitionCountdown kind={p.countdown.kind} target={p.countdown.target} />
+                ) : null}
+              </div>
+            ) : null}
+
+            {p.description ? (
+              <p className="line-clamp-2 text-[12.5px] leading-snug text-slate-200/90 @[600px]:text-[13.5px]">
+                {p.description}
+              </p>
+            ) : null}
+
+            {primary.length > 0 ? (
+              <div className="mt-auto grid grid-cols-2 gap-2 @[600px]:grid-cols-[repeat(4,minmax(0,1fr))]">
+                {primary.map((m) => (
+                  <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 
-        {/* Content column */}
-        <div className="flex min-w-0 flex-col gap-2.5 p-3.5 @[600px]:py-4 @[600px]:pl-2 @[600px]:pr-4">
-          <div
-            className={`flex items-start justify-between gap-3 ${
-              p.showCancelledRibbon ? "pr-[78px]" : ""
-            }`}
-          >
-            <div className="min-w-0">
-              <h3 className="line-clamp-2 text-[17px] font-black leading-tight text-white @[600px]:text-[19px]">
-                {p.title}
-              </h3>
-              {p.tags.length > 0 ? (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {p.tags.map((tag) => (
-                    <span
-                      key={`${tag.tone}-${tag.label}`}
-                      className={`inline-flex h-[22px] items-center rounded-full border px-2 text-[10px] font-bold leading-none ${
-                        TAG_TONE.get(tag.tone) ?? TAG_TONE.get("neutral")
-                      }`}
-                    >
-                      {tag.label}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            <span
-              className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-extrabold uppercase leading-none tracking-wide sm:text-[11px]"
-              style={{
-                borderColor: `${p.gameAccent}66`,
-                color: p.gameAccent,
-                background: `${p.gameAccent}1a`,
-                boxShadow: settled ? undefined : `0 0 10px ${p.theme.glow}`,
-              }}
-            >
-              <Image
-                src={p.gameIcon}
-                alt=""
-                width={16}
-                height={16}
-                className="size-4 object-contain"
-              />
-              {p.gameName}
-            </span>
-          </div>
-
-          {p.description ? (
-            <p className="line-clamp-2 text-[12px] leading-snug text-slate-200/90 @[600px]:text-[13px]">
-              {p.description}
-            </p>
-          ) : null}
-
-          {primary.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2 @[600px]:grid-cols-[repeat(4,minmax(0,1fr))]">
-              {primary.map((m) => (
-                <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
-              ))}
-            </div>
-          ) : null}
-
-              {/* Reason: the CTA joins the box row only once three boxes plus a ≥170px
-              CTA fit (card ≥720px); narrower, it drops beneath so no value is squeezed. */}
-          <div className="mt-auto grid grid-cols-2 items-center gap-2 @[420px]:grid-cols-3 @[720px]:grid-cols-[repeat(3,minmax(0,1fr))_minmax(170px,1.15fr)]">
-            {secondary.map((m) => (
-              <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
-            ))}
-            <div className="col-span-full mt-1 flex justify-center @[600px]:justify-end @[720px]:col-span-1 @[720px]:col-start-4 @[720px]:mt-0">
-              <CompetitionCTA cta={p.cta} glow={settled ? undefined : p.theme.glow} />
-            </div>
+        {/* Footer — full card width: game-specific boxes + CTA, vertically centred */}
+        <div className="grid grid-cols-2 items-stretch gap-2 @[460px]:grid-cols-3 @[600px]:grid-cols-[repeat(3,minmax(0,1fr))_minmax(190px,1.25fr)]">
+          {secondary.map((m) => (
+            <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
+          ))}
+          <div className="col-span-full flex items-center justify-center @[600px]:col-span-1 @[600px]:col-start-4">
+            <CompetitionCTA cta={p.cta} glow={settled ? undefined : p.theme.glow} />
           </div>
         </div>
       </div>

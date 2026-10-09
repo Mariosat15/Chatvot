@@ -1,3 +1,15 @@
+# BUILT 9 Oct 2026 (eng, fifth pass) — status top-right, live countdown, full-width footer, whole artwork, glow
+
+Supersedes the fourth pass's hero and footer layout (correct as history only).
+
+- **Status badge replaces the game-name pill on the right**, using the new `size="lg"` variant of `CompetitionStatusBadge`: 36px tall, 22px icon, 11–12px text. The game's identity is still on the card, through the game tag, which now carries the game icon.
+- **Live countdown beside the tags**: the new `CompetitionCountdown.tsx` ("use client") ticks every second toward `presentation.countdown`. That field is built in `build-competition-presentation.ts`: an upcoming competition counts to its start, a live one to its end. The clock renders nothing once its target has passed. The first render shows `--:--:--`, so the server and browser agree (no hydration mismatch). `countdownLabel` is kept because the list row reads it.
+- **Footer spans the whole card**: three game-specific boxes plus the CTA, with the CTA vertically centred. The card has more padding and a larger title. Previously the footer shared the 72% content column, which is what squeezed the values.
+- **Artwork is shown whole** (`object-contain`, centred), so a title baked into a game's banner (e.g. trading) is no longer cropped. The blurred copy behind it is unchanged. This is game-agnostic.
+- **Glow**: the card border is the game accent at about 85% with an outer and inset glow (dimmer once settled). Info boxes have accent-tinted borders and an inner glow; the prize box glows gold.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, fourth pass) — readable text, centred hero, info boxes to images 3/4
 
 - **Text was unreadable** because the crisp artwork filled the whole card and the game's logo showed through the title and description. The backdrop is now the **same artwork blurred, faded and blended** (`blur-2xl`, 60% opacity, darkened to ~92% behind the content column); description/tags/labels brightened.

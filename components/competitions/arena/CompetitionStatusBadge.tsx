@@ -39,25 +39,38 @@ const ICONS = new Map<CompetitionStatusKey, string>([
 const PILL =
   "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-extrabold uppercase leading-none tracking-wide backdrop-blur-sm sm:text-[11px]";
 
+const PILL_LG =
+  "inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[11px] font-black uppercase leading-none tracking-wide backdrop-blur-sm sm:text-[12px]";
+
 export function CompetitionStatusBadge({
   status,
   label,
   countdown,
+  size = "md",
 }: {
   status: CompetitionStatusKey;
   label: string;
   countdown?: string;
+  /** `lg` is the card's top-right badge (replaces the game-name pill) */
+  size?: "md" | "lg";
 }) {
   const style =
     STYLES.get(status) ?? "border-slate-400/40 bg-slate-600/40 text-slate-100";
   const icon = ICONS.get(status);
+  const lg = size === "lg";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className={`${PILL} ${style}`}>
+      <span className={`${lg ? PILL_LG : PILL} ${style}`}>
         {icon ? (
-          <Image src={icon} alt="" width={14} height={14} className="size-3.5 object-contain" />
+          <Image
+            src={icon}
+            alt=""
+            width={lg ? 22 : 14}
+            height={lg ? 22 : 14}
+            className={`${lg ? "size-[22px]" : "size-3.5"} object-contain`}
+          />
         ) : (
-          <span className="size-1.5 rounded-full bg-current" aria-hidden />
+          <span className={`${lg ? "size-2" : "size-1.5"} rounded-full bg-current`} aria-hidden />
         )}
         {label}
       </span>
