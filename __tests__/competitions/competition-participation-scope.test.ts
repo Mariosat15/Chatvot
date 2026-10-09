@@ -148,7 +148,7 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(list).toContain('aspect-[3/1] h-[56px] max-w-full');
     expect(parts).toContain('funded: { label: "Funding", icon: COMPETITION_ICON.gm }');
     expect(list).not.toContain("col-span-full flex h-[56px]");
-    expect(card).toContain("col-span-full flex h-[56px] items-stretch justify-center");
+    expect(card).toContain("col-span-full flex h-[68px] items-stretch justify-center");
     expect(card).toContain("<PrivateRibbon");
     expect(list).toContain("<PrivateRibbon");
     expect(parts).toContain("COMPETITION_TYPE_RIBBON_ASSET.private");
@@ -178,7 +178,7 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(other).toBeGreaterThan(creator);
     expect(cardCta).toBeGreaterThan(other);
     expect(card.slice(other, cardCta)).toContain(
-      "col-span-full flex h-[56px] items-stretch justify-center",
+      "col-span-full flex h-[68px] items-stretch justify-center",
     );
 
     // CTA must live inside the metric grid so it aligns with the boxes.
