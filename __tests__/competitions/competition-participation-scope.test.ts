@@ -99,6 +99,14 @@ describe("scopeCompetitionStatusesToParticipant", () => {
       "components/competitions/arena/ArenaCompetitionListRow.tsx",
       "utf8",
     );
+    const infoBlock = readFileSync(
+      "components/competitions/arena/CompetitionInfoDataBlock.tsx",
+      "utf8",
+    );
+    const countdown = readFileSync(
+      "components/competitions/arena/CompetitionCountdown.tsx",
+      "utf8",
+    );
     const header = parts.slice(
       parts.indexOf("export function CardBadgesRow"),
       parts.indexOf("export function CardContextDataBlocks"),
@@ -106,11 +114,18 @@ describe("scopeCompetitionStatusesToParticipant", () => {
 
     expect(header).not.toContain("p.tags.map");
     expect(header).not.toContain("CompetitionCountdown");
-    expect(parts).toContain("<CompetitionDataShell");
+    expect(parts).toContain("<CompetitionInfoDataBlock");
     expect(parts).toContain("<CompetitionCountdownDataBlock");
     expect(card).toContain("<CardContextDataBlocks");
     expect(list).toContain("<CardContextDataBlocks");
     expect(card).toContain('className="w-full max-w-[220px]"');
     expect(card).not.toContain("max-w-none");
+    expect(infoBlock).toContain("<PopoverTrigger asChild>");
+    expect(infoBlock).toContain("onPointerEnter={showForMouse}");
+    expect(infoBlock).toContain("onPointerLeave={hideForMouse}");
+    expect(infoBlock).toContain('event.pointerType === "mouse"');
+    expect(infoBlock).toContain("onOpenChange={setOpen}");
+    expect(infoBlock).toContain("onOpenAutoFocus={(event) => event.preventDefault()}");
+    expect(countdown).toContain("<CompetitionInfoDataBlock");
   });
 });

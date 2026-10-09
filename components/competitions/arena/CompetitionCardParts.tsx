@@ -7,7 +7,7 @@ import type {
   CompetitionPresentation,
 } from "@/lib/competitions/types";
 import { CompetitionCountdownDataBlock } from "./CompetitionCountdown";
-import { CompetitionDataShell } from "./CompetitionDataBlock";
+import { CompetitionInfoDataBlock } from "./CompetitionInfoDataBlock";
 import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 
 /**
@@ -113,6 +113,30 @@ export function CardBadgesRow({ presentation: p }: { presentation: CompetitionPr
   );
 }
 
+function contextExplanation(
+  p: CompetitionPresentation,
+  tone: string,
+  value: string,
+): string {
+  switch (tone) {
+    case "creator":
+      return p.creatorType === "gm"
+        ? `${value} is the Game Master hosting and managing this competition.`
+        : "This competition is hosted and managed by the ChartVolt team.";
+    case "funded":
+      return (
+        p.gmFundedNote ??
+        "The Game Master pays the entry cost for every player in this competition."
+      );
+    case "private":
+      return "This is a private competition. Only players allowed by its host can enter.";
+    case "skill":
+      return `${value} is the minimum account level required to enter this competition.`;
+    default:
+      return `${value} is an additional condition for this competition.`;
+  }
+}
+
 /** Context and timing are data, so they use the same boxes as every other card metric. */
 export function CardContextDataBlocks({
   presentation: p,
@@ -126,11 +150,12 @@ export function CardContextDataBlocks({
         const context =
           CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
         return (
-          <CompetitionDataShell
+          <CompetitionInfoDataBlock
             key={`${tag.tone}-${tag.label}`}
             icon={context.icon}
             label={context.label}
             value={tag.label}
+            explanation={contextExplanation(p, tag.tone, tag.label)}
             accent={p.gameAccent}
           />
         );

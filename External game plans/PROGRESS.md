@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, twelfth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement and the live countdown now use the same shared data-box shell beside prize, players and game-defined facts. The repeated game badge is gone and the CTA is capped at 220px. A cancelled competition uses only the uploaded 96–112px ribbon as its cancelled marker; no duplicate cancelled badge. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
+- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, thirteenth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement and the live countdown use the same shared data-box shell beside prize, players and game-defined facts. Those contextual boxes now explain themselves on mouse hover and on touch/keyboard press. The repeated game badge is gone and the CTA is capped at 220px. A cancelled competition uses only the uploaded 96–112px ribbon as its cancelled marker; no duplicate cancelled badge. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -976,6 +976,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 9 October 2026 - Competition context boxes explain themselves on hover and touch
+
+**Owner request:** explain contextual items such as GM Funded and Private when a player hovers on desktop or presses on mobile.
+
+**Built:** `CompetitionInfoDataBlock` wraps the same visual data shell in an accessible popover trigger. The whole box opens on mouse hover; click, touch or keyboard activation pins it until outside press or Escape. Pointer-enter behavior is restricted to a real mouse so one mobile tap cannot open and immediately close the controlled popover. Host, funding, access, level requirement and Starts in / Ends in each carry a specific explanation. Both card layouts receive the behavior from the same context component.
+
+Focused tests pass **19/19** and scoped ESLint is clean. **Never verified by eye.**
 
 ### 9 October 2026 - Competition-card header cleared; context and clock moved beside the data
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
-import { CompetitionDataShell } from "./CompetitionDataBlock";
+import { CompetitionInfoDataBlock } from "./CompetitionInfoDataBlock";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -52,13 +52,18 @@ export function CompetitionCountdownDataBlock({
 
   const starts = kind === "starts";
   return (
-    <CompetitionDataShell
+    <CompetitionInfoDataBlock
       icon={COMPETITION_ICON.clock}
       label={starts ? "Starts in" : "Ends in"}
       value={
         <span className="font-mono tabular-nums">
           {ms === null ? "--:--:--" : formatRemaining(ms)}
         </span>
+      }
+      explanation={
+        starts
+          ? "Time remaining until this competition starts."
+          : "Time remaining until this competition ends."
       }
       accent={starts ? "#ffb020" : accent}
     />
