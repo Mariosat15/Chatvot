@@ -1,3 +1,12 @@
+# BUILT 9 Oct 2026 (eng, eighteenth pass) — card grid survives any number of boxes
+
+- **Supersedes the seventeenth pass's grid-card CTA position.** The box count differs per game, so there is no fixed "button cell". Grid order is now: game metrics → **Host (two cells)** → **Starts in / Ends in (two cells)** with **Funding** beside it → other context → the **CTA on its own full-width row, always centred**. `grid-flow-row-dense` lets one-cell boxes fill any gap.
+- **Private access is a top-left PRIVATE ribbon** (`ribbon-private-r1.png`, owner-supplied, transparent) on both the grid card and the list row; the Access box is gone. The right corner keeps GAME / TRADING / cancelled.
+- Host is two cells in the list view too (unchanged there); the list keeps its own order otherwise.
+- Focused verification: competition tests **23/23**, scoped ESLint clean.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, seventeenth pass) — competition ribbons and exact grid-cell CTA placement
 
 - Every open competition now carries the supplied corner identity ribbon: green **TRADING** for Trading and gold **GAME** for every game competition. A cancelled/refunded ribbon takes precedence, so one card never displays two corner ribbons.

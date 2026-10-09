@@ -8,6 +8,7 @@ import {
   CardContextDataBlocks,
   CardHero,
   CompetitionTypeRibbon,
+  PrivateRibbon,
   cardFrameStyle,
   hasMetricValue,
   isSettled,
@@ -43,6 +44,7 @@ export function ArenaCompetitionListRow({
       <CardBackdrop presentation={p} />
       <CancelledRibbon presentation={p} />
       <CompetitionTypeRibbon presentation={p} />
+      <PrivateRibbon presentation={p} />
 
       <div className="relative z-10 grid grid-cols-1 gap-3 p-3 @[760px]:grid-cols-[220px_minmax(0,1fr)] @[760px]:p-3.5">
         <CardHero

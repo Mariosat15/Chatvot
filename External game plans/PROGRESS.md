@@ -978,6 +978,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 9 October 2026 - Card grid that survives any number of boxes, and the PRIVATE ribbon
+
+**Owner correction:** with more boxes (Circuit Sprint GM card) Host and Starts In were squeezed into one cell, Private took a box, and the button landed off-centre. **Built:** Host and the countdown each span two cells, Funding sits beside the countdown, the grid packs densely, and the CTA has its own full-width centred row. Private access is now a top-left PRIVATE corner ribbon on grid and list, with the Access box removed. This supersedes the entry below on where the grid-card CTA sits. Tests **23/23**. **Never verified by eye.**
+
 ### 9 October 2026 - Competition type ribbons and final Host/CTA placement
 
 **Owner correction:** open competition cards needed the supplied TRADING/GAME corner identity, the list CTA needed the exact footprint of its neighbouring box, and the grid card needed Host and CTA swapped.

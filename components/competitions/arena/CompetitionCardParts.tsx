@@ -182,8 +182,10 @@ export function CardContextDataBlocks({
   only?: "all" | "creator" | "other";
 }) {
   const order = layout === "grid" ? GRID_CONTEXT_ORDER : LIST_CONTEXT_ORDER;
+  // Reason: private access is shown by the top-left PrivateRibbon, so a box
+  // repeating it would spend a whole grid cell on a fact already on the card.
   const tags = p.tags
-    .filter((tag) => tag.tone !== "game")
+    .filter((tag) => tag.tone !== "game" && tag.tone !== "private")
     .filter((tag) => {
       if (only === "creator") return tag.tone === "creator";
       if (only === "other") return tag.tone !== "creator";
@@ -195,8 +197,22 @@ export function CardContextDataBlocks({
         (order.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
     );
 
+  // Grid: Host and the countdown are two cells wide (a GM name and a "1d
+  // 00:57:24" clock do not fit one cell), and the countdown leads so Funding
+  // sits beside it.
+  const countdown =
+    only !== "creator" && p.countdown ? (
+      <CompetitionCountdownDataBlock
+        kind={p.countdown.kind}
+        target={p.countdown.target}
+        accent={p.gameAccent}
+        className={layout === "grid" ? "col-span-2" : undefined}
+      />
+    ) : null;
+
   return (
     <>
+      {layout === "grid" ? countdown : null}
       {tags.map((tag) => {
         const context =
           CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
@@ -208,22 +224,36 @@ export function CardContextDataBlocks({
             value={tag.label}
             explanation={contextExplanation(p, tag.tone, tag.label)}
             accent={p.gameAccent}
-            className={
-              tag.tone === "creator" && layout === "list"
-                ? "col-span-2"
-                : undefined
-            }
+            className={tag.tone === "creator" ? "col-span-2" : undefined}
           />
         );
       })}
-      {only !== "creator" && p.countdown ? (
-        <CompetitionCountdownDataBlock
-          kind={p.countdown.kind}
-          target={p.countdown.target}
-          accent={p.gameAccent}
-        />
-      ) : null}
+      {layout === "list" ? countdown : null}
     </>
+  );
+}
+
+/** True when the presentation carries a private-access tag. */
+export function isPrivateCompetition(p: CompetitionPresentation): boolean {
+  return p.tags.some((tag) => tag.tone === "private");
+}
+
+/** Top-left PRIVATE ribbon; the right corner keeps the GAME / TRADING / cancelled ribbon. */
+export function PrivateRibbon({
+  presentation: p,
+}: {
+  presentation: CompetitionPresentation;
+}) {
+  if (!isPrivateCompetition(p)) return null;
+  return (
+    <Image
+      src={COMPETITION_TYPE_RIBBON_ASSET.private}
+      alt="Private competition: only players allowed by the host can enter"
+      width={112}
+      height={112}
+      className="pointer-events-none absolute -left-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]"
+      sizes="112px"
+    />
   );
 }
 

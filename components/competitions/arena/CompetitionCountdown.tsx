@@ -29,10 +29,12 @@ export function CompetitionCountdownDataBlock({
   kind,
   target,
   accent,
+  className,
 }: {
   kind: "starts" | "ends";
   target: string;
   accent: string;
+  className?: string;
 }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -66,6 +68,7 @@ export function CompetitionCountdownDataBlock({
           : "Time remaining until this competition ends."
       }
       accent={starts ? "#ffb020" : accent}
+      className={className}
     />
   );
 }

@@ -8,6 +8,7 @@ import {
   CardContextDataBlocks,
   CardHero,
   CompetitionTypeRibbon,
+  PrivateRibbon,
   cardFrameStyle,
   hasMetricValue,
   isSettled,
@@ -40,6 +41,7 @@ export function ArenaCompetitionCard({
       <CardBackdrop presentation={p} />
       <CancelledRibbon presentation={p} />
       <CompetitionTypeRibbon presentation={p} />
+      <PrivateRibbon presentation={p} />
 
       <div className="relative z-10 grid h-full grid-cols-1 gap-3 p-3 @[560px]:grid-cols-[35%_minmax(0,1fr)] @[560px]:p-3.5">
         <CardHero
@@ -66,10 +68,12 @@ export function ArenaCompetitionCard({
           ) : null}
 
           {/*
-            Reason: the CTA is a cell in the same metric grid so it stays aligned
-            with prize/players/mode instead of floating alone under the boxes.
+            Reason: the number of boxes differs per game, so no fixed cell is
+            "the button's place". Host and the countdown span two cells, `dense`
+            lets one-cell boxes (Funding) fill any gap beside them, and the CTA
+            takes its own full-width row so it is always centred under the grid.
           */}
-          <div className="mt-auto grid auto-rows-fr grid-cols-2 gap-2 @[420px]:grid-cols-3">
+          <div className="mt-auto grid grid-flow-row-dense auto-rows-fr grid-cols-2 gap-2 @[420px]:grid-cols-3">
             {metrics.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
             ))}
@@ -78,19 +82,21 @@ export function ArenaCompetitionCard({
               layout="grid"
               only="creator"
             />
-            <div className="col-span-2 flex h-full min-h-[56px] items-stretch justify-stretch">
-              <CompetitionCTA
-                cta={p.cta}
-                glow={settled ? undefined : p.theme.glow}
-                fillCell
-                className="h-full w-full"
-              />
-            </div>
             <CardContextDataBlocks
               presentation={p}
               layout="grid"
               only="other"
             />
+            <div className="col-span-full flex h-full min-h-[56px] items-stretch justify-center">
+              <div className="aspect-[3/1] h-full min-h-[56px] max-w-full">
+                <CompetitionCTA
+                  cta={p.cta}
+                  glow={settled ? undefined : p.theme.glow}
+                  fillCell
+                  className="h-full w-full"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

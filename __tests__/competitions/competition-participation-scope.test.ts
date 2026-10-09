@@ -129,7 +129,17 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(card).toContain("only=\"creator\"");
     expect(card).toContain("only=\"other\"");
     expect(list).toContain('<CardContextDataBlocks presentation={p} layout="list"');
-    expect(parts).toContain('tag.tone === "creator" && layout === "list"');
+    // Host spans two cells in both views; private access is a ribbon, not a box.
+    expect(parts).toContain('tag.tone === "creator" ? "col-span-2"');
+    expect(parts).toContain('tag.tone !== "private"');
+    expect(parts).toContain('className={layout === "grid" ? "col-span-2" : undefined}');
+    expect(parts.indexOf('{layout === "grid" ? countdown : null}')).toBeLessThan(
+      parts.indexOf("{tags.map((tag)"),
+    );
+    expect(card).toContain("<PrivateRibbon");
+    expect(list).toContain("<PrivateRibbon");
+    expect(parts).toContain("COMPETITION_TYPE_RIBBON_ASSET.private");
+    expect(parts).toContain("absolute -left-1 -top-1");
     expect(parts.indexOf('["private", 1]')).toBeLessThan(
       parts.indexOf('["creator", 4]'),
     );
@@ -144,17 +154,18 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(list).toContain("fillCell");
     expect(card).toContain('className="h-full w-full"');
     expect(list).toContain('className="h-full w-full"');
-    // Grid order is metrics → one-cell Host → two-cell CTA → other context.
-    const cardGridStart = card.indexOf('mt-auto grid auto-rows-fr');
+    // Grid order: metrics → two-cell Host → two-cell countdown + Funding →
+    // CTA on its own full-width, centred row (box count varies per game).
+    const cardGridStart = card.indexOf("mt-auto grid grid-flow-row-dense");
     const creator = card.indexOf('only="creator"', cardGridStart);
-    const cardCta = card.indexOf("<CompetitionCTA", cardGridStart);
     const other = card.indexOf('only="other"', cardGridStart);
+    const cardCta = card.indexOf("<CompetitionCTA", cardGridStart);
+    expect(cardGridStart).toBeGreaterThan(-1);
     expect(creator).toBeGreaterThan(cardGridStart);
-    expect(cardCta).toBeGreaterThan(creator);
-    expect(other).toBeGreaterThan(cardCta);
-    expect(card.slice(creator, other)).toContain("col-span-2");
-    expect(parts).toContain(
-      'tag.tone === "creator" && layout === "list"',
+    expect(other).toBeGreaterThan(creator);
+    expect(cardCta).toBeGreaterThan(other);
+    expect(card.slice(other, cardCta)).toContain(
+      "col-span-full flex h-full min-h-[56px] items-stretch justify-center",
     );
 
     // CTA must live inside the metric grid so it aligns with the boxes.
@@ -163,7 +174,9 @@ describe("scopeCompetitionStatusesToParticipant", () => {
       list.indexOf("<CardContextDataBlocks"),
     );
     expect(listMetricsGrid).toContain("<CompetitionCTA");
-    expect(card.slice(cardGridStart, other)).toContain("<CompetitionCTA");
+    expect(card.slice(cardGridStart, card.indexOf("</article>"))).toContain(
+      "<CompetitionCTA",
+    );
     expect(list).not.toContain("@[1100px]:grid-cols-[230px_minmax(0,1fr)_220px]");
     expect(list).not.toContain("flex items-end justify-center");
     expect(card).toContain("<CompetitionTypeRibbon");
