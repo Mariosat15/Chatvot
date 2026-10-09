@@ -7,6 +7,7 @@ import type {
   CompetitionPresentation,
 } from "@/lib/competitions/types";
 import { CompetitionCountdown } from "./CompetitionCountdown";
+import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 
 /**
  * Pieces shared by the grid card and the list row, so the two views cannot
@@ -140,6 +141,7 @@ export function CardTagsRow({ presentation: p }: { presentation: CompetitionPres
       {p.tags.map((tag) => (
         <span
           key={`${tag.tone}-${tag.label}`}
+          title={tag.tone === "funded" ? p.gmFundedNote : undefined}
           className={`inline-flex h-[24px] items-center gap-1 rounded-full border px-2.5 text-[11px] font-bold leading-none ${
             TAG_TONE.get(tag.tone) ?? TAG_TONE.get("neutral")
           }`}
@@ -172,19 +174,35 @@ export function CardTagsRow({ presentation: p }: { presentation: CompetitionPres
   );
 }
 
-/** One line telling the player a GM-funded contest costs them nothing. */
-export function GmFundedNote({ presentation: p }: { presentation: CompetitionPresentation }) {
-  if (!p.gmFunded || !p.gmFundedNote) return null;
+/** Owner reference: a small boxed game name with its icon, top-right of the content. */
+export function GamePill({ presentation: p }: { presentation: CompetitionPresentation }) {
   return (
-    <p className="flex items-center gap-1.5 rounded-lg border border-amber-300/40 bg-amber-400/10 px-2.5 py-1.5 text-[12px] font-semibold leading-snug text-amber-100">
-      <Image
-        src={COMPETITION_ICON.volts}
-        alt=""
-        width={16}
-        height={16}
-        className="size-4 shrink-0 object-contain"
-      />
-      {p.gmFundedNote}
-    </p>
+    <span
+      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border bg-black/45 px-2.5 text-[12px] font-bold leading-none text-white"
+      style={{ borderColor: `${p.gameAccent}80`, boxShadow: `0 0 10px ${p.gameAccent}33` }}
+    >
+      <Image src={p.gameIcon} alt="" width={16} height={16} className="size-4 object-contain" />
+      {p.gameName}
+    </span>
+  );
+}
+
+/** The game artwork with the status pill sitting on its top-left corner. */
+export function CardHeroWithStatus({
+  presentation: p,
+  className,
+  sizes,
+}: {
+  presentation: CompetitionPresentation;
+  className: string;
+  sizes: string;
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      <CardHero presentation={p} className="absolute inset-0" sizes={sizes} />
+      <div className="absolute left-1.5 top-1.5 z-10">
+        <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
+      </div>
+    </div>
   );
 }

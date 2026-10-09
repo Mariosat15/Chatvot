@@ -1,13 +1,12 @@
 import type { CompetitionPresentation } from "@/lib/competitions/types";
-import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 import { CompetitionDataBlock } from "./CompetitionDataBlock";
 import { CompetitionCTA } from "./CompetitionCTA";
 import {
   CancelledRibbon,
   CardBackdrop,
-  CardHero,
+  CardHeroWithStatus,
   CardTagsRow,
-  GmFundedNote,
+  GamePill,
   cardFrameStyle,
   hasMetricValue,
   isSettled,
@@ -16,17 +15,16 @@ import {
 /**
  * Competition Arena card — owner reference anatomy (design-reference target).
  *
- * Top: the game's artwork on the left, shown WHOLE (`object-contain`, so a
- * title baked into any game's banner is never cropped) over the same artwork
- * blurred and faded; on the right the title with the status badge, tags plus a
- * ticking countdown, the GM Funded note, the description and four primary
- * boxes. Below: the game-specific boxes across the full card width, then the
- * supplied CTA PNG centred.
+ * Top: the game's artwork on the left, shown WHOLE (`object-contain`) with the
+ * status pill on its corner; on the right the title with the boxed game name,
+ * tags plus a ticking countdown, a two-line description and four primary boxes.
+ * Footer: the game-specific boxes and the supplied CTA PNG as the fourth column,
+ * so the button is the same height as the boxes beside it.
  *
- * Reason: the footer used to share the 72% content column with the CTA, which
- * left ~45px of text per box and split values mid-word. Spanning the whole card
- * (as the reference does) gives each box room for its label and value.
- * The card is its own CSS container, so the layout follows ITS width.
+ * Reason: the owner rejected a centred CTA in its own row ("too much space, very
+ * big button, no structure"). The reference puts it in the footer grid. GM Funded
+ * shows as the gold tag (with the funding sentence as its tooltip) and as the
+ * FREE / GM pays entry box, rather than as a full-width banner.
  */
 export function ArenaCompetitionCard({
   presentation,
@@ -41,49 +39,46 @@ export function ArenaCompetitionCard({
 
   return (
     <article
-      className="@container relative overflow-hidden rounded-[20px] border-[1.5px]"
+      className="@container relative overflow-hidden rounded-[18px] border-[1.5px]"
       style={cardFrameStyle(p)}
     >
       <CardBackdrop presentation={p} />
       <CancelledRibbon presentation={p} />
 
-      <div className="relative z-10 flex flex-col gap-4 p-4 @[600px]:gap-5 @[600px]:p-5">
-        <div className="grid grid-cols-1 gap-4 @[600px]:grid-cols-[30%_minmax(0,1fr)] @[600px]:gap-5">
-          <CardHero
+      <div className="relative z-10 flex flex-col gap-2.5 p-3 @[560px]:p-3.5">
+        <div className="grid grid-cols-1 gap-3 @[560px]:grid-cols-[32%_minmax(0,1fr)]">
+          <CardHeroWithStatus
             presentation={p}
-            className="aspect-video w-full @[600px]:aspect-auto @[600px]:h-full @[600px]:min-h-[230px]"
-            sizes="(max-width: 600px) 100vw, 320px"
+            className="aspect-video w-full overflow-hidden rounded-xl @[560px]:aspect-auto @[560px]:h-full @[560px]:min-h-[170px]"
+            sizes="(max-width: 560px) 100vw, 300px"
           />
 
-          <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-col gap-2">
             <div
-              className={`flex items-start justify-between gap-3 ${
+              className={`flex items-start justify-between gap-2 ${
                 p.showCancelledRibbon ? "pr-[84px]" : ""
               }`}
             >
-              {/* Reason: the owner wants the full title shown — the card grows instead. */}
               <h3
-                className="min-w-0 text-[18px] font-black leading-tight text-white @[600px]:text-[21px]"
+                className="line-clamp-2 min-w-0 text-[17px] font-black leading-tight text-white @[560px]:text-[19px]"
                 style={{ textShadow: "0 1px 8px rgba(0,0,0,.6)" }}
+                title={p.title}
               >
                 {p.title}
               </h3>
-              <div className="shrink-0">
-                <CompetitionStatusBadge status={p.status} label={p.statusLabel} size="lg" />
-              </div>
+              <GamePill presentation={p} />
             </div>
 
             <CardTagsRow presentation={p} />
-            <GmFundedNote presentation={p} />
 
             {p.description ? (
-              <p className="line-clamp-3 text-[12.5px] leading-snug text-slate-200/90 @[600px]:text-[13.5px]">
+              <p className="line-clamp-2 text-[12px] leading-snug text-slate-300/90">
                 {p.description}
               </p>
             ) : null}
 
             {primary.length > 0 ? (
-              <div className="mt-auto grid grid-cols-2 gap-2 @[600px]:grid-cols-[repeat(4,minmax(0,1fr))]">
+              <div className="mt-auto grid grid-cols-2 gap-2 @[560px]:grid-cols-[repeat(4,minmax(0,1fr))]">
                 {primary.map((m) => (
                   <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
                 ))}
@@ -92,21 +87,17 @@ export function ArenaCompetitionCard({
           </div>
         </div>
 
-        {secondary.length > 0 ? (
-          <div className="grid grid-cols-2 items-stretch gap-2 @[460px]:grid-cols-[repeat(3,minmax(0,1fr))]">
-            {secondary.map((m) => (
-              <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
-            ))}
+        <div className="grid grid-cols-2 items-stretch gap-2 @[560px]:grid-cols-[repeat(4,minmax(0,1fr))]">
+          {secondary.map((m) => (
+            <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
+          ))}
+          <div className="col-span-2 flex items-center justify-center @[560px]:col-span-1 @[560px]:col-start-4">
+            <CompetitionCTA
+              cta={p.cta}
+              glow={settled ? undefined : p.theme.glow}
+              className="max-w-[260px]"
+            />
           </div>
-        ) : null}
-
-        {/* CTA — its own row, centred in the card (owner reference) */}
-        <div className="flex justify-center pt-1">
-          <CompetitionCTA
-            cta={p.cta}
-            glow={settled ? undefined : p.theme.glow}
-            className="max-w-[320px]"
-          />
         </div>
       </div>
     </article>

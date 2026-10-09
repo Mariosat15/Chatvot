@@ -24,7 +24,7 @@ export function CompetitionDataBlock({
   return (
     <div className="@container h-full min-w-0">
       <div
-        className="grid h-full min-h-[68px] grid-cols-[26px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-2 py-2 @[120px]:grid-cols-[32px_minmax(0,1fr)] @[120px]:px-2.5"
+        className="grid h-full min-h-[56px] grid-cols-[26px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-2 py-1.5 @[120px]:grid-cols-[32px_minmax(0,1fr)] @[120px]:px-2.5"
         style={{
           borderColor: prize ? "rgba(255,176,0,.55)" : `${accent}40`,
           background: prize

@@ -7,33 +7,40 @@ export interface ArenaKpiValues {
   prizePoolLabel: string;
 }
 
+const ICON_BASE = "/assets/neon/competitions/icons";
+
+/**
+ * Owner reference: each tile is tinted in its own colour, with a glowing ring
+ * icon, a coloured label, the white figure with its caption beside it, faint
+ * artwork on the right and a ringed arrow.
+ */
 const CARDS = [
   {
     key: "live" as const,
     label: "LIVE NOW",
     description: "Active competitions",
     icon: COMPETITION_ICON.live,
-    accent: "rgba(0,216,255,.45)",
-    border: "border-cyan-400/45",
-    valueClass: "text-cyan-200",
+    art: `${ICON_BASE}/icon-chart.png`,
+    rgb: "0,229,200",
+    labelClass: "text-[#3dffd8]",
   },
   {
     key: "soon" as const,
     label: "STARTING SOON",
     description: "Reserve your spot",
     icon: COMPETITION_ICON.soon,
-    accent: "rgba(255,176,32,.4)",
-    border: "border-amber-400/45",
-    valueClass: "text-amber-200",
+    art: COMPETITION_ICON.volts,
+    rgb: "255,190,40",
+    labelClass: "text-[#ffd23d]",
   },
   {
     key: "prize" as const,
     label: "PRIZE POOL",
     description: "Total value across all competitions",
     icon: COMPETITION_ICON.prize,
-    accent: "rgba(217,76,255,.4)",
-    border: "border-fuchsia-400/45",
-    valueClass: "text-fuchsia-200",
+    art: `${ICON_BASE}/icon-trophy-purple.png`,
+    rgb: "196,80,255",
+    labelClass: "text-[#e9b8ff]",
   },
 ];
 
@@ -46,42 +53,64 @@ function KpiPanel({
   value: string;
   onClick?: () => void;
 }) {
+  const c = card.rgb;
   const body = (
     <>
+      {/* Faint artwork on the right, as in the reference */}
       <div
-        className="pointer-events-none absolute -right-6 -top-6 h-36 w-36 rounded-full opacity-35"
-        style={{
-          background: `radial-gradient(circle, ${card.accent}, transparent 70%)`,
-        }}
-      />
-      <div className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45">
-        <Image
-          src={card.icon}
-          alt=""
-          width={58}
-          height={58}
-          className="h-[42px] w-[42px] object-contain"
-        />
+        className="pointer-events-none absolute inset-y-0 right-10 w-[45%] opacity-30 [mask-image:linear-gradient(90deg,transparent,#000_45%)]"
+        aria-hidden
+      >
+        <Image src={card.art} alt="" fill className="object-contain object-right" sizes="200px" />
       </div>
+
+      {/* Glowing ring icon */}
+      <div
+        className="relative flex size-[46px] shrink-0 items-center justify-center rounded-full border-2"
+        style={{
+          borderColor: `rgba(${c},.9)`,
+          background: `radial-gradient(circle, rgba(${c},.25), rgba(0,0,0,.55) 70%)`,
+          boxShadow: `0 0 14px rgba(${c},.7), inset 0 0 10px rgba(${c},.45)`,
+        }}
+      >
+        <Image src={card.icon} alt="" width={30} height={30} className="size-[28px] object-contain" />
+      </div>
+
       <div className="relative min-w-0 flex-1">
-        <p className="text-[13px] font-extrabold uppercase tracking-wide text-white/70">
+        <p
+          className={`text-[13px] font-black uppercase leading-none tracking-wide ${card.labelClass}`}
+          style={{ textShadow: `0 0 10px rgba(${c},.6)` }}
+        >
           {card.label}
         </p>
-        <p
-          className={`truncate text-[32px] font-extrabold leading-none tabular-nums ${card.valueClass}`}
-        >
-          {value}
-        </p>
-        <p className="mt-1 truncate text-xs text-white/45">{card.description}</p>
+        <div className="mt-1 flex items-center gap-2.5">
+          <span className="text-[28px] font-black leading-none text-white tabular-nums [text-shadow:0_0_12px_rgba(255,255,255,.25)]">
+            {value}
+          </span>
+          <span className="line-clamp-2 max-w-[130px] text-[11.5px] font-semibold leading-tight text-white/85">
+            {card.description}
+          </span>
+        </div>
       </div>
-      <span className="relative text-2xl text-white/35" aria-hidden>
+
+      {/* Ringed arrow */}
+      <span
+        className="relative flex size-[28px] shrink-0 items-center justify-center rounded-full border-2 bg-black/40 text-[16px] font-black leading-none text-white"
+        style={{ borderColor: `rgba(${c},.85)`, boxShadow: `0 0 10px rgba(${c},.55)` }}
+        aria-hidden
+      >
         ›
       </span>
     </>
   );
 
-  const className = `relative flex h-[118px] w-full items-center gap-4 overflow-hidden rounded-2xl border bg-gradient-to-br from-[rgba(7,22,55,.92)] to-[rgba(3,11,29,.96)] px-4 text-left ${card.border}`;
-  const style = { boxShadow: `0 0 22px ${card.accent}` };
+  const className =
+    "relative flex h-[76px] w-full items-center gap-3.5 overflow-hidden rounded-xl border-[1.5px] px-4 text-left";
+  const style = {
+    borderColor: `rgba(${c},.85)`,
+    background: `linear-gradient(100deg, rgba(${c},.22) 0%, rgba(${c},.10) 45%, rgba(6,10,28,.92) 100%), #060a1c`,
+    boxShadow: `0 0 18px rgba(${c},.45), inset 0 0 22px rgba(${c},.18)`,
+  };
 
   if (onClick) {
     return (
@@ -110,11 +139,11 @@ export function ArenaKpiCards({
   values: ArenaKpiValues;
   onSelect?: (key: "live" | "soon" | "prize") => void;
 }) {
-  const map = {
-    live: String(values.liveNow),
-    soon: String(values.startingSoon),
-    prize: values.prizePoolLabel,
-  };
+  const map = new Map<string, string>([
+    ["live", String(values.liveNow)],
+    ["soon", String(values.startingSoon)],
+    ["prize", values.prizePoolLabel],
+  ]);
 
   return (
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
@@ -122,7 +151,7 @@ export function ArenaKpiCards({
         <KpiPanel
           key={card.key}
           card={card}
-          value={map[card.key]}
+          value={map.get(card.key) ?? ""}
           onClick={
             onSelect && card.key !== "prize"
               ? () => onSelect(card.key)

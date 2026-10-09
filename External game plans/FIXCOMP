@@ -1,3 +1,18 @@
+# BUILT 9 Oct 2026 (eng, ninth pass) — KPI tiles restyled; card made compact to the owner reference
+
+- **KPI tiles (LIVE NOW / STARTING SOON / PRIZE POOL)** in `ArenaKpiCards.tsx` now use the reference look: a tinted gradient tile in each tile's own colour, a strong coloured border with an outer and inner glow, a glowing ring around the icon, a coloured label with a text glow, the white value with its caption beside it, faint artwork on the right and a ringed arrow. **The wording is unchanged.**
+- **The card is compact and structured** to the reference. It supersedes the seventh pass's centred CTA in its own row, which the owner rejected as "too much space, very big button, no structure".
+  - The status pill sits on the artwork's top-left corner.
+  - A boxed game pill (icon plus name) sits at the top-right of the title.
+  - The title is clamped to two lines, with the full title available as a tooltip. The description is clamped to two lines.
+  - The four primary boxes sit under the description.
+  - The footer row holds the game-specific boxes, with **the CTA PNG as the fourth column**, so the button is box-sized.
+  - Padding and gaps are tighter, and the box minimum height drops from 68 to 56px.
+- The list row uses the same status-on-artwork and game pill, with tighter spacing and a narrower CTA column.
+- **GM Funded is still shown on both views**, as the gold first tag and as the FREE / GM pays entry box. The full-width "Free to enter…" banner was removed for space. Its sentence is now the tag's tooltip, and `GmFundedNote` was deleted rather than left unused.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, eighth pass) — list view on par with the grid card; GM Funded on both
 
 - **The list row now shows everything the card shows**: the whole game artwork over a blurred backdrop, the full title with the large status badge, the tags, a **ticking countdown**, the description, all seven boxes (primary plus game-specific), the glowing accent border, and the CTA in its own column (centred below on narrow rows). Previously it dropped the tags, the description, the countdown and up to two boxes, and cropped the artwork.
