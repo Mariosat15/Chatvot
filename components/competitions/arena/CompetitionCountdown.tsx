@@ -19,24 +19,17 @@ function formatRemaining(ms: number): string {
 }
 
 /**
- * Ticking "Starts in" / "Ends in" clock in the card's data grid.
+ * The ticking text shared by the desktop data block and the phone card.
  *
  * Reason: the first render shows a placeholder and the clock starts after
  * mount, so server and client markup agree (no hydration mismatch from two
  * different `Date.now()` values). Once the moment passes it reads
  * "Starting now" / "Ending now" rather than disappearing.
  */
-export function CompetitionCountdownDataBlock({
-  kind,
-  target,
-  accent,
-  className,
-}: {
-  kind: "starts" | "ends";
-  target: string;
-  accent: string;
-  className?: string;
-}) {
+export function useCountdownDisplay(
+  kind: "starts" | "ends",
+  target: string,
+): string {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
     const tick = () => setNow(Date.now());
@@ -59,6 +52,23 @@ export function CompetitionCountdownDataBlock({
   let display = "--:--:--";
   if (passed) display = starts ? "Starting now" : "Ending now";
   else if (ms !== null) display = formatRemaining(ms);
+  return display;
+}
+
+/** Ticking "Starts in" / "Ends in" clock in the card's data grid. */
+export function CompetitionCountdownDataBlock({
+  kind,
+  target,
+  accent,
+  className,
+}: {
+  kind: "starts" | "ends";
+  target: string;
+  accent: string;
+  className?: string;
+}) {
+  const display = useCountdownDisplay(kind, target);
+  const starts = kind === "starts";
   return (
     <CompetitionInfoDataBlock
       icon={COMPETITION_ICON.clock}

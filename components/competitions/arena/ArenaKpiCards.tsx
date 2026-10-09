@@ -44,6 +44,9 @@ const CARDS = [
   },
 ];
 
+/** Shared with the phone KPI strip so the two layouts use one palette and wording. */
+export const ARENA_KPI_CARDS = CARDS;
+
 function KpiPanel({
   card,
   value,

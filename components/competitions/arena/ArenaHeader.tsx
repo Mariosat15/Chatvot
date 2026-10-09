@@ -7,7 +7,8 @@ import type { GameDefinition } from "@/lib/competitions/game-definitions";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { ArenaUtilityCard } from "./ArenaUtilityCard";
 
-function splitArenaTitle(title: string): { lead: string; accent: string } {
+/** Shared with the phone header so the arena title cannot drift between layouts. */
+export function splitArenaTitle(title: string): { lead: string; accent: string } {
   const parts = title.trim().split(/\s+/);
   if (parts.length < 2) return { lead: title, accent: "" };
   return {

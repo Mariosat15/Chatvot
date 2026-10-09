@@ -10,6 +10,8 @@ import {
   type BrowseCompetitionsResult,
 } from "@/lib/competitions/browse-types";
 import { CompetitionsArena } from "@/components/competitions/arena/CompetitionsArena";
+import { MobileCompetitionsArena } from "@/components/competitions/arena/mobile/MobileCompetitionsArena";
+import { useMobileArenaPages } from "@/components/competitions/arena/mobile/useMobileArenaPages";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -97,7 +99,7 @@ export default function CompetitionsPageContent({
   levelLadder,
 }: CompetitionsPageContentProps) {
   const { settings } = useAppSettings();
-
+  
   const [items, setItems] = useState<Competition[]>(
     (initialBrowse.items as Competition[]) || [],
   );
@@ -124,6 +126,7 @@ export default function CompetitionsPageContent({
 
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -244,6 +247,9 @@ export default function CompetitionsPageContent({
         if (competitionsRes.ok) {
           const data = (await competitionsRes.json()) as BrowseCompetitionsResult;
           applyBrowseResult(data);
+          setLoadError(false);
+        } else {
+          setLoadError(true);
         }
 
         if (walletRes.ok) {
@@ -252,6 +258,7 @@ export default function CompetitionsPageContent({
         }
       } catch (error) {
         console.error("Error refreshing competitions:", error);
+        setLoadError(true);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -381,67 +388,101 @@ export default function CompetitionsPageContent({
   const showAssets =
     gameFilter === "trading" || gameFilter === "all";
 
+  const queryForPage = useCallback(
+    (p: number) =>
+      buildQuery({
+        page: p,
+        status: statusFilter,
+        game: gameFilter,
+        asset: assetFilter,
+        q: debouncedSearch,
+        sort: sortBy,
+        difficulty: difficultyFilter,
+      }),
+    [statusFilter, gameFilter, assetFilter, debouncedSearch, sortBy, difficultyFilter],
+  );
+
+  const mobilePages = useMobileArenaPages({
+    baseItems: items,
+    page,
+    totalPages,
+    resetKey: queryForPage(page),
+    queryForPage,
+  });
+
+  const mobileUserInCompetitions = useMemo(
+    () => new Set([...userInCompetitions, ...mobilePages.extraRegisteredIds]),
+    [userInCompetitions, mobilePages.extraRegisteredIds],
+  );
+
+  const resetting = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setPage(1);
+  };
+
+  // Reason: one set of filter handlers for both layouts, so a filter change on
+  // the phone resets exactly what it resets on desktop.
+  const filterProps = {
+    userBalance,
+    creditSymbol: settings?.credits?.symbol,
+    levelLadder,
+    platformLeverage,
+    selectedGameId: gameFilter,
+    searchQuery,
+    onSearchChange: resetting(setSearchQuery),
+    statusValue: statusFilter,
+    onStatusChange: resetting(setStatusFilter),
+    gameValue: gameFilter,
+    onGameChange: resetting(setGameFilter),
+    assetValue: assetFilter,
+    onAssetChange: resetting(setAssetFilter),
+    showAssets,
+    assetOptions: availableAssets.map((a) => ({ value: a, label: a.toUpperCase() })),
+    difficultyValue: difficultyFilter,
+    onDifficultyChange: resetting((v) => setDifficultyFilter(v as DifficultyLevel | "")),
+    sortValue: sortBy,
+    onSortChange: resetting(setSortBy),
+    hasActiveFilters,
+    onClear: clearFilters,
+    liveNow: kpis.liveNow,
+    startingSoon: kpis.startingSoon,
+    totalPrizePool: kpis.totalPrizePool,
+    isLoading,
+    isRefreshing,
+    onRefresh: () => fetchPage(page, { spinner: true }),
+  };
+
   return (
-    <CompetitionsArena
-      competitions={items}
-      userBalance={userBalance}
-      userInCompetitions={userInCompetitions}
-      creditSymbol={settings?.credits?.symbol}
-      levelLadder={levelLadder}
-      platformLeverage={platformLeverage}
-      selectedGameId={gameFilter}
-      searchQuery={searchQuery}
-      onSearchChange={(v) => {
-        setSearchQuery(v);
-        setPage(1);
-      }}
-      statusValue={statusFilter}
-      onStatusChange={(v) => {
-        setStatusFilter(v);
-        setPage(1);
-      }}
-      gameValue={gameFilter}
-      onGameChange={(v) => {
-        setGameFilter(v);
-        setPage(1);
-      }}
-      assetValue={assetFilter}
-      onAssetChange={(v) => {
-        setAssetFilter(v);
-        setPage(1);
-      }}
-      showAssets={showAssets}
-      assetOptions={availableAssets.map((a) => ({
-        value: a,
-        label: a.toUpperCase(),
-      }))}
-      difficultyValue={difficultyFilter}
-      onDifficultyChange={(v) => {
-        setDifficultyFilter(v as DifficultyLevel | "");
-        setPage(1);
-      }}
-      sortValue={sortBy}
-      onSortChange={(v) => {
-        setSortBy(v);
-        setPage(1);
-      }}
-      hasActiveFilters={hasActiveFilters}
-      onClear={clearFilters}
-      viewMode={viewMode}
-      onViewModeChange={setViewMode}
-      page={page}
-      pageSize={pageSize}
-      totalItems={totalItems}
-      totalPages={totalPages}
-      hasNextPage={hasNextPage}
-      hasPreviousPage={hasPreviousPage}
-      onPageChange={setPage}
-      liveNow={kpis.liveNow}
-      startingSoon={kpis.startingSoon}
-      totalPrizePool={kpis.totalPrizePool}
-      isLoading={isLoading}
-      isRefreshing={isRefreshing}
-      onRefresh={() => fetchPage(page, { spinner: true })}
-    />
+    <>
+      <div className="md:hidden">
+        <MobileCompetitionsArena
+          {...filterProps}
+          competitions={mobilePages.items}
+          userInCompetitions={mobileUserInCompetitions}
+          totalItems={totalItems}
+          hasMore={mobilePages.hasMore}
+          isLoadingMore={mobilePages.isLoadingMore}
+          loadMoreError={mobilePages.loadMoreError}
+          onLoadMore={mobilePages.loadMore}
+          loadError={loadError}
+        />
+      </div>
+      <div className="hidden md:block">
+        <CompetitionsArena
+          {...filterProps}
+          competitions={items}
+          userInCompetitions={userInCompetitions}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          totalPages={totalPages}
+          hasNextPage={hasNextPage}
+          hasPreviousPage={hasPreviousPage}
+          onPageChange={setPage}
+        />
+      </div>
+    </>
   );
 }

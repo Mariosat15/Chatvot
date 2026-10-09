@@ -1,0 +1,31 @@
+# Competition Arena — phone layout
+
+> **BUILT 9 October 2026. Code-complete, not committed. Never verified by eye** (the page is behind sign-in, and nobody has reviewed it on a real phone).
+>
+> **Where it lives:** `components/competitions/arena/mobile/`. Below `md`, `app/(root)/competitions/page-content.tsx` renders `MobileCompetitionsArena`. Desktop (`CompetitionsArena`, behind `hidden md:block`) is unchanged.
+>
+> | Reference part | Built as |
+> |---|---|
+> | Header: back button, "Competition Arena" with subtitle | `MobileArenaHeader`. The back button links to `/dashboard`; the title comes from the shared `splitArenaTitle` |
+> | Server Time, Balance, Add Volts | Three compact `ArenaUtilityCard`s (the shared card with a new `compact` prop). Add Volts links to `/wallet` |
+> | KPI strip with dots | `MobileArenaKpis`: one tile per screen, snap scrolling, and dots you can tap. Live and Starting Soon set the status filter |
+> | Search, then chips | `MobileArenaFilters`: native selects on an opaque background (R60) for Game, Assets (trading only), Difficulty, Sort and Status, plus a Clear button |
+> | One card per row: 3:4 cover on the left; status and countdown, title, description and metrics on the right; Host and the button at the bottom | `MobileCompetitionCard`, built from the shared parts (`CardHero`, frame, ribbons, `CompetitionCTA`, `CompetitionStatusBadge`, `useCountdownDisplay`). Each metric shows its value beside its label, with at most six |
+> | "Loading more competitions... Automatically loads 10 more items" | `MobileArenaInfiniteList`: an IntersectionObserver sentinel feeds `useMobileArenaPages`, ten items per page. It also has loading skeletons, an empty state, and a retry button on the error states |
+>
+> **Rules kept:**
+> - The phone tree never imports `ArenaCompetitionCard`, `ArenaCompetitionListRow` or `ArenaPagination`.
+> - Both trees build their cards with one presentation helper (`arena-shared.ts`).
+> - The pages the phone appends never reach the desktop list.
+>
+> **Not built:** a grid/list toggle on the phone (deliberate).
+>
+> **Guarded by:** `__tests__/competitions/competition-arena-mobile.test.ts`.
+
+## Brief
+
+Rebuild `/competitions` on phones (360–430px) to match the owner's Mobile UI Guide image. Follow `.cursor/rules/player-mobile-ui.mdc`:
+- give the phone its own tree below `md`;
+- use the same data, filters and routes as desktop;
+- share identity chrome rather than forking it;
+- respect safe areas.

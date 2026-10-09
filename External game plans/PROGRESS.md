@@ -978,6 +978,27 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 9 October 2026 - Competition Arena gets its own phone layout
+
+**Status: code-complete, not committed. Never verified by eye.** Brief and BUILT note: `External game plans/competitionmobile`.
+
+**Owner request:** the Mobile UI Guide image. The page has a header with a back button, the title and subtitle, then Server Time, Balance and Add Volts. Next comes a KPI strip that snaps between tiles and shows dots, then search and filter chips. Cards run one per row, each with a 3:4 cover on the left and the status, countdown, title, description, metrics, host and button on the right. More competitions load automatically as the player scrolls ("Loading more competitions...").
+
+**Shipped:**
+- Below `md` the page renders a separate tree, `components/competitions/arena/mobile/`. Desktop sits behind `hidden md:block` and its markup is unchanged.
+- The two trees share their data and their parts:
+  - the same fetch, filters and query keys, with one set of filter handlers in `page-content.tsx`;
+  - `buildArenaPresentations` and `resolveArenaHeaderGame` in `arena-shared.ts`;
+  - `CardHero`, the card frame and ribbons, `CompetitionCTA`, `CompetitionStatusBadge`, and the countdown via the newly extracted `useCountdownDisplay`.
+- `ArenaUtilityCard` gained a `compact` prop instead of being forked.
+- The phone appends pages through its own accumulator, `useMobileArenaPages`, which is thrown away whenever the filters or the page change.
+  - Reason: both trees are mounted at once, so appending into the shared list would have made desktop page 1 grow by ten rows each time.
+- Filter selects are native, on an opaque background (R60).
+
+**Deliberately not built:** a grid/list toggle on the phone. One layout is the brief.
+
+**Tests:** `__tests__/competitions/competition-arena-mobile.test.ts` (15 tests). The cover-shape guard was probed red on exactly one test. Competitions suite 48/48, eslint `--max-warnings=0` clean, and no new type errors: the three `TS2352` errors in `page-content.tsx` already exist in HEAD.
+
 ### 9 October 2026 - Gamepad board-size icon, "GM" tag, compact clock, ALREADY IN on Suggested for you
 
 **Owner request:** Board Size gets the supplied gamepad icon (`icons/icon-gamepad.png`). The funding tag reads **GM** instead of "GM Funded". The Starts In clock is a little smaller (12-13px, nowrap). Values in narrow boxes drop to 13px below 150px, so short values such as Rounds "1 Attempt" stay on one line. On the dashboard **Suggested for you**, `suggestOpenContests` now returns `alreadyIn` from a non-refunded `CompetitionParticipant` seat (matched as strings, since `competitionId` is declared `String`; a failed lookup degrades to "not in"). The card shows the green ALREADY IN corner ribbon (`cta/ribbon-already-in-r1.png`) and the button reads **Already In** instead of Join. Tests: competitions 25/25 and overview-standing green. The single `gm-private-discovery` failure on `app/api/competitions/route.ts` is **pre-existing** (it fails with these changes stashed). **Never verified by eye.**

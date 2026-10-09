@@ -1,19 +1,18 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import {
-  COMPETITIONS_ARENA_BG,
-  gameDefinitions,
-  getGameDefinition,
-  resolveGameDefinition,
-  type GameDefinition,
-} from "@/lib/competitions/game-definitions";
-import { buildCompetitionPresentation } from "@/lib/competitions/build-competition-presentation";
+import { COMPETITIONS_ARENA_BG } from "@/lib/competitions/game-definitions";
 import type { CompetitionListItem } from "@/lib/competitions/types";
 import type { TitleLevel } from "@/lib/constants/levels";
 import { formatVolts } from "@/lib/utils/format-volts";
-import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
-import { difficultyForCompetition } from "@/lib/competitions/competition-difficulty-input";
+import {
+  ARENA_DIFFICULTY_OPTIONS,
+  ARENA_GAME_OPTIONS,
+  ARENA_SORT_OPTIONS,
+  ARENA_STATUS_OPTIONS,
+  buildArenaPresentations,
+  resolveArenaHeaderGame,
+} from "./arena-shared";
 import { ArenaHeader } from "./ArenaHeader";
 import { ArenaKpiCards } from "./ArenaKpiCards";
 import { CompetitionToolbar, type ToolbarFilterOption } from "./CompetitionToolbar";
@@ -104,69 +103,19 @@ export function CompetitionsArena({
 }) {
   const clock = useUtcClock();
 
-  const headerGame: GameDefinition =
-    selectedGameId && selectedGameId !== "all"
-      ? getGameDefinition(selectedGameId)
-      : competitions.length === 1
-        ? resolveGameDefinition(competitions[0])
-        : gameDefinitions.all;
-
-  // Reason: the difficulty filter runs on the server across every matching competition
-  // (browse-competitions.ts), so the page arrives already filtered.
-  const presentations = competitions.map((c) => {
-    const difficulty = difficultyForCompetition(c, platformLeverage);
-    return buildCompetitionPresentation(c, {
-      isRegistered: userInCompetitions.has(String(c._id)),
-      userBalance,
-      registrationClosed: isRegistrationClosed({
-        registrationDeadline: (c as { registrationDeadline?: string })
-          .registrationDeadline,
-        startTime: c.startTime,
-        gameType: c.gameType,
-        playWindowEnd: (c as { playWindowEnd?: string }).playWindowEnd,
-      }),
-      creditSymbol,
-      levelLadder,
-      difficultyLabel: difficulty.label,
-    });
+  const headerGame = resolveArenaHeaderGame(selectedGameId, competitions);
+  const presentations = buildArenaPresentations(competitions, {
+    userInCompetitions,
+    userBalance,
+    creditSymbol,
+    levelLadder,
+    platformLeverage,
   });
 
-  const statusOptions: ToolbarFilterOption[] = [
-    { value: "active,upcoming", label: "All Open" },
-    { value: "active", label: "Live" },
-    { value: "upcoming", label: "Starting Soon" },
-    { value: "completed", label: "Completed" },
-    { value: "cancelled", label: "Cancelled" },
-    { value: "active,upcoming,completed,cancelled", label: "All" },
-  ];
-
-  const gameOptions: ToolbarFilterOption[] = [
-    { value: "all", label: "All Games" },
-    { value: "trading", label: "Trading" },
-    { value: "circuitSprint", label: "Circuit Sprint" },
-    { value: "voltVelocity", label: "Volt Velocity" },
-    { value: "voltStack", label: "Volt Stack" },
-    { value: "provider", label: "Other Games" },
-  ];
-
-  const difficultyOptions: ToolbarFilterOption[] = [
-    { value: "", label: "All" },
-    { value: "Novice", label: "Novice" },
-    { value: "Apprentice", label: "Apprentice" },
-    { value: "Skilled", label: "Skilled" },
-    { value: "Expert", label: "Expert" },
-    { value: "Elite", label: "Elite" },
-    { value: "Master", label: "Master" },
-  ];
-
-  const sortOptions: ToolbarFilterOption[] = [
-    { value: "featured", label: "Featured" },
-    { value: "newest", label: "Newest" },
-    { value: "start", label: "Starting Soon" },
-    { value: "prize", label: "Prize Pool" },
-    { value: "participants", label: "Players" },
-    { value: "entry", label: "Entry Fee" },
-  ];
+  const statusOptions = ARENA_STATUS_OPTIONS;
+  const gameOptions = ARENA_GAME_OPTIONS;
+  const difficultyOptions = ARENA_DIFFICULTY_OPTIONS;
+  const sortOptions = ARENA_SORT_OPTIONS;
 
   return (
     <div
