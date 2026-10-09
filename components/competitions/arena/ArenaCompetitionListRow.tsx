@@ -75,19 +75,22 @@ export function ArenaCompetitionListRow({
             so it fills the open cell beside the last metric instead of sitting
             alone in a third column below the row.
           */}
-          <div className="mt-auto grid auto-rows-fr grid-cols-2 gap-2 @[520px]:grid-cols-[repeat(auto-fit,minmax(118px,1fr))]">
+          <div className="mt-auto grid grid-flow-row-dense auto-rows-fr grid-cols-2 gap-2 @[520px]:grid-cols-[repeat(auto-fit,minmax(118px,1fr))]">
             {metrics.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
             ))}
-            <div className="flex h-full min-h-[56px] items-stretch justify-stretch">
-              <CompetitionCTA
-                cta={p.cta}
-                glow={settled ? undefined : p.theme.glow}
-                fillCell
-                className="h-full w-full"
-              />
-            </div>
             <CardContextDataBlocks presentation={p} layout="list" />
+            {/* Same centred, box-height CTA row as the grid card. */}
+            <div className="col-span-full flex h-[56px] items-stretch justify-center">
+              <div className="aspect-[3/1] h-full max-w-full">
+                <CompetitionCTA
+                  cta={p.cta}
+                  glow={settled ? undefined : p.theme.glow}
+                  fillCell
+                  className="h-full w-full"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

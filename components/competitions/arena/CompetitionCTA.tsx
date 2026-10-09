@@ -52,7 +52,13 @@ export function CompetitionCTA({
         fill
         loading="lazy"
         className="object-contain"
-        style={!greyed && glow ? { filter: `drop-shadow(0 0 10px ${glow})` } : undefined}
+        // Reason: the drop-shadow glow haloes the baked-in text so the small
+        // in-grid button reads as blurred; only the standalone size keeps it.
+        style={
+          !greyed && glow && !fillCell
+            ? { filter: `drop-shadow(0 0 10px ${glow})` }
+            : undefined
+        }
         sizes="300px"
       />
       <span className="sr-only">{cta.label}</span>

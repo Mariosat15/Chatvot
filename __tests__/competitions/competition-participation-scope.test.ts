@@ -132,10 +132,16 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     // Host spans two cells in both views; private access is a ribbon, not a box.
     expect(parts).toContain('tag.tone === "creator" ? "col-span-2"');
     expect(parts).toContain('tag.tone !== "private"');
-    expect(parts).toContain('className={layout === "grid" ? "col-span-2" : undefined}');
-    expect(parts.indexOf('{layout === "grid" ? countdown : null}')).toBeLessThan(
+    // Countdown is two cells and leads the context, in both views, so
+    // Funding sits beside it.
+    expect(parts.indexOf("{countdown}")).toBeGreaterThan(-1);
+    expect(parts.indexOf("{countdown}")).toBeLessThan(
       parts.indexOf("{tags.map((tag)"),
     );
+    // CTA: centred own row, one box tall, never stretched, no blurring glow.
+    expect(cta).toContain("!greyed && glow && !fillCell");
+    expect(list).toContain("col-span-full flex h-[56px] items-stretch justify-center");
+    expect(card).toContain("col-span-full flex h-[56px] items-stretch justify-center");
     expect(card).toContain("<PrivateRibbon");
     expect(list).toContain("<PrivateRibbon");
     expect(parts).toContain("COMPETITION_TYPE_RIBBON_ASSET.private");
@@ -165,15 +171,16 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(other).toBeGreaterThan(creator);
     expect(cardCta).toBeGreaterThan(other);
     expect(card.slice(other, cardCta)).toContain(
-      "col-span-full flex h-full min-h-[56px] items-stretch justify-center",
+      "col-span-full flex h-[56px] items-stretch justify-center",
     );
 
     // CTA must live inside the metric grid so it aligns with the boxes.
-    const listMetricsGrid = list.slice(
-      list.indexOf('mt-auto grid auto-rows-fr'),
-      list.indexOf("<CardContextDataBlocks"),
+    const listGridStart = list.indexOf("mt-auto grid grid-flow-row-dense");
+    expect(listGridStart).toBeGreaterThan(-1);
+    const listMetricsGrid = list.slice(listGridStart, list.indexOf("</article>"));
+    expect(listMetricsGrid.indexOf("<CardContextDataBlocks")).toBeLessThan(
+      listMetricsGrid.indexOf("<CompetitionCTA"),
     );
-    expect(listMetricsGrid).toContain("<CompetitionCTA");
     expect(card.slice(cardGridStart, card.indexOf("</article>"))).toContain(
       "<CompetitionCTA",
     );

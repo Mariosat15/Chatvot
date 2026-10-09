@@ -4,6 +4,7 @@
 - **Private access is a top-left PRIVATE ribbon** (`ribbon-private-r1.png`, owner-supplied, transparent) on both the grid card and the list row; the Access box is gone. The right corner keeps GAME / TRADING / cancelled.
 - Host is two cells in the list view too (unchanged there); the list keeps its own order otherwise.
 - Focused verification: competition tests **23/23**, scoped ESLint clean.
+- **Amended same day for the wide list view:** Starts In is two cells there too and leads the context boxes, with Funding beside it. The list CTA moved off the metric row onto its own centred row. In both views the CTA is one box tall (56px) at the artwork's own 3:1 proportions, never stretched, and the drop-shadow glow is off for the in-grid button because it made the baked-in text look blurred.
 
 **Never verified by eye.**
 

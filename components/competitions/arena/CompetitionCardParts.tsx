@@ -197,22 +197,22 @@ export function CardContextDataBlocks({
         (order.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
     );
 
-  // Grid: Host and the countdown are two cells wide (a GM name and a "1d
-  // 00:57:24" clock do not fit one cell), and the countdown leads so Funding
-  // sits beside it.
+  // Host and the countdown are two cells wide in both views (a GM name and a
+  // "1d 00:57:24" clock do not fit one cell), and the countdown leads so
+  // Funding sits beside it.
   const countdown =
     only !== "creator" && p.countdown ? (
       <CompetitionCountdownDataBlock
         kind={p.countdown.kind}
         target={p.countdown.target}
         accent={p.gameAccent}
-        className={layout === "grid" ? "col-span-2" : undefined}
+        className="col-span-2"
       />
     ) : null;
 
   return (
     <>
-      {layout === "grid" ? countdown : null}
+      {countdown}
       {tags.map((tag) => {
         const context =
           CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
@@ -228,7 +228,6 @@ export function CardContextDataBlocks({
           />
         );
       })}
-      {layout === "list" ? countdown : null}
     </>
   );
 }

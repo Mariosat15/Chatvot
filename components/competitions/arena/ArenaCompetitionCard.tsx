@@ -87,8 +87,8 @@ export function ArenaCompetitionCard({
               layout="grid"
               only="other"
             />
-            <div className="col-span-full flex h-full min-h-[56px] items-stretch justify-center">
-              <div className="aspect-[3/1] h-full min-h-[56px] max-w-full">
+            <div className="col-span-full flex h-[56px] items-stretch justify-center">
+              <div className="aspect-[3/1] h-full max-w-full">
                 <CompetitionCTA
                   cta={p.cta}
                   glow={settled ? undefined : p.theme.glow}
