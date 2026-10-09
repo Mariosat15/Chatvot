@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { COMPETITIONS_ARENA_BG } from "@/lib/competitions/game-definitions";
 import type { CompetitionListItem } from "@/lib/competitions/types";
 import type { TitleLevel } from "@/lib/constants/levels";
-import { formatVolts } from "@/lib/utils/format-volts";
+import { formatVoltsCompact } from "@/lib/utils/format-volts";
 import {
   ARENA_DIFFICULTY_OPTIONS,
   ARENA_GAME_OPTIONS,
@@ -137,7 +137,7 @@ export function MobileCompetitionsArena({
         <MobileArenaKpis
           liveNow={liveNow}
           startingSoon={startingSoon}
-          prizePoolLabel={formatVolts(totalPrizePool, { symbol: creditSymbol })}
+          prizePoolLabel={formatVoltsCompact(totalPrizePool, { symbol: creditSymbol })}
           onSelect={(key) => {
             if (key === "live") onStatusChange("active");
             if (key === "soon") onStatusChange("upcoming");

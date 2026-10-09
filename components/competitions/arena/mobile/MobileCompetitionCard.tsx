@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import type { ReactNode } from "react";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
 import type {
   CompetitionMetric,
@@ -20,9 +21,52 @@ import {
   isSettled,
 } from "../CompetitionCardParts";
 
-const MAX_METRICS = 6;
+/** Three rows of two: enough for every competition shape we ship. */
+const MAX_CELLS = 6;
 
-function LiveCountdown({
+/**
+ * Label above value, icon on the left (Mobile UI Guide stat chip). The value
+ * wraps rather than truncating: a cut "1,0…" prize is worse than two lines.
+ */
+function StatCell({
+  icon,
+  label,
+  children,
+}: {
+  icon: string;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-1.5 rounded-lg border border-white/10 bg-black/45 px-1.5 py-1.5">
+      <Image
+        src={icon}
+        alt=""
+        width={18}
+        height={18}
+        className="h-[18px] w-[18px] shrink-0 object-contain"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-[9.5px] font-semibold leading-tight text-white/60">
+          {label}
+        </p>
+        <p className="break-words text-[12px] font-black leading-tight text-white tabular-nums">
+          {children}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MetricStat({ metric }: { metric: CompetitionMetric }) {
+  return (
+    <StatCell icon={metric.icon} label={metric.label}>
+      {metric.value}
+    </StatCell>
+  );
+}
+
+function CountdownStat({
   kind,
   target,
 }: {
@@ -31,36 +75,19 @@ function LiveCountdown({
 }) {
   const display = useCountdownDisplay(kind, target);
   return (
-    <span className="whitespace-nowrap font-mono text-[11px] font-bold tabular-nums text-white/85">
-      {kind === "starts" ? "Starts " : "Ends "}
-      {display}
-    </span>
-  );
-}
-
-/** Value beside its label on one line (player-mobile-ui rule 6). */
-function MetricCell({ metric }: { metric: CompetitionMetric }) {
-  return (
-    <div className="flex min-w-0 items-center gap-1 rounded-lg border border-white/10 bg-black/40 px-1.5 py-1">
-      <Image
-        src={metric.icon}
-        alt=""
-        width={16}
-        height={16}
-        className="h-4 w-4 shrink-0 object-contain"
-      />
-      <span className="min-w-0 truncate text-[10.5px] leading-tight">
-        <span className="font-black text-white">{metric.value}</span>{" "}
-        <span className="text-white/55">{metric.label}</span>
-      </span>
-    </div>
+    <StatCell
+      icon={COMPETITION_ICON.clock}
+      label={kind === "starts" ? "Starts In" : "Ends In"}
+    >
+      <span className="font-mono">{display}</span>
+    </StatCell>
   );
 }
 
 /**
- * Phone competition card (Mobile UI Guide): 3:4 cover hero on the left; on
- * the right the status badge with its countdown, title, description, a
- * compact metric grid, then Host on the left and the action on the right.
+ * Phone competition card (Mobile UI Guide): 3:4 cover on the left; status,
+ * a two-line title, a two-line description and a two-column stat grid on the
+ * right; then "Hosted by" and the main action across the full card width.
  *
  * Reason: composed from the same parts as the desktop card so the two views
  * cannot tell a player different things about one competition.
@@ -75,7 +102,12 @@ export function MobileCompetitionCard({
   const metrics = [
     ...p.primaryMetrics.filter(hasMetricValue),
     ...p.secondaryMetrics.filter(hasMetricValue),
-  ].slice(0, MAX_METRICS);
+  ];
+  // Reason: the countdown is the third chip in the guide (Prize, Players,
+  // Starts In, ...), so it takes one of the six slots.
+  const metricSlots = p.countdown ? MAX_CELLS - 1 : MAX_CELLS;
+  const leading = metrics.slice(0, 2);
+  const trailing = metrics.slice(2, metricSlots);
   const hostIcon =
     p.creatorType === "gm" ? COMPETITION_ICON.gm : COMPETITION_ICON.starbox;
 
@@ -89,82 +121,94 @@ export function MobileCompetitionCard({
       <CompetitionTypeRibbon presentation={p} />
       <PrivateRibbon presentation={p} />
 
-      <div className="relative z-10 flex gap-2.5 p-2.5">
-        <CardHero
-          presentation={p}
-          className="aspect-[3/4] w-[34%] shrink-0 self-start rounded-xl"
-          sizes="150px"
-        />
+      <div className="relative z-10 flex flex-col gap-2.5 p-2.5">
+        <div className="flex gap-2.5">
+          <CardHero
+            presentation={p}
+            className="aspect-[3/4] w-[34%] shrink-0 self-start rounded-xl"
+            sizes="150px"
+          />
 
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
-            {p.countdown ? (
-              <LiveCountdown kind={p.countdown.kind} target={p.countdown.target} />
-            ) : p.countdownLabel ? (
-              <span className="text-[11px] font-bold text-white/70">
-                {p.countdownLabel}
-              </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            {/* Right padding keeps the pill and title clear of the corner ribbon. */}
+            <div className="flex min-h-[22px] flex-wrap items-center gap-x-2 gap-y-1 pr-14">
+              <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
+              {!p.countdown && p.countdownLabel ? (
+                <span className="text-[11px] font-bold text-white/70">
+                  {p.countdownLabel}
+                </span>
+              ) : null}
+            </div>
+
+            <h3
+              className="line-clamp-2 break-words pr-6 text-[15px] font-black leading-tight text-white"
+              style={{ textShadow: "0 1px 8px rgba(0,0,0,.6)" }}
+              title={p.title}
+            >
+              {p.title}
+            </h3>
+
+            {p.description ? (
+              <p className="line-clamp-2 text-[11px] leading-snug text-slate-300/90">
+                {p.description}
+              </p>
+            ) : null}
+
+            {leading.length > 0 || p.countdown ? (
+              <div className="grid grid-cols-2 gap-1.5">
+                {leading.map((m) => (
+                  <MetricStat key={m.key} metric={m} />
+                ))}
+                {p.countdown ? (
+                  <CountdownStat
+                    kind={p.countdown.kind}
+                    target={p.countdown.target}
+                  />
+                ) : null}
+                {trailing.map((m) => (
+                  <MetricStat key={m.key} metric={m} />
+                ))}
+              </div>
             ) : null}
           </div>
+        </div>
 
-          <h3
-            className="line-clamp-2 text-[15px] font-black leading-tight text-white"
-            style={{ textShadow: "0 1px 8px rgba(0,0,0,.6)" }}
-            title={p.title}
-          >
-            {p.title}
-          </h3>
+        {p.gmFunded ? (
+          <p className="flex items-start gap-1 text-[11px] font-bold leading-snug text-amber-200">
+            <Image
+              src={COMPETITION_ICON.starbox}
+              alt=""
+              width={14}
+              height={14}
+              className="mt-px h-3.5 w-3.5 shrink-0 object-contain"
+            />
+            <span>{p.gmFundedNote ?? "GM Funded"}</span>
+          </p>
+        ) : null}
 
-          {p.description ? (
-            <p className="line-clamp-2 text-[11px] leading-snug text-slate-300/90">
-              {p.description}
-            </p>
-          ) : null}
-
-          {metrics.length > 0 ? (
-            <div className="grid grid-cols-2 gap-1 min-[400px]:grid-cols-3">
-              {metrics.map((m) => (
-                <MetricCell key={m.key} metric={m} />
-              ))}
+        <div className="flex items-center justify-between gap-3 border-t border-white/10 pt-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Image
+              src={hostIcon}
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7 shrink-0 object-contain"
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] leading-tight text-white/55">Hosted by</p>
+              <p className="break-words text-[12.5px] font-bold leading-tight text-white">
+                {p.creatorName}
+              </p>
             </div>
-          ) : null}
-
-          {p.gmFunded ? (
-            <p className="flex items-start gap-1 text-[10.5px] font-bold leading-snug text-amber-200">
-              <Image
-                src={COMPETITION_ICON.starbox}
-                alt=""
-                width={14}
-                height={14}
-                className="mt-px h-3.5 w-3.5 shrink-0 object-contain"
-              />
-              <span className="line-clamp-2">{p.gmFundedNote ?? "GM Funded"}</span>
-            </p>
-          ) : null}
-
-          <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <Image
-                src={hostIcon}
-                alt=""
-                width={20}
-                height={20}
-                className="h-5 w-5 shrink-0 object-contain"
-              />
-              <span className="min-w-0 truncate text-[11px] leading-tight">
-                <span className="text-white/55">Host </span>
-                <span className="font-bold text-white">{p.creatorName}</span>
-              </span>
-            </div>
-            <div className="aspect-[3/1] h-10 shrink-0">
-              <CompetitionCTA
-                cta={p.cta}
-                glow={settled ? undefined : p.theme.glow}
-                fillCell
-                className="h-full w-full"
-              />
-            </div>
+          </div>
+          <div className="aspect-[3/1] h-11 shrink-0">
+            <CompetitionCTA
+              cta={p.cta}
+              glow={settled ? undefined : p.theme.glow}
+              fillCell
+              className="h-full w-full"
+            />
           </div>
         </div>
       </div>

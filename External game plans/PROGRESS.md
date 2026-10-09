@@ -982,6 +982,8 @@ Newest at the top.
 
 **Status: code-complete, not committed. Never verified by eye.** Brief and BUILT note: `External game plans/competitionmobile`.
 
+**Redesigned the same day** after the owner said the first pass was squeezed and cut off. The phone now has a wrapping header title, phone-sized utility tiles, three KPI tiles in one row, smaller labelled filter chips, card stats with the label above the value (including Starts In), and a full-width "Hosted by" + 44px action row. Nothing is truncated with an ellipsis except the title and description, which wrap to two lines first. Desktop is unchanged.
+
 **Owner request:** the Mobile UI Guide image. The page has a header with a back button, the title and subtitle, then Server Time, Balance and Add Volts. Next comes a KPI strip that snaps between tiles and shows dots, then search and filter chips. Cards run one per row, each with a 3:4 cover on the left and the status, countdown, title, description, metrics, host and button on the right. More competitions load automatically as the player scrolls ("Loading more competitions...").
 
 **Shipped:**

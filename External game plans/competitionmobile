@@ -2,6 +2,8 @@
 
 > **BUILT 9 October 2026. Code-complete, not committed. Never verified by eye** (the page is behind sign-in, and nobody has reviewed it on a real phone).
 >
+> **REDESIGNED later on 9 October 2026, after the owner rejected the first pass as squeezed and cut off.** Parts of the table below are now history; this is what the phone shows now. The header title is in normal case and wraps instead of truncating, and the three utility tiles are phone-sized (Server Time, Your Volts, Add Volts / Top Up) rather than compact desktop cards. The KPIs are **three tiles in one row** with short phone captions, replacing the swipe strip; the prize pool is abbreviated (`240K ⚡`) so it fits. The filter chips are smaller, in the order Game, Assets, Difficulty, Status, Sort, and show a short label until something is chosen; an invisible native select over each chip still opens the browser's picker with an opaque background (R60). The card puts **label above value** in a two-column grid, with Starts In / Ends In as its own cell, and values wrap rather than truncate. "Hosted by" and a 44px main button sit in a row across the full card width. **No filter-icon button was added**, because there is no filter sheet for it to open, and a button that does nothing is worse than none.
+>
 > **Where it lives:** `components/competitions/arena/mobile/`. Below `md`, `app/(root)/competitions/page-content.tsx` renders `MobileCompetitionsArena`. Desktop (`CompetitionsArena`, behind `hidden md:block`) is unchanged.
 >
 > | Reference part | Built as |
