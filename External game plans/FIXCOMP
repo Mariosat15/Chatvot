@@ -1,3 +1,12 @@
+# BUILT 9 Oct 2026 (eng, nineteenth pass) - gamepad, GM tag, compact clock, ALREADY IN
+
+- Board Size uses the owner's gamepad icon (`COMPETITION_ICON.gamepad`).
+- The funding tag is labelled **GM**, replacing "GM Funded".
+- The Starts In / Ends In clock is slightly smaller and never wraps.
+- Narrow data boxes (under 150px) use 13px values, so Rounds "1 Attempt" fits on one line.
+- Dashboard **Suggested for you**: when the player already holds a non-refunded seat, the card shows the green ALREADY IN corner ribbon and the button reads **Already In**. The flag is computed server-side in `suggestOpenContests`.
+- **Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, eighteenth pass) — card grid survives any number of boxes
 
 - **Supersedes the seventeenth pass's grid-card CTA position.** The box count differs per game, so there is no fixed "button cell". Grid order is now: game metrics → **Host (two cells)** → **Starts in / Ends in (two cells)** with **Funding** beside it → other context → the **CTA on its own full-width row, always centred**. `grid-flow-row-dense` lets one-cell boxes fill any gap.

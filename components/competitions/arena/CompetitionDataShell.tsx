@@ -53,7 +53,7 @@ export function CompetitionDataShell({
             className={`mt-0.5 font-extrabold leading-tight tabular-nums [overflow-wrap:normal] [word-break:keep-all] ${
               prize
                 ? "text-[15px] text-amber-300 @[120px]:text-[18px]"
-                : "text-[14px] text-white @[120px]:text-[15px]"
+                : "text-[13px] text-white @[150px]:text-[15px]"
             }`}
           >
             {value}

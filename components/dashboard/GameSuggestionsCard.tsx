@@ -14,6 +14,7 @@ import {
   OVERVIEW_ACTION_BUTTON,
   OVERVIEW_TEXT_LINK,
 } from "@/components/dashboard/overview/overview-actions";
+import { COMPETITION_TYPE_RIBBON_ASSET } from "@/lib/competitions/game-artwork";
 
 interface Suggestion {
   gameKey: string;
@@ -31,6 +32,8 @@ interface Suggestion {
   blurb?: string;
   visibility?: "public" | "gm_private";
   fundingMode?: "player_paid" | "gm_funded";
+  /** Set by the server when the player already holds a seat in this contest. */
+  alreadyIn?: boolean;
 }
 
 const SECTION_FRAME =
@@ -152,6 +155,16 @@ function SuggestionTile({
           </span>
           {/* Reason: owner, 3 Oct 2026 - the entry-fee pill on the cover is removed. */}
         </div>
+        {c.alreadyIn ? (
+          <Image
+            src={COMPETITION_TYPE_RIBBON_ASSET.alreadyIn}
+            alt="Already in"
+            width={1024}
+            height={1024}
+            unoptimized
+            className="pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] sm:size-[104px]"
+          />
+        ) : null}
       </div>
 
       <div className="flex flex-1 flex-col px-3.5 pb-3.5 pt-3">
@@ -264,8 +277,9 @@ function SuggestionTile({
           8. Join — same sharp cyan CTA as Challenge / Matching Cards / View
           Leaderboard (owner, 5 Oct 2026). Inside the card link, not a nested link.
         */}
+        {/* Reason: a player already seated is not invited to join again (owner, 9 Oct 2026). */}
         <span className={`${OVERVIEW_ACTION_BUTTON} mt-3`} aria-hidden>
-          Join
+          {c.alreadyIn ? "Already In" : "Join"}
           <ArrowRight className="h-3.5 w-3.5" />
         </span>
       </div>

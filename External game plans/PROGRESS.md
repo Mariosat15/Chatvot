@@ -978,6 +978,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 9 October 2026 - Gamepad board-size icon, "GM" tag, compact clock, ALREADY IN on Suggested for you
+
+**Owner request:** Board Size gets the supplied gamepad icon (`icons/icon-gamepad.png`). The funding tag reads **GM** instead of "GM Funded". The Starts In clock is a little smaller (12-13px, nowrap). Values in narrow boxes drop to 13px below 150px, so short values such as Rounds "1 Attempt" stay on one line. On the dashboard **Suggested for you**, `suggestOpenContests` now returns `alreadyIn` from a non-refunded `CompetitionParticipant` seat (matched as strings, since `competitionId` is declared `String`; a failed lookup degrades to "not in"). The card shows the green ALREADY IN corner ribbon (`cta/ribbon-already-in-r1.png`) and the button reads **Already In** instead of Join. Tests: competitions 25/25 and overview-standing green. The single `gm-private-discovery` failure on `app/api/competitions/route.ts` is **pre-existing** (it fails with these changes stashed). **Never verified by eye.**
+
 ### 9 October 2026 - Card grid that survives any number of boxes, and the PRIVATE ribbon
 
 **Owner correction:** with more boxes (Circuit Sprint GM card) Host and Starts In were squeezed into one cell, Private took a box, and the button landed off-centre. **Built:** Host and the countdown each span two cells, Funding sits beside the countdown, the grid packs densely, and the CTA has its own full-width centred row. Private access is now a top-left PRIVATE corner ribbon on grid and list, with the Access box removed. This supersedes the entry below on where the grid-card CTA sits. **Amended same day:** the wide list view follows the same order (two-cell Starts In, Funding beside it), and in both views the CTA is a centred row one box tall, at its own proportions, with no blurring glow. Tests **23/23**. **Never verified by eye.**

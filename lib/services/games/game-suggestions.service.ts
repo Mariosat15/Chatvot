@@ -6,6 +6,7 @@
  * licence. Matchmaking and challenge create remain separate.
  */
 import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { TRADING_GAME_TYPE } from "@/lib/games/types";
 import { listInterestedGameKeys } from "@/lib/services/games/interest-inference.service";
 import {
@@ -52,6 +53,23 @@ export interface GameSuggestion {
   blurb: string;
   visibility: "public" | "gm_private";
   fundingMode: "player_paid" | "gm_funded";
+  /** The player already holds a (non-refunded) seat, so the card says "Already In". */
+  alreadyIn: boolean;
+}
+
+/** Competition ids among `ids` where the player holds a seat that was not refunded. */
+async function findJoinedCompetitionIds(userId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  // Reason: participant.competitionId is declared String while Competition._id is an
+  // ObjectId, so the ids are matched as strings; a refunded seat is no longer "in".
+  const seats = await CompetitionParticipant.find({
+    userId,
+    competitionId: { $in: ids },
+    status: { $ne: "refunded" },
+  })
+    .select("competitionId")
+    .lean<Array<{ competitionId: string }>>();
+  return new Set(seats.map((s) => String(s.competitionId)));
 }
 
 export async function suggestOpenContests(
@@ -110,6 +128,11 @@ export async function suggestOpenContests(
   ]);
 
   const byKey = new Map(catalogue.map((g) => [g.gameKey, g]));
+  // Reason: the badge is decoration - a failed seat lookup must not hide the suggestions.
+  const joined = await findJoinedCompetitionIds(
+    userId,
+    contests.map((c) => c._id.toString()),
+  ).catch(() => new Set<string>());
 
   return contests.map((c) => {
     const cat = byKey.get(c.gameKey);
@@ -148,6 +171,7 @@ export async function suggestOpenContests(
       // (invariant 5 / player-paid default) — never invent gm_private or gm_funded.
       visibility: c.visibility === "gm_private" ? "gm_private" : "public",
       fundingMode: c.fundingMode === "gm_funded" ? "gm_funded" : "player_paid",
+      alreadyIn: joined.has(c._id.toString()),
     };
   });
 }

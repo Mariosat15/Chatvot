@@ -199,4 +199,30 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(dataBlock).toContain("describeCompetitionMode(metric.value)");
     expect(dataBlock).toContain("<CompetitionInfoDataBlock");
   });
+
+  it("uses the gamepad for board size, a short GM tag, a compact clock and narrow-cell values", () => {
+    const read = (p: string) => readFileSync(p, "utf8");
+    const presentation = read("lib/competitions/build-competition-presentation.ts");
+    expect(presentation).toContain('["boardSize", COMPETITION_ICON.gamepad]');
+    expect(presentation).toContain('label: "GM", tone: "funded"');
+    expect(presentation).not.toContain('"GM Funded"');
+    expect(read("lib/competitions/game-definitions.ts")).toContain(
+      "gamepad: `${ICON_BASE}/icon-gamepad.png`",
+    );
+    expect(read("components/competitions/arena/CompetitionCountdown.tsx")).toContain(
+      "whitespace-nowrap font-mono text-[12px]",
+    );
+    expect(read("components/competitions/arena/CompetitionDataShell.tsx")).toContain(
+      "text-[13px] text-white @[150px]:text-[15px]",
+    );
+  });
+
+  it("marks suggestions the player already joined with the ALREADY IN ribbon and button", () => {
+    const service = readFileSync("lib/services/games/game-suggestions.service.ts", "utf8");
+    const card = readFileSync("components/dashboard/GameSuggestionsCard.tsx", "utf8");
+    expect(service).toContain('status: { $ne: "refunded" }');
+    expect(service).toContain("alreadyIn: joined.has(c._id.toString())");
+    expect(card).toContain("COMPETITION_TYPE_RIBBON_ASSET.alreadyIn");
+    expect(card).toContain('{c.alreadyIn ? "Already In" : "Join"}');
+  });
 });

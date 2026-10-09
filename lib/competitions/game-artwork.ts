@@ -112,6 +112,8 @@ export const COMPETITION_TYPE_RIBBON_ASSET = {
   trading: `${CTA_BASE}/ribbon-trading-r1.png`,
   /** Top-left corner: private access is a ribbon, never a data box. */
   private: `${CTA_BASE}/ribbon-private-r1.png`,
+  /** Top-right corner on the dashboard suggestions: the player already holds a seat. */
+  alreadyIn: `${CTA_BASE}/ribbon-already-in-r1.png`,
 } as const;
 
 // Reason: Map — request-supplied / variant keys must not walk Object.prototype.

@@ -58,7 +58,9 @@ export function CompetitionCountdownDataBlock({
       icon={COMPETITION_ICON.clock}
       label={starts ? "Starts in" : "Ends in"}
       value={
-        <span className="font-mono tabular-nums">
+        // Reason: a slightly smaller clock (owner, 9 Oct 2026) so it never
+        // crowds the boxes beside it; whitespace-nowrap keeps "1d 00:37:45" whole.
+        <span className="whitespace-nowrap font-mono text-[12px] tabular-nums @[150px]:text-[13px]">
           {ms === null ? "--:--:--" : formatRemaining(ms)}
         </span>
       }

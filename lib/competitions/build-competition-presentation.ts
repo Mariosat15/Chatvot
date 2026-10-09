@@ -151,7 +151,7 @@ function metricOrNull(
     ["difficulty", COMPETITION_ICON.live],
     ["startingCapital", COMPETITION_ICON.wallet],
     ["track", COMPETITION_ICON.soon],
-    ["boardSize", COMPETITION_ICON.prize],
+    ["boardSize", COMPETITION_ICON.gamepad],
     ["mode", COMPETITION_ICON.bolt],
     ["rounds", COMPETITION_ICON.soon],
     ["laps", COMPETITION_ICON.bolt],
@@ -364,7 +364,7 @@ export function buildCompetitionPresentation(
   // that both missed real sponsored contests and could label a free one as funded.
   const gmFunded = isSponsoredContest(competition.fundingMode);
   if (gmFunded) {
-    tags.unshift({ label: "GM Funded", tone: "funded" });
+    tags.unshift({ label: "GM", tone: "funded" });
   }
 
   const cta = getCompetitionCTA({
