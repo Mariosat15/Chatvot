@@ -15,8 +15,8 @@ import {
 /**
  * Competition Arena list row — the same elements as the grid card, laid out
  * across one wide row: whole game artwork, then the wrapping badge row, title,
- * description and every populated game-specific box, followed by the CTA in its
- * own column.
+ * description and every populated game-specific box with the CTA in that same
+ * metric grid so the button aligns with the boxes.
  *
  * Reason: it composes the card's own parts (`CompetitionCardParts`) so the two
  * views cannot tell a player different things about the same competition.
@@ -42,7 +42,7 @@ export function ArenaCompetitionListRow({
       <CardBackdrop presentation={p} />
       <CancelledRibbon presentation={p} />
 
-      <div className="relative z-10 grid grid-cols-1 gap-3 p-3 @[760px]:grid-cols-[220px_minmax(0,1fr)] @[760px]:p-3.5 @[1100px]:grid-cols-[230px_minmax(0,1fr)_220px]">
+      <div className="relative z-10 grid grid-cols-1 gap-3 p-3 @[760px]:grid-cols-[220px_minmax(0,1fr)] @[760px]:p-3.5">
         <CardHero
           presentation={p}
           className="aspect-video w-full rounded-xl @[760px]:aspect-auto @[760px]:h-full @[760px]:min-h-[160px]"
@@ -66,21 +66,24 @@ export function ArenaCompetitionListRow({
             </p>
           ) : null}
 
-          <div className="mt-auto grid grid-cols-2 gap-2 @[520px]:grid-cols-[repeat(auto-fit,minmax(118px,1fr))]">
+          {/*
+            Reason: the CTA belongs in the same auto-fit track as the data boxes
+            so it fills the open cell beside the last metric instead of sitting
+            alone in a third column below the row.
+          */}
+          <div className="mt-auto grid auto-rows-fr grid-cols-2 gap-2 @[520px]:grid-cols-[repeat(auto-fit,minmax(118px,1fr))]">
             {metrics.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
             ))}
+            <div className="flex h-full min-h-[56px] items-center justify-center">
+              <CompetitionCTA
+                cta={p.cta}
+                glow={settled ? undefined : p.theme.glow}
+                className="max-w-[220px]"
+              />
+            </div>
             <CardContextDataBlocks presentation={p} layout="list" />
           </div>
-        </div>
-
-        {/* CTA — below on narrow rows, its own column on wide ones */}
-        <div className="flex items-end justify-center @[760px]:col-span-2 @[1100px]:col-span-1">
-          <CompetitionCTA
-            cta={p.cta}
-            glow={settled ? undefined : p.theme.glow}
-            className="max-w-[220px]"
-          />
         </div>
       </div>
     </article>

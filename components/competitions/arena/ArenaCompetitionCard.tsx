@@ -16,8 +16,8 @@ import {
  * Competition Arena card — owner reference anatomy (design-reference target).
  *
  * The artwork owns the full left side. The right side grows around its badges,
- * title, description and however many game-specific metric boxes exist, followed
- * by the supplied full-width CTA artwork.
+ * title, description and however many game-specific metric boxes exist, with
+ * the supplied CTA sitting in that same metric grid.
  */
 export function ArenaCompetitionCard({
   presentation,
@@ -63,19 +63,22 @@ export function ArenaCompetitionCard({
             </p>
           ) : null}
 
+          {/*
+            Reason: the CTA is a cell in the same metric grid so it stays aligned
+            with prize/players/mode instead of floating alone under the boxes.
+          */}
           <div className="mt-auto grid auto-rows-fr grid-cols-2 gap-2 @[420px]:grid-cols-3">
             {metrics.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
             ))}
+            <div className="flex h-full min-h-[56px] items-center justify-center">
+              <CompetitionCTA
+                cta={p.cta}
+                glow={settled ? undefined : p.theme.glow}
+                className="w-full max-w-[220px]"
+              />
+            </div>
             <CardContextDataBlocks presentation={p} layout="grid" />
-          </div>
-
-          <div className="mt-0.5 flex items-center justify-center">
-            <CompetitionCTA
-              cta={p.cta}
-              glow={settled ? undefined : p.theme.glow}
-              className="w-full max-w-[220px]"
-            />
           </div>
         </div>
       </div>

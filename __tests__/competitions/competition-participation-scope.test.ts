@@ -133,7 +133,19 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     );
     expect(card).toContain('className="w-full max-w-[220px]"');
     expect(card).not.toContain("max-w-none");
-    expect(list).toContain("flex items-end justify-center");
+    // Reason: CTA must live inside the metric grid so it aligns with the boxes.
+    const listMetricsGrid = list.slice(
+      list.indexOf('mt-auto grid auto-rows-fr'),
+      list.indexOf("<CardContextDataBlocks"),
+    );
+    const cardMetricsGrid = card.slice(
+      card.indexOf('mt-auto grid auto-rows-fr'),
+      card.indexOf("<CardContextDataBlocks"),
+    );
+    expect(listMetricsGrid).toContain("<CompetitionCTA");
+    expect(cardMetricsGrid).toContain("<CompetitionCTA");
+    expect(list).not.toContain("@[1100px]:grid-cols-[230px_minmax(0,1fr)_220px]");
+    expect(list).not.toContain("flex items-end justify-center");
     expect(infoBlock).toContain("<PopoverTrigger asChild>");
     expect(infoBlock).toContain("onPointerEnter={showForMouse}");
     expect(infoBlock).toContain("onPointerLeave={hideForMouse}");

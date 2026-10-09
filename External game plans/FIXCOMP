@@ -1,4 +1,14 @@
+# BUILT 9 Oct 2026 (eng, sixteenth pass) — CTA aligned inside the metric grid
+
+- The Join / View Results button is no longer in a separate column under the card. It is a cell in the same auto-fit metric grid as Prize Pool, Mode and Rounds, so it sits beside those boxes instead of floating below the open slot.
+- Both the wide list row and the grid card use that placement. The list row's third CTA column is removed.
+- Host and the other context boxes still follow after the CTA in the same grid, so a long Host name keeps its two-column span on the next track.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, fifteenth pass) — every Mode box explains itself
+
+**Extended by the sixteenth pass above.** Mode help remains current; only the CTA placement changed.
 
 - Every **Mode** metric now uses the same hover, keyboard and touch explanation treatment as Host, Funding, Access and the clock.
 - **Anytime** explains that each player can start during the open play window. **Scheduled** explains the shared start and warns that arriving late may leave less playing time.
@@ -10,9 +20,11 @@
 
 # BUILT 9 Oct 2026 (eng, fourteenth pass) — host/access placement; lower list CTA; cancelled red
 
+**List CTA placement superseded by the sixteenth pass above** — the dedicated right column is history; host/access order and cancelled red remain current.
+
 - **Grid card:** Funding keeps its existing slot, Access moves into the old Host slot, and Host moves to the lower row and spans two grid columns. A long Game Master name therefore gets twice the width instead of wrapping inside a single metric box.
 - **List row:** Host also spans two boxes, but appears before Access so Access sits immediately to its right as marked in the wide-row reference. The context renderer takes an explicit `grid` / `list` layout; neither card duplicates the boxes.
-- **List CTA:** the button is bottom-aligned in its dedicated right column rather than floating halfway up beside the title.
+- ~~**List CTA:** the button is bottom-aligned in its dedicated right column rather than floating halfway up beside the title.~~ **Superseded** — CTA is now a metric-grid cell.
 - **Cancelled/refunded cards are red:** red border, outer/inset glow, dark-red base and red-tinted artwork scrim. The uploaded cancellation ribbon remains the only cancellation-status marker.
 - Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **19/19**; scoped ESLint clean.
 
