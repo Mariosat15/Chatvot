@@ -37,12 +37,12 @@ export function CompetitionStatusBadge({
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span
-        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide ${style}`}
+        className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide sm:text-[12px] ${style}`}
       >
         {label}
       </span>
       {countdown ? (
-        <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-black/40 px-2.5 py-1 text-[11px] font-bold text-amber-200">
+        <span className="inline-flex items-center rounded-full border border-amber-400/30 bg-black/40 px-2.5 py-1 text-[11px] font-bold text-amber-200 sm:text-[12px]">
           {countdown}
         </span>
       ) : null}

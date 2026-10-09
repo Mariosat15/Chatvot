@@ -5,6 +5,7 @@
 
 import { formatVolts } from "@/lib/utils/format-volts";
 import { COMPETITION_ICON, resolveGameDefinition } from "./game-definitions";
+import { resolveCompetitionArtwork } from "./game-artwork";
 import { getCompetitionCTA } from "./competition-cta";
 import type {
   CompetitionListItem,
@@ -336,13 +337,24 @@ export function buildCompetitionPresentation(
   const shortDesc =
     desc.length > 160 ? `${desc.slice(0, 157).trimEnd()}…` : desc;
 
+  const art = resolveCompetitionArtwork({
+    gameId: def.id,
+    gameCode: competition.gameCode,
+    bannerUrl: (competition as { bannerUrl?: string }).bannerUrl,
+    gameName: def.label,
+  });
+
+  const showCancelledRibbon =
+    status === "cancelled" || status === "refunded";
+
   return {
     id: String(competition._id),
     title: competition.name,
     description: shortDesc,
     gameId: def.id,
     gameName: def.label,
-    gameArtwork: def.artwork,
+    gameArtwork: art.src,
+    artworkObjectPosition: art.objectPosition,
     gameAccent: def.accent,
     theme: def.theme,
     creatorName: creatorName || "Admin",
@@ -353,6 +365,9 @@ export function buildCompetitionPresentation(
       competition.status === "upcoming"
         ? formatCountdown(competition.startTime, opts.now)
         : undefined,
+    showCancelledRibbon,
+    cancelledRibbonLabel:
+      status === "refunded" ? "CANCELLED / REFUNDED" : "CANCELLED",
     tags,
     primaryMetrics,
     secondaryMetrics,
@@ -362,4 +377,16 @@ export function buildCompetitionPresentation(
     gmFunded,
     cta,
   };
+}
+
+/**
+ * Adapter: only meaningful, populated fields for a competition card.
+ * Reason: cards must not hardcode trading tiles — empty/irrelevant keys stay out.
+ */
+export function getCompetitionDisplayFields(
+  competition: CompetitionListItem,
+  opts: BuildPresentationOptions,
+): CompetitionMetric[] {
+  const p = buildCompetitionPresentation(competition, opts);
+  return [...p.primaryMetrics, ...p.secondaryMetrics];
 }

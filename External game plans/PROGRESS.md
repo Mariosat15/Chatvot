@@ -322,7 +322,8 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competitions arena rebuild CODE-COMPLETE 9 Oct (eng)** — `/competitions` presentation rebuilt to owner target (arena BG, header utilities, 3 KPIs, toolbar, 2-col game-agnostic cards + list). Join GM still lobby-only. Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems. Tests: `competition-presentation.test.ts` (9). **Never verified by eye.**
+- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng)** — Owner rejected vertical Image-1 cards; rebuilt to Image-2 horizontal mini-dashboards (`FIXCOMP`). Play-* artwork, Join CTA asset, cancelled ribbon, server pagination (pageSize 10), skeletons, debounce, prefetch. Join GM still lobby-only. Tests: `competition-presentation.test.ts` (10). **Never verified by eye.**
+- **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue polish pass 2 CODE-COMPLETE 8 Oct (eng)** — Wallet-style **Games Catalog** + gamepad icon; card art back to `object-contain` in `aspect-[16/11]` (no crop). Tests: `games-catalogue-routes.test.ts`. **Never verified by eye.**
@@ -976,13 +977,17 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
-### 9 October 2026 - Rebuild Competitions page to arena target (owner brief)
+### 9 October 2026 - FIXCOMP Competition Arena rebuild (Image 2)
 
-**Owner task:** rebuild `/competitions` presentation to match the ChartVolt competitions target image — game-agnostic cards, KPI strip, search/filter toolbar, grid/list — using Menuitems graphics. Preserve backend, Join GM, registration, wallet.
+**Owner task:** stop polishing Image 1; rebuild listing/cards to Image 2 (`FIXCOMP`) — horizontal mini-dashboards, play-* artwork, Join CTA assets, hierarchy, server pagination 10/page.
 
-**Shipped:** Menuitems → `public/assets/neon/competitions/`; `lib/competitions/{game-definitions,competition-cta,build-competition-presentation,types}`; arena UI under `components/competitions/arena/`; `page-content.tsx` keeps poll/filters and renders `CompetitionsArena`. CTA engine links to lobby for Join GM (no new GM system). No giant CANCELLED watermark — status badges only.
+**Shipped:** `game-artwork.ts` + browse service/types; horizontal `ArenaCompetitionCard` with fade + cancelled ribbon; Join pill CTA chrome; header/KPI/toolbar sizing; `GET /api/competitions` paginated; skeletons + debounce + prefetch; Join GM still lobby-only. Indexes already covered status/startTime/gameKey. **Deliberate:** no separate Reserve/ribbon PNGs in Menuitems — tinted Join chrome + CSS sash. Difficulty soft-filters the current page only.
 
-**Nothing was paid wrongly.** Tests: `__tests__/competitions/competition-presentation.test.ts` (9). Never verified by eye.
+**Nothing was paid wrongly.** Tests: `competition-presentation.test.ts` (10). Never verified by eye.
+
+### 9 October 2026 - Rebuild Competitions page to arena target (owner brief) — superseded same day
+
+**Owner task:** first arena pass (vertical cards). **Superseded by FIXCOMP Image-2 rebuild above — say which.**
 
 ### 8 October 2026 - Games catalogue mobile launcher (owner design-reference)
 

@@ -51,6 +51,8 @@ export interface CompetitionPresentation {
   gameId: string;
   gameName: string;
   gameArtwork: string;
+  /** CSS object-position for the hero so game logos stay visible */
+  artworkObjectPosition: string;
   gameAccent: string;
   theme: GameDefinition["theme"];
   creatorName: string;
@@ -58,6 +60,9 @@ export interface CompetitionPresentation {
   status: CompetitionStatusKey;
   statusLabel: string;
   countdownLabel?: string;
+  /** Diagonal CANCELLED / REFUNDED sash on cancelled cards */
+  showCancelledRibbon: boolean;
+  cancelledRibbonLabel?: string;
   tags: CompetitionTag[];
   primaryMetrics: CompetitionMetric[];
   secondaryMetrics: CompetitionMetric[];

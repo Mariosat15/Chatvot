@@ -1,13 +1,15 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/better-auth/auth";
-import {
-  getCompetitions,
-  getCompetitionIdsUserIsIn,
-} from "@/lib/actions/trading/competition.actions";
 import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
 import CompetitionsPageContent from "./page-content";
 import { redirectIfRestricted } from "@/lib/services/restriction-guard.service";
 import { getTitleLevels } from "@/lib/services/xp-config.service";
+import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
+import {
+  browseCompetitions,
+  COMPETITIONS_PAGE_SIZE,
+} from "@/lib/competitions/browse-competitions";
+import { connectToDatabase } from "@/database/mongoose";
 
 // Force dynamic rendering - this page uses authentication
 export const dynamic = "force-dynamic";
@@ -16,45 +18,27 @@ const CompetitionsPage = async () => {
   // Reason: bounce restricted users to /account/review instead of showing
   // a list of competitions they cannot enter.
   await redirectIfRestricted("enterCompetition");
+  await connectToDatabase();
 
-  // Fetch competitions with limits so list doesn't grow unbounded (50 upcoming, 50 active, etc.)
-  const [
-    upcomingCompetitions,
-    activeCompetitions,
-    completedCompetitions,
-    cancelledCompetitions,
-  ] = await Promise.all([
-    getCompetitions({ status: "upcoming", limit: 50 }),
-    getCompetitions({ status: "active", limit: 50 }),
-    getCompetitions({ status: "completed", limit: 20 }),
-    getCompetitions({ status: "cancelled", limit: 10 }),
-  ]);
+  const session = await auth.api.getSession({ headers: await headers() });
+  const viewer = await resolveContestViewer(session?.user?.id ?? null);
 
-  const allCompetitions = [
-    ...activeCompetitions,
-    ...upcomingCompetitions,
-    ...completedCompetitions,
-    ...cancelledCompetitions,
-  ];
+  // Reason: never seed the browser with hundreds of historical contests — page 1 only.
+  const browse = await browseCompetitions({
+    page: 1,
+    limit: COMPETITIONS_PAGE_SIZE,
+    status: "active,upcoming",
+    sort: "featured",
+    viewer,
+  });
 
   const walletBalance = await getWalletBalance();
-
-  // Reason: the level-requirement badge on every card names a rung, and the operator may have
-  // renamed it (R88). Read here rather than in the client child, which cannot reach the database.
   const levelLadder = await getTitleLevels();
-
-  // Single batch query for user's participations (avoids N+1)
-  const session = await auth.api.getSession({ headers: await headers() });
-  const competitionIds = allCompetitions.map((c) => c._id.toString());
-  const userInCompetitionIds = session?.user?.id
-    ? await getCompetitionIdsUserIsIn(session.user.id, competitionIds)
-    : [];
 
   return (
     <CompetitionsPageContent
-      initialCompetitions={allCompetitions}
+      initialBrowse={browse}
       initialBalance={walletBalance.balance}
-      userInCompetitionIds={userInCompetitionIds}
       levelLadder={levelLadder}
     />
   );

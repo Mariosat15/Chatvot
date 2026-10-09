@@ -48,28 +48,28 @@ export function ArenaUtilityCard({
   const t = TONES.get(tone) ?? fallback;
   return (
     <div
-      className={`flex h-[74px] items-center gap-3 rounded-[14px] border bg-black/40 px-3 ${t.border} ${t.glow} ${
+      className={`flex h-[86px] items-center gap-3 rounded-[14px] border bg-black/45 px-3.5 ${t.border} ${t.glow} ${
         interactive ? "transition hover:brightness-110" : ""
       }`}
     >
       <Image
         src={icon}
         alt=""
-        width={36}
-        height={36}
-        className="h-9 w-9 shrink-0 object-contain"
+        width={40}
+        height={40}
+        className="h-9 w-9 shrink-0 object-contain sm:h-10 sm:w-10"
       />
       <div className="min-w-0">
         <p
-          className={`text-[10px] font-bold uppercase tracking-wider ${t.label}`}
+          className={`text-[11px] font-bold uppercase tracking-wider sm:text-[12px] ${t.label}`}
         >
           {label}
         </p>
-        <p className="truncate text-base font-black tabular-nums text-white sm:text-[17px]">
+        <p className="truncate text-[21px] font-black tabular-nums leading-tight text-white sm:text-[23px]">
           {value}
         </p>
         {subvalue ? (
-          <p className="truncate text-[11px] text-white/50">{subvalue}</p>
+          <p className="truncate text-[12px] text-white/50">{subvalue}</p>
         ) : null}
       </div>
     </div>

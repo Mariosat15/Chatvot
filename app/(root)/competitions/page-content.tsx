@@ -1,19 +1,17 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
-import {
-  calculateCompetitionDifficulty,
-  DifficultyLevel,
-} from "@/lib/utils/competition-difficulty";
+import type { DifficultyLevel } from "@/lib/utils/competition-difficulty";
 import type { TitleLevel } from "@/lib/constants/levels";
-import { resolveGameDefinition } from "@/lib/competitions/game-definitions";
 import type { CompetitionListItem } from "@/lib/competitions/types";
+import {
+  COMPETITIONS_PAGE_SIZE,
+  type BrowseCompetitionsResult,
+} from "@/lib/competitions/browse-types";
 import { CompetitionsArena } from "@/components/competitions/arena/CompetitionsArena";
 
-const POLL_FAST = 5_000;
-const POLL_NORMAL = 15_000;
-const POLL_SLOW = 30_000;
+const SEARCH_DEBOUNCE_MS = 350;
 
 interface Competition extends CompetitionListItem {
   riskLimits?: {
@@ -24,35 +22,27 @@ interface Competition extends CompetitionListItem {
   createdAt?: string;
   registrationDeadline?: string;
   playWindowEnd?: string;
+  bannerUrl?: string;
 }
 
 interface CompetitionsPageContentProps {
-  initialCompetitions: Competition[];
+  initialBrowse: BrowseCompetitionsResult;
   initialBalance: number;
-  userInCompetitionIds: string[];
   levelLadder: TitleLevel[];
 }
 
-const FILTER_STORAGE_KEY = "competition-filters";
+const FILTER_STORAGE_KEY = "competition-filters-v2";
 
 interface SavedFilters {
-  viewMode: "card" | "list" | "grid";
-  statusFilter: string[];
-  rankingFilter: string[];
-  assetFilter: string[];
-  difficultyFilter: DifficultyLevel[];
-  levelFilter: number[];
-  sortBy:
-    | "newest"
-    | "prize"
-    | "start"
-    | "participants"
-    | "entry"
-    | "difficulty";
-  gameFilter?: string;
+  viewMode: "grid" | "list";
+  statusFilter: string;
+  assetFilter: string;
+  difficultyFilter: string;
+  sortBy: string;
+  gameFilter: string;
 }
 
-const loadSavedFilters = (): Partial<SavedFilters> => {
+function loadSavedFilters(): Partial<SavedFilters> {
   if (typeof window === "undefined") return {};
   try {
     const saved = localStorage.getItem(FILTER_STORAGE_KEY);
@@ -60,65 +50,93 @@ const loadSavedFilters = (): Partial<SavedFilters> => {
   } catch {
     return {};
   }
-};
+}
 
-const saveFilters = (filters: SavedFilters) => {
+function saveFilters(filters: SavedFilters) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
   } catch {
     // Ignore storage errors
   }
-};
+}
 
-function matchesGameFilter(c: Competition, gameFilter: string): boolean {
-  if (!gameFilter || gameFilter === "all") return true;
-  const def = resolveGameDefinition(c);
-  if (gameFilter === "provider") {
-    return def.id === "provider" || c.gameType === "provider";
-  }
-  return def.id === gameFilter;
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+function buildQuery(params: {
+  page: number;
+  status: string;
+  game: string;
+  asset: string;
+  q: string;
+  sort: string;
+}): string {
+  const sp = new URLSearchParams();
+  sp.set("page", String(params.page));
+  sp.set("limit", String(COMPETITIONS_PAGE_SIZE));
+  sp.set("status", params.status || "active,upcoming");
+  sp.set("game", params.game || "all");
+  sp.set("sort", params.sort || "featured");
+  if (params.asset) sp.set("asset", params.asset);
+  if (params.q.trim()) sp.set("q", params.q.trim());
+  return sp.toString();
 }
 
 export default function CompetitionsPageContent({
-  initialCompetitions,
+  initialBrowse,
   initialBalance,
-  userInCompetitionIds,
   levelLadder,
 }: CompetitionsPageContentProps) {
   const { settings } = useAppSettings();
 
-  const [competitions, setCompetitions] =
-    useState<Competition[]>(initialCompetitions);
+  const [items, setItems] = useState<Competition[]>(
+    (initialBrowse.items as Competition[]) || [],
+  );
   const [userBalance, setUserBalance] = useState(initialBalance);
-  const [userInCompetitionIdsState, setUserInCompetitionIdsState] =
-    useState<string[]>(userInCompetitionIds);
+  const [userInCompetitionIdsState, setUserInCompetitionIdsState] = useState<
+    string[]
+  >(initialBrowse.userInCompetitionIds || []);
   const userInCompetitions = useMemo(
     () => new Set(userInCompetitionIdsState.map(String)),
     [userInCompetitionIdsState],
   );
 
+  const [page, setPage] = useState(initialBrowse.page || 1);
+  const [pageSize] = useState(initialBrowse.pageSize || COMPETITIONS_PAGE_SIZE);
+  const [totalItems, setTotalItems] = useState(initialBrowse.totalItems || 0);
+  const [totalPages, setTotalPages] = useState(initialBrowse.totalPages || 1);
+  const [hasNextPage, setHasNextPage] = useState(
+    initialBrowse.hasNextPage || false,
+  );
+  const [hasPreviousPage, setHasPreviousPage] = useState(
+    initialBrowse.hasPreviousPage || false,
+  );
+  const [kpis, setKpis] = useState(initialBrowse.kpis);
+
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [_lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [isHydrated, setIsHydrated] = useState(false);
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string[]>([
-    "active",
-    "upcoming",
-  ]);
-  const [rankingFilter, setRankingFilter] = useState<string[]>([]);
-  const [assetFilter, setAssetFilter] = useState<string[]>([]);
-  const [difficultyFilter, setDifficultyFilter] = useState<DifficultyLevel[]>(
-    [],
-  );
-  const [levelFilter, setLevelFilter] = useState<number[]>([]);
+  const debouncedSearch = useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS);
+  const [statusFilter, setStatusFilter] = useState("active,upcoming");
+  const [assetFilter, setAssetFilter] = useState("");
+  const [difficultyFilter, setDifficultyFilter] = useState("");
   const [gameFilter, setGameFilter] = useState("all");
-  const [sortBy, setSortBy] = useState<
-    "newest" | "prize" | "start" | "participants" | "entry" | "difficulty"
-  >("newest");
-  const [platformLeverage, setPlatformLeverage] = useState<number>(100);
+  const [sortBy, setSortBy] = useState("featured");
+  const [platformLeverage, setPlatformLeverage] = useState(100);
+  const [availableAssets, setAvailableAssets] = useState<string[]>([]);
+
+  const prefetchCache = useRef(new Map<string, BrowseCompetitionsResult>());
+  const skipNextFetch = useRef(true);
 
   useEffect(() => {
     const fetchRiskSettings = async () => {
@@ -131,359 +149,233 @@ export default function CompetitionsPageContent({
           }
         }
       } catch {
-        // Use default
+        // default
       }
     };
     fetchRiskSettings();
   }, []);
 
-  const getAdaptivePollInterval = useCallback((comps: Competition[]) => {
-    const now = Date.now();
-    let soonest = Infinity;
-    for (const c of comps) {
-      if (c.status === "upcoming") {
-        const ms = new Date(c.startTime).getTime() - now;
-        if (ms < soonest) soonest = ms;
-      }
-    }
-    if (soonest <= 0) return POLL_FAST;
-    if (soonest <= 2 * 60 * 1000) return POLL_FAST;
-    if (soonest <= 10 * 60 * 1000) return POLL_NORMAL;
-    return POLL_SLOW;
-  }, []);
-
-  const triggerStaleTransitions = useCallback(async (comps: Competition[]) => {
-    const now = Date.now();
-    const stale = comps.filter(
-      (c) =>
-        c.status === "upcoming" && new Date(c.startTime).getTime() <= now,
-    );
-    if (stale.length === 0) return false;
-    await Promise.allSettled(
-      stale.slice(0, 3).map((c) => fetch(`/api/competitions/${c._id}/status`)),
-    );
-    return true;
-  }, []);
-
-  const refreshData = useCallback(
-    async (showSpinner = true) => {
-      if (showSpinner) setIsRefreshing(true);
-      try {
-        const [competitionsRes, walletRes] = await Promise.all([
-          fetch("/api/competitions"),
-          fetch("/api/wallet/balance"),
-        ]);
-
-        if (competitionsRes.ok) {
-          const data = await competitionsRes.json();
-          const freshComps: Competition[] = data.competitions || [];
-          setCompetitions(freshComps);
-          setUserInCompetitionIdsState(data.userInCompetitionIds || []);
-
-          const hadStale = await triggerStaleTransitions(freshComps);
-          if (hadStale) {
-            await new Promise((r) => setTimeout(r, 2000));
-            const retryRes = await fetch("/api/competitions");
-            if (retryRes.ok) {
-              const retryData = await retryRes.json();
-              setCompetitions(retryData.competitions || []);
-              setUserInCompetitionIdsState(
-                retryData.userInCompetitionIds || [],
-              );
-            }
-          }
-        }
-
-        if (walletRes.ok) {
-          const walletData = await walletRes.json();
-          setUserBalance(walletData.balance ?? initialBalance);
-        }
-
-        setLastRefresh(new Date());
-      } catch (error) {
-        console.error("Error refreshing competitions:", error);
-      } finally {
-        setIsRefreshing(false);
-      }
-    },
-    [initialBalance, triggerStaleTransitions],
-  );
-
   useEffect(() => {
     const saved = loadSavedFilters();
-    if (saved.viewMode === "list") setViewMode("list");
-    else if (saved.viewMode === "card" || saved.viewMode === "grid") {
-      setViewMode("grid");
+    if (saved.viewMode === "list" || saved.viewMode === "grid") {
+      setViewMode(saved.viewMode);
     }
     if (saved.statusFilter) setStatusFilter(saved.statusFilter);
-    if (saved.rankingFilter) setRankingFilter(saved.rankingFilter);
-    if (saved.assetFilter) setAssetFilter(saved.assetFilter);
-    if (saved.difficultyFilter) setDifficultyFilter(saved.difficultyFilter);
-    if (saved.levelFilter) setLevelFilter(saved.levelFilter);
+    if (typeof saved.assetFilter === "string") setAssetFilter(saved.assetFilter);
+    if (typeof saved.difficultyFilter === "string") {
+      setDifficultyFilter(saved.difficultyFilter);
+    }
     if (saved.sortBy) setSortBy(saved.sortBy);
     if (saved.gameFilter) setGameFilter(saved.gameFilter);
     setIsHydrated(true);
   }, []);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    let cancelled = false;
-
-    const poll = async () => {
-      if (cancelled || document.visibilityState === "hidden") return;
-      await refreshData(false);
-      if (cancelled) return;
-      const interval = getAdaptivePollInterval(competitions);
-      timer = setTimeout(poll, interval);
-    };
-
-    const interval = getAdaptivePollInterval(competitions);
-    timer = setTimeout(poll, interval);
-
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshData, getAdaptivePollInterval]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        refreshData(false);
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [refreshData]);
-
-  useEffect(() => {
     if (!isHydrated) return;
     saveFilters({
       viewMode,
       statusFilter,
-      rankingFilter,
       assetFilter,
       difficultyFilter,
-      levelFilter,
       sortBy,
       gameFilter,
     });
   }, [
     viewMode,
     statusFilter,
-    rankingFilter,
     assetFilter,
     difficultyFilter,
-    levelFilter,
     sortBy,
     gameFilter,
     isHydrated,
   ]);
 
-  const getCompetitionDifficulty = useCallback(
-    (c: Competition) => {
-      const start = new Date(c.startTime);
-      const end = new Date(c.endTime);
-      const durationHours =
-        (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+  const applyBrowseResult = useCallback((data: BrowseCompetitionsResult) => {
+    setItems((data.items as Competition[]) || []);
+    setUserInCompetitionIdsState(data.userInCompetitionIds || []);
+    setPage(data.page);
+    setTotalItems(data.totalItems);
+    setTotalPages(data.totalPages);
+    setHasNextPage(data.hasNextPage);
+    setHasPreviousPage(data.hasPreviousPage);
+    setKpis(data.kpis);
+    const assets = new Set<string>();
+    for (const c of data.items as Competition[]) {
+      for (const a of c.assetClasses || []) {
+        if (a) assets.add(a);
+      }
+    }
+    if (assets.size > 0) {
+      setAvailableAssets(Array.from(assets).sort());
+    }
+  }, []);
 
-      return calculateCompetitionDifficulty({
-        entryFeeCredits: c.entryFee || c.entryFeeCredits || 0,
-        startingCapital: c.startingCapital || c.startingTradingPoints || 10000,
-        leverageAllowed: c.leverage?.max || platformLeverage,
-        maxParticipants: c.maxParticipants,
-        participantCount: c.currentParticipants,
-        durationHours,
-        rules: c.rules as never,
-        riskLimits: c.riskLimits,
-        levelRequirement: c.levelRequirement as never,
+  const fetchPage = useCallback(
+    async (
+      nextPage: number,
+      opts?: { showSkeleton?: boolean; spinner?: boolean },
+    ) => {
+      const query = buildQuery({
+        page: nextPage,
+        status: statusFilter,
+        game: gameFilter,
+        asset: assetFilter,
+        q: debouncedSearch,
+        sort: sortBy,
       });
-    },
-    [platformLeverage],
-  );
-
-  const applyFilters = useCallback(
-    (comps: Competition[]) => {
-      let result = [...comps];
-
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        result = result.filter((c) => {
-          const def = resolveGameDefinition(c);
-          const hay = [
-            c.name,
-            c.description,
-            def.label,
-            c.gameKey,
-            c.gameCode,
-            c.createdByName,
-            c.gameMasterName,
-            c.privateGameMasterName,
-            c.playMode,
-            c.attemptsPolicy,
-            ...(c.assetClasses || []),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          return hay.includes(query);
-        });
+      const cached = prefetchCache.current.get(query);
+      if (cached) {
+        applyBrowseResult(cached);
+        prefetchCache.current.delete(query);
+        return;
       }
 
-      if (gameFilter && gameFilter !== "all") {
-        result = result.filter((c) => matchesGameFilter(c, gameFilter));
-      }
+      if (opts?.showSkeleton) setIsLoading(true);
+      if (opts?.spinner) setIsRefreshing(true);
+      try {
+        const [competitionsRes, walletRes] = await Promise.all([
+          fetch(`/api/competitions?${query}`),
+          fetch("/api/wallet/balance"),
+        ]);
 
-      if (rankingFilter.length > 0) {
-        result = result.filter((c) =>
-          rankingFilter.includes(c.rules?.rankingMethod || ""),
-        );
-      }
-
-      if (assetFilter.length > 0) {
-        result = result.filter((c) =>
-          c.assetClasses?.some((asset) => assetFilter.includes(asset)),
-        );
-      }
-
-      if (difficultyFilter.length > 0) {
-        result = result.filter((c) => {
-          const difficulty = getCompetitionDifficulty(c);
-          return difficultyFilter.includes(difficulty.level);
-        });
-      }
-
-      if (levelFilter.length > 0) {
-        result = result.filter((c) => {
-          if (
-            levelFilter.includes(0) &&
-            (!c.levelRequirement?.enabled || !c.levelRequirement?.minLevel)
-          ) {
-            return true;
-          }
-          if (c.levelRequirement?.enabled && c.levelRequirement?.minLevel) {
-            return levelFilter.includes(c.levelRequirement.minLevel);
-          }
-          return false;
-        });
-      }
-
-      result.sort((a, b) => {
-        switch (sortBy) {
-          case "newest":
-            return (
-              new Date(b.createdAt || b.startTime).getTime() -
-              new Date(a.createdAt || a.startTime).getTime()
-            );
-          case "prize":
-            return (
-              (b.prizePool || b.prizePoolCredits || 0) -
-              (a.prizePool || a.prizePoolCredits || 0)
-            );
-          case "start":
-            return (
-              new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-            );
-          case "participants":
-            return (
-              (b.currentParticipants || 0) - (a.currentParticipants || 0)
-            );
-          case "entry":
-            return (
-              (a.entryFee || a.entryFeeCredits || 0) -
-              (b.entryFee || b.entryFeeCredits || 0)
-            );
-          case "difficulty":
-            return (
-              getCompetitionDifficulty(a).score -
-              getCompetitionDifficulty(b).score
-            );
-          default:
-            return 0;
+        if (competitionsRes.ok) {
+          const data = (await competitionsRes.json()) as BrowseCompetitionsResult;
+          applyBrowseResult(data);
         }
-      });
 
-      return result;
+        if (walletRes.ok) {
+          const walletData = await walletRes.json();
+          setUserBalance(walletData.balance ?? initialBalance);
+        }
+      } catch (error) {
+        console.error("Error refreshing competitions:", error);
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     },
     [
-      searchQuery,
+      statusFilter,
       gameFilter,
-      rankingFilter,
       assetFilter,
-      difficultyFilter,
-      levelFilter,
+      debouncedSearch,
       sortBy,
-      getCompetitionDifficulty,
+      applyBrowseResult,
+      initialBalance,
     ],
   );
 
-  const upcomingCompetitions = useMemo(() => {
-    if (!statusFilter.includes("upcoming")) return [];
-    return applyFilters(competitions.filter((c) => c.status === "upcoming"));
-  }, [competitions, applyFilters, statusFilter]);
+  // Prefetch next page after a successful load
+  useEffect(() => {
+    if (!hasNextPage || isLoading) return;
+    const next = page + 1;
+    const query = buildQuery({
+      page: next,
+      status: statusFilter,
+      game: gameFilter,
+      asset: assetFilter,
+      q: debouncedSearch,
+      sort: sortBy,
+    });
+    if (prefetchCache.current.has(query)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/competitions?${query}`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as BrowseCompetitionsResult;
+        if (!cancelled) prefetchCache.current.set(query, data);
+      } catch {
+        // prefetch is best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    page,
+    hasNextPage,
+    isLoading,
+    statusFilter,
+    gameFilter,
+    assetFilter,
+    debouncedSearch,
+    sortBy,
+  ]);
 
-  const otherCompetitions = useMemo(() => {
-    const otherStatuses = statusFilter.filter((s) => s !== "upcoming");
-    if (otherStatuses.length === 0) return [];
-    return applyFilters(
-      competitions.filter((c) => otherStatuses.includes(c.status)),
-    );
-  }, [competitions, applyFilters, statusFilter]);
+  // Refetch when filters / debounced search / page change (skip first hydrate with SSR data)
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (skipNextFetch.current) {
+      skipNextFetch.current = false;
+      // Reason: localStorage may restore filters that diverge from the SSR seed.
+      const diverged =
+        statusFilter !== "active,upcoming" ||
+        gameFilter !== "all" ||
+        sortBy !== "featured" ||
+        Boolean(assetFilter) ||
+        Boolean(debouncedSearch.trim());
+      if (!diverged) return;
+    }
+    prefetchCache.current.clear();
+    void fetchPage(page, { showSkeleton: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isHydrated,
+    page,
+    statusFilter,
+    gameFilter,
+    assetFilter,
+    debouncedSearch,
+    sortBy,
+  ]);
 
-  const totalFilteredCount =
-    upcomingCompetitions.length + otherCompetitions.length;
+  // Soft poll current page
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      await fetchPage(page, { showSkeleton: false });
+      if (cancelled) return;
+      timer = setTimeout(poll, 20_000);
+    };
+    timer = setTimeout(poll, 20_000);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [fetchPage, page]);
 
-  const activeCount = competitions.filter((c) => c.status === "active").length;
-  const upcomingCount = competitions.filter(
-    (c) => c.status === "upcoming",
-  ).length;
-  const totalPrizePool = competitions
-    .filter((c) => ["active", "upcoming"].includes(c.status))
-    .reduce((sum, c) => sum + (c.prizePool || c.prizePoolCredits || 0), 0);
+  const resetToPage1 = useCallback(() => {
+    setPage(1);
+  }, []);
 
   const clearFilters = () => {
     setSearchQuery("");
-    setStatusFilter(["active", "upcoming"]);
-    setRankingFilter([]);
-    setAssetFilter([]);
-    setDifficultyFilter([]);
-    setLevelFilter([]);
+    setStatusFilter("active,upcoming");
+    setAssetFilter("");
+    setDifficultyFilter("");
     setGameFilter("all");
+    setSortBy("featured");
+    resetToPage1();
   };
 
   const hasActiveFilters = Boolean(
     searchQuery ||
-      rankingFilter.length > 0 ||
-      assetFilter.length > 0 ||
-      difficultyFilter.length > 0 ||
-      levelFilter.length > 0 ||
+      assetFilter ||
+      difficultyFilter ||
       (gameFilter && gameFilter !== "all") ||
-      statusFilter.length !== 2 ||
-      !statusFilter.includes("active") ||
-      !statusFilter.includes("upcoming"),
+      statusFilter !== "active,upcoming" ||
+      sortBy !== "featured",
   );
 
-  const availableAssets = useMemo(() => {
-    const assets = new Set(competitions.flatMap((c) => c.assetClasses || []));
-    return Array.from(assets);
-  }, [competitions]);
-
-  // Assets filter only when browsing trading (or all with trading present)
   const showAssets =
-    gameFilter === "trading" ||
-    gameFilter === "all" ||
-    resolveGameDefinition({ gameType: "trading" }).filters.includes("assets");
-
-  const statusValue = statusFilter.join(",") || "active,upcoming";
+    gameFilter === "trading" || gameFilter === "all";
 
   return (
     <CompetitionsArena
-      competitions={competitions}
-      upcomingCompetitions={upcomingCompetitions}
-      otherCompetitions={otherCompetitions}
+      competitions={items}
       userBalance={userBalance}
       userInCompetitions={userInCompetitions}
       creditSymbol={settings?.credits?.symbol}
@@ -491,36 +383,56 @@ export default function CompetitionsPageContent({
       platformLeverage={platformLeverage}
       selectedGameId={gameFilter}
       searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
-      statusValue={statusValue}
-      onStatusChange={(v) =>
-        setStatusFilter(v.split(",").map((s) => s.trim()).filter(Boolean))
-      }
+      onSearchChange={(v) => {
+        setSearchQuery(v);
+        setPage(1);
+      }}
+      statusValue={statusFilter}
+      onStatusChange={(v) => {
+        setStatusFilter(v);
+        setPage(1);
+      }}
       gameValue={gameFilter}
-      onGameChange={setGameFilter}
-      assetValue={assetFilter[0] || ""}
-      onAssetChange={(v) => setAssetFilter(v ? [v] : [])}
+      onGameChange={(v) => {
+        setGameFilter(v);
+        setPage(1);
+      }}
+      assetValue={assetFilter}
+      onAssetChange={(v) => {
+        setAssetFilter(v);
+        setPage(1);
+      }}
       showAssets={showAssets}
       assetOptions={availableAssets.map((a) => ({
         value: a,
         label: a.toUpperCase(),
       }))}
-      difficultyValue={difficultyFilter[0] || ""}
+      difficultyValue={difficultyFilter}
       onDifficultyChange={(v) =>
-        setDifficultyFilter(v ? [v as DifficultyLevel] : [])
+        setDifficultyFilter(v as DifficultyLevel | "")
       }
       sortValue={sortBy}
-      onSortChange={(v) => setSortBy(v as typeof sortBy)}
+      onSortChange={(v) => {
+        setSortBy(v);
+        setPage(1);
+      }}
       hasActiveFilters={hasActiveFilters}
       onClear={clearFilters}
       viewMode={viewMode}
       onViewModeChange={setViewMode}
-      totalFilteredCount={totalFilteredCount}
-      liveNow={activeCount}
-      startingSoon={upcomingCount}
-      totalPrizePool={totalPrizePool}
+      page={page}
+      pageSize={pageSize}
+      totalItems={totalItems}
+      totalPages={totalPages}
+      hasNextPage={hasNextPage}
+      hasPreviousPage={hasPreviousPage}
+      onPageChange={setPage}
+      liveNow={kpis.liveNow}
+      startingSoon={kpis.startingSoon}
+      totalPrizePool={kpis.totalPrizePool}
+      isLoading={isLoading}
       isRefreshing={isRefreshing}
-      onRefresh={() => refreshData(true)}
+      onRefresh={() => fetchPage(page, { spinner: true })}
     />
   );
 }

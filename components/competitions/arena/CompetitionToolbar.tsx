@@ -55,25 +55,25 @@ export function CompetitionToolbar({
   onViewModeChange: (v: "grid" | "list") => void;
 }) {
   const selectClass =
-    "h-11 min-w-[120px] rounded-xl border border-cyan-400/25 bg-black/45 px-3 text-sm font-semibold text-white outline-none focus:border-cyan-400/60";
+    "h-[44px] min-w-[128px] rounded-xl border border-cyan-400/35 bg-black/50 px-3 text-[13px] font-semibold text-white outline-none focus:border-cyan-400/70";
 
   return (
     <section
-      className="flex flex-col gap-3 rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-[rgba(7,22,55,.9)] to-[rgba(3,11,29,.94)] p-3 sm:p-4"
-      style={{ boxShadow: "0 0 16px rgba(0,160,255,.1)" }}
+      className="flex flex-col gap-3 rounded-2xl border border-cyan-400/35 bg-gradient-to-r from-[rgba(7,22,55,.92)] to-[rgba(3,11,29,.96)] p-3 sm:gap-3 sm:p-4"
+      style={{ boxShadow: "0 0 18px rgba(0,160,255,.12)" }}
     >
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300/70" />
+        <div className="relative min-w-0 flex-[1.4]">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-300/80" />
           <input
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search competitions, games, or keywords..."
-            className="h-11 w-full rounded-xl border border-cyan-400/25 bg-black/45 pl-10 pr-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-cyan-400/60"
+            className="h-[44px] w-full rounded-xl border border-cyan-400/35 bg-black/50 pl-11 pr-3 text-[13px] text-white placeholder:text-white/40 outline-none focus:border-cyan-400/70"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <select
             aria-label="Status"
             className={selectClass}
@@ -145,7 +145,7 @@ export function CompetitionToolbar({
             <button
               type="button"
               onClick={onClear}
-              className="inline-flex h-11 items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-3 text-sm font-semibold text-white/70 hover:bg-white/10"
+              className="inline-flex h-[44px] items-center gap-1 rounded-xl border border-white/15 bg-white/5 px-3 text-[13px] font-semibold text-white/70 hover:bg-white/10"
             >
               <X className="h-4 w-4" />
               Clear

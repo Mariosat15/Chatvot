@@ -1,56 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
-import Competition from "@/database/models/trading/competition.model";
-import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { auth } from "@/lib/better-auth/auth";
 import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
-import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
-import { annotatePrivateContests } from "@/lib/services/gamemaster/private-contest-listing.service";
+import {
+  browseCompetitions,
+  COMPETITIONS_PAGE_SIZE,
+} from "@/lib/competitions/browse-competitions";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * GET /api/competitions
+ *
+ * Paginated browse (default pageSize 10). Query:
+ *   page, limit, status, game, asset, q, sort
+ *
+ * Legacy clients that omit page still get a paged envelope; `competitions` is
+ * aliased to `items` for older callers that only read that key.
+ */
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    // Get session for user-specific data
     let userId: string | null = null;
     try {
       const session = await auth.api.getSession({ headers: request.headers });
       userId = session?.user?.id || null;
     } catch {
-      // Not logged in, continue without user data
+      // anonymous browse
     }
 
-    // Fetch non-draft competitions (capped to prevent unbounded scan). Private Game Master
-    // contests are listed to every signed-in player and annotated with what this viewer may
-    // do about each one - the same answer `getCompetitions` gives, since the page refetches here.
+    const sp = request.nextUrl.searchParams;
     const viewer = await resolveContestViewer(userId);
-    const listed = await Competition.find(
-      withVisibleContests({ status: { $ne: "draft" } }, viewer),
-    )
-      .sort({ startTime: -1 })
-      .limit(200)
-      .lean();
-    const rows = listed as Array<Record<string, unknown>>;
-    const competitions = await annotatePrivateContests(rows, viewer);
 
-    // Get user's participation status if logged in
-    let userInCompetitionIds: string[] = [];
-    if (userId) {
-      const participations = await CompetitionParticipant.find({
-        userId,
-        status: { $in: ["active", "completed"] },
-      })
-        .select("competitionId")
-        .lean();
-
-      userInCompetitionIds = participations.map((p) => String(p.competitionId));
-    }
+    const result = await browseCompetitions({
+      page: Number(sp.get("page") || 1),
+      limit: Number(sp.get("limit") || COMPETITIONS_PAGE_SIZE),
+      status: sp.get("status") || "active,upcoming",
+      game: sp.get("game") || sp.get("type") || "all",
+      asset: sp.get("asset") || undefined,
+      q: sp.get("q") || sp.get("search") || undefined,
+      sort: sp.get("sort") || "featured",
+      viewer,
+    });
 
     return NextResponse.json({
-      competitions: JSON.parse(JSON.stringify(competitions)),
-      userInCompetitionIds,
+      ...result,
+      // Reason: older pollers read `competitions`; keep both until fully migrated.
+      competitions: result.items,
+      userInCompetitionIds: result.userInCompetitionIds,
     });
   } catch (error) {
     console.error("Error fetching competitions:", error);

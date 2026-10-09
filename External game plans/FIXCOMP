@@ -1,0 +1,629 @@
+# BUILT 9 Oct 2026 (eng) — FIXCOMP Competition Arena rebuild
+
+**Target:** Image 2 (horizontal mini-dashboard cards). Image 1 was the incorrect vertical stack.
+
+**Shipped:**
+- Horizontal card anatomy (art left → content right) with fade integration + cancelled diagonal ribbon
+- Artwork from `/assets/neon/overview/play-*` (Games/Dashboard family) via `lib/competitions/game-artwork.ts`
+- Join CTA chrome from supplied `btn-join-hires.png` (tint overlays for reserve / Join GM)
+- Header / KPI / toolbar hierarchy sized up; data tiles ~30px icons + readable values
+- Server browse: `lib/competitions/browse-competitions.ts` + `GET /api/competitions?page&limit=10&…`
+- Client: debounce search 350ms, skeletons, next-page prefetch, pagination UI
+- Indexes already present on Competition (`status+startTime`, `gameKey+status`, etc.) — no blind new indexes
+
+**Deliberate gaps:** separate Reserve/Join-GM/Cancelled ribbon PNGs were not in Menuitems (only Join pill) — CSS sash + hue-tint on Join chrome. Difficulty stays a soft client filter on the current page (not stored). **Never verified by eye.**
+
+---
+
+Yes. Image 1 is structurally far away from Image 2. Cursor has copied some concepts, but not the visual system, hierarchy, spacing, card anatomy, image treatment, or state logic. Give Cursor the following instructions as a strict rebuild specification, not as optional design suggestions.
+Cursor instruction — rebuild Competition Arena to match target
+IMPORTANT: Do not continue polishing the current implementation. Rebuild the competition listing/card area to match the supplied TARGET image. The current implementation is structurally wrong.
+The TARGET is Image 2. Image 1 is only the current incorrect implementation.
+1. Fix the overall visual hierarchy
+The current page looks like normal web cards placed over a background. The target needs to feel like a ChartVolt competition control center / arena.
+Use this hierarchy:
+1. Arena hero/header
+2. 3 large KPI cards
+3. Search + filters toolbar
+4. Competition results
+5. Pagination / loading controls
+Use a centered desktop content width around 1500–1600px, consistent spacing, and a clear rhythm between sections.
+Do not let cards, filters and text float independently.
+2. Header / Arena Summary
+Current header is too plain and compressed.
+Match the target:
+Left
+- Large trophy/icon approximately 64–72px.
+- COMPETITION ARENA large and strong.
+- “ARENA” may use cyan accent.
+- Subtitle underneath.
+Right
+Use three separate premium mini-cards:
+- Server Time
+- Your Balance
+- Add Credits
+Their icons must be much larger than now.
+Approximate sizing:
+header-icon: 60-72px
+mini-card-icon: 34-42px
+main-title: 28-34px
+primary-value: 21-25px
+secondary-label: 11-13px
+
+The problem with the current design is that everything is tiny. Do not solve this by simply increasing all fonts globally. Increase hierarchy: important numbers/icons large, supporting labels smaller.
+3. KPI cards need to look like actual feature panels
+The target has:
+LIVE NOW
+- green/cyan theme
+STARTING SOON
+- amber/gold theme
+PRIZE POOL
+- purple/magenta theme
+Each should contain:
+- large themed icon
+- section label
+- very large number/value
+- supporting description
+- subtle illustrated background
+- glow border
+- right navigation arrow
+Do not use the tiny icons currently in Image 1.
+Recommended icon sizes:
+.kpiIcon {
+  width: 58px;
+  height: 58px;
+}
+
+.kpiValue {
+  font-size: 32px;
+  font-weight: 800;
+}
+
+4. Search/filter row
+Keep all discovery controls together inside one toolbar.
+Target structure:
+[ Search............................ ]
+[Status ▼] [Type ▼] [Assets ▼] [Difficulty ▼] [Sort ▼]
+[Clear]
+[Grid] [List]
+
+Search gets the most width.
+Controls must have:
+- 42–46px desktop height
+- dark glass background
+- blue/cyan border
+- visible icons
+- 12–14px text minimum
+- 10–12px horizontal gap
+Current implementation is too small and visually flat.
+5. COMPETITION CARDS — THIS IS THE MAIN PROBLEM
+The current cards do not match the target.
+They currently look like:
+status
+huge rectangular image
+title
+tags
+description
+random statistic boxes
+button
+
+This is too generic and vertically inefficient.
+The target cards need to feel like mini game dashboards.
+Correct card anatomy
+Each card should use:
+┌──────────────────────────────────────┐
+│ STATUS                 GAME BADGE    │
+│                                      │
+│ ARTWORK / GAME HERO      CONTENT     │
+│                         TITLE        │
+│                         tags         │
+│                         description  │
+│                                      │
+│                         DATA BLOCKS  │
+│                                      │
+│ ENTRY / MODE / ETC        CTA        │
+└──────────────────────────────────────┘
+
+The artwork and information must feel integrated.
+6. Fix game image handling completely
+This is particularly wrong in Image 1.
+You already have the correct game artwork used on:
+- Games page
+- Dashboard
+- Game Performance
+- Suggested competitions
+Reuse those same assets.
+Do not randomly crop them into generic large rectangles.
+The card image should automatically use the correct game artwork based on gameId / gameSlug.
+Example:
+const gameArtwork = {
+  trading: "/games/trading/card.webp",
+  "volt-stack": "/games/volt-stack/card.webp",
+  "circuit-sprint": "/games/circuit-sprint/card.webp",
+  "volt-velocity": "/games/volt-velocity/card.webp",
+};
+
+Use the existing actual paths where available.
+Image treatment
+Images should use:
+object-fit: cover;
+object-position: center;
+
+But there must also be per-game focal positioning if necessary:
+const gameArtworkPosition = {
+  trading: "center 45%",
+  "volt-stack": "center",
+  "circuit-sprint": "center",
+  "volt-velocity": "center 55%",
+};
+
+Add fade integration
+Do not end the artwork with a hard rectangular edge.
+Apply a dark fade into the card:
+background:
+ linear-gradient(
+   90deg,
+   rgba(3,10,29,0.03) 0%,
+   rgba(3,10,29,0.15) 58%,
+   rgba(3,10,29,0.96) 100%
+ );
+
+For another layout variation, fade downward:
+linear-gradient(
+ to bottom,
+ transparent 35%,
+ rgba(3,10,29,.65) 72%,
+ rgba(3,10,29,1) 100%
+)
+
+The logo/title contained in the source artwork must remain visible. Do not crop off Volt Stack, Circuit Sprint, Volt Velocity or Trading logos.
+7. Cards need game-specific accent colours
+Do not make every card visually identical.
+Use game accent metadata:
+const GAME_THEME = {
+  trading: {
+    accent: "#00f0ff",
+    secondary: "#00ffad"
+  },
+
+  "volt-stack": {
+    accent: "#e42cff",
+    secondary: "#793cff"
+  },
+
+  "circuit-sprint": {
+    accent: "#ffb000",
+    secondary: "#ff5c22"
+  },
+
+  "volt-velocity": {
+    accent: "#1dcfff",
+    secondary: "#3677ff"
+  }
+};
+
+Apply this to:
+- card border
+- small icon highlights
+- section badges
+- CTA glow where appropriate
+- hover
+- spark lines / decorations
+Do not flood the entire card with that color.
+8. Make icons larger and aligned with the numbers
+This is one of the clearest problems in Image 1.
+Currently the statistic icons are tiny and visually disconnected from the values.
+Each data tile should work like:
+ [ICON]   PRIZE POOL
+          20,000 VOLTS
+          ≈ $20,000
+
+or
+[ICON] PLAYERS
+       24 / 100
+
+Use approximately:
+.dataIcon {
+  width: 30px;
+  height: 30px;
+}
+
+.dataLabel {
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+
+.dataValue {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+Larger primary prize boxes can use icons around 38–42px.
+Align icon and text vertically using flex/grid.
+9. Stop hardcoding trading fields
+Competition cards must be game agnostic.
+The current design should not assume every competition has:
+- leverage
+- assets
+- capital
+- trading difficulty
+Generate the data tiles according to the competition creator's actual settings.
+For example:
+Trading
+Prize Pool
+Players
+Duration
+Assets
+Entry Fee
+Capital
+Leverage
+Trading Mode
+
+Volt Stack
+Prize Pool
+Players
+Duration
+Board Size
+Entry Fee
+Rounds
+Game Mode
+Difficulty
+
+Circuit Sprint
+Prize Pool
+Players
+Duration
+Board Size
+Entry Fee
+Rounds
+Puzzle Mode
+Difficulty
+
+Volt Velocity
+Prize Pool
+Players
+Duration
+Track
+Entry Fee
+Laps
+Race Mode
+Difficulty
+
+Build a reusable adapter:
+getCompetitionDisplayFields(competition)
+
+It should return only meaningful fields.
+Never display empty or irrelevant fields.
+10. Competition state must control the entire card
+Create a proper state machine.
+type CompetitionState =
+  | "live"
+  | "starting-soon"
+  | "open"
+  | "private-gm"
+  | "joined"
+  | "full"
+  | "completed"
+  | "cancelled"
+  | "refunded"
+  | "disabled";
+
+The state affects:
+- badge
+- card accent
+- CTA
+- CTA icon
+- secondary text
+- accessibility
+- whether CTA is clickable
+11. USE THE ACTUAL CTA ASSETS I PROVIDED
+Cursor is currently recreating plain CSS buttons.
+Stop doing this.
+I already supplied visual assets for:
+- Join Competition
+- Reserve Spot
+- Join GM to Enter
+- View Results
+- Already In
+- Cancelled ribbon
+Use those actual assets.
+Do not approximate them with generic gradients.
+The button should preserve the artwork while still acting like a real button:
+<button className="competitionCta">
+  <img src={ctaAsset} alt="" />
+  <span className="sr-only">{ctaLabel}</span>
+</button>
+
+Or place the asset as a background while preserving responsive text/interaction if necessary.
+Use:
+background-size: 100% 100%;
+background-repeat: no-repeat;
+background-position: center;
+
+State mapping
+live/open + eligible
+→ Join Competition
+
+starting soon
+→ Reserve Spot
+
+private GM + user not affiliated
+→ Join GM to Enter
+
+already joined
+→ Already In
+
+completed
+→ View Results
+
+cancelled
+→ disabled/details only + CANCELLED ribbon
+
+full
+→ Competition Full
+
+12. Existing Join GM logic must remain
+Do not create another GM system.
+Reuse ChartVolt's existing logic.
+For a private GM competition:
+if (competition.private && competition.gmId) {
+   if (!user.isAcceptedReferralOf(competition.gmId)) {
+      CTA = "Join GM to Enter";
+   }
+}
+
+After GM joining + terms acceptance:
+Join GM to Enter
+        ↓
+Join Competition
+
+Or Already In if entry already occurred.
+13. Fix card proportions
+Image 1 cards are too tall and feel empty.
+Desktop target should show 2 cards per row with approximately:
+grid-template-columns: repeat(2, minmax(0,1fr));
+gap: 14px;
+
+Approx card height:
+310–380px, depending on actual data.
+Do not force every card to be exactly the same height if dynamic fields differ slightly, but aim for visual alignment.
+The CTA should stay in a consistent footer area.
+Use:
+.card {
+ display:flex;
+ flex-direction:column;
+}
+
+.cardContent {
+ flex:1;
+}
+
+.cardFooter {
+ margin-top:auto;
+}
+
+14. Improve text readability
+Current text is far too small.
+On normal desktop 1440p/1600p:
+Competition title     18–21px
+Description           12–14px
+Primary value         16–19px
+Data label            9–11px
+Badges                10–12px
+CTA text              14–16px
+
+Do not use 7–9px body text.
+Users should not need zoom to understand a card.
+15. Status badges should be stronger
+Examples:
+🟢 LIVE NOW
+🟡 STARTING SOON
+🟣 PRIVATE · GM ONLY
+🔵 COMPLETED
+🔴 CANCELLED
+The status must be immediately visible without reading the body.
+16. Cancelled state
+The current small CANCELLED badge is weak.
+Use the red diagonal CANCELLED ribbon asset I supplied across the upper-right corner.
+A cancelled card should also have:
+- slightly reduced artwork saturation
+- muted CTA
+- optionally reason/refund status
+- no Join CTA
+Example:
+CANCELLED
+Entry refunded
+
+if refund actually occurred.
+17. Completed competition card
+Completed does not mean visually dead.
+Keep game artwork visible.
+Show:
+COMPLETED
+Prize
+Players
+Duration
+Game-specific result information
+
+[ VIEW RESULTS ]
+
+Do not display a bland generic card.
+18. ADD PROPER DATA LOADING — IMPORTANT
+Do not load every competition into the browser.
+With thousands of:
+- completed
+- expired
+- cancelled
+- refunded
+competitions, this will become slow and eventually unusable.
+Use server-side pagination.
+Default:
+pageSize = 10
+
+Only request 10 competitions at a time.
+Example API:
+GET /api/competitions
+?page=1
+&limit=10
+&status=all
+&type=all
+&game=all
+&difficulty=all
+&sort=featured
+
+Backend should return:
+{
+  items: Competition[],
+  page: 1,
+  pageSize: 10,
+  totalItems: 3284,
+  totalPages: 329,
+  hasNextPage: true,
+  hasPreviousPage: false
+}
+
+Never:
+fetchAllCompetitions()
+
+and then filter 3,000 records client-side.
+19. Pagination
+Below the competition cards add:
+Showing 1–10 of 3,284
+
+‹ Previous   1  2  3  4  ... 329   Next ›
+
+Keep 10 cards per page.
+This is important because the user needs predictable browsing instead of endless scrolling.
+When filters change:
+setPage(1)
+
+Then refetch.
+20. Lazy-load images
+All competition artwork must use lazy loading:
+<img
+  src={image}
+  loading="lazy"
+  decoding="async"
+/>
+
+In Next.js:
+<Image
+  src={image}
+  fill
+  sizes="(max-width: 768px) 100vw, 50vw"
+  loading="lazy"
+/>
+
+Only hero/header imagery above the fold should receive priority.
+Competition card images should not use priority.
+21. Add skeleton loading states
+When requesting another page, do not blank out the whole section.
+Render 4–6 skeleton cards matching the card geometry.
+Example:
+┌────────────────────┐
+│ ██████████████████ │
+│ ██████             │
+│ ▓▓▓  ▓▓▓  ▓▓▓     │
+│ ███████████        │
+└────────────────────┘
+
+Use subtle animated shimmer, not a spinner centered on the whole screen.
+22. Prefetch next page
+After page 1 loads, optionally prefetch page 2 in the background.
+For React Query/TanStack Query:
+queryClient.prefetchQuery({
+  queryKey: ["competitions", filters, page + 1],
+  queryFn: ...
+});
+
+This makes next-page navigation nearly instant.
+23. Filtering must happen on server
+These should change API query parameters:
+- Status
+- Game/type
+- Assets
+- Difficulty
+- Sort
+- Search
+Do not load everything first.
+Use search debounce around:
+300–400ms
+
+Example:
+useDebounce(search, 350);
+
+24. Historical competition strategy
+As the platform grows, the current competition page should prioritize relevant competitions.
+Suggested sort:
+1 Live
+2 Starting Soon
+3 Open
+4 Private eligible
+5 Private requiring GM
+6 Completed recent
+7 Cancelled/refunded recent
+8 Historical
+
+Consider status tabs later:
+Discover
+Live
+Upcoming
+Joined
+Completed
+
+This prevents old competitions overwhelming active opportunities.
+25. Database indexes
+Cursor must make sure MongoDB queries are indexable.
+Likely indexes:
+{ status: 1, startTime: 1 }
+
+{ gameId: 1, status: 1, startTime: 1 }
+
+{ status: 1, createdAt: -1 }
+
+{ gmId: 1, visibility: 1, status: 1 }
+
+{ endTime: -1 }
+
+Do not create every imaginable compound index blindly; inspect existing queries and add indexes supporting the actual filter/sort combinations.
+26. ARCHIVE OLD COMPETITIONS LOGICALLY
+Do not mix thousands of historical competitions into the first discovery results.
+Completed/cancelled competitions should remain searchable, but users should reach them through filtering/pagination.
+Possible data logic:
+isHistorical =
+  status === "completed" ||
+  status === "cancelled" ||
+  status === "refunded";
+
+Do not delete them because they are needed for:
+- history
+- results
+- audit
+- player performance
+- GM reporting
+Final visual requirement
+Do not recreate Image 1 with slightly larger fonts.
+The result must structurally resemble Image 2:
+- larger, stronger icons
+- readable typography
+- integrated game artwork
+- game-specific artwork automatically selected
+- artwork fades naturally into card
+- game logos remain visible
+- dynamic data blocks
+- meaningful hierarchy
+- premium neon/glass ChartVolt aesthetic
+- real supplied CTA artwork
+- state-aware actions
+- clear badges
+- consistent two-column card system
+- no tiny UI
+- no hardcoded trading fields
+- no loading every historical competition
+- 10 competitions per page
+- server-side pagination
+- lazy-loaded artwork
+- skeleton loading
+- responsive mobile layout
+Critical acceptance test
+Before considering the page finished, compare it side-by-side with the target. At 100% browser zoom, I should immediately be able to read the title, prize, players, duration, game information and CTA of every competition without zooming. The game artwork must look like the existing ChartVolt Games/Dashboard cards, not generic landscape images. The target should feel like a premium competitive gaming interface, not a standard admin listing.

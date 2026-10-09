@@ -37,7 +37,79 @@ const CARDS = [
   },
 ];
 
-export function ArenaKpiCards({ values }: { values: ArenaKpiValues }) {
+function KpiPanel({
+  card,
+  value,
+  onClick,
+}: {
+  card: (typeof CARDS)[number];
+  value: string;
+  onClick?: () => void;
+}) {
+  const body = (
+    <>
+      <div
+        className="pointer-events-none absolute -right-6 -top-6 h-36 w-36 rounded-full opacity-35"
+        style={{
+          background: `radial-gradient(circle, ${card.accent}, transparent 70%)`,
+        }}
+      />
+      <div className="relative flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45">
+        <Image
+          src={card.icon}
+          alt=""
+          width={58}
+          height={58}
+          className="h-[42px] w-[42px] object-contain"
+        />
+      </div>
+      <div className="relative min-w-0 flex-1">
+        <p className="text-[13px] font-extrabold uppercase tracking-wide text-white/70">
+          {card.label}
+        </p>
+        <p
+          className={`truncate text-[32px] font-extrabold leading-none tabular-nums ${card.valueClass}`}
+        >
+          {value}
+        </p>
+        <p className="mt-1 truncate text-xs text-white/45">{card.description}</p>
+      </div>
+      <span className="relative text-2xl text-white/35" aria-hidden>
+        ›
+      </span>
+    </>
+  );
+
+  const className = `relative flex h-[118px] w-full items-center gap-4 overflow-hidden rounded-2xl border bg-gradient-to-br from-[rgba(7,22,55,.92)] to-[rgba(3,11,29,.96)] px-4 text-left ${card.border}`;
+  const style = { boxShadow: `0 0 22px ${card.accent}` };
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${className} cursor-pointer transition hover:brightness-110`}
+        style={style}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <div className={className} style={style}>
+      {body}
+    </div>
+  );
+}
+
+export function ArenaKpiCards({
+  values,
+  onSelect,
+}: {
+  values: ArenaKpiValues;
+  onSelect?: (key: "live" | "soon" | "prize") => void;
+}) {
   const map = {
     live: String(values.liveNow),
     soon: String(values.startingSoon),
@@ -47,43 +119,16 @@ export function ArenaKpiCards({ values }: { values: ArenaKpiValues }) {
   return (
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
       {CARDS.map((card) => (
-        <div
+        <KpiPanel
           key={card.key}
-          className={`relative flex h-[104px] items-center gap-3 overflow-hidden rounded-2xl border bg-gradient-to-br from-[rgba(7,22,55,.9)] to-[rgba(3,11,29,.95)] px-4 ${card.border}`}
-          style={{ boxShadow: `0 0 18px ${card.accent}` }}
-        >
-          <div
-            className="pointer-events-none absolute -right-4 -top-4 h-28 w-28 rounded-full opacity-30"
-            style={{
-              background: `radial-gradient(circle, ${card.accent}, transparent 70%)`,
-            }}
-          />
-          <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/40">
-            <Image
-              src={card.icon}
-              alt=""
-              width={40}
-              height={40}
-              className="h-10 w-10 object-contain"
-            />
-          </div>
-          <div className="relative min-w-0 flex-1">
-            <p className="text-[13px] font-extrabold uppercase tracking-wide text-white/70">
-              {card.label}
-            </p>
-            <p
-              className={`truncate text-[30px] font-black leading-none tabular-nums ${card.valueClass}`}
-            >
-              {map[card.key]}
-            </p>
-            <p className="mt-1 truncate text-xs text-white/45">
-              {card.description}
-            </p>
-          </div>
-          <span className="relative text-xl text-white/35" aria-hidden>
-            ›
-          </span>
-        </div>
+          card={card}
+          value={map[card.key]}
+          onClick={
+            onSelect && card.key !== "prize"
+              ? () => onSelect(card.key)
+              : undefined
+          }
+        />
       ))}
     </section>
   );

@@ -19,12 +19,12 @@ import { ArenaKpiCards } from "./ArenaKpiCards";
 import { CompetitionToolbar, type ToolbarFilterOption } from "./CompetitionToolbar";
 import { ArenaCompetitionCard } from "./ArenaCompetitionCard";
 import { ArenaCompetitionListRow } from "./ArenaCompetitionListRow";
+import { ArenaCompetitionSkeletonGrid } from "./ArenaCompetitionSkeleton";
+import { ArenaPagination } from "./ArenaPagination";
 import { useUtcClock } from "./useUtcClock";
 
 export function CompetitionsArena({
   competitions,
-  upcomingCompetitions,
-  otherCompetitions,
   userBalance,
   userInCompetitions,
   creditSymbol,
@@ -49,16 +49,21 @@ export function CompetitionsArena({
   onClear,
   viewMode,
   onViewModeChange,
-  totalFilteredCount,
+  page,
+  pageSize,
+  totalItems,
+  totalPages,
+  hasNextPage,
+  hasPreviousPage,
+  onPageChange,
   liveNow,
   startingSoon,
   totalPrizePool,
+  isLoading,
   isRefreshing,
   onRefresh,
 }: {
   competitions: CompetitionListItem[];
-  upcomingCompetitions: CompetitionListItem[];
-  otherCompetitions: CompetitionListItem[];
   userBalance: number;
   userInCompetitions: Set<string>;
   creditSymbol?: string;
@@ -83,10 +88,17 @@ export function CompetitionsArena({
   onClear: () => void;
   viewMode: "grid" | "list";
   onViewModeChange: (v: "grid" | "list") => void;
-  totalFilteredCount: number;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  onPageChange: (page: number) => void;
   liveNow: number;
   startingSoon: number;
   totalPrizePool: number;
+  isLoading: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
 }) {
@@ -99,7 +111,30 @@ export function CompetitionsArena({
         ? resolveGameDefinition(competitions[0])
         : gameDefinitions.all;
 
-  const toPresentation = (c: CompetitionListItem) => {
+  // Reason: difficulty is derived client-side (not stored) — filter only the current page.
+  const visibleCompetitions =
+    difficultyValue.trim().length > 0
+      ? competitions.filter((c) => {
+          const difficulty = calculateCompetitionDifficulty({
+            entryFeeCredits: Number(c.entryFeeCredits ?? c.entryFee ?? 0) || 0,
+            startingCapital:
+              Number(c.startingCapital ?? c.startingTradingPoints ?? 10000) ||
+              10000,
+            leverageAllowed: c.leverage?.max || platformLeverage,
+            maxParticipants: c.maxParticipants,
+            participantCount: c.currentParticipants,
+            durationHours:
+              (new Date(c.endTime).getTime() -
+                new Date(c.startTime).getTime()) /
+              (1000 * 60 * 60),
+            rules: c.rules as never,
+            levelRequirement: c.levelRequirement as never,
+          });
+          return difficulty.level === difficultyValue;
+        })
+      : competitions;
+
+  const presentations = visibleCompetitions.map((c) => {
     const difficulty = calculateCompetitionDifficulty({
       entryFeeCredits: Number(c.entryFeeCredits ?? c.entryFee ?? 0) || 0,
       startingCapital:
@@ -128,10 +163,7 @@ export function CompetitionsArena({
       levelLadder,
       difficultyLabel: difficulty.label,
     });
-  };
-
-  const upcomingPresentations = upcomingCompetitions.map(toPresentation);
-  const otherPresentations = otherCompetitions.map(toPresentation);
+  });
 
   const statusOptions: ToolbarFilterOption[] = [
     { value: "active,upcoming", label: "All Open" },
@@ -162,12 +194,12 @@ export function CompetitionsArena({
   ];
 
   const sortOptions: ToolbarFilterOption[] = [
-    { value: "newest", label: "Featured" },
+    { value: "featured", label: "Featured" },
+    { value: "newest", label: "Newest" },
     { value: "start", label: "Starting Soon" },
     { value: "prize", label: "Prize Pool" },
     { value: "participants", label: "Players" },
     { value: "entry", label: "Entry Fee" },
-    { value: "difficulty", label: "Difficulty" },
   ];
 
   return (
@@ -180,7 +212,7 @@ export function CompetitionsArena({
         backgroundAttachment: "fixed",
       }}
     >
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 sm:gap-[16px] sm:px-6 sm:pb-8 sm:pt-4">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-4 sm:gap-5 sm:px-6 sm:pb-10 sm:pt-5">
         <div className="flex items-center justify-end sm:hidden">
           <button
             type="button"
@@ -211,6 +243,10 @@ export function CompetitionsArena({
               symbol: creditSymbol,
             }),
           }}
+          onSelect={(key) => {
+            if (key === "live") onStatusChange("active");
+            if (key === "soon") onStatusChange("upcoming");
+          }}
         />
 
         <CompetitionToolbar
@@ -238,68 +274,42 @@ export function CompetitionsArena({
           onViewModeChange={onViewModeChange}
         />
 
-        <p className="text-sm text-white/55">
-          Showing{" "}
-          <span className="font-bold text-white">{totalFilteredCount}</span>{" "}
-          competitions
-        </p>
-
-        {upcomingPresentations.length > 0 ? (
-          <section className="space-y-3">
-            <h2 className="text-lg font-extrabold text-amber-200">
-              Starting Soon
-            </h2>
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4"
-                  : "flex flex-col gap-3"
-              }
-            >
-              {upcomingPresentations.map((p) =>
-                viewMode === "grid" ? (
-                  <ArenaCompetitionCard key={p.id} presentation={p} />
-                ) : (
-                  <ArenaCompetitionListRow key={p.id} presentation={p} />
-                ),
-              )}
-            </div>
-          </section>
-        ) : null}
-
-        {otherPresentations.length > 0 ? (
-          <section className="space-y-3">
-            {upcomingPresentations.length > 0 ? (
-              <h2 className="text-lg font-extrabold text-cyan-200">
-                Live & More
-              </h2>
-            ) : null}
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4"
-                  : "flex flex-col gap-3"
-              }
-            >
-              {otherPresentations.map((p) =>
-                viewMode === "grid" ? (
-                  <ArenaCompetitionCard key={p.id} presentation={p} />
-                ) : (
-                  <ArenaCompetitionListRow key={p.id} presentation={p} />
-                ),
-              )}
-            </div>
-          </section>
-        ) : null}
-
-        {totalFilteredCount === 0 ? (
+        {isLoading ? (
+          <ArenaCompetitionSkeletonGrid count={4} />
+        ) : presentations.length > 0 ? (
+          <div
+            className={
+              viewMode === "grid"
+                ? "grid grid-cols-1 gap-[14px] md:grid-cols-2"
+                : "flex flex-col gap-3"
+            }
+          >
+            {presentations.map((p) =>
+              viewMode === "grid" ? (
+                <ArenaCompetitionCard key={p.id} presentation={p} />
+              ) : (
+                <ArenaCompetitionListRow key={p.id} presentation={p} />
+              ),
+            )}
+          </div>
+        ) : (
           <div className="rounded-2xl border border-white/10 bg-black/40 px-6 py-16 text-center">
             <p className="text-lg font-bold text-white">No competitions found</p>
             <p className="mt-2 text-sm text-white/55">
               Try clearing filters or searching a different keyword.
             </p>
           </div>
-        ) : null}
+        )}
+
+        <ArenaPagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          totalPages={totalPages}
+          hasNextPage={hasNextPage}
+          hasPreviousPage={hasPreviousPage}
+          onPageChange={onPageChange}
+        />
       </div>
     </div>
   );

@@ -107,7 +107,7 @@ describe("buildCompetitionPresentation", () => {
     expect(p.statusLabel).toBe("LIVE NOW");
   });
 
-  it("does not paint a giant cancelled watermark — status is a badge", () => {
+  it("marks cancelled cards with a ribbon label (not a giant watermark)", () => {
     const p = buildCompetitionPresentation(
       base({ status: "cancelled", cancellationReason: "refunded" }),
       {
@@ -117,7 +117,18 @@ describe("buildCompetitionPresentation", () => {
       },
     );
     expect(p.status === "cancelled" || p.status === "refunded").toBe(true);
-    expect(p.statusLabel).not.toMatch(/watermark/i);
+    expect(p.showCancelledRibbon).toBe(true);
+    expect(p.cancelledRibbonLabel).toMatch(/CANCELLED/i);
+  });
+
+  it("resolves Games/Dashboard play-card artwork for trading", () => {
+    const p = buildCompetitionPresentation(base(), {
+      isRegistered: false,
+      userBalance: 100,
+      registrationClosed: false,
+    });
+    expect(p.gameArtwork).toContain("/assets/neon/overview/play-trading");
+    expect(p.artworkObjectPosition).toBeTruthy();
   });
 
   it("omits assets for a provider puzzle with no assetClasses", () => {

@@ -90,8 +90,9 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
         disabled: false,
       };
     }
+    // Reason: FIXCOMP state machine — seated but not live reads "Already In".
     return {
-      label: "Enter Lobby",
+      label: "Already In",
       href: lobbyHref(id),
       variant: "join",
       disabled: false,
