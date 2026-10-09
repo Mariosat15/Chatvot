@@ -6,7 +6,8 @@ import type {
   CompetitionMetric,
   CompetitionPresentation,
 } from "@/lib/competitions/types";
-import { CompetitionCountdown } from "./CompetitionCountdown";
+import { CompetitionCountdownDataBlock } from "./CompetitionCountdown";
+import { CompetitionDataShell } from "./CompetitionDataBlock";
 import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 
 /**
@@ -14,18 +15,13 @@ import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
  * drift apart (one shows a countdown or a GM Funded tag and the other does not).
  */
 
-// Reason: Map lookup — object indexing trips security/detect-object-injection.
-const TAG_TONE = new Map<string, string>([
-  ["neutral", "border-white/20 bg-white/10 text-slate-100"],
-  ["game", "border-white/20 bg-white/10 text-slate-100"],
-  ["creator", "border-sky-300/40 bg-sky-500/15 text-sky-100"],
-  ["skill", "border-amber-400/40 bg-amber-500/15 text-amber-100"],
-  ["private", "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-100"],
-  [
-    "funded",
-    "border-amber-300/70 bg-amber-400/20 text-amber-50 shadow-[0_0_12px_rgba(251,191,36,.35)]",
-  ],
-]);
+const CONTEXT_BLOCK = {
+  creator: { label: "Host", icon: COMPETITION_ICON.players },
+  funded: { label: "Funding", icon: COMPETITION_ICON.volts },
+  private: { label: "Access", icon: COMPETITION_ICON.wallet },
+  skill: { label: "Requirement", icon: COMPETITION_ICON.trophyGold },
+  neutral: { label: "Details", icon: COMPETITION_ICON.live },
+} as const;
 
 /**
  * Reason: the blurred backdrop is ambience only — text sits on it, so it is
@@ -105,47 +101,48 @@ export function CardHero({
   );
 }
 
-/** Status, optional context badges and clock share one wrapping row. */
+/** Keep the card header quiet: game identity is already in the artwork and title. */
 export function CardBadgesRow({ presentation: p }: { presentation: CompetitionPresentation }) {
   const cancelled = p.status === "cancelled" || p.status === "refunded";
+  if (cancelled) return null;
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {!cancelled ? (
-        <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
-      ) : null}
-      {p.tags.map((tag) => (
-        <span
-          key={`${tag.tone}-${tag.label}`}
-          title={tag.tone === "funded" ? p.gmFundedNote : undefined}
-          className={`inline-flex h-[28px] items-center gap-1 rounded-lg border px-2.5 text-[10px] font-bold leading-none ${
-            TAG_TONE.get(tag.tone) ?? TAG_TONE.get("neutral")
-          }`}
-        >
-          {tag.tone === "game" ? (
-            <Image
-              src={p.gameIcon}
-              alt=""
-              width={14}
-              height={14}
-              className="size-3.5 object-contain"
-            />
-          ) : null}
-          {tag.tone === "funded" ? (
-            <Image
-              src={COMPETITION_ICON.volts}
-              alt=""
-              width={14}
-              height={14}
-              className="size-3.5 object-contain"
-            />
-          ) : null}
-          {tag.label}
-        </span>
-      ))}
-      {p.countdown ? (
-        <CompetitionCountdown kind={p.countdown.kind} target={p.countdown.target} />
-      ) : null}
+    <div className="flex min-h-[28px] items-center">
+      <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
     </div>
+  );
+}
+
+/** Context and timing are data, so they use the same boxes as every other card metric. */
+export function CardContextDataBlocks({
+  presentation: p,
+}: {
+  presentation: CompetitionPresentation;
+}) {
+  return (
+    <>
+      {p.tags.map((tag) => {
+        if (tag.tone === "game") return null;
+        const context =
+          CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
+        return (
+          <CompetitionDataShell
+            key={`${tag.tone}-${tag.label}`}
+            icon={context.icon}
+            label={context.label}
+            value={tag.label}
+            accent={p.gameAccent}
+          />
+        );
+      })}
+      {p.countdown ? (
+        <CompetitionCountdownDataBlock
+          kind={p.countdown.kind}
+          target={p.countdown.target}
+          accent={p.gameAccent}
+        />
+      ) : null}
+    </>
   );
 }
 

@@ -80,9 +80,37 @@ describe("scopeCompetitionStatusesToParticipant", () => {
       "components/competitions/arena/ArenaCompetitionCard.tsx",
       "utf8",
     );
-    expect(parts).toContain("!cancelled ? (");
+    expect(parts).toContain("if (cancelled) return null");
     expect(parts).toContain("<CompetitionStatusBadge");
     expect(parts).toContain('p.status !== "cancelled"');
     expect(card).toContain("<CancelledRibbon");
+  });
+
+  it("keeps the header clear and puts context plus time in the data grid", () => {
+    const parts = readFileSync(
+      "components/competitions/arena/CompetitionCardParts.tsx",
+      "utf8",
+    );
+    const card = readFileSync(
+      "components/competitions/arena/ArenaCompetitionCard.tsx",
+      "utf8",
+    );
+    const list = readFileSync(
+      "components/competitions/arena/ArenaCompetitionListRow.tsx",
+      "utf8",
+    );
+    const header = parts.slice(
+      parts.indexOf("export function CardBadgesRow"),
+      parts.indexOf("export function CardContextDataBlocks"),
+    );
+
+    expect(header).not.toContain("p.tags.map");
+    expect(header).not.toContain("CompetitionCountdown");
+    expect(parts).toContain("<CompetitionDataShell");
+    expect(parts).toContain("<CompetitionCountdownDataBlock");
+    expect(card).toContain("<CardContextDataBlocks");
+    expect(list).toContain("<CardContextDataBlocks");
+    expect(card).toContain('className="w-full max-w-[220px]"');
+    expect(card).not.toContain("max-w-none");
   });
 });

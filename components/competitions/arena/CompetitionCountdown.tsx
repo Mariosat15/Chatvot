@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { CompetitionDataShell } from "./CompetitionDataBlock";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -19,18 +19,20 @@ function formatRemaining(ms: number): string {
 }
 
 /**
- * Ticking "Starts in" / "Ends in" clock beside a card's tags.
+ * Ticking "Starts in" / "Ends in" clock in the card's data grid.
  *
  * Reason: the first render shows a placeholder and the clock starts after
  * mount, so server and client markup agree (no hydration mismatch from two
  * different `Date.now()` values). Hidden once the moment has passed.
  */
-export function CompetitionCountdown({
+export function CompetitionCountdownDataBlock({
   kind,
   target,
+  accent,
 }: {
   kind: "starts" | "ends";
   target: string;
+  accent: string;
 }) {
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -50,30 +52,15 @@ export function CompetitionCountdown({
 
   const starts = kind === "starts";
   return (
-    <span
-      className={`inline-flex h-[30px] shrink-0 items-center gap-2 rounded-lg border px-2.5 ${
-        starts
-          ? "border-amber-400/60 bg-amber-500/15 shadow-[0_0_14px_rgba(255,176,32,.35)]"
-          : "border-cyan-400/60 bg-cyan-500/15 shadow-[0_0_14px_rgba(0,216,255,.35)]"
-      }`}
-    >
-      <Image
-        src={COMPETITION_ICON.clock}
-        alt=""
-        width={20}
-        height={20}
-        className="size-5 object-contain"
-      />
-      <span
-        className={`text-[9px] font-bold uppercase leading-none tracking-[0.08em] ${
-          starts ? "text-amber-200" : "text-cyan-200"
-        }`}
-      >
-        {starts ? "Starts in" : "Ends in"}
-      </span>
-      <span className="font-mono text-[14px] font-black leading-none tabular-nums text-white">
-        {ms === null ? "--:--:--" : formatRemaining(ms)}
-      </span>
-    </span>
+    <CompetitionDataShell
+      icon={COMPETITION_ICON.clock}
+      label={starts ? "Starts in" : "Ends in"}
+      value={
+        <span className="font-mono tabular-nums">
+          {ms === null ? "--:--:--" : formatRemaining(ms)}
+        </span>
+      }
+      accent={starts ? "#ffb020" : accent}
+    />
   );
 }

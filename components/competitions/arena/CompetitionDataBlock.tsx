@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { ReactNode } from "react";
 import type { CompetitionMetric } from "@/lib/competitions/types";
 
 /**
@@ -11,14 +12,22 @@ import type { CompetitionMetric } from "@/lib/competitions/types";
  * text, so `break-words` split "Skilled" and "Attempt" mid-word. The bare icon
  * gives that width back, and values now wrap only between words.
  */
-export function CompetitionDataBlock({
-  metric,
+export function CompetitionDataShell({
+  icon,
+  label,
+  value,
+  subvalue,
   accent,
+  emphasize = false,
 }: {
-  metric: CompetitionMetric;
+  icon: string;
+  label: string;
+  value: ReactNode;
+  subvalue?: string;
   accent: string;
+  emphasize?: boolean;
 }) {
-  const prize = Boolean(metric.emphasize);
+  const prize = emphasize;
   const tint = prize ? "#ffb000" : accent;
 
   return (
@@ -36,7 +45,7 @@ export function CompetitionDataBlock({
         }}
       >
         <Image
-          src={metric.icon}
+          src={icon}
           alt=""
           width={32}
           height={32}
@@ -46,7 +55,7 @@ export function CompetitionDataBlock({
         />
         <div className="min-w-0">
           <p className="truncate text-[9px] font-bold uppercase leading-tight tracking-[0.06em] text-slate-300 @[120px]:text-[10px]">
-            {metric.label}
+            {label}
           </p>
           <p
             className={`mt-0.5 font-extrabold leading-tight tabular-nums [overflow-wrap:normal] [word-break:keep-all] ${
@@ -55,15 +64,34 @@ export function CompetitionDataBlock({
                 : "text-[14px] text-white @[120px]:text-[15px]"
             }`}
           >
-            {metric.value}
+            {value}
           </p>
-          {metric.subvalue ? (
+          {subvalue ? (
             <p className="mt-0.5 text-[10px] font-semibold leading-tight text-slate-300/80">
-              {metric.subvalue}
+              {subvalue}
             </p>
           ) : null}
         </div>
       </div>
     </div>
+  );
+}
+
+export function CompetitionDataBlock({
+  metric,
+  accent,
+}: {
+  metric: CompetitionMetric;
+  accent: string;
+}) {
+  return (
+    <CompetitionDataShell
+      icon={metric.icon}
+      label={metric.label}
+      value={metric.value}
+      subvalue={metric.subvalue}
+      accent={accent}
+      emphasize={metric.emphasize}
+    />
   );
 }

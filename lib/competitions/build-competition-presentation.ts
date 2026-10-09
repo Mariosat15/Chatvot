@@ -344,8 +344,6 @@ export function buildCompetitionPresentation(
   } else {
     tags.push({ label: "Admin", tone: "creator" });
   }
-  tags.push({ label: def.label, tone: "game" });
-
   if (competition.levelRequirement?.enabled && competition.levelRequirement.minLevel) {
     const lvl = Number(competition.levelRequirement.minLevel);
     const name = opts.levelLadder

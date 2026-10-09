@@ -116,6 +116,7 @@ describe("buildCompetitionPresentation", () => {
       true,
     );
     expect(p.statusLabel).toBe("LIVE NOW");
+    expect(p.tags).toEqual([{ label: "Admin", tone: "creator" }]);
   });
 
   it("marks a cancelled row for the card's ribbon-only status treatment", () => {

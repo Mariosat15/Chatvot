@@ -1,4 +1,17 @@
+# BUILT 9 Oct 2026 (eng, twelfth pass) — quiet header; context and clock moved into the data grid
+
+- **The clutter marked X is removed from every competition-card header.** The header now carries only the competition status. The repeated game-name badge was removed at the presentation source because the artwork and title already identify the game.
+- **Host, funding, access and level requirement are now data boxes**, using the exact same shared shell, icon scale, height and typography as prize, players and every game-defined metric. They join the dynamic grid only when that fact exists; there is no reserved empty slot.
+- **The ticking Starts in / Ends in clock is now another data box in that grid.** It keeps the hydration-safe placeholder and one-second update, but no longer competes with the status above the title.
+- **The CTA is restrained to 220px** rather than stretching across the content column. The list view keeps the same cap.
+- Cancelled/refunded cards still use only the uploaded corner ribbon, and difficulty remains Trading-only. Circuit Sprint board size, Volt Velocity laps/track, Volt Stack scoring and future game-defined metrics remain data-driven; no title branch was added to either card.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **19/19**; scoped ESLint clean.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, eleventh pass) — personal history; target card anatomy; cancelled ribbon only
+
+**Superseded in layout by the twelfth pass above.** Personal-history scope, the left-side artwork, dynamic metrics and cancelled-ribbon rule remain current; the wrapping badge row and full-width CTA are history only.
 
 - **Completed and cancelled history is now personal.** `browseCompetitions` reads the signed-in player's participant seats before constructing the paginated MongoDB query. Active/upcoming competitions remain discoverable, while `finalizing`, `completed`, `cancelled` and the historical `emergency_ended` state are admitted only when that competition id belongs to the viewer. Anonymous viewers and players with no seats receive no settled history. Counts, pages and prize totals use the same scoped query. Participant ids are converted back to ObjectIds before the featured aggregation match because Mongoose does not cast aggregation pipelines.
 - **The card now follows the supplied target's structure.** The game artwork owns the full left side; the right side holds one wrapping badge row, title, two-line description, a dynamic three-column grid containing every populated game-specific metric, and the supplied CTA PNG across the bottom. The grid becomes two-up at `lg`, so a desktop row matches the two-card target rather than showing one oversized card.

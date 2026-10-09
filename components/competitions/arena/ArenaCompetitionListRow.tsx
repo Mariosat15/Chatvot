@@ -5,6 +5,7 @@ import {
   CancelledRibbon,
   CardBackdrop,
   CardBadgesRow,
+  CardContextDataBlocks,
   CardHero,
   cardFrameStyle,
   hasMetricValue,
@@ -65,13 +66,12 @@ export function ArenaCompetitionListRow({
             </p>
           ) : null}
 
-          {metrics.length > 0 ? (
-            <div className="mt-auto grid grid-cols-2 gap-2 @[520px]:grid-cols-[repeat(auto-fit,minmax(118px,1fr))]">
-              {metrics.map((m) => (
-                <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
-              ))}
-            </div>
-          ) : null}
+          <div className="mt-auto grid grid-cols-2 gap-2 @[520px]:grid-cols-[repeat(auto-fit,minmax(118px,1fr))]">
+            {metrics.map((m) => (
+              <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
+            ))}
+            <CardContextDataBlocks presentation={p} />
+          </div>
         </div>
 
         {/* CTA — below on narrow rows, its own column on wide ones */}
