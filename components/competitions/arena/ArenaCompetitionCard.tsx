@@ -69,9 +69,9 @@ export function ArenaCompetitionCard({
 
           {/*
             Reason: the number of boxes differs per game, so no fixed cell is
-            "the button's place". Host and Starts In span two cells; `dense`
-            lets Funding fill the gap beside Host, and the CTA takes its own
-            full-width row so it is always centred under the grid.
+            "the button's place". Host is full-width; Starts In is two cells
+            beside Funding (or full-row alone); the CTA takes its own centred
+            full-width row under the grid.
           */}
           <div className="mt-auto grid grid-flow-row-dense auto-rows-fr grid-cols-2 gap-2 @[420px]:grid-cols-3">
             {metrics.map((m) => (

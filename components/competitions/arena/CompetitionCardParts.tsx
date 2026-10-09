@@ -197,20 +197,17 @@ export function CardContextDataBlocks({
         (order.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
     );
 
-  // Host is two cells (a GM name does not fit one). The countdown is two cells
-  // when a one-cell neighbour (Funding) can sit beside it; otherwise it spans
-  // the full row so the empty third cell / trailing gap is not left blank.
-  // Reason: grid densifies Funding into Host's gap, so the clock is alone on
-  // its row there and always expands; list keeps countdown first so Funding
-  // can still share that row.
+  // Reason: Host is full-width on the grid so dense packing cannot pull Funding
+  // into the gap beside it — Funding must stay on the same line as Starts In.
+  // List keeps Host at two cells (a long GM name). Starts In is two cells when
+  // a one-cell neighbour exists, otherwise full-row in both views.
   const hasCountdownNeighbor = tags.some(
     (tag) =>
       tag.tone === "funded" ||
       tag.tone === "skill" ||
       tag.tone === "neutral",
   );
-  const countdownSpan =
-    layout === "list" && hasCountdownNeighbor ? "col-span-2" : "col-span-full";
+  const countdownSpan = hasCountdownNeighbor ? "col-span-2" : "col-span-full";
   const countdown =
     only !== "creator" && p.countdown ? (
       <CompetitionCountdownDataBlock
@@ -224,6 +221,12 @@ export function CardContextDataBlocks({
   const tagBlocks = tags.map((tag) => {
     const context =
       CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
+    const hostSpan =
+      tag.tone === "creator"
+        ? layout === "grid"
+          ? "col-span-full"
+          : "col-span-2"
+        : undefined;
     return (
       <CompetitionInfoDataBlock
         key={`${tag.tone}-${tag.label}`}
@@ -232,24 +235,17 @@ export function CardContextDataBlocks({
         value={tag.label}
         explanation={contextExplanation(p, tag.tone, tag.label)}
         accent={p.gameAccent}
-        className={tag.tone === "creator" ? "col-span-2" : undefined}
+        className={hostSpan}
       />
     );
   });
 
+  // Both views: clock then side boxes so Funding packs beside Starts In, not
+  // into an earlier Host gap.
   return (
     <>
-      {layout === "grid" ? (
-        <>
-          {tagBlocks}
-          {countdown}
-        </>
-      ) : (
-        <>
-          {countdown}
-          {tagBlocks}
-        </>
-      )}
+      {countdown}
+      {tagBlocks}
     </>
   );
 }

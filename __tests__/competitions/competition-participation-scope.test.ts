@@ -130,15 +130,18 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(card).toContain("only=\"other\"");
     expect(list).toContain('<CardContextDataBlocks presentation={p} layout="list"');
     // Host spans two cells in both views; private access is a ribbon, not a box.
-    expect(parts).toContain('tag.tone === "creator" ? "col-span-2"');
-    expect(parts).toContain('tag.tone !== "private"');
-    // Grid: Funding then Starts In; clock expands full-row when alone. List:
-    // clock leads, stays two cells when Funding can sit beside it.
+    expect(parts).toContain('tag.tone === "creator"');
     expect(parts).toContain('layout === "grid"');
-    expect(parts).toContain('layout === "list" && hasCountdownNeighbor');
-    expect(parts).toContain('col-span-full');
-    expect(parts.indexOf("{tagBlocks}")).toBeGreaterThan(-1);
-    expect(parts.indexOf("{countdown}")).toBeGreaterThan(-1);
+    expect(parts).toContain('"col-span-full"');
+    expect(parts).toContain('"col-span-2"');
+    expect(parts).toContain('tag.tone !== "private"');
+    // Starts In shares a row with Funding when present; alone it goes full-row.
+    expect(parts).toContain(
+      'hasCountdownNeighbor ? "col-span-2" : "col-span-full"',
+    );
+    expect(parts.indexOf("{countdown}")).toBeLessThan(
+      parts.indexOf("{tagBlocks}"),
+    );
     // CTA: grid and list share 68px height; no reason caption under fillCell.
     expect(cta).toContain("!greyed && glow && !fillCell");
     expect(cta).toContain("fillCell ? \"\"");
