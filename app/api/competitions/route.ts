@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * GET /api/competitions
  *
  * Paginated browse (default pageSize 10). Query:
- *   page, limit, status, game, asset, q, sort
+ *   page, limit, status, game, asset, q, sort, difficulty
  *
  * Legacy clients that omit page still get a paged envelope; `competitions` is
  * aliased to `items` for older callers that only read that key.
@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
       asset: sp.get("asset") || undefined,
       q: sp.get("q") || sp.get("search") || undefined,
       sort: sp.get("sort") || "featured",
+      difficulty: sp.get("difficulty") || undefined,
       viewer,
     });
 

@@ -1,3 +1,23 @@
+# BUILT 9 Oct 2026 (eng, fourth pass) — readable text, centred hero, info boxes to images 3/4
+
+- **Text was unreadable** because the crisp artwork filled the whole card and the game's logo showed through the title and description. The backdrop is now the **same artwork blurred, faded and blended** (`blur-2xl`, 60% opacity, darkened to ~92% behind the content column); description/tags/labels brightened.
+- **Game not centred**: the crisp art was positioned against the whole card, so its centre sat behind the content. It now lives in **its own left hero box** (`object-cover`, the game's `objectPosition`, centre for every catalogue banner), with a soft inner-edge mask. Game-agnostic: both layers read `gameArtwork`, nothing per game.
+- **Info boxes**: icons drawn bare and large (34px, glow in the box tint) instead of in a 38px tile — the tile is what left ~45px for text and split "Skilled"/"Attempt" mid-word. Labels stay on one line; values wrap only between words (`word-break: keep-all`). CTA column floor 190px → 170px to widen the footer boxes.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, third pass) — difficulty filter is server-side
+
+The Difficulty dropdown used to hide cards on the **current page only**. Now it filters **every** competition: the list sends `?difficulty=` to `GET /api/competitions`, and `browseCompetitions` turns it into an `_id $in` clause on the normal query. That means pagination, totals, sort and the featured KPIs all count only the matching competitions.
+
+- Difficulty is **derived** from eight fields and is never stored, so the server scans the candidate competitions (same visibility and filters, projected to `DIFFICULTY_SOURCE_FIELDS`), works out each one's difficulty in JS, and keeps the matching ids. A warning is logged if more than 5,000 are scanned.
+- There is **one definition** of difficulty: `difficultyForCompetition` in `lib/competitions/competition-difficulty-input.ts`. Both the label on each card and the server filter call it, so a card can never be labelled with a difficulty its filter disagrees with. It imports no database model, so client components can use it (R58).
+- An unknown `difficulty` value is ignored (checked against a `Set`), not treated as "match nothing".
+- Platform leverage comes from `getTradingRiskSettings()`, falling back to 100, the same value the client uses.
+- Join GM still only opens the lobby. That is correct and was deliberately not changed.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, second pass) — card anatomy rebuilt to the strict brief
 
 Supersedes the "card correction pass" block below (correct as history only — its `mix-blend-screen` ribbon is gone).
@@ -27,7 +47,7 @@ Supersedes the "card correction pass" block below (correct as history only — i
 - Browse attaches ProviderGame `bannerUrl` so cards match Games catalogue when set
 - Server pagination 10/page unchanged
 
-**Never verified by eye.** Difficulty remains a soft client filter on the current page.
+**Never verified by eye.** ~~Difficulty remains a soft client filter on the current page.~~ This was true when written. It stopped being true after the third pass above: difficulty is now filtered on the server.
 
 ---
 

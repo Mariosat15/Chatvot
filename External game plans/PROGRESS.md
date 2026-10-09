@@ -977,11 +977,19 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 9 October 2026 - Difficulty filter covers every competition, not one page
+
+**Owner report:** the difficulty filter only filtered the cards on the current page.
+
+**Fixed:** the filter now runs on the server. `?difficulty=` flows from `page-content.tsx` through `GET /api/competitions` into `browseCompetitions`. That function scans the candidates matching the other filters (projected), derives each one's difficulty with the shared `difficultyForCompetition`, and adds the matching ids as `_id $in`. Pagination, totals, sort and KPIs therefore all respect the filter. The card label and the filter share one definition (`lib/competitions/competition-difficulty-input.ts`, model-free). The client-side page filter is removed. Join GM was left lobby-only on purpose: the owner confirmed that behaviour is correct.
+
+**Nothing was paid wrongly and nothing was backfilled.** tsc shows no new errors (the five pre-existing errors in these files only moved line numbers), eslint is clean, and `competition-presentation.test.ts` passes. Never verified by eye.
+
 ### 9 October 2026 - Competition Arena cards corrected to Image 1
 
 **Owner task:** Image 1 is the target; prior build (Image 2 shape) was wrong — use Games-area game art auto, boxed secondary fields, owner CTA/ribbon PNGs from Menuitems, full faded game bg.
 
-**Shipped:** `public/assets/neon/competitions/cta/*` (Join, Reserve, Join GM, View Results, Already In, cancelled ribbon); `ArenaCompetitionCard` full-bleed faded art + left hero + all metrics in boxes; `CompetitionCTA` uses real assets (no tinted Join); browse attaches ProviderGame `bannerUrl`. Join GM still lobby-only. Difficulty soft-filters current page only.
+**Shipped:** `public/assets/neon/competitions/cta/*` (Join, Reserve, Join GM, View Results, Already In, cancelled ribbon); `ArenaCompetitionCard` full-bleed faded art + left hero + all metrics in boxes; `CompetitionCTA` uses real assets (no tinted Join); browse attaches ProviderGame `bannerUrl`. Join GM still lobby-only. Difficulty soft-filters current page only (true as history; it has been filtered on the server since the entry above).
 
 **Nothing was paid wrongly.** Tests: `competition-presentation.test.ts`. Never verified by eye.
 

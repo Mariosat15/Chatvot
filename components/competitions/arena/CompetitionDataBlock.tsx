@@ -2,12 +2,14 @@ import Image from "next/image";
 import type { CompetitionMetric } from "@/lib/competitions/types";
 
 /**
- * One boxed stat on a competition card (Image 1 anatomy).
+ * One boxed stat on a competition card (owner reference anatomy).
  *
- * Reason: values must never be cut off with "…" — the old block used `truncate`,
- * which clipped Entry Fee / Mode / Difficulty in the footer. Values now wrap.
- * The box is its own container so, when a card is narrow, the icon tile shrinks
- * instead of squeezing the value into an unreadable sliver.
+ * Icon on the left drawn bare and large (no tile), label on one line, value
+ * beneath it, optional sub-value under that.
+ *
+ * Reason: the icon used to sit in a 38px tile, which left a footer box ~45px for
+ * text, so `break-words` split "Skilled" and "Attempt" mid-word. The bare icon
+ * gives that width back, and values now wrap only between words.
  */
 export function CompetitionDataBlock({
   metric,
@@ -22,42 +24,38 @@ export function CompetitionDataBlock({
   return (
     <div className="@container h-full min-w-0">
       <div
-        className="grid h-full min-h-[72px] grid-cols-[28px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-2.5 py-2 @[130px]:grid-cols-[38px_minmax(0,1fr)]"
+        className="grid h-full min-h-[68px] grid-cols-[26px_minmax(0,1fr)] items-center gap-2 rounded-xl border px-2.5 py-2 @[120px]:grid-cols-[34px_minmax(0,1fr)] @[120px]:gap-2.5"
         style={{
-          borderColor: prize ? "rgba(255,176,0,.38)" : "rgba(255,255,255,.10)",
+          borderColor: prize ? "rgba(255,176,0,.45)" : "rgba(120,160,255,.18)",
           background: prize
-            ? "linear-gradient(135deg, rgba(255,176,0,.16), rgba(255,92,34,.08))"
-            : "rgba(5,11,28,.72)",
+            ? "linear-gradient(135deg, rgba(255,176,0,.18), rgba(255,92,34,.08))"
+            : "linear-gradient(180deg, rgba(14,24,52,.92), rgba(6,12,30,.92))",
         }}
       >
-        <span
-          className="flex size-7 items-center justify-center rounded-lg border @[130px]:size-[38px]"
-          style={{ borderColor: `${tint}40`, background: `${tint}1a` }}
+        <Image
+          src={metric.icon}
+          alt=""
+          width={34}
+          height={34}
           aria-hidden
-        >
-          <Image
-            src={metric.icon}
-            alt=""
-            width={26}
-            height={26}
-            className="size-5 object-contain @[130px]:size-[26px]"
-          />
-        </span>
+          className="size-[26px] object-contain @[120px]:size-[34px]"
+          style={{ filter: `drop-shadow(0 0 6px ${tint}80)` }}
+        />
         <div className="min-w-0">
-          <p className="text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-white/55 @[130px]:text-[10px]">
+          <p className="whitespace-nowrap text-[9px] font-bold uppercase leading-tight tracking-[0.06em] text-slate-300 @[120px]:text-[10px]">
             {metric.label}
           </p>
           <p
-            className={`mt-0.5 break-words font-extrabold leading-tight tabular-nums ${
+            className={`mt-0.5 font-extrabold leading-tight tabular-nums [overflow-wrap:normal] [word-break:keep-all] ${
               prize
-                ? "text-[16px] text-amber-200 @[130px]:text-[18px]"
-                : "text-[15px] text-white @[130px]:text-[16px]"
+                ? "text-[15px] text-amber-300 @[120px]:text-[18px]"
+                : "text-[14px] text-white @[120px]:text-[15px]"
             }`}
           >
             {metric.value}
           </p>
           {metric.subvalue ? (
-            <p className="mt-0.5 break-words text-[10px] font-medium leading-tight text-white/45">
+            <p className="mt-0.5 text-[10px] font-semibold leading-tight text-slate-300/80">
               {metric.subvalue}
             </p>
           ) : null}

@@ -77,6 +77,7 @@ function buildQuery(params: {
   asset: string;
   q: string;
   sort: string;
+  difficulty: string;
 }): string {
   const sp = new URLSearchParams();
   sp.set("page", String(params.page));
@@ -86,6 +87,7 @@ function buildQuery(params: {
   sp.set("sort", params.sort || "featured");
   if (params.asset) sp.set("asset", params.asset);
   if (params.q.trim()) sp.set("q", params.q.trim());
+  if (params.difficulty) sp.set("difficulty", params.difficulty);
   return sp.toString();
 }
 
@@ -222,6 +224,7 @@ export default function CompetitionsPageContent({
         asset: assetFilter,
         q: debouncedSearch,
         sort: sortBy,
+        difficulty: difficultyFilter,
       });
       const cached = prefetchCache.current.get(query);
       if (cached) {
@@ -260,6 +263,7 @@ export default function CompetitionsPageContent({
       assetFilter,
       debouncedSearch,
       sortBy,
+      difficultyFilter,
       applyBrowseResult,
       initialBalance,
     ],
@@ -276,6 +280,7 @@ export default function CompetitionsPageContent({
       asset: assetFilter,
       q: debouncedSearch,
       sort: sortBy,
+      difficulty: difficultyFilter,
     });
     if (prefetchCache.current.has(query)) return;
     let cancelled = false;
@@ -301,6 +306,7 @@ export default function CompetitionsPageContent({
     assetFilter,
     debouncedSearch,
     sortBy,
+    difficultyFilter,
   ]);
 
   // Refetch when filters / debounced search / page change (skip first hydrate with SSR data)
@@ -314,6 +320,7 @@ export default function CompetitionsPageContent({
         gameFilter !== "all" ||
         sortBy !== "featured" ||
         Boolean(assetFilter) ||
+        Boolean(difficultyFilter) ||
         Boolean(debouncedSearch.trim());
       if (!diverged) return;
     }
@@ -328,6 +335,7 @@ export default function CompetitionsPageContent({
     assetFilter,
     debouncedSearch,
     sortBy,
+    difficultyFilter,
   ]);
 
   // Soft poll current page
@@ -408,9 +416,10 @@ export default function CompetitionsPageContent({
         label: a.toUpperCase(),
       }))}
       difficultyValue={difficultyFilter}
-      onDifficultyChange={(v) =>
-        setDifficultyFilter(v as DifficultyLevel | "")
-      }
+      onDifficultyChange={(v) => {
+        setDifficultyFilter(v as DifficultyLevel | "");
+        setPage(1);
+      }}
       sortValue={sortBy}
       onSortChange={(v) => {
         setSortBy(v);

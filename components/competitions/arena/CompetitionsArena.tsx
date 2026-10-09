@@ -13,7 +13,7 @@ import type { CompetitionListItem } from "@/lib/competitions/types";
 import type { TitleLevel } from "@/lib/constants/levels";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
-import { calculateCompetitionDifficulty } from "@/lib/utils/competition-difficulty";
+import { difficultyForCompetition } from "@/lib/competitions/competition-difficulty-input";
 import { ArenaHeader } from "./ArenaHeader";
 import { ArenaKpiCards } from "./ArenaKpiCards";
 import { CompetitionToolbar, type ToolbarFilterOption } from "./CompetitionToolbar";
@@ -111,44 +111,10 @@ export function CompetitionsArena({
         ? resolveGameDefinition(competitions[0])
         : gameDefinitions.all;
 
-  // Reason: difficulty is derived client-side (not stored) — filter only the current page.
-  const visibleCompetitions =
-    difficultyValue.trim().length > 0
-      ? competitions.filter((c) => {
-          const difficulty = calculateCompetitionDifficulty({
-            entryFeeCredits: Number(c.entryFeeCredits ?? c.entryFee ?? 0) || 0,
-            startingCapital:
-              Number(c.startingCapital ?? c.startingTradingPoints ?? 10000) ||
-              10000,
-            leverageAllowed: c.leverage?.max || platformLeverage,
-            maxParticipants: c.maxParticipants,
-            participantCount: c.currentParticipants,
-            durationHours:
-              (new Date(c.endTime).getTime() -
-                new Date(c.startTime).getTime()) /
-              (1000 * 60 * 60),
-            rules: c.rules as never,
-            levelRequirement: c.levelRequirement as never,
-          });
-          return difficulty.level === difficultyValue;
-        })
-      : competitions;
-
-  const presentations = visibleCompetitions.map((c) => {
-    const difficulty = calculateCompetitionDifficulty({
-      entryFeeCredits: Number(c.entryFeeCredits ?? c.entryFee ?? 0) || 0,
-      startingCapital:
-        Number(c.startingCapital ?? c.startingTradingPoints ?? 10000) || 10000,
-      leverageAllowed: c.leverage?.max || platformLeverage,
-      maxParticipants: c.maxParticipants,
-      participantCount: c.currentParticipants,
-      durationHours:
-        (new Date(c.endTime).getTime() - new Date(c.startTime).getTime()) /
-        (1000 * 60 * 60),
-      rules: c.rules as never,
-      levelRequirement: c.levelRequirement as never,
-    });
-
+  // Reason: the difficulty filter runs on the server across every matching competition
+  // (browse-competitions.ts), so the page arrives already filtered.
+  const presentations = competitions.map((c) => {
+    const difficulty = difficultyForCompetition(c, platformLeverage);
     return buildCompetitionPresentation(c, {
       isRegistered: userInCompetitions.has(String(c._id)),
       userBalance,

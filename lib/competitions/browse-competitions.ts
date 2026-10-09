@@ -16,6 +16,13 @@ import {
 import type { ContestViewer } from "@/lib/services/gamemaster/visible-contests";
 import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
 import { resolveGameDefinition } from "./game-definitions";
+import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.actions";
+import {
+  DIFFICULTY_SOURCE_FIELDS,
+  difficultyForCompetition,
+  isDifficultyLevel,
+  type DifficultySource,
+} from "./competition-difficulty-input";
 import {
   COMPETITIONS_PAGE_SIZE,
   type BrowseCompetitionsResult,
@@ -101,6 +108,8 @@ export interface BrowseCompetitionsInput {
   asset?: string;
   q?: string;
   sort?: BrowseSort | string;
+  /** A DifficultyLevel; anything else is ignored. */
+  difficulty?: string;
   viewer: ContestViewer;
 }
 
@@ -181,6 +190,45 @@ function statusRankExpr() {
   };
 }
 
+/** Above this many candidates the filter still works, but we say so in the log. */
+const DIFFICULTY_SCAN_WARN = 5000;
+
+/**
+ * Difficulty is derived from eight fields rather than stored, so it cannot be a Mongo
+ * predicate. Reason: filtering the fetched page in the browser (the previous version)
+ * showed 0-10 cards out of every page and a total that ignored the filter. Instead read
+ * the deciding fields of every candidate, decide here with the SAME helper the cards use,
+ * and hand the matching ids back to the normal query so sort, counts and pages stay right.
+ */
+async function idsMatchingDifficulty(
+  query: Record<string, unknown>,
+  level: string,
+): Promise<unknown[]> {
+  let platformLeverage = 100;
+  try {
+    const settings = await getTradingRiskSettings();
+    if (settings?.maxLeverage) platformLeverage = settings.maxLeverage;
+  } catch (error) {
+    console.warn("⚠️ Risk settings unavailable for difficulty filter:", error);
+  }
+
+  const candidates = await Competition.find(query)
+    .select(DIFFICULTY_SOURCE_FIELDS)
+    .lean();
+  if (candidates.length > DIFFICULTY_SCAN_WARN) {
+    console.warn(
+      `⚠️ Difficulty filter scanned ${candidates.length} competitions; consider storing difficulty.`,
+    );
+  }
+  return candidates
+    .filter(
+      (c) =>
+        difficultyForCompetition(c as DifficultySource, platformLeverage)
+          .level === level,
+    )
+    .map((c) => c._id);
+}
+
 export async function browseCompetitions(
   input: BrowseCompetitionsInput,
 ): Promise<BrowseCompetitionsResult> {
@@ -220,6 +268,17 @@ export async function browseCompetitions(
         { gameMasterName: rx },
         { assetClasses: rx },
       ],
+    });
+  }
+
+  if (isDifficultyLevel(input.difficulty)) {
+    and.push({
+      _id: {
+        $in: await idsMatchingDifficulty(
+          withVisibleContests({ $and: [...and] }, input.viewer),
+          input.difficulty,
+        ),
+      },
     });
   }
 

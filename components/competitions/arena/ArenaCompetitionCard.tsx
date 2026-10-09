@@ -10,20 +10,25 @@ import { CompetitionCTA } from "./CompetitionCTA";
 
 // Reason: Map lookup — object indexing trips security/detect-object-injection.
 const TAG_TONE = new Map<string, string>([
-  ["neutral", "border-white/15 bg-white/5 text-white/70"],
-  ["game", "border-white/15 bg-white/5 text-white/75"],
-  ["creator", "border-white/20 bg-white/10 text-white/85"],
+  ["neutral", "border-white/20 bg-white/10 text-slate-100"],
+  ["game", "border-white/20 bg-white/10 text-slate-100"],
+  ["creator", "border-sky-300/35 bg-sky-500/15 text-sky-100"],
   ["skill", "border-amber-400/30 bg-amber-500/10 text-amber-200"],
   ["private", "border-fuchsia-400/35 bg-fuchsia-500/15 text-fuchsia-200"],
   ["funded", "border-amber-400/40 bg-amber-500/15 text-amber-100"],
 ]);
 
-/** Full-card fade: art stays clear on the left, content sits on near-black. */
-const WIDE_FADE =
-  "linear-gradient(90deg, rgba(3,9,25,.05) 0%, rgba(3,9,25,.20) 28%, rgba(3,9,25,.82) 48%, rgba(3,9,25,.98) 66%, #050b1c 100%), linear-gradient(0deg, rgba(3,9,25,.95) 0%, transparent 45%)";
-/** Stacked (narrow) fade: art on top, content below. */
-const STACKED_FADE =
-  "linear-gradient(180deg, rgba(3,9,25,.05) 0%, rgba(3,9,25,.25) 26%, rgba(3,9,25,.88) 44%, #050b1c 62%)";
+/**
+ * Reason: the blurred backdrop is ambience only — text sits on it, so it is
+ * dimmed to near-solid behind the content column; any game's logo baked into its
+ * artwork otherwise shows through the copy and makes it unreadable.
+ */
+const WIDE_SCRIM =
+  "linear-gradient(90deg, rgba(4,9,24,.55) 0%, rgba(4,9,24,.80) 26%, rgba(4,9,24,.92) 40%, rgba(4,9,24,.94) 100%)";
+const STACKED_SCRIM =
+  "linear-gradient(180deg, rgba(4,9,24,.55) 0%, rgba(4,9,24,.92) 40%, rgba(4,9,24,.94) 100%)";
+/** The hero's inner edge melts into the card instead of ending in a hard line. */
+const HERO_EDGE_MASK = "linear-gradient(90deg, #000 78%, transparent 100%)";
 
 function hasValue(m: CompetitionMetric): boolean {
   return Boolean(m.value && m.value.trim() && m.value !== "-" && m.value !== "—");
@@ -63,25 +68,26 @@ export function ArenaCompetitionCard({
         background: "#050b1c",
       }}
     >
-      {/* Full-card game artwork + fade */}
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
+      {/* Backdrop: the same game artwork, blurred, faded and blended — not the hero */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <Image
           src={p.gameArtwork}
           alt=""
           fill
           loading="lazy"
           decoding="async"
-          className={`object-cover ${settled ? "saturate-[.7]" : ""}`}
-          style={{ objectPosition: p.artworkObjectPosition }}
-          sizes="(max-width: 1536px) 100vw, 50vw"
+          className={`scale-125 object-cover opacity-60 blur-2xl ${
+            settled ? "saturate-50" : "saturate-150"
+          }`}
+          sizes="(max-width: 1536px) 50vw, 25vw"
         />
         <div
           className="absolute inset-0 @[600px]:hidden"
-          style={{ background: STACKED_FADE }}
+          style={{ background: STACKED_SCRIM }}
         />
         <div
           className="absolute inset-0 hidden @[600px]:block"
-          style={{ background: WIDE_FADE }}
+          style={{ background: WIDE_SCRIM }}
         />
       </div>
 
@@ -106,13 +112,30 @@ export function ArenaCompetitionCard({
       ) : null}
 
       <div className="relative z-10 grid grid-cols-1 @[600px]:grid-cols-[28%_72%]">
-        {/* Art column — the artwork itself shows through; only the status sits here */}
-        <div className="relative h-[150px] p-3 @[600px]:h-auto">
-          <CompetitionStatusBadge
-            status={p.status}
-            label={p.statusLabel}
-            countdown={p.countdownLabel}
-          />
+        {/* Hero column — the game's artwork, crisp and centred in its own box */}
+        <div className="relative h-[170px] @[600px]:h-auto @[600px]:min-h-[260px]">
+          <div
+            className="absolute inset-0 overflow-hidden @[600px]:[mask-image:var(--hero-mask)]"
+            style={{ ["--hero-mask" as string]: HERO_EDGE_MASK }}
+          >
+            <Image
+              src={p.gameArtwork}
+              alt={p.gameName}
+              fill
+              loading="lazy"
+              decoding="async"
+              className={`object-cover ${settled ? "saturate-[.7]" : ""}`}
+              style={{ objectPosition: p.artworkObjectPosition }}
+              sizes="(max-width: 600px) 100vw, 260px"
+            />
+          </div>
+          <div className="relative p-3">
+            <CompetitionStatusBadge
+              status={p.status}
+              label={p.statusLabel}
+              countdown={p.countdownLabel}
+            />
+          </div>
         </div>
 
         {/* Content column */}
@@ -162,7 +185,7 @@ export function ArenaCompetitionCard({
           </div>
 
           {p.description ? (
-            <p className="line-clamp-2 text-[12px] leading-snug text-white/65 @[600px]:text-[13px]">
+            <p className="line-clamp-2 text-[12px] leading-snug text-slate-200/90 @[600px]:text-[13px]">
               {p.description}
             </p>
           ) : null}
@@ -175,9 +198,9 @@ export function ArenaCompetitionCard({
             </div>
           ) : null}
 
-          {/* Reason: the CTA joins the box row only once three boxes plus a ≥190px
+              {/* Reason: the CTA joins the box row only once three boxes plus a ≥170px
               CTA fit (card ≥720px); narrower, it drops beneath so no value is squeezed. */}
-          <div className="mt-auto grid grid-cols-2 items-center gap-2 @[420px]:grid-cols-3 @[720px]:grid-cols-[repeat(3,minmax(0,1fr))_minmax(190px,1.3fr)]">
+          <div className="mt-auto grid grid-cols-2 items-center gap-2 @[420px]:grid-cols-3 @[720px]:grid-cols-[repeat(3,minmax(0,1fr))_minmax(170px,1.15fr)]">
             {secondary.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
             ))}
