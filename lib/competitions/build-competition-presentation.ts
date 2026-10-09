@@ -4,6 +4,10 @@
  */
 
 import { formatVolts } from "@/lib/utils/format-volts";
+import {
+  isSponsoredContest,
+  sponsoredContestCopy,
+} from "@/lib/utils/sponsored-contest-copy";
 import { COMPETITION_ICON, resolveGameDefinition } from "./game-definitions";
 import { resolveCompetitionArtwork } from "./game-artwork";
 import { getCompetitionCTA } from "./competition-cta";
@@ -201,6 +205,11 @@ function buildMetric(
       );
     }
     case "entryFee":
+      // Reason: a GM-funded contest stores the per-seat fee the GM pays, so showing it
+      // would quote the player a price they never pay.
+      if (isSponsoredContest(c.fundingMode)) {
+        return metricOrNull(key, "FREE", { subvalue: "GM pays" });
+      }
       return metricOrNull(
         key,
         entry <= 0 ? "FREE" : formatVolts(entry, { symbol }),
@@ -317,6 +326,7 @@ export function buildCompetitionPresentation(
     competition.createdByName ||
     "";
   const isGm =
+    Boolean(competition.gameMasterId) ||
     Boolean(competition.isPrivate) ||
     Boolean(competition.privateGameMasterName) ||
     competition.createdByType === "gamemaster";
@@ -339,14 +349,19 @@ export function buildCompetitionPresentation(
     tags.push({ label: name, tone: "skill" });
   }
 
-  if (competition.isPrivate || competition.privateAccess) {
+  const isPrivateContest =
+    Boolean(competition.isPrivate) ||
+    Boolean(competition.privateAccess) ||
+    competition.visibility === "gm_private";
+  if (isPrivateContest) {
     tags.push({ label: "Private", tone: "private" });
   }
 
-  // GM funded heuristic: private + zero entry is a common sponsored shape; also explicit flag later
-  const gmFunded = Boolean(competition.isPrivate) && entry <= 0;
+  // Reason: read the stored `fundingMode`, never infer it — "private + free" was a guess
+  // that both missed real sponsored contests and could label a free one as funded.
+  const gmFunded = isSponsoredContest(competition.fundingMode);
   if (gmFunded) {
-    tags.push({ label: "GM Funded", tone: "funded" });
+    tags.unshift({ label: "GM Funded", tone: "funded" });
   }
 
   const cta = getCompetitionCTA({
@@ -403,8 +418,9 @@ export function buildCompetitionPresentation(
     secondaryMetrics,
     prizePool: prize,
     entryFee: entry,
-    visibility: competition.isPrivate || competition.privateAccess ? "private" : "public",
+    visibility: isPrivateContest ? "private" : "public",
     gmFunded,
+    gmFundedNote: gmFunded ? sponsoredContestCopy(creatorName).detail : undefined,
     cta,
   };
 }

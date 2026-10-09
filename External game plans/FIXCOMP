@@ -1,3 +1,26 @@
+# BUILT 9 Oct 2026 (eng, eighth pass) — list view on par with the grid card; GM Funded on both
+
+- **The list row now shows everything the card shows**: the whole game artwork over a blurred backdrop, the full title with the large status badge, the tags, a **ticking countdown**, the description, all seven boxes (primary plus game-specific), the glowing accent border, and the CTA in its own column (centred below on narrow rows). Previously it dropped the tags, the description, the countdown and up to two boxes, and cropped the artwork.
+- **The two views cannot drift apart again.** The backdrop, ribbon, hero, tag row and GM Funded note live in `components/competitions/arena/CompetitionCardParts.tsx`, and both views use them.
+- **GM Funded is read from the stored `fundingMode === "gm_funded"`** (`isSponsoredContest`), never guessed. The old heuristic was "private plus a free entry". It missed sponsored contests that store the per-seat fee the GM pays, and it could also label a contest that was free for another reason. On both views a funded contest gets:
+  - a gold "GM Funded" tag first in the row, with the Volts icon;
+  - the line "Free to enter - {GM} pays every seat…" (the existing `sponsoredContestCopy`);
+  - an Entry Fee box reading **FREE / GM pays** instead of the fee the GM is charged.
+- Private now also covers `visibility === "gm_private"`, and the GM creator tag also covers `gameMasterId`.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, seventh pass) — taller card, everything moved down, button centred
+
+Supersedes the fifth pass's footer, which put the CTA in the fourth column beside the boxes. That is correct as history only.
+
+- The card is taller: more padding (16 → 20px), bigger gaps, and a taller hero (minimum 230px).
+- The **full title** shows; the two-line clamp that cut off "Circuit Sprint: Legendary Connect-A-..." is gone, and the card grows instead. The description now shows up to 3 lines.
+- The three game-specific boxes span the full card width on their own row.
+- The CTA has **its own row, centred in the card**, and its maximum width is now 300px (was 260px).
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, sixth pass) — owner's replacement button PNGs, "Add Volts"
 
 - The owner supplied new images for Join Competition, Reserve Spot, Join GM to Enter and View Results, plus a new Cancelled/Refunded ribbon. They are saved as `*-r2.png` under `public/assets/neon/competitions/cta/` and wired in `COMPETITION_CTA_ASSET`. The old files are left in place. The new names matter because overwriting the old filenames would keep serving the old images to returning visitors from their browser cache (R54). "Already in" got no new image and is unchanged.

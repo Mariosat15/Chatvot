@@ -1,109 +1,102 @@
-import Image from "next/image";
-import { COMPETITION_CTA_ASSET } from "@/lib/competitions/game-artwork";
 import type { CompetitionPresentation } from "@/lib/competitions/types";
 import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 import { CompetitionDataBlock } from "./CompetitionDataBlock";
 import { CompetitionCTA } from "./CompetitionCTA";
+import {
+  CancelledRibbon,
+  CardBackdrop,
+  CardHero,
+  CardTagsRow,
+  GmFundedNote,
+  cardFrameStyle,
+  hasMetricValue,
+  isSettled,
+} from "./CompetitionCardParts";
 
+/**
+ * Competition Arena list row — the same elements as the grid card, laid out
+ * across one wide row: whole game artwork on the left, then the title with the
+ * status badge, tags plus the ticking countdown, the GM Funded note, the
+ * description and every box (primary and game-specific), then the CTA in its
+ * own column, vertically centred.
+ *
+ * Reason: it used to be a slimmer copy that dropped the tags, the description,
+ * the live countdown and three of the boxes, so the two views told a player
+ * different things about the same competition. It now composes the card's own
+ * parts (`CompetitionCardParts`) so they cannot drift again.
+ * The row is its own CSS container, so it stacks when ITS width is narrow.
+ */
 export function ArenaCompetitionListRow({
   presentation,
 }: {
   presentation: CompetitionPresentation;
 }) {
   const p = presentation;
-  const metrics = [...p.primaryMetrics, ...p.secondaryMetrics]
-    .filter((m) => m.value && m.value.trim() && m.value !== "-" && m.value !== "—")
-    .slice(0, 5);
-  const mutedArt =
-    p.status === "cancelled" ||
-    p.status === "refunded" ||
-    p.status === "completed";
+  const settled = isSettled(p);
+  const metrics = [
+    ...p.primaryMetrics.filter(hasMetricValue).slice(0, 4),
+    ...p.secondaryMetrics.filter(hasMetricValue).slice(0, 3),
+  ];
 
   return (
     <article
-      className="relative flex min-h-[160px] flex-col gap-3 overflow-hidden rounded-2xl border p-3 sm:flex-row sm:items-stretch sm:gap-4 sm:p-4"
-      style={{
-        borderColor: `${p.gameAccent}55`,
-        boxShadow: `0 0 16px ${p.theme.glow}`,
-        background: "rgba(3,10,29,.92)",
-      }}
+      className="@container relative overflow-hidden rounded-[20px] border-[1.5px]"
+      style={cardFrameStyle(p)}
     >
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        <Image
-          src={p.gameArtwork}
-          alt=""
-          fill
-          loading="lazy"
-          decoding="async"
-          className={`object-cover opacity-[0.22] ${mutedArt ? "saturate-50" : ""}`}
-          style={{ objectPosition: p.artworkObjectPosition }}
-          sizes="100vw"
+      <CardBackdrop presentation={p} />
+      <CancelledRibbon presentation={p} />
+
+      <div className="relative z-10 grid grid-cols-1 gap-4 p-4 @[760px]:grid-cols-[220px_minmax(0,1fr)] @[760px]:p-5 @[1100px]:grid-cols-[240px_minmax(0,1fr)_260px] @[1100px]:gap-5">
+        <CardHero
+          presentation={p}
+          className="aspect-video w-full @[760px]:aspect-auto @[760px]:h-full @[760px]:min-h-[180px]"
+          sizes="(max-width: 760px) 100vw, 240px"
         />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,10,29,.4),rgba(3,10,29,.95))]" />
-      </div>
 
-      {p.showCancelledRibbon ? (
-        <div
-          className="pointer-events-none absolute -right-[5px] -top-[2px] z-20 h-[100px] w-[150px]"
-          aria-hidden
-        >
-          <Image
-            src={COMPETITION_CTA_ASSET.cancelledRibbon}
-            alt=""
-            fill
-            className="object-contain object-right-top"
-            sizes="150px"
-          />
-        </div>
-      ) : null}
-
-      <div className="relative z-10 h-36 w-full shrink-0 overflow-hidden rounded-xl border border-white/10 sm:h-auto sm:w-[200px]">
-        <Image
-          src={p.gameArtwork}
-          alt=""
-          fill
-          loading="lazy"
-          decoding="async"
-          className={`object-cover ${mutedArt ? "saturate-50" : ""}`}
-          style={{ objectPosition: p.artworkObjectPosition }}
-          sizes="200px"
-        />
-      </div>
-
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-between gap-2">
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CompetitionStatusBadge
-              status={p.status}
-              label={p.statusLabel}
-              countdown={p.countdownLabel}
-            />
-            <span
-              className="rounded-full border px-2.5 py-1 text-[11px] font-bold"
-              style={{
-                borderColor: `${p.gameAccent}55`,
-                color: p.gameAccent,
-                background: `${p.gameAccent}14`,
-              }}
+        <div className="flex min-w-0 flex-col gap-3">
+          <div
+            className={`flex items-start justify-between gap-3 ${
+              p.showCancelledRibbon ? "pr-[84px]" : ""
+            }`}
+          >
+            <h3
+              className="min-w-0 text-[18px] font-black leading-tight text-white @[760px]:text-[21px]"
+              style={{ textShadow: "0 1px 8px rgba(0,0,0,.6)" }}
             >
-              {p.gameName}
-            </span>
+              {p.title}
+            </h3>
+            {/* Reason: on the widest rows the ribbon sits over the CTA column,
+                so the badge stays with the title rather than under the ribbon. */}
+            <div className="shrink-0">
+              <CompetitionStatusBadge status={p.status} label={p.statusLabel} size="lg" />
+            </div>
           </div>
-          <h3 className="mt-2 text-[18px] font-black text-white sm:text-[20px]">
-            {p.title}
-          </h3>
+
+          <CardTagsRow presentation={p} />
+          <GmFundedNote presentation={p} />
+
+          {p.description ? (
+            <p className="line-clamp-2 text-[12.5px] leading-snug text-slate-200/90 @[760px]:text-[13.5px]">
+              {p.description}
+            </p>
+          ) : null}
+
+          {metrics.length > 0 ? (
+            <div className="mt-auto grid grid-cols-2 gap-2 @[520px]:grid-cols-[repeat(auto-fit,minmax(118px,1fr))]">
+              {metrics.map((m) => (
+                <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        {metrics.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-            {metrics.map((m) => (
-              <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
-            ))}
-          </div>
-        ) : null}
-
-        <div className="flex justify-end sm:w-[220px] sm:self-end">
-          <CompetitionCTA cta={p.cta} glow={p.theme.glow} />
+        {/* CTA — centred below on narrow rows, its own column on wide ones */}
+        <div className="flex items-center justify-center @[760px]:col-span-2 @[1100px]:col-span-1">
+          <CompetitionCTA
+            cta={p.cta}
+            glow={settled ? undefined : p.theme.glow}
+            className="max-w-[300px]"
+          />
         </div>
       </div>
     </article>

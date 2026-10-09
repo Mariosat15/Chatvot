@@ -7,7 +7,7 @@ import {
 import type { CompetitionCta } from "@/lib/competitions/types";
 
 /**
- * Owner-supplied CTA PNGs — text and icon are baked into the asset.
+ * Owner-supplied CTA PNGs â€” text and icon are baked into the asset.
  *
  * Reason: every state uses the supplied artwork, never a CSS pill. The PNGs are
  * RGBA with clear corners (checked 9 Oct 2026), so no blend mode is needed; the
@@ -30,7 +30,7 @@ export function CompetitionCTA({
   const greyed = unavailable && cta.variant !== "already_in";
   const caption = cta.reason || (greyed ? cta.label : "");
 
-  const shell = `competitionCta relative block aspect-[3/1] w-full max-w-[260px] ${
+  const shell = `competitionCta relative block aspect-[3/1] w-full max-w-[300px] ${
     greyed
       ? "cursor-not-allowed opacity-45 grayscale"
       : "transition hover:-translate-y-px hover:brightness-110"
@@ -63,7 +63,7 @@ export function CompetitionCTA({
         </Link>
       )}
       {caption ? (
-        <p className="mt-1 w-full max-w-[260px] text-center text-[11px] leading-tight text-white/55">
+        <p className="mt-1 w-full max-w-[300px] text-center text-[11px] leading-tight text-white/55">
           {caption}
         </p>
       ) : null}

@@ -75,6 +75,8 @@ export interface CompetitionPresentation {
   entryFee: number;
   visibility: "public" | "private";
   gmFunded: boolean;
+  /** "Free to enter - X pays every seat…" — present only when `gmFunded`. */
+  gmFundedNote?: string;
   cta: CompetitionCta;
 }
 
@@ -117,6 +119,11 @@ export interface CompetitionListItem {
   gameCode?: string;
   providerKey?: string;
   isPrivate?: boolean;
+  /** `gm_private` = only players affiliated to the Game Master */
+  visibility?: string;
+  /** `gm_funded` = the Game Master pays every seat */
+  fundingMode?: string;
+  gameMasterId?: string;
   privateAccess?: string;
   privateGameMasterName?: string;
   createdByType?: string;
