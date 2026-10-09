@@ -48,30 +48,35 @@ function UtilityTile({
   const t = tone === "cyan" ? CYAN : GOLD;
   return (
     <div
-      className="flex h-full min-h-[58px] items-center gap-1.5 rounded-xl border bg-black/45 px-2 py-1.5"
+      className="flex h-full min-h-[64px] min-w-0 flex-col justify-center gap-1 rounded-xl border bg-black/45 px-2 py-1.5"
       style={{ borderColor: t.border, boxShadow: `inset 0 0 14px ${t.glow}` }}
     >
-      <Image
-        src={icon}
-        alt=""
-        width={26}
-        height={26}
-        className="h-[26px] w-[26px] shrink-0 object-contain"
-      />
-      <div className="min-w-0 flex-1">
+      {/* Reason: icon and label share the top line so the value below gets
+          the tile's whole width; side by side, "14:57:09" and the date did
+          not fit a third of a phone. */}
+      <div className="flex min-w-0 items-center gap-1">
+        <Image
+          src={icon}
+          alt=""
+          width={18}
+          height={18}
+          className="h-[18px] w-[18px] shrink-0 object-contain"
+        />
         <p
-          className={`text-[8.5px] font-black uppercase leading-tight tracking-wide ${t.label}`}
+          className={`min-w-0 whitespace-nowrap text-[9px] font-black uppercase leading-none ${t.label}`}
         >
           {label}
         </p>
-        <p className="flex items-center gap-0.5 break-words text-[12.5px] font-black leading-tight text-white tabular-nums">
-          {value}
-          {trailing ? <ChevronRight className="h-3 w-3 shrink-0" aria-hidden /> : null}
-        </p>
-        {subvalue ? (
-          <p className="text-[9px] leading-tight text-white/55">{subvalue}</p>
-        ) : null}
       </div>
+      <p className="flex items-center gap-0.5 whitespace-nowrap text-[14px] font-black leading-tight text-white tabular-nums">
+        {value}
+        {trailing ? <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
+      </p>
+      {subvalue ? (
+        <p className="whitespace-nowrap text-[9.5px] leading-tight text-white/55">
+          {subvalue}
+        </p>
+      ) : null}
     </div>
   );
 }

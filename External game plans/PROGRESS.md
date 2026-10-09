@@ -984,6 +984,8 @@ Newest at the top.
 
 **Redesigned the same day** after the owner said the first pass was squeezed and cut off. The phone now has a wrapping header title, phone-sized utility tiles, three KPI tiles in one row, smaller labelled filter chips, card stats with the label above the value (including Starts In), and a full-width "Hosted by" + 44px action row. Nothing is truncated with an ellipsis except the title and description, which wrap to two lines first. Desktop is unchanged.
 
+**Polished again the same day** after the owner's live screenshot. The header tiles are now stacked: icon and label on one line, with the value at full width underneath, so Server Time no longer wraps. On each card the prize pool fills the empty space beside the cover and the description gets three lines. The other stats sit in a full-width two-column grid, so the countdown and "Scheduled" no longer break. Every stat opens a short explanation when tapped, like the desktop pop-ups (`MobileStatCell.tsx`, `lib/competitions/metric-explanations.ts`). Never verified by eye.
+
 **Owner request:** the Mobile UI Guide image. The page has a header with a back button, the title and subtitle, then Server Time, Balance and Add Volts. Next comes a KPI strip that snaps between tiles and shows dots, then search and filter chips. Cards run one per row, each with a 3:4 cover on the left and the status, countdown, title, description, metrics, host and button on the right. More competitions load automatically as the player scrolls ("Loading more competitions...").
 
 **Shipped:**
