@@ -23,7 +23,8 @@ function formatRemaining(ms: number): string {
  *
  * Reason: the first render shows a placeholder and the clock starts after
  * mount, so server and client markup agree (no hydration mismatch from two
- * different `Date.now()` values). Hidden once the moment has passed.
+ * different `Date.now()` values). Once the moment passes it reads
+ * "Starting now" / "Ending now" rather than disappearing.
  */
 export function CompetitionCountdownDataBlock({
   kind,
@@ -47,12 +48,17 @@ export function CompetitionCountdownDataBlock({
     };
   }, []);
 
+  // Reason: the card's row packer already counted this box, so it must keep
+  // its cell even when the moment passes (or the date is bad). Removing it
+  // left a hole in the row until the page reloaded. Show the moment instead.
   const end = new Date(target).getTime();
-  if (!Number.isFinite(end)) return null;
-  const ms = now === null ? null : end - now;
-  if (ms !== null && ms <= 0) return null;
+  const ms = now === null || !Number.isFinite(end) ? null : end - now;
+  const passed = ms !== null && ms <= 0;
 
   const starts = kind === "starts";
+  let display = "--:--:--";
+  if (passed) display = starts ? "Starting now" : "Ending now";
+  else if (ms !== null) display = formatRemaining(ms);
   return (
     <CompetitionInfoDataBlock
       icon={COMPETITION_ICON.clock}
@@ -61,7 +67,7 @@ export function CompetitionCountdownDataBlock({
         // Reason: a slightly smaller clock (owner, 9 Oct 2026) so it never
         // crowds the boxes beside it; whitespace-nowrap keeps "1d 00:37:45" whole.
         <span className="whitespace-nowrap font-mono text-[12px] tabular-nums @[150px]:text-[13px]">
-          {ms === null ? "--:--:--" : formatRemaining(ms)}
+          {display}
         </span>
       }
       explanation={

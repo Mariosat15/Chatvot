@@ -127,6 +127,13 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(header).not.toContain("CompetitionCountdown");
     expect(parts).toContain("<CompetitionInfoDataBlock");
     expect(parts).toContain("<CompetitionCountdownDataBlock");
+    // The packer counted the clock's cell, so the clock must never vanish.
+    const clockSrc = readFileSync(
+      "components/competitions/arena/CompetitionCountdown.tsx",
+      "utf8",
+    );
+    expect(clockSrc).not.toMatch(/return null/);
+    expect(clockSrc).toContain('"Starting now"');
     expect(card).toContain("gridContextItems(p)");
     expect(card).toContain("packedSpanClasses(");
     expect(card).not.toContain("grid-flow-row-dense");
