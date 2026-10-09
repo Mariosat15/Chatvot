@@ -210,6 +210,42 @@ describe("performance model", () => {
     expect(gamesOnly.map((c) => c.gameKey)).toEqual(["provider:p1:g1"]);
   });
 
+  it("hides Game Performance cards when the player has no plays yet", () => {
+    // Reason: owner, 9 Oct 2026 — empty Trading card with a neon-icon hero.
+    const none = buildGameCards(
+      fixture({
+        overview: {
+          roi: 0,
+          totalTrades: 0,
+          winRate: 0,
+          totalPnLPercentage: 0,
+          profitFactor: 0,
+          averageWin: 0,
+          averageLoss: 0,
+          largestWin: 0,
+          largestLoss: 0,
+        },
+        gamePerformance: [],
+        gameActivity: [],
+        competitions: { completed: [] },
+        challenges: { completed: [] },
+      }),
+      "30d",
+      ALL_GAMES,
+    );
+    expect(none).toEqual([]);
+  });
+
+  it("always sets real play art on every shown card, never a neon icon path", () => {
+    const cards = buildGameCards(fixture(), "30d", ALL_GAMES);
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) {
+      expect(card.artSrc).toMatch(/^\/assets\//);
+      expect(card.artSrc).not.toMatch(/Menuitems|chart-growth|candles\.webp/i);
+    }
+    expect(cards.find((c) => c.gameKey === TRADING_KEY)?.artSrc).toContain("play-trading");
+  });
+
   it("shows Trade ROI on the Trading card Best score, never wallet credit ROI", () => {
     const empty = buildGameCards(fixture(), "30d", TRADING_KEY)[0];
     expect(empty.bestScore).toBe("-");
@@ -340,6 +376,14 @@ describe("performance page structure", () => {
     expect(card).toMatch(/heroObjectPosition/);
     expect(card).toMatch(/ResizeObserver/);
     expect(card).not.toMatch(/object-\[center_38%\]/);
+    // Reason: icon-as-hero was the empty-state bug; art must come from overviewPlayCardArt.
+    // Identity icons still use PERF_SECTION_ICON — assert on the artSrc assignment only.
+    const artAssign = card.slice(
+      card.indexOf("const artSrc"),
+      card.indexOf("const identityIcon"),
+    );
+    expect(artAssign).toMatch(/overviewPlayCardArt/);
+    expect(artAssign).not.toMatch(/PERF_SECTION_ICON|PERF_METRIC_ICON/);
     expect(section).not.toMatch(/controls=\{arrows\}/);
     expect(card).toMatch(/View Details/);
     expect(card).toMatch(/Best score/);
@@ -358,6 +402,12 @@ describe("performance page structure", () => {
     expect(section).not.toMatch(/lg:grid-cols-2/);
     expect(section).toMatch(/Every game you have played, including trading\./);
     expect(section).not.toMatch(/artwork, metrics and trend/);
+    const model = stripComments(read(`${DIR}/performance-game-cards.ts`));
+    expect(model).toMatch(/hasPlayedGameCard/);
+    expect(model).toMatch(/overviewPlayCardArt/);
+    const mobile = stripComments(read(`${DIR}/mobile/MobileGamePerformanceCarousel.tsx`));
+    expect(mobile).toMatch(/overviewPlayCardArt/);
+    expect(mobile).not.toMatch(/NeonIcon src=\{PERF_SECTION_ICON\.games\}/);
     const summary = stripComments(read(`${DIR}/PerformanceSummaryPanel.tsx`));
     expect(summary).toMatch(/Volts won/);
     expect(summary).not.toMatch(/Credits won/);

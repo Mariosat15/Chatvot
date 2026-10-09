@@ -145,46 +145,39 @@ export function RoundClockNote({
 
   return (
     <div className="space-y-2">
-      <div className="rounded-lg border border-gray-700 bg-gray-900/60 p-3">
-        <div className="flex items-start gap-2">
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-          <div className="space-y-1 text-xs text-gray-400">
-            {/*
-              THIS COMMENT USED TO SAY THIS WAS THE ONLY TOKEN IN THE COMPONENT, on the grounds
-              that every other noun sits mid-sentence where a Title Case token would read
-              wrongly, and that chapter 14 scoped the pass to labels rather than to argued
-              prose. THE OWNER DECIDED OTHERWISE on 15 September 2026, and the correction is
-              left visible rather than deleted because the argument was believed for long
-              enough to be written down: a token is used mid-sentence and the capital is
-              accepted, because the alternative is worse in both available directions.
-              Lower-casing edits a word the operator typed, turning "eSports Event" into
-              "esports event"; leaving the noun hard-coded means a renamed platform still says
-              "contest" in the sentence under a heading that says "Tournament", which reads as
-              the setting being broken. The only position still avoided is an article agreeing
-              with a first letter we do not know - so "a {"{"}terms.contest{"}"}" is written
-              "this" or "the" where the grammar allows it.
-            */}
+      {/*
+        Reason: owner, 9 Oct 2026 — join window was easy to miss / misread. Start IS the
+        join deadline; keep the example concrete (13:00 → 13:40 = 40 minutes).
+      */}
+      <div className="rounded-xl border-2 border-cyan-500/50 bg-cyan-500/10 p-4 shadow-[0_0_20px_rgba(34,211,238,0.12)]">
+        <div className="flex items-start gap-3">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
+          <div className="space-y-2 text-sm leading-relaxed text-cyan-50/90">
+            <p className="font-semibold text-white">
+              Join window = time until <strong className="text-cyan-200">start</strong>
+            </p>
             <p>
               {terms.players} can join from the moment you save until the{" "}
-              <strong className="text-gray-200">start</strong> time, and play between start and{" "}
-              <strong className="text-gray-200">end</strong>. To give a five-minute sign-up
-              window, set the start five minutes from now.
+              <strong className="text-white">start</strong> time. Example: if it is{" "}
+              <strong className="text-white">13:00</strong> now and you set start to{" "}
+              <strong className="text-white">13:40</strong>, they have{" "}
+              <strong className="text-white">40 minutes</strong> to join.
+            </p>
+            <p>
+              Then they play from start until <strong className="text-white">end</strong>.
+              Anything still running closes at the end.
             </p>
             {fit && fit.reservesFullRound && fit.lastAttemptStart ? (
               <p>
-                Play lasts <strong className="text-gray-200">{reserved}</strong>, and everyone
-                gets all of it, so the last {terms.attempt} can start at{" "}
-                <strong className="text-gray-200">
+                Play lasts <strong className="text-white">{reserved}</strong> per{" "}
+                {terms.attempt.toLowerCase()}, so the last {terms.attempt.toLowerCase()} can
+                start at{" "}
+                <strong className="text-white">
                   {fit.lastAttemptStart.toLocaleString()}
                 </strong>
-                . Everything still running is closed at the end time.
+                .
               </p>
-            ) : (
-              <p>
-                Everything still running is closed at the end time, so play never outlives the{" "}
-                {terms.contest}.
-              </p>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

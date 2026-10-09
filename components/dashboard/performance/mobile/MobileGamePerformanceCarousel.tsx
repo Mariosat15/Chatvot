@@ -5,9 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Sparkline } from "@/components/dashboard/wallet/AnalyticsCard";
+import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
 import { NeonIcon, TrendDelta, accentHex } from "../PerformanceChrome";
 import { PERF_METRIC_ICON, PERF_SECTION_ICON } from "../performance-assets";
 import type { GameCardView } from "../performance-game-cards";
+import { TRADING_KEY } from "../performance-model";
 import { MobilePerfHeading, MobilePerfPlate } from "./mobile-perf-shell";
 
 /**
@@ -87,23 +89,20 @@ export default function MobileGamePerformanceCarousel({ cards }: { cards: GameCa
 
 function MobileGameCard({ card }: { card: GameCardView }) {
   const hex = accentHex(card.accent);
+  // Reason: same as desktop — always show game art, never a lone neon icon.
+  const artSrc =
+    card.artSrc || overviewPlayCardArt(null, card.gameKey === TRADING_KEY);
   return (
     <MobilePerfPlate accent={card.accent} className="p-0">
       <div className="flex min-h-[196px] flex-col">
         <div className="relative h-[72px] w-full overflow-hidden bg-[#041025]">
-          {card.artSrc ? (
-            <Image
-              src={card.artSrc}
-              alt=""
-              fill
-              sizes="430px"
-              className="object-cover object-[center_top]"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <NeonIcon src={PERF_SECTION_ICON.games} size={36} />
-            </div>
-          )}
+          <Image
+            src={artSrc}
+            alt=""
+            fill
+            sizes="430px"
+            className="object-cover object-[center_top]"
+          />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#041025] to-transparent" />
           <span
             className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"

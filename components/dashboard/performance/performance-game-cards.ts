@@ -1,3 +1,4 @@
+import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
 import {
   ALL_GAMES,
   TRADING_KEY,
@@ -22,7 +23,8 @@ export interface GameCardView {
   /** Catalogue tagline when the overview payload has one — never invented here (R29). */
   tagline: string | null;
   category?: string;
-  artSrc: string | null;
+  /** Always a real play/banner image when the card is shown — never a neon icon. */
+  artSrc: string;
   href: string;
   /** Free-text unit for the activity count ("Trades" / "Rounds" / catalogue label). */
   activityLabel: string;
@@ -41,6 +43,11 @@ export interface GameCardView {
   avgPlayTrend: number | null;
   /** Trading cyan; other titles cycle without naming a game (R29). */
   accent: PerfAccent;
+}
+
+/** A card with nothing played is noise — hide it (owner, 9 Oct 2026). */
+export function hasPlayedGameCard(card: Pick<GameCardView, "scoredRounds" | "contests">): boolean {
+  return card.scoredRounds > 0 || card.contests > 0;
 }
 
 const PROVIDER_ACCENTS = new Map<number, PerfAccent>([
@@ -129,7 +136,9 @@ function tradingGameCard(
     title: "Trading",
     tagline: meta.tagline,
     category: "Markets",
-    artSrc: meta.artSrc,
+    // Reason: never use a neon icon as the hero strip — same art as Overview when
+    // the standing payload has no play card yet.
+    artSrc: meta.artSrc ?? overviewPlayCardArt(null, true),
     href: meta.href,
     activityLabel: meta.activityLabel,
     status: "active",
@@ -199,7 +208,7 @@ export function buildGameCards(
       title: g.title,
       tagline: meta.tagline,
       category: g.category?.label,
-      artSrc: meta.artSrc,
+      artSrc: meta.artSrc ?? overviewPlayCardArt(null, false),
       href: meta.href,
       activityLabel: meta.activityLabel,
       status: g.rounds.live > 0 ? "live" : g.inCatalogue ? "active" : "retired",
@@ -220,9 +229,12 @@ export function buildGameCards(
 
   // Reason: Game Performance is every playable title. Trading is not a
   // `game_round` row so it never arrived in `gamePerformance`; without this
-  // card the strip only showed provider games.
+  // card the strip only showed provider games. Omit when the player has never
+  // traded or entered a trading contest — an empty card with a neon-icon hero
+  // was worse than the empty state (owner, 9 Oct 2026).
   if (input.showTrading && (gameFilter === ALL_GAMES || gameFilter === TRADING_KEY)) {
-    cards.unshift(tradingGameCard(input, range, now));
+    const trading = tradingGameCard(input, range, now);
+    if (hasPlayedGameCard(trading)) cards.unshift(trading);
   }
-  return cards;
+  return cards.filter(hasPlayedGameCard);
 }

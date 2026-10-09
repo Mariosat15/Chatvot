@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Minus } from "lucide-react";
+import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
 import { NeonIcon, accentHex } from "./PerformanceChrome";
 import { PERF, PERF_METRIC_ICON, PERF_SECTION_ICON } from "./performance-assets";
 import { type GameCardView } from "./performance-game-cards";
@@ -198,9 +199,10 @@ function MetricTile({
  */
 export function GamePerformanceCard({ card }: { card: GameCardView }) {
   const hex = accentHex(card.accent);
+  // Reason: icon-as-hero looked like an empty glowing pill (owner screenshot).
+  // Prefer the card's art; fall back to the same Overview play art, never Menuitems icons.
   const artSrc =
-    card.artSrc ??
-    (card.gameKey === TRADING_KEY ? PERF_SECTION_ICON.trading : PERF_METRIC_ICON.gameFallback);
+    card.artSrc || overviewPlayCardArt(null, card.gameKey === TRADING_KEY);
   const identityIcon =
     card.gameKey === TRADING_KEY ? PERF_SECTION_ICON.trading : PERF_METRIC_ICON.gameFallback;
   const subtitle = [card.category, card.tagline].filter(Boolean).join(" • ");

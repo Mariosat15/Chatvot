@@ -1,3 +1,6 @@
+BUILT (eng, 9 Oct 2026): Empty Game Performance cards omitted when the player has no
+plays; shown cards always use Overview play art (desktop + mobile). Never verified by eye.
+
 TASK: REBUILD CHARTVOLT PERFORMANCE ANALYTICS PAGE FOR MOBILE
 
 We already have a desktop Performance Analytics page.

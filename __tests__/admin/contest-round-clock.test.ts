@@ -969,6 +969,21 @@ describe("the round-start policy - the gate became the contest's choice", () => 
     expect(field).not.toMatch(/reserve_full_round["']\s*:\s*\{/);
   });
 
+  it("states the join window with the owner's 13:00→13:40 example", () => {
+    // Reason: owner, 9 Oct 2026 — start IS join time; wording must stay this plain.
+    const note = readCode(NOTE);
+    expect(note).toMatch(/13:00/);
+    expect(note).toMatch(/13:40/);
+    expect(note).toMatch(/40 minutes/);
+    expect(note).toMatch(/Join window/);
+    expect(note).not.toMatch(/five-minute sign-up/);
+    const gm = readCode("components/gamemaster/ProviderRoundControls.tsx");
+    expect(gm).toMatch(/13:00/);
+    expect(gm).toMatch(/13:40/);
+    expect(gm).toMatch(/40 minutes/);
+    expect(gm).toMatch(/Join window/);
+  });
+
   it("changes what the clock note SAYS, not just what it emphasises", () => {
     /*
       The note is the one place the derived deadline is rendered. If it kept printing one
