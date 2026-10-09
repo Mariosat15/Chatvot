@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { COMPETITION_CANCELLED_RIBBON_ASSET } from "@/lib/competitions/game-artwork";
 import type {
   CompetitionMetric,
   CompetitionPresentation,
@@ -104,16 +105,19 @@ export function CardHero({
   );
 }
 
-/** Tags (GM Funded first, when it applies) followed by the ticking countdown. */
-export function CardTagsRow({ presentation: p }: { presentation: CompetitionPresentation }) {
-  if (p.tags.length === 0 && !p.countdown) return null;
+/** Status, optional context badges and clock share one wrapping row. */
+export function CardBadgesRow({ presentation: p }: { presentation: CompetitionPresentation }) {
+  const cancelled = p.status === "cancelled" || p.status === "refunded";
   return (
     <div className="flex flex-wrap items-center gap-1.5">
+      {!cancelled ? (
+        <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
+      ) : null}
       {p.tags.map((tag) => (
         <span
           key={`${tag.tone}-${tag.label}`}
           title={tag.tone === "funded" ? p.gmFundedNote : undefined}
-          className={`inline-flex h-[24px] items-center gap-1 rounded-full border px-2.5 text-[11px] font-bold leading-none ${
+          className={`inline-flex h-[28px] items-center gap-1 rounded-lg border px-2.5 text-[10px] font-bold leading-none ${
             TAG_TONE.get(tag.tone) ?? TAG_TONE.get("neutral")
           }`}
         >
@@ -145,35 +149,21 @@ export function CardTagsRow({ presentation: p }: { presentation: CompetitionPres
   );
 }
 
-/** Owner reference: a small boxed game name with its icon, top-right of the content. */
-export function GamePill({ presentation: p }: { presentation: CompetitionPresentation }) {
-  return (
-    <span
-      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border bg-black/45 px-2.5 text-[12px] font-bold leading-none text-white"
-      style={{ borderColor: `${p.gameAccent}80`, boxShadow: `0 0 10px ${p.gameAccent}33` }}
-    >
-      <Image src={p.gameIcon} alt="" width={16} height={16} className="size-4 object-contain" />
-      {p.gameName}
-    </span>
-  );
-}
-
-/** The game artwork with the status pill sitting on its top-left corner. */
-export function CardHeroWithStatus({
+/** The uploaded ribbon is the only cancelled-status marker on a cancelled card. */
+export function CancelledRibbon({
   presentation: p,
-  className,
-  sizes,
 }: {
   presentation: CompetitionPresentation;
-  className: string;
-  sizes: string;
 }) {
+  if (p.status !== "cancelled" && p.status !== "refunded") return null;
   return (
-    <div className={`relative ${className}`}>
-      <CardHero presentation={p} className="h-full w-full" sizes={sizes} />
-      <div className="absolute left-1.5 top-1.5 z-10">
-        <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
-      </div>
-    </div>
+    <Image
+      src={COMPETITION_CANCELLED_RIBBON_ASSET}
+      alt={p.statusLabel}
+      width={112}
+      height={112}
+      className="pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]"
+      sizes="112px"
+    />
   );
 }

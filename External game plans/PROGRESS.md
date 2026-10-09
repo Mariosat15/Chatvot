@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, tenth pass)** — horizontal mini-dashboards (`FIXCOMP`); visible game artwork, one status badge (cancelled ribbon removed), equal-height metric tracks and per-title boxes (difficulty trading-only; Circuit board size; Velocity laps/track; Stack scoring). Join CTA assets and server pagination (pageSize 10) remain. Join GM still lobby-only. Tests: `competition-presentation.test.ts` (13). **Never verified by eye.**
+- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, eleventh pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards now match the supplied two-up target anatomy (full-height left artwork, wrapping boxed badges, dynamic three-column metric grid, full-width CTA). A cancelled competition uses only the uploaded 96–112px ribbon as its cancelled marker; no duplicate cancelled badge. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -977,7 +977,19 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 9 October 2026 - Competition history is personal; cards rebuilt to the supplied target
+
+**Owner correction:** the Completed/Cancelled filters exposed every settled competition on the platform rather than only competitions the signed-in player had joined; the latest card still did not match the two-up target, and cancelled competitions must use the uploaded corner image only.
+
+**Fixed:** `browseCompetitions` now builds one participant-id set for the viewer and applies it inside the server-side MongoDB query for `finalizing`, `completed`, `cancelled` and historical `emergency_ended` rows. Active/upcoming rows remain discoverable. The same scoped query drives items, pagination, counts and prize totals. Membership on returned cards is derived from the same set, including refunded/disqualified seats rather than only participant rows whose status happened to be `active` or `completed`. The ids are converted from the participant model's strings back to ObjectIds before the featured aggregation match because Mongoose does not cast aggregation pipelines.
+
+The grid card is now the target's horizontal mini-dashboard: artwork fills the left 35%; the right side grows around a wrapping boxed badge row, title/description, every populated game-defined metric in one equal three-column grid, and the owner CTA PNG across the bottom. Desktop switches to two cards per row at `lg`. Cancelled/refunded presentations suppress the duplicate status badge and use only the newly uploaded 96–112px `CANCELLED / REFUNDED` ribbon, and only when the stored competition is cancelled. Difficulty remains Trading-only.
+
+**Nothing was paid wrongly and nothing was backfilled.** Focused tests pass **18/18** (`competition-presentation` + `competition-participation-scope`); ESLint, IDE diagnostics and scoped diff check are clean; the repository-wide typecheck retains unrelated failures and reports none in these files. **Never verified by eye.**
+
 ### 9 October 2026 - Competition cards: artwork, duplicate cancellation and per-game fields corrected
+
+**Superseded in part by the entry above:** artwork and per-title metric corrections remain current; the ribbon removal and compact footer anatomy are history only.
 
 **Owner report:** game artwork was blank, cancelled cards showed both a badge and a ribbon, metric boxes did not align, and provider-game cards incorrectly showed trading difficulty instead of each title's own fields.
 

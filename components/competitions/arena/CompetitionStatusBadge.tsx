@@ -37,10 +37,10 @@ const ICONS = new Map<CompetitionStatusKey, string>([
 ]);
 
 const PILL =
-  "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-extrabold uppercase leading-none tracking-wide backdrop-blur-sm sm:text-[11px]";
+  "inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-[10px] font-extrabold uppercase leading-none tracking-wide backdrop-blur-sm sm:text-[11px]";
 
 const PILL_LG =
-  "inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-[11px] font-black uppercase leading-none tracking-wide backdrop-blur-sm sm:text-[12px]";
+  "inline-flex h-9 items-center gap-2 rounded-lg border px-3.5 text-[11px] font-black uppercase leading-none tracking-wide backdrop-blur-sm sm:text-[12px]";
 
 export function CompetitionStatusBadge({
   status,

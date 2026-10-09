@@ -1,4 +1,17 @@
+# BUILT 9 Oct 2026 (eng, eleventh pass) — personal history; target card anatomy; cancelled ribbon only
+
+- **Completed and cancelled history is now personal.** `browseCompetitions` reads the signed-in player's participant seats before constructing the paginated MongoDB query. Active/upcoming competitions remain discoverable, while `finalizing`, `completed`, `cancelled` and the historical `emergency_ended` state are admitted only when that competition id belongs to the viewer. Anonymous viewers and players with no seats receive no settled history. Counts, pages and prize totals use the same scoped query. Participant ids are converted back to ObjectIds before the featured aggregation match because Mongoose does not cast aggregation pipelines.
+- **The card now follows the supplied target's structure.** The game artwork owns the full left side; the right side holds one wrapping badge row, title, two-line description, a dynamic three-column grid containing every populated game-specific metric, and the supplied CTA PNG across the bottom. The grid becomes two-up at `lg`, so a desktop row matches the two-card target rather than showing one oversized card.
+- **Metric boxes are dynamic rather than hard-coded into two mismatched rows.** Circuit Sprint can add board size/attempts, Volt Velocity laps/track, Volt Stack scoring, and future titles can add further declared metrics without changing the card component. Every populated box in a card shares the same grid and row sizing.
+- **Cancelled competitions use only the newly uploaded `CANCELLED / REFUNDED` corner ribbon as their cancellation marker.** It is restrained to a 96–112px top-right box and is rendered only for a stored cancelled competition (including its refunded presentation); the duplicate cancelled/refunded status badge is withheld. Other status/context/countdown badges remain boxed and wrap when present.
+- Difficulty remains Trading-only and all game fields still come through `gameDefinitions`; the card contains no per-title branch.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **18/18**; ESLint and IDE diagnostics clean; scoped diff check clean. The repository-wide typecheck retains unrelated failures and reports none in these files.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, tenth pass) — artwork restored; one cancelled state; per-game boxes corrected
+
+**Superseded by the eleventh pass above.** The artwork/per-game-field diagnosis remains correct; the ribbon removal and compact footer anatomy are history only.
 
 - **The blank artwork panel was a component defect, not missing files.** `CardHeroWithStatus` put a relative `CardHero` inside an absolute zero-intrinsic-size wrapper. The shared hero now owns its dimensions directly, fills its panel with the resolved game artwork and uses `artworkObjectPosition`; the dedicated Trading, Circuit Sprint, Volt Stack and Volt Velocity assets were also opened directly and confirmed to load.
 - **There is one cancelled treatment.** The supplied diagonal ribbon and its presentation fields were removed; cancelled/refunded cards retain the existing top-left status badge. This supersedes the sixth pass's ribbon requirement at the owner's instruction.

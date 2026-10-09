@@ -5,7 +5,7 @@
  * Indexes already cover status+startTime / gameKey+status (competition.model.ts).
  */
 
-import type { PipelineStage } from "mongoose";
+import { Types, type PipelineStage } from "mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
@@ -28,6 +28,7 @@ import {
   type BrowseCompetitionsResult,
   type BrowseSort,
 } from "./browse-types";
+import { scopeCompetitionStatusesToParticipant } from "./competition-participation-scope";
 
 function pickImage(banner: unknown, thumb: unknown): string {
   if (typeof banner === "string" && banner.trim()) return banner.trim();
@@ -240,9 +241,23 @@ export async function browseCompetitions(
   const statuses = parseStatuses(input.status);
   const sort = (input.sort || "featured") as BrowseSort;
 
-  const base: Record<string, unknown> = {
-    status: { $in: statuses, $ne: "draft" },
-  };
+  const participantCompetitionIds = input.viewer.userId
+    ? (
+        await CompetitionParticipant.distinct("competitionId", {
+          userId: input.viewer.userId,
+        })
+      ).map(String)
+    : [];
+  const participantCompetitionIdSet = new Set(participantCompetitionIds);
+  // Reason: Mongoose casts find() predicates but does not cast aggregation
+  // pipelines; the featured query is an aggregate over ObjectId `_id` values.
+  const participantCompetitionObjectIds = participantCompetitionIds
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
+  const base = scopeCompetitionStatusesToParticipant(
+    statuses,
+    participantCompetitionObjectIds,
+  );
 
   const gameClause = gameMatchClause(input.game);
   // Reason: trading clause sets gameType twice if merged naively — build $and.
@@ -354,20 +369,9 @@ export async function browseCompetitions(
       annotated as Array<Record<string, unknown>>,
     );
 
-    let userInCompetitionIds: string[] = [];
-    if (input.viewer.userId) {
-      const ids = withArt.map((c) => String(c._id));
-      if (ids.length > 0) {
-        const parts = await CompetitionParticipant.find({
-          userId: input.viewer.userId,
-          competitionId: { $in: ids },
-          status: { $in: ["active", "completed"] },
-        })
-          .select("competitionId")
-          .lean();
-        userInCompetitionIds = parts.map((p) => String(p.competitionId));
-      }
-    }
+    const userInCompetitionIds = withArt
+      .map((c) => String(c._id))
+      .filter((id) => participantCompetitionIdSet.has(id));
 
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     return {
@@ -402,14 +406,10 @@ export async function browseCompetitions(
       .limit(pageSize * 3)
       .lean(),
     Competition.countDocuments(mongoQuery),
-    Competition.countDocuments(
-      withVisibleContests({ status: "active" }, input.viewer),
-    ),
-    Competition.countDocuments(
-      withVisibleContests({ status: "upcoming" }, input.viewer),
-    ),
+    Competition.countDocuments({ $and: [mongoQuery, { status: "active" }] }),
+    Competition.countDocuments({ $and: [mongoQuery, { status: "upcoming" }] }),
     Competition.aggregate([
-      { $match: withVisibleContests({ status: { $in: statuses } }, input.viewer) },
+      { $match: mongoQuery },
       {
         $group: {
           _id: null,
@@ -439,20 +439,9 @@ export async function browseCompetitions(
     annotated as Array<Record<string, unknown>>,
   );
 
-  let userInCompetitionIds: string[] = [];
-  if (input.viewer.userId) {
-    const ids = withArt.map((c) => String(c._id));
-    if (ids.length > 0) {
-      const parts = await CompetitionParticipant.find({
-        userId: input.viewer.userId,
-        competitionId: { $in: ids },
-        status: { $in: ["active", "completed"] },
-      })
-        .select("competitionId")
-        .lean();
-      userInCompetitionIds = parts.map((p) => String(p.competitionId));
-    }
-  }
+  const userInCompetitionIds = withArt
+    .map((c) => String(c._id))
+    .filter((id) => participantCompetitionIdSet.has(id));
 
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   return {

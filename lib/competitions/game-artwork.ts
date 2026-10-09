@@ -102,6 +102,10 @@ export const COMPETITION_CTA_ASSET = {
   already_in: `${CTA_BASE}/btn-already-in.png`,
 } as const;
 
+/** Owner-supplied corner ribbon; rendered only for a cancelled competition. */
+export const COMPETITION_CANCELLED_RIBBON_ASSET =
+  `${CTA_BASE}/ribbon-cancelled-refunded-r2.png`;
+
 // Reason: Map — request-supplied / variant keys must not walk Object.prototype.
 const CTA_BY_VARIANT = new Map<CtaVariant, string>([
   ["join", COMPETITION_CTA_ASSET.join],

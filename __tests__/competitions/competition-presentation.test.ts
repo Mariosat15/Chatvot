@@ -118,7 +118,7 @@ describe("buildCompetitionPresentation", () => {
     expect(p.statusLabel).toBe("LIVE NOW");
   });
 
-  it("represents cancellation with the status badge only", () => {
+  it("marks a cancelled row for the card's ribbon-only status treatment", () => {
     const p = buildCompetitionPresentation(
       base({ status: "cancelled", cancellationReason: "refunded" }),
       {
