@@ -67,7 +67,7 @@ export function ArenaCompetitionCard({
             {metrics.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
             ))}
-            <CardContextDataBlocks presentation={p} />
+            <CardContextDataBlocks presentation={p} layout="grid" />
           </div>
 
           <div className="mt-0.5 flex items-center justify-center">

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveGameDefinition } from "@/lib/competitions/game-definitions";
 import { getCompetitionCTA } from "@/lib/competitions/competition-cta";
 import { buildCompetitionPresentation } from "@/lib/competitions/build-competition-presentation";
+import { describeCompetitionMode } from "@/lib/competitions/competition-mode-copy";
 import type { CompetitionListItem } from "@/lib/competitions/types";
 
 function base(overrides: Partial<CompetitionListItem> = {}): CompetitionListItem {
@@ -36,6 +37,24 @@ describe("resolveGameDefinition", () => {
         name: "Circuit Sprint Cup",
       }).id,
     ).toBe("circuitSprint");
+  });
+});
+
+describe("describeCompetitionMode", () => {
+  it("explains anytime play", () => {
+    expect(describeCompetitionMode("Anytime")).toMatch(/start.*open play window/i);
+  });
+
+  it("explains scheduled play", () => {
+    expect(describeCompetitionMode("Scheduled")).toMatch(
+      /set start time.*late.*less time/i,
+    );
+  });
+
+  it("still explains a title-specific mode without inventing its rules", () => {
+    expect(describeCompetitionMode("Time Trial")).toBe(
+      "Time Trial is the game mode configured for this competition and controls how its rounds are played.",
+    );
   });
 });
 

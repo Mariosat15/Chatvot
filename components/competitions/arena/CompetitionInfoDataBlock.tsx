@@ -7,7 +7,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CompetitionDataShell } from "./CompetitionDataBlock";
+import { cn } from "@/lib/utils";
+import { CompetitionDataShell } from "./CompetitionDataShell";
 
 /**
  * A data box with help that works with a mouse, keyboard, or touch.
@@ -22,12 +23,14 @@ export function CompetitionInfoDataBlock({
   value,
   explanation,
   accent,
+  className,
 }: {
   icon: string;
   label: string;
   value: ReactNode;
   explanation: string;
   accent: string;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -44,7 +47,10 @@ export function CompetitionInfoDataBlock({
         <button
           type="button"
           aria-label={`${label}: ${explanation}`}
-          className="group relative block h-full w-full cursor-help rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
+          className={cn(
+            "group relative block h-full w-full cursor-help rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80",
+            className,
+          )}
           onPointerEnter={showForMouse}
           onPointerLeave={hideForMouse}
         >

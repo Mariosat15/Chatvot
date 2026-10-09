@@ -80,9 +80,11 @@ describe("scopeCompetitionStatusesToParticipant", () => {
       "components/competitions/arena/ArenaCompetitionCard.tsx",
       "utf8",
     );
-    expect(parts).toContain("if (cancelled) return null");
+    expect(parts).toContain("if (isCancelled(p)) return null");
     expect(parts).toContain("<CompetitionStatusBadge");
     expect(parts).toContain('p.status !== "cancelled"');
+    expect(parts).toContain('borderColor: "rgba(248,74,89,.92)"');
+    expect(parts).toContain("CANCELLED_SCRIM");
     expect(card).toContain("<CancelledRibbon");
   });
 
@@ -103,6 +105,10 @@ describe("scopeCompetitionStatusesToParticipant", () => {
       "components/competitions/arena/CompetitionInfoDataBlock.tsx",
       "utf8",
     );
+    const dataBlock = readFileSync(
+      "components/competitions/arena/CompetitionDataBlock.tsx",
+      "utf8",
+    );
     const countdown = readFileSync(
       "components/competitions/arena/CompetitionCountdown.tsx",
       "utf8",
@@ -116,10 +122,18 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(header).not.toContain("CompetitionCountdown");
     expect(parts).toContain("<CompetitionInfoDataBlock");
     expect(parts).toContain("<CompetitionCountdownDataBlock");
-    expect(card).toContain("<CardContextDataBlocks");
-    expect(list).toContain("<CardContextDataBlocks");
+    expect(card).toContain('<CardContextDataBlocks presentation={p} layout="grid"');
+    expect(list).toContain('<CardContextDataBlocks presentation={p} layout="list"');
+    expect(parts).toContain('tag.tone === "creator" ? "col-span-2"');
+    expect(parts.indexOf('["private", 1]')).toBeLessThan(
+      parts.indexOf('["creator", 4]'),
+    );
+    expect(parts.indexOf('["creator", 1]')).toBeLessThan(
+      parts.indexOf('["private", 2]'),
+    );
     expect(card).toContain('className="w-full max-w-[220px]"');
     expect(card).not.toContain("max-w-none");
+    expect(list).toContain("flex items-end justify-center");
     expect(infoBlock).toContain("<PopoverTrigger asChild>");
     expect(infoBlock).toContain("onPointerEnter={showForMouse}");
     expect(infoBlock).toContain("onPointerLeave={hideForMouse}");
@@ -127,5 +141,8 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(infoBlock).toContain("onOpenChange={setOpen}");
     expect(infoBlock).toContain("onOpenAutoFocus={(event) => event.preventDefault()}");
     expect(countdown).toContain("<CompetitionInfoDataBlock");
+    expect(dataBlock).toContain('metric.key === "mode"');
+    expect(dataBlock).toContain("describeCompetitionMode(metric.value)");
+    expect(dataBlock).toContain("<CompetitionInfoDataBlock");
   });
 });

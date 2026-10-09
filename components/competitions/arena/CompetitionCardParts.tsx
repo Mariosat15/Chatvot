@@ -23,6 +23,21 @@ const CONTEXT_BLOCK = {
   neutral: { label: "Details", icon: COMPETITION_ICON.live },
 } as const;
 
+const GRID_CONTEXT_ORDER = new Map([
+  ["funded", 0],
+  ["private", 1],
+  ["skill", 2],
+  ["neutral", 3],
+  ["creator", 4],
+]);
+const LIST_CONTEXT_ORDER = new Map([
+  ["funded", 0],
+  ["creator", 1],
+  ["private", 2],
+  ["skill", 3],
+  ["neutral", 4],
+]);
+
 /**
  * Reason: the blurred backdrop is ambience only — text sits on it, so it is
  * dimmed to near-solid behind the content; any game's logo baked into its
@@ -30,17 +45,31 @@ const CONTEXT_BLOCK = {
  */
 const SCRIM =
   "linear-gradient(90deg, rgba(4,9,24,.50) 0%, rgba(4,9,24,.82) 28%, rgba(4,9,24,.93) 42%, rgba(4,9,24,.94) 100%)";
+const CANCELLED_SCRIM =
+  "linear-gradient(90deg, rgba(45,5,12,.48) 0%, rgba(35,5,12,.86) 35%, rgba(28,4,10,.96) 100%)";
 export function hasMetricValue(m: CompetitionMetric): boolean {
   return Boolean(m.value && m.value.trim() && m.value !== "-" && m.value !== "—");
 }
 
+function isCancelled(p: CompetitionPresentation): boolean {
+  return p.status === "cancelled" || p.status === "refunded";
+}
+
 export function isSettled(p: CompetitionPresentation): boolean {
-  return p.status === "completed" || p.status === "cancelled" || p.status === "refunded";
+  return p.status === "completed" || isCancelled(p);
 }
 
 /** Border + glow in the game's accent; dimmer once the contest is settled. */
 export function cardFrameStyle(p: CompetitionPresentation): CSSProperties {
   const accent = p.gameAccent;
+  if (isCancelled(p)) {
+    return {
+      borderColor: "rgba(248,74,89,.92)",
+      boxShadow:
+        "0 0 22px rgba(239,44,65,.48), 0 0 2px #f84a59, inset 0 0 34px rgba(122,8,27,.28)",
+      background: "#18060c",
+    };
+  }
   const settled = isSettled(p);
   return {
     borderColor: settled ? `${accent}80` : `${accent}d9`,
@@ -66,7 +95,10 @@ export function CardBackdrop({ presentation: p }: { presentation: CompetitionPre
         }`}
         sizes="(max-width: 1536px) 50vw, 25vw"
       />
-      <div className="absolute inset-0" style={{ background: SCRIM }} />
+      <div
+        className="absolute inset-0"
+        style={{ background: isCancelled(p) ? CANCELLED_SCRIM : SCRIM }}
+      />
     </div>
   );
 }
@@ -103,8 +135,7 @@ export function CardHero({
 
 /** Keep the card header quiet: game identity is already in the artwork and title. */
 export function CardBadgesRow({ presentation: p }: { presentation: CompetitionPresentation }) {
-  const cancelled = p.status === "cancelled" || p.status === "refunded";
-  if (cancelled) return null;
+  if (isCancelled(p)) return null;
 
   return (
     <div className="flex min-h-[28px] items-center">
@@ -140,13 +171,23 @@ function contextExplanation(
 /** Context and timing are data, so they use the same boxes as every other card metric. */
 export function CardContextDataBlocks({
   presentation: p,
+  layout,
 }: {
   presentation: CompetitionPresentation;
+  layout: "grid" | "list";
 }) {
+  const order = layout === "grid" ? GRID_CONTEXT_ORDER : LIST_CONTEXT_ORDER;
+  const tags = p.tags
+    .filter((tag) => tag.tone !== "game")
+    .sort(
+      (a, b) =>
+        (order.get(a.tone) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
+    );
+
   return (
     <>
-      {p.tags.map((tag) => {
-        if (tag.tone === "game") return null;
+      {tags.map((tag) => {
         const context =
           CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
         return (
@@ -157,6 +198,7 @@ export function CardContextDataBlocks({
             value={tag.label}
             explanation={contextExplanation(p, tag.tone, tag.label)}
             accent={p.gameAccent}
+            className={tag.tone === "creator" ? "col-span-2" : undefined}
           />
         );
       })}

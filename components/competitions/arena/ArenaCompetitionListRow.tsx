@@ -70,12 +70,12 @@ export function ArenaCompetitionListRow({
             {metrics.map((m) => (
               <CompetitionDataBlock key={m.key} metric={m} accent={p.gameAccent} />
             ))}
-            <CardContextDataBlocks presentation={p} />
+            <CardContextDataBlocks presentation={p} layout="list" />
           </div>
         </div>
 
         {/* CTA — below on narrow rows, its own column on wide ones */}
-        <div className="flex items-center justify-center @[760px]:col-span-2 @[1100px]:col-span-1">
+        <div className="flex items-end justify-center @[760px]:col-span-2 @[1100px]:col-span-1">
           <CompetitionCTA
             cta={p.cta}
             glow={settled ? undefined : p.theme.glow}

@@ -1,4 +1,26 @@
+# BUILT 9 Oct 2026 (eng, fifteenth pass) — every Mode box explains itself
+
+- Every **Mode** metric now uses the same hover, keyboard and touch explanation treatment as Host, Funding, Access and the clock.
+- **Anytime** explains that each player can start during the open play window. **Scheduled** explains the shared start and warns that arriving late may leave less playing time.
+- A title-specific or future mode still receives an honest generic explanation. The card does not branch on a game code or invent rules the title did not declare.
+- The visual data-box shell was extracted once and is shared by ordinary and explanatory metrics, so Mode keeps exactly the same size and alignment as the surrounding boxes.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **22/22**; scoped ESLint and IDE diagnostics clean; scoped diff check clean. The repository-wide typecheck retains unrelated failures and reports none in these files.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, fourteenth pass) — host/access placement; lower list CTA; cancelled red
+
+- **Grid card:** Funding keeps its existing slot, Access moves into the old Host slot, and Host moves to the lower row and spans two grid columns. A long Game Master name therefore gets twice the width instead of wrapping inside a single metric box.
+- **List row:** Host also spans two boxes, but appears before Access so Access sits immediately to its right as marked in the wide-row reference. The context renderer takes an explicit `grid` / `list` layout; neither card duplicates the boxes.
+- **List CTA:** the button is bottom-aligned in its dedicated right column rather than floating halfway up beside the title.
+- **Cancelled/refunded cards are red:** red border, outer/inset glow, dark-red base and red-tinted artwork scrim. The uploaded cancellation ribbon remains the only cancellation-status marker.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **19/19**; scoped ESLint clean.
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, thirteenth pass) — contextual explanations on hover and touch
+
+**Extended by the fourteenth pass above.** Hover/touch behavior and its shared component remain current.
 
 - Host, GM funding, private access, level requirement and the live clock now explain what they mean from the card itself.
 - **Desktop:** hovering the whole data box opens its explanation. **Mobile:** pressing the box opens the same popover and it stays open until the player presses elsewhere. Keyboard users can focus the real button and press Enter; Escape closes it.

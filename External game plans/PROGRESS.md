@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, thirteenth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement and the live countdown use the same shared data-box shell beside prize, players and game-defined facts. Those contextual boxes now explain themselves on mouse hover and on touch/keyboard press. The repeated game badge is gone and the CTA is capped at 220px. A cancelled competition uses only the uploaded 96–112px ribbon as its cancelled marker; no duplicate cancelled badge. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
+- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, fifteenth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement, the live clock and every Mode value use shared data boxes with hover/touch help. Anytime and Scheduled receive specific explanations; future title-specific modes receive a generic explanation without a game-code branch. Host spans two columns; grid cards put Access in its former slot, while wide rows keep Access immediately after the widened Host. The list CTA is bottom-aligned. Cancelled/refunded cards use a red frame/scrim and only the uploaded ribbon as their cancellation marker. The repeated game badge is gone and the CTA remains capped at 220px. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -977,6 +977,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 9 October 2026 - Host/access slots corrected; list CTA lowered; cancelled cards red
+
+**Owner correction:** Access belonged in the grid card's former Host slot; Host needed the lower slot at twice the width for long Game Master names; the wide row needed the same widened Host with Access moved beside it; the list CTA belonged at the bottom of its right column; and a cancelled card needed a red treatment.
+
+**Fixed:** context boxes now have layout-aware order without duplicating their content or explanations. In the grid, Funding → Access → Host puts Access at row three column three and the two-column Host on the next row. In the list, Funding → Host → Access keeps the wide Host first and its Access box immediately after it. The CTA column bottom-aligns its button. Cancelled/refunded cards resolve to a red frame, glow, base and artwork scrim while retaining the uploaded ribbon as their only cancelled-status marker.
+
+Focused tests pass **19/19** and scoped ESLint is clean. **Never verified by eye.**
+
 ### 9 October 2026 - Competition context boxes explain themselves on hover and touch
 
 **Owner request:** explain contextual items such as GM Funded and Private when a player hovers on desktop or presses on mobile.
@@ -1030,6 +1038,8 @@ The grid card is now the target's horizontal mini-dashboard: artwork fills the l
 **Nothing was paid wrongly.** Tests: `competition-presentation.test.ts`. Never verified by eye.
 
 **Second pass, same day (strict brief):** card rebuilt to the exact anatomy in `FIXCOMP`'s top block — 28/72 grid by container query (600px wide, 720px CTA inline), boxed values that wrap with no ellipsis, 28px badges, per-game accent + game icon, ribbon/CTA PNGs without blend modes, softer settled glow. Deviation: arena grid two-up only at `2xl`. Also typed the browse aggregate as `PipelineStage[]` (tsc fix). Lint clean, 11/11 tests. **Never verified by eye.**
+
+**Fifteenth pass, same day:** every Mode metric now opens an explanation on mouse hover, keyboard activation or touch. Anytime and Scheduled explain their distinct timing rules; any future title-specific value receives a generic mode explanation without inventing game-specific behavior. `CompetitionDataShell` is shared by ordinary and explanatory boxes, preserving the card grid's size and alignment. Focused tests pass **22/22**; scoped ESLint, IDE diagnostics and diff check are clean; the repository-wide typecheck retains unrelated failures and reports none in these files. **Never verified by eye.**
 
 ### 9 October 2026 - FIXCOMP Competition Arena rebuild (Image 2) — superseded same day
 
