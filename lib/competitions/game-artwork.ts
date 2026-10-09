@@ -93,12 +93,14 @@ const CTA_BASE = "/assets/neon/competitions/cta";
  * do not tint one Join pill to fake the others.
  */
 export const COMPETITION_CTA_ASSET = {
-  join: `${CTA_BASE}/btn-join-competition.png`,
-  reserve: `${CTA_BASE}/btn-reserve-spot.png`,
-  join_gm: `${CTA_BASE}/btn-join-gm.png`,
-  results: `${CTA_BASE}/btn-view-results.png`,
+  // Reason: `-r2` — a replacement written over the old filename is served from a
+  // returning visitor's cache for hours (R54).
+  join: `${CTA_BASE}/btn-join-competition-r2.png`,
+  reserve: `${CTA_BASE}/btn-reserve-spot-r2.png`,
+  join_gm: `${CTA_BASE}/btn-join-gm-r2.png`,
+  results: `${CTA_BASE}/btn-view-results-r2.png`,
   already_in: `${CTA_BASE}/btn-already-in.png`,
-  cancelledRibbon: `${CTA_BASE}/ribbon-cancelled.png`,
+  cancelledRibbon: `${CTA_BASE}/ribbon-cancelled-r2.png`,
 } as const;
 
 // Reason: Map — request-supplied / variant keys must not walk Object.prototype.

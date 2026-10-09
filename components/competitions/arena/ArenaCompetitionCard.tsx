@@ -89,10 +89,10 @@ export function ArenaCompetitionCard({
       </div>
 
       {p.showCancelledRibbon ? (
-        // Reason: the ribbon art fills the right 716×660 of a 1024×682 canvas, so a
-        // 150px box shows a ~105px ribbon pinned to the corner.
+        // Reason: the ribbon art fills the top-right ~80% of a square 1024 canvas,
+        // so a square box pins it to the corner at its own aspect.
         <div
-          className="pointer-events-none absolute -right-[5px] -top-[2px] z-20 h-[100px] w-[150px]"
+          className="pointer-events-none absolute -right-[3px] -top-[2px] z-20 size-[118px]"
           aria-hidden
         >
           <Image
@@ -100,7 +100,7 @@ export function ArenaCompetitionCard({
             alt=""
             fill
             className="object-contain object-right-top"
-            sizes="150px"
+            sizes="118px"
           />
         </div>
       ) : null}

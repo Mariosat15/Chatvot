@@ -90,7 +90,7 @@ export function ArenaHeader({
               tone="gold"
               icon={COMPETITION_ICON.topup}
               label="Top Up"
-              value="Add Credits →"
+              value="Add Volts →"
               interactive
             />
           </Link>

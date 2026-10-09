@@ -1,3 +1,11 @@
+# BUILT 9 Oct 2026 (eng, sixth pass) — owner's replacement button PNGs, "Add Volts"
+
+- The owner supplied new images for Join Competition, Reserve Spot, Join GM to Enter and View Results, plus a new Cancelled/Refunded ribbon. They are saved as `*-r2.png` under `public/assets/neon/competitions/cta/` and wired in `COMPETITION_CTA_ASSET`. The old files are left in place. The new names matter because overwriting the old filenames would keep serving the old images to returning visitors from their browser cache (R54). "Already in" got no new image and is unchanged.
+- The new ribbon is square (1024×1024; the old one was 1024×682), so its box on the card is now a 118px square pinned top-right.
+- The arena header's Top Up card now reads **"Add Volts →"** instead of "Add Credits →".
+
+**Never verified by eye.**
+
 # BUILT 9 Oct 2026 (eng, fifth pass) — status top-right, live countdown, full-width footer, whole artwork, glow
 
 Supersedes the fourth pass's hero and footer layout (correct as history only).
