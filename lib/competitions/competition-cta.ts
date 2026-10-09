@@ -90,11 +90,11 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
         disabled: false,
       };
     }
-    // Reason: FIXCOMP state machine — seated but not live reads "Already In".
+    // Reason: Image 1 state machine — seated but not live uses Already In asset.
     return {
       label: "Already In",
       href: lobbyHref(id),
-      variant: "join",
+      variant: "already_in",
       disabled: false,
     };
   }

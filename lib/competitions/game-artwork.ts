@@ -1,12 +1,12 @@
 /**
  * Competition card artwork — same play-card family as Games / Dashboard / Suggested.
  *
- * Reason: Menuitems crop art was being used as generic landscape tiles. The overview
- * play-* cards keep logos readable; card heroes must share that set (with neon banners
- * as a wide fallback when a play card is missing).
+ * Reason: cards must auto-pick the real game image by gameId / gameCode the same way
+ * the Games catalogue resolves banners — never a generic landscape crop.
  */
 
 import type { CompetitionGameId } from "./game-definitions";
+import type { CtaVariant } from "./types";
 
 export interface CompetitionArtwork {
   src: string;
@@ -69,6 +69,7 @@ export function resolveCompetitionArtwork(input: {
   bannerUrl?: string | null;
   gameName?: string | null;
 }): CompetitionArtwork {
+  // Reason: catalogue / operator upload wins — same preference as Games catalogue.
   const url = typeof input.bannerUrl === "string" ? input.bannerUrl.trim() : "";
   if (url) {
     return {
@@ -85,13 +86,35 @@ export function resolveCompetitionArtwork(input: {
   return BY_GAME_ID.get(input.gameId) ?? GENERIC;
 }
 
+const CTA_BASE = "/assets/neon/competitions/cta";
+
 /**
- * CTA artwork under /public.
- * Reason: only Join chrome was supplied as a reusable pill; other states reuse it with
- * tint overlays + label text, or fall back to CSS for results/details.
+ * Owner-supplied CTA / ribbon PNGs (Menuitems). Text state uses its own asset —
+ * do not tint one Join pill to fake the others.
  */
 export const COMPETITION_CTA_ASSET = {
-  join: "/assets/neon/competitions/icons/btn-join-hires.png",
-  joinCompact: "/assets/neon/competitions/icons/btn-join.png",
-  joinSuggested: "/assets/neon/overview/suggested/btn-join-hr.png",
+  join: `${CTA_BASE}/btn-join-competition.png`,
+  reserve: `${CTA_BASE}/btn-reserve-spot.png`,
+  join_gm: `${CTA_BASE}/btn-join-gm.png`,
+  results: `${CTA_BASE}/btn-view-results.png`,
+  already_in: `${CTA_BASE}/btn-already-in.png`,
+  cancelledRibbon: `${CTA_BASE}/ribbon-cancelled.png`,
 } as const;
+
+// Reason: Map — request-supplied / variant keys must not walk Object.prototype.
+const CTA_BY_VARIANT = new Map<CtaVariant, string>([
+  ["join", COMPETITION_CTA_ASSET.join],
+  ["reserve", COMPETITION_CTA_ASSET.reserve],
+  ["join_gm", COMPETITION_CTA_ASSET.join_gm],
+  ["terms", COMPETITION_CTA_ASSET.join_gm],
+  ["results", COMPETITION_CTA_ASSET.results],
+  ["already_in", COMPETITION_CTA_ASSET.already_in],
+  // Play uses Join chrome — no separate Play asset was supplied.
+  ["play", COMPETITION_CTA_ASSET.join],
+  // Cancelled / details use View Results chrome (muted by the component).
+  ["details", COMPETITION_CTA_ASSET.results],
+]);
+
+export function resolveCtaAsset(variant: CtaVariant): string | null {
+  return CTA_BY_VARIANT.get(variant) ?? null;
+}

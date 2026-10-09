@@ -1,17 +1,16 @@
-# BUILT 9 Oct 2026 (eng) — FIXCOMP Competition Arena rebuild
+# BUILT 9 Oct 2026 (eng) — Competition Arena cards → Image 1 target
 
-**Target:** Image 2 (horizontal mini-dashboard cards). Image 1 was the incorrect vertical stack.
+**Target:** Image 1 (horizontal mini-dashboards with full faded game bg, boxed metrics, owner CTA PNGs). Image 2 was the incorrect prior build.
 
-**Shipped:**
-- Horizontal card anatomy (art left → content right) with fade integration + cancelled diagonal ribbon
-- Artwork from `/assets/neon/overview/play-*` (Games/Dashboard family) via `lib/competitions/game-artwork.ts`
-- Join CTA chrome from supplied `btn-join-hires.png` (tint overlays for reserve / Join GM)
-- Header / KPI / toolbar hierarchy sized up; data tiles ~30px icons + readable values
-- Server browse: `lib/competitions/browse-competitions.ts` + `GET /api/competitions?page&limit=10&…`
-- Client: debounce search 350ms, skeletons, next-page prefetch, pagination UI
-- Indexes already present on Competition (`status+startTime`, `gameKey+status`, etc.) — no blind new indexes
+**Shipped (card correction pass):**
+- Full game artwork as faded card background + crisp left hero (`play-*` / catalogue `bannerUrl`)
+- Primary + secondary metrics all in boxes (ENTRY FEE / MODE / DIFFICULTY never plain text chips)
+- Owner CTA assets under `public/assets/neon/competitions/cta/` — Join, Reserve Spot, Join GM, View Results, Already In
+- Cancelled ribbon uses `ribbon-cancelled.png` (mix-blend-screen), not a CSS sash
+- Browse attaches ProviderGame `bannerUrl` so cards match Games catalogue when set
+- Server pagination 10/page unchanged
 
-**Deliberate gaps:** separate Reserve/Join-GM/Cancelled ribbon PNGs were not in Menuitems (only Join pill) — CSS sash + hue-tint on Join chrome. Difficulty stays a soft client filter on the current page (not stored). **Never verified by eye.**
+**Never verified by eye.** Difficulty remains a soft client filter on the current page.
 
 ---
 

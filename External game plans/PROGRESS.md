@@ -977,13 +977,17 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
-### 9 October 2026 - FIXCOMP Competition Arena rebuild (Image 2)
+### 9 October 2026 - Competition Arena cards corrected to Image 1
 
-**Owner task:** stop polishing Image 1; rebuild listing/cards to Image 2 (`FIXCOMP`) — horizontal mini-dashboards, play-* artwork, Join CTA assets, hierarchy, server pagination 10/page.
+**Owner task:** Image 1 is the target; prior build (Image 2 shape) was wrong — use Games-area game art auto, boxed secondary fields, owner CTA/ribbon PNGs from Menuitems, full faded game bg.
 
-**Shipped:** `game-artwork.ts` + browse service/types; horizontal `ArenaCompetitionCard` with fade + cancelled ribbon; Join pill CTA chrome; header/KPI/toolbar sizing; `GET /api/competitions` paginated; skeletons + debounce + prefetch; Join GM still lobby-only. Indexes already covered status/startTime/gameKey. **Deliberate:** no separate Reserve/ribbon PNGs in Menuitems — tinted Join chrome + CSS sash. Difficulty soft-filters the current page only.
+**Shipped:** `public/assets/neon/competitions/cta/*` (Join, Reserve, Join GM, View Results, Already In, cancelled ribbon); `ArenaCompetitionCard` full-bleed faded art + left hero + all metrics in boxes; `CompetitionCTA` uses real assets (no tinted Join); browse attaches ProviderGame `bannerUrl`. Join GM still lobby-only. Difficulty soft-filters current page only.
 
-**Nothing was paid wrongly.** Tests: `competition-presentation.test.ts` (10). Never verified by eye.
+**Nothing was paid wrongly.** Tests: `competition-presentation.test.ts`. Never verified by eye.
+
+### 9 October 2026 - FIXCOMP Competition Arena rebuild (Image 2) — superseded same day
+
+**Owner task:** first horizontal pass. **Superseded by Image 1 card correction above — say which.**
 
 ### 9 October 2026 - Rebuild Competitions page to arena target (owner brief) — superseded same day
 

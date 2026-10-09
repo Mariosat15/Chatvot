@@ -88,6 +88,17 @@ describe("getCompetitionCTA", () => {
     expect(cta.variant).toBe("results");
     expect(cta.href).toContain("/results");
   });
+
+  it("uses Already In when the player is seated on an upcoming contest", () => {
+    const cta = getCompetitionCTA({
+      competition: base({ status: "upcoming" }),
+      isRegistered: true,
+      userBalance: 100,
+      registrationClosed: false,
+    });
+    expect(cta.variant).toBe("already_in");
+    expect(cta.label).toMatch(/already in/i);
+  });
 });
 
 describe("buildCompetitionPresentation", () => {

@@ -7,6 +7,7 @@
 
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ProviderGame from "@/database/models/games/provider-game.model";
 import {
   annotatePrivateContests,
 } from "@/lib/services/gamemaster/private-contest-listing.service";
@@ -18,6 +19,50 @@ import {
   type BrowseCompetitionsResult,
   type BrowseSort,
 } from "./browse-types";
+
+/**
+ * Attach catalogue bannerUrl so cards use the same artwork as /games.
+ * Reason: Games prefers operator/catalogue banner; play-* neon is the fallback.
+ */
+async function attachCatalogueArtwork<T extends Record<string, unknown>>(
+  rows: T[],
+): Promise<T[]> {
+  const codes = new Set<string>();
+  for (const row of rows) {
+    const code =
+      typeof row.gameCode === "string" ? row.gameCode.trim().toLowerCase() : "";
+    if (code) codes.add(code);
+  }
+  if (codes.size === 0) return rows;
+
+  const titles = await ProviderGame.find({
+    gameCode: { $in: [...codes] },
+  })
+    .select("gameCode bannerUrl thumbnailUrl")
+    .lean();
+
+  const byCode = new Map<string, string>();
+  for (const t of titles) {
+    const code = String(t.gameCode || "")
+      .trim()
+      .toLowerCase();
+    if (!code) continue;
+    const banner =
+      (typeof t.bannerUrl === "string" && t.bannerUrl.trim()) ||
+      (typeof t.thumbnailUrl === "string" && t.thumbnailUrl.trim()) ||
+      "";
+    if (banner) byCode.set(code, banner);
+  }
+
+  return rows.map((row) => {
+    const code =
+      typeof row.gameCode === "string" ? row.gameCode.trim().toLowerCase() : "";
+    if (!code) return row;
+    const banner = byCode.get(code);
+    if (!banner) return row;
+    return { ...row, bannerUrl: banner };
+  });
+}
 
 export { COMPETITIONS_PAGE_SIZE, type BrowseCompetitionsResult, type BrowseSort };
 
@@ -220,10 +265,13 @@ export async function browseCompetitions(
     const totalPrizePool = Number(agg?.prize?.[0]?.sum || 0);
 
     const annotated = await annotatePrivateContests(rows, input.viewer);
+    const withArt = await attachCatalogueArtwork(
+      annotated as Array<Record<string, unknown>>,
+    );
 
     let userInCompetitionIds: string[] = [];
     if (input.viewer.userId) {
-      const ids = annotated.map((c) => String(c._id));
+      const ids = withArt.map((c) => String(c._id));
       if (ids.length > 0) {
         const parts = await CompetitionParticipant.find({
           userId: input.viewer.userId,
@@ -238,7 +286,7 @@ export async function browseCompetitions(
 
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     return {
-      items: JSON.parse(JSON.stringify(annotated)),
+      items: JSON.parse(JSON.stringify(withArt)),
       page,
       pageSize,
       totalItems,
@@ -302,10 +350,13 @@ export async function browseCompetitions(
   rows = gameFiltered.slice(0, pageSize);
 
   const annotated = await annotatePrivateContests(rows, input.viewer);
+  const withArt = await attachCatalogueArtwork(
+    annotated as Array<Record<string, unknown>>,
+  );
 
   let userInCompetitionIds: string[] = [];
   if (input.viewer.userId) {
-    const ids = annotated.map((c) => String(c._id));
+    const ids = withArt.map((c) => String(c._id));
     if (ids.length > 0) {
       const parts = await CompetitionParticipant.find({
         userId: input.viewer.userId,
@@ -320,7 +371,7 @@ export async function browseCompetitions(
 
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   return {
-    items: JSON.parse(JSON.stringify(annotated)),
+    items: JSON.parse(JSON.stringify(withArt)),
     page,
     pageSize,
     totalItems,

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { COMPETITION_CTA_ASSET } from "@/lib/competitions/game-artwork";
 import type { CompetitionPresentation } from "@/lib/competitions/types";
 import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 import { CompetitionDataBlock } from "./CompetitionDataBlock";
@@ -15,8 +16,10 @@ const TAG_TONE = new Map<string, string>([
 ]);
 
 /**
- * Horizontal mini-dashboard card (FIXCOMP Image 2 anatomy).
- * Artwork left → content right, with a soft fade into the panel.
+ * Competition Arena card — Image 1 target anatomy.
+ *
+ * Full game artwork as faded card background + crisp left hero, dynamic metric
+ * boxes (primary + secondary), owner CTA PNGs, cancelled ribbon asset.
  */
 export function ArenaCompetitionCard({
   presentation,
@@ -28,28 +31,66 @@ export function ArenaCompetitionCard({
     p.status === "cancelled" ||
     p.status === "refunded" ||
     p.status === "completed";
-  const chips = p.secondaryMetrics.slice(0, 3);
+  // Reason: secondary fields are always boxed (ENTRY FEE / MODE / DIFFICULTY …) —
+  // never plain "Label: value" chips. Only render keys that have values.
+  const secondaryBoxes = p.secondaryMetrics.filter(
+    (m) => m.value && m.value.trim() && m.value !== "-" && m.value !== "—",
+  );
+  const primaryBoxes = p.primaryMetrics
+    .filter((m) => m.value && m.value.trim() && m.value !== "-" && m.value !== "—")
+    .slice(0, 4);
 
   return (
     <article
-      className="card relative flex min-h-[310px] flex-col overflow-hidden rounded-2xl border bg-gradient-to-br from-[rgba(7,22,55,.94)] to-[rgba(2,8,22,.98)] md:min-h-[340px]"
+      className="card relative flex min-h-[310px] flex-col overflow-hidden rounded-2xl border md:min-h-[360px]"
       style={{
         borderColor: `${p.gameAccent}66`,
-        boxShadow: `0 0 22px ${p.theme.glow}`,
+        boxShadow: `0 0 24px ${p.theme.glow}`,
+        background: "rgba(3,10,29,.92)",
       }}
     >
+      {/* Full-card faded game artwork (Image 1) */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <Image
+          src={p.gameArtwork}
+          alt=""
+          fill
+          loading="lazy"
+          decoding="async"
+          className={`object-cover opacity-[0.28] ${mutedArt ? "saturate-50" : "saturate-75"}`}
+          style={{ objectPosition: p.artworkObjectPosition }}
+          sizes="(max-width: 768px) 100vw, 50vw"
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(3,10,29,0.35) 0%, rgba(3,10,29,0.72) 42%, rgba(3,10,29,0.96) 100%)",
+          }}
+        />
+      </div>
+
       {p.showCancelledRibbon ? (
         <div
-          className="pointer-events-none absolute -right-10 top-5 z-20 w-[160px] rotate-45 bg-gradient-to-r from-red-700 to-red-500 py-1 text-center text-[10px] font-black uppercase tracking-wider text-white shadow-lg"
+          className="pointer-events-none absolute -right-1 -top-1 z-30 h-[140px] w-[140px] sm:h-[168px] sm:w-[168px]"
           aria-hidden
         >
-          {p.cancelledRibbonLabel || "CANCELLED"}
+          <Image
+            src={COMPETITION_CTA_ASSET.cancelledRibbon}
+            alt=""
+            fill
+            className="object-contain object-right-top mix-blend-screen"
+            sizes="168px"
+          />
+          <span className="sr-only">
+            {p.cancelledRibbonLabel || "CANCELLED"}
+          </span>
         </div>
       ) : null}
 
-      <div className="cardContent relative flex min-h-0 flex-1 flex-col md:flex-row">
-        {/* Artwork pane */}
-        <div className="relative h-[140px] w-full shrink-0 overflow-hidden md:h-auto md:w-[42%] lg:w-[44%]">
+      <div className="cardContent relative z-10 flex min-h-0 flex-1 flex-col md:flex-row">
+        {/* Crisp left hero — same game art, full colour */}
+        <div className="relative h-[150px] w-full shrink-0 overflow-hidden md:h-auto md:w-[38%] lg:w-[40%]">
           <Image
             src={p.gameArtwork}
             alt=""
@@ -58,33 +99,34 @@ export function ArenaCompetitionCard({
             decoding="async"
             className={`object-cover ${mutedArt ? "saturate-50 opacity-90" : ""}`}
             style={{ objectPosition: p.artworkObjectPosition }}
-            sizes="(max-width: 768px) 100vw, 25vw"
+            sizes="(max-width: 768px) 100vw, 22vw"
           />
-          {/* Fade into content — horizontal on desktop, downward on mobile */}
           <div
             className="absolute inset-0 hidden md:block"
             style={{
               background:
-                "linear-gradient(90deg, rgba(3,10,29,0.03) 0%, rgba(3,10,29,0.15) 58%, rgba(3,10,29,0.96) 100%)",
+                "linear-gradient(90deg, rgba(3,10,29,0.02) 0%, rgba(3,10,29,0.18) 55%, rgba(3,10,29,0.92) 100%)",
             }}
           />
           <div
             className="absolute inset-0 md:hidden"
             style={{
               background:
-                "linear-gradient(to bottom, transparent 35%, rgba(3,10,29,.65) 72%, rgba(3,10,29,1) 100%)",
+                "linear-gradient(to bottom, transparent 40%, rgba(3,10,29,.75) 100%)",
             }}
           />
-        </div>
-
-        {/* Content pane */}
-        <div className="relative flex min-w-0 flex-1 flex-col gap-2.5 p-3.5 sm:p-4">
-          <div className="flex items-start justify-between gap-2">
+          <div className="absolute left-3 top-3 z-10">
             <CompetitionStatusBadge
               status={p.status}
               label={p.statusLabel}
               countdown={p.countdownLabel}
             />
+          </div>
+        </div>
+
+        {/* Content pane */}
+        <div className="relative flex min-w-0 flex-1 flex-col gap-2.5 p-3.5 sm:p-4">
+          <div className="flex items-start justify-end gap-2">
             <span
               className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:text-[12px]"
               style={{
@@ -119,31 +161,25 @@ export function ArenaCompetitionCard({
             </p>
           ) : null}
 
-          {p.primaryMetrics.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-              {p.primaryMetrics.slice(0, 4).map((m) => (
+          {primaryBoxes.length > 0 ? (
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              {primaryBoxes.map((m) => (
                 <CompetitionDataBlock key={m.key} metric={m} />
               ))}
             </div>
           ) : null}
 
-          <div className="cardFooter mt-auto flex flex-col gap-2 pt-1 sm:flex-row sm:items-end sm:justify-between">
-            {chips.length > 0 ? (
-              <div className="flex min-w-0 flex-wrap gap-1.5">
-                {chips.map((m) => (
-                  <span
-                    key={m.key}
-                    className="inline-flex items-center gap-1 rounded-lg border border-white/12 bg-black/35 px-2 py-1 text-[11px] font-semibold text-white/75"
-                  >
-                    <span className="text-white/45">{m.label}:</span>
-                    {m.value}
-                  </span>
+          <div className="cardFooter mt-auto flex flex-col gap-2.5 pt-1 sm:flex-row sm:items-end sm:justify-between">
+            {secondaryBoxes.length > 0 ? (
+              <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 sm:grid-cols-3">
+                {secondaryBoxes.slice(0, 4).map((m) => (
+                  <CompetitionDataBlock key={m.key} metric={m} compact />
                 ))}
               </div>
             ) : (
               <span />
             )}
-            <div className="w-full shrink-0 sm:w-[200px]">
+            <div className="w-full shrink-0 sm:w-[220px]">
               <CompetitionCTA cta={p.cta} />
             </div>
           </div>

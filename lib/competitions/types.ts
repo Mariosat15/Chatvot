@@ -16,6 +16,7 @@ export type CtaVariant =
   | "join"
   | "reserve"
   | "join_gm"
+  | "already_in"
   | "play"
   | "results"
   | "details"
@@ -122,4 +123,6 @@ export interface CompetitionListItem {
   playMode?: string;
   refunded?: boolean;
   cancellationReason?: string;
+  /** Catalogue / operator banner when browse enrichment attached it */
+  bannerUrl?: string | null;
 }

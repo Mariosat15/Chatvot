@@ -340,7 +340,7 @@ export function buildCompetitionPresentation(
   const art = resolveCompetitionArtwork({
     gameId: def.id,
     gameCode: competition.gameCode,
-    bannerUrl: (competition as { bannerUrl?: string }).bannerUrl,
+    bannerUrl: competition.bannerUrl,
     gameName: def.label,
   });
 
