@@ -37,7 +37,7 @@ export function CompetitionCTA({
   const caption = cta.reason || (greyed ? cta.label : "");
 
   const shell = `competitionCta relative block w-full ${
-    fillCell ? "h-full min-h-[56px] max-w-none" : "aspect-[3/1] max-w-[300px]"
+    fillCell ? "h-full max-w-none" : "aspect-[3/1] max-w-[300px]"
   } ${
     greyed
       ? "cursor-not-allowed opacity-45 grayscale"

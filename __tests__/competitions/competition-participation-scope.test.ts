@@ -138,9 +138,15 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(parts.indexOf("{countdown}")).toBeLessThan(
       parts.indexOf("{tags.map((tag)"),
     );
-    // CTA: centred own row, one box tall, never stretched, no blurring glow.
+    // CTA: grid card keeps a centred own row; the list row puts it in the
+    // last two cells, right-aligned and slightly shorter than a box. Never
+    // stretched, no blurring glow.
     expect(cta).toContain("!greyed && glow && !fillCell");
-    expect(list).toContain("col-span-full flex h-[56px] items-stretch justify-center");
+    expect(list).toContain(
+      'flex items-center justify-end [grid-column:span_2/-1]',
+    );
+    expect(list).toContain('aspect-[3/1] h-[44px] max-w-full');
+    expect(list).not.toContain("col-span-full flex h-[56px]");
     expect(card).toContain("col-span-full flex h-[56px] items-stretch justify-center");
     expect(card).toContain("<PrivateRibbon");
     expect(list).toContain("<PrivateRibbon");
