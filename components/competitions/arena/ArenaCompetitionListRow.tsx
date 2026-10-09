@@ -82,11 +82,10 @@ export function ArenaCompetitionListRow({
             <CardContextDataBlocks presentation={p} layout="list" />
             {/*
               Reason: in the wide row the CTA takes the last two cells of the
-              final row (beside Host), right-aligned and a little shorter than
-              a box, so it reads as the row's action rather than a lone banner.
+              final row (beside Host), right-aligned and one box tall, so it reads as the row's action rather than a lone banner.
             */}
             <div className="flex items-center justify-end [grid-column:span_2/-1]">
-              <div className="aspect-[3/1] h-[44px] max-w-full">
+              <div className="aspect-[3/1] h-[56px] max-w-full">
                 <CompetitionCTA
                   cta={p.cta}
                   glow={settled ? undefined : p.theme.glow}

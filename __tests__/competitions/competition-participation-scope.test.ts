@@ -145,7 +145,8 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(list).toContain(
       'flex items-center justify-end [grid-column:span_2/-1]',
     );
-    expect(list).toContain('aspect-[3/1] h-[44px] max-w-full');
+    expect(list).toContain('aspect-[3/1] h-[56px] max-w-full');
+    expect(parts).toContain('funded: { label: "Funding", icon: COMPETITION_ICON.gm }');
     expect(list).not.toContain("col-span-full flex h-[56px]");
     expect(card).toContain("col-span-full flex h-[56px] items-stretch justify-center");
     expect(card).toContain("<PrivateRibbon");

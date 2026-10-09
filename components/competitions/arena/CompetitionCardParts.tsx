@@ -20,7 +20,7 @@ import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 
 const CONTEXT_BLOCK = {
   creator: { label: "Host", icon: COMPETITION_ICON.players },
-  funded: { label: "Funding", icon: COMPETITION_ICON.volts },
+  funded: { label: "Funding", icon: COMPETITION_ICON.gm },
   private: { label: "Access", icon: COMPETITION_ICON.wallet },
   skill: { label: "Requirement", icon: COMPETITION_ICON.trophyGold },
   neutral: { label: "Details", icon: COMPETITION_ICON.live },
