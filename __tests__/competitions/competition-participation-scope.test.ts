@@ -236,7 +236,10 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(card).toContain("COMPETITION_TYPE_RIBBON_ASSET.alreadyIn");
     // Same corner mount and size as CompetitionTypeRibbon (not inside the cover).
     expect(card).toContain(
-      "pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]",
+      "pointer-events-none absolute -right-1 -top-1 z-20 size-[112px] object-contain sm:size-[128px]",
+    );
+    expect(readFileSync("lib/competitions/game-artwork.ts", "utf8")).toContain(
+      "ribbon-already-in-r3.png",
     );
     expect(card.indexOf("COMPETITION_TYPE_RIBBON_ASSET.alreadyIn")).toBeLessThan(
       card.indexOf("aspect-[16/11]"),

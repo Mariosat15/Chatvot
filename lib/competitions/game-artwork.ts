@@ -113,7 +113,10 @@ export const COMPETITION_TYPE_RIBBON_ASSET = {
   /** Top-left corner: private access is a ribbon, never a data box. */
   private: `${CTA_BASE}/ribbon-private-r1.png`,
   /** Top-right corner on the dashboard suggestions: the player already holds a seat. */
-  alreadyIn: `${CTA_BASE}/ribbon-already-in-r2.png`,
+  // Reason: r3 trims the source and pins the sash to the top-right of the
+  // square (same geometry as ribbon-game-r1) so the corner is covered and the
+  // longer "ALREADY IN" lettering keeps more pixels than the padded r1/r2.
+  alreadyIn: `${CTA_BASE}/ribbon-already-in-r3.png`,
 } as const;
 
 // Reason: Map — request-supplied / variant keys must not walk Object.prototype.

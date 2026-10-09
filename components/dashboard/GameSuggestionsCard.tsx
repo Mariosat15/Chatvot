@@ -132,11 +132,13 @@ function SuggestionTile({
         <Image
           src={COMPETITION_TYPE_RIBBON_ASSET.alreadyIn}
           alt="Already in"
-          width={112}
-          height={112}
+          width={128}
+          height={128}
           unoptimized
-          className="pointer-events-none absolute -right-1 -top-1 z-20 size-[96px] object-contain sm:size-[112px]"
-          sizes="112px"
+          // Reason: same corner mount as CompetitionTypeRibbon; a touch larger
+          // so the longer "ALREADY IN" lettering stays sharp on these narrower cards.
+          className="pointer-events-none absolute -right-1 -top-1 z-20 size-[112px] object-contain sm:size-[128px]"
+          sizes="128px"
         />
       ) : null}
       {/*
