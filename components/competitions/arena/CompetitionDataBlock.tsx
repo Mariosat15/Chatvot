@@ -10,9 +10,12 @@ import { CompetitionInfoDataBlock } from "./CompetitionInfoDataBlock";
 export function CompetitionDataBlock({
   metric,
   accent,
+  className,
 }: {
   metric: CompetitionMetric;
   accent: string;
+  /** Grid span classes from the card's row packer. */
+  className?: string;
 }) {
   if (metric.key === "mode") {
     return (
@@ -22,18 +25,21 @@ export function CompetitionDataBlock({
         value={metric.value}
         explanation={describeCompetitionMode(metric.value)}
         accent={accent}
+        className={className}
       />
     );
   }
 
   return (
-    <CompetitionDataShell
-      icon={metric.icon}
-      label={metric.label}
-      value={metric.value}
-      subvalue={metric.subvalue}
-      accent={accent}
-      emphasize={metric.emphasize}
-    />
+    <div className={`min-w-0 ${className ?? ""}`}>
+      <CompetitionDataShell
+        icon={metric.icon}
+        label={metric.label}
+        value={metric.value}
+        subvalue={metric.subvalue}
+        accent={accent}
+        emphasize={metric.emphasize}
+      />
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
 import {
   COMPETITION_CANCELLED_RIBBON_ASSET,
@@ -171,63 +171,30 @@ function contextExplanation(
   }
 }
 
-/** Context and timing are data, so they use the same boxes as every other card metric. */
-export function CardContextDataBlocks({
-  presentation: p,
-  layout,
-  only = "all",
-}: {
-  presentation: CompetitionPresentation;
-  layout: "grid" | "list";
-  only?: "all" | "creator" | "other";
-}) {
-  const order = layout === "grid" ? GRID_CONTEXT_ORDER : LIST_CONTEXT_ORDER;
+/** A context or timing box plus the fewest grid cells its text needs. */
+export type CardContextItem = {
+  key: string;
+  /** Host and the clock need two cells so a GM name / "1d 00:57:24" is not cut. */
+  minSpan: 1 | 2;
+  render: (className?: string) => ReactNode;
+};
+
+function visibleTags(p: CompetitionPresentation) {
   // Reason: private access is shown by the top-left PrivateRibbon, so a box
   // repeating it would spend a whole grid cell on a fact already on the card.
-  const tags = p.tags
-    .filter((tag) => tag.tone !== "game" && tag.tone !== "private")
-    .filter((tag) => {
-      if (only === "creator") return tag.tone === "creator";
-      if (only === "other") return tag.tone !== "creator";
-      return true;
-    })
-    .sort(
-      (a, b) =>
-        (order.get(a.tone) ?? Number.MAX_SAFE_INTEGER) -
-        (order.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
-    );
+  return p.tags.filter((tag) => tag.tone !== "game" && tag.tone !== "private");
+}
 
-  // Reason: Host is full-width on the grid so dense packing cannot pull Funding
-  // into the gap beside it — Funding must stay on the same line as Starts In.
-  // List keeps Host at two cells (a long GM name). Starts In is two cells when
-  // a one-cell neighbour exists, otherwise full-row in both views.
-  const hasCountdownNeighbor = tags.some(
-    (tag) =>
-      tag.tone === "funded" ||
-      tag.tone === "skill" ||
-      tag.tone === "neutral",
-  );
-  const countdownSpan = hasCountdownNeighbor ? "col-span-2" : "col-span-full";
-  const countdown =
-    only !== "creator" && p.countdown ? (
-      <CompetitionCountdownDataBlock
-        kind={p.countdown.kind}
-        target={p.countdown.target}
-        accent={p.gameAccent}
-        className={countdownSpan}
-      />
-    ) : null;
-
-  const tagBlocks = tags.map((tag) => {
-    const context =
-      CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
-    const hostSpan =
-      tag.tone === "creator"
-        ? layout === "grid"
-          ? "col-span-full"
-          : "col-span-2"
-        : undefined;
-    return (
+function tagItem(
+  p: CompetitionPresentation,
+  tag: CompetitionPresentation["tags"][number],
+): CardContextItem {
+  const context =
+    CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
+  return {
+    key: `${tag.tone}-${tag.label}`,
+    minSpan: tag.tone === "creator" ? 2 : 1,
+    render: (className) => (
       <CompetitionInfoDataBlock
         key={`${tag.tone}-${tag.label}`}
         icon={context.icon}
@@ -235,17 +202,75 @@ export function CardContextDataBlocks({
         value={tag.label}
         explanation={contextExplanation(p, tag.tone, tag.label)}
         accent={p.gameAccent}
-        className={hostSpan}
+        className={className}
       />
-    );
-  });
+    ),
+  };
+}
 
-  // Both views: clock then side boxes so Funding packs beside Starts In, not
-  // into an earlier Host gap.
+function countdownItem(p: CompetitionPresentation): CardContextItem | null {
+  if (!p.countdown) return null;
+  const { kind, target } = p.countdown;
+  return {
+    key: "countdown",
+    minSpan: 2,
+    render: (className) => (
+      <CompetitionCountdownDataBlock
+        key="countdown"
+        kind={kind}
+        target={target}
+        accent={p.gameAccent}
+        className={className}
+      />
+    ),
+  };
+}
+
+/**
+ * Grid-card context boxes in packing order: Host, then Starts In, then
+ * Funding and other one-cell tags — so Funding lands on the clock's row.
+ * The card's row packer sets every span, so no row is left with a hole.
+ */
+export function gridContextItems(p: CompetitionPresentation): CardContextItem[] {
+  const tags = visibleTags(p);
+  const host = tags.filter((t) => t.tone === "creator").map((t) => tagItem(p, t));
+  const rest = tags
+    .filter((t) => t.tone !== "creator")
+    .sort(
+      (a, b) =>
+        (GRID_CONTEXT_ORDER.get(a.tone) ?? Number.MAX_SAFE_INTEGER) -
+        (GRID_CONTEXT_ORDER.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((t) => tagItem(p, t));
+  const clock = countdownItem(p);
+  return [...host, ...(clock ? [clock] : []), ...rest];
+}
+
+/** List-row context boxes (auto-fit track, so spans stay simple). */
+export function CardContextDataBlocks({
+  presentation: p,
+}: {
+  presentation: CompetitionPresentation;
+  layout: "list";
+}) {
+  const tags = visibleTags(p).sort(
+    (a, b) =>
+      (LIST_CONTEXT_ORDER.get(a.tone) ?? Number.MAX_SAFE_INTEGER) -
+      (LIST_CONTEXT_ORDER.get(b.tone) ?? Number.MAX_SAFE_INTEGER),
+  );
+  // Reason: the clock is two cells when a one-cell neighbour (Funding) can
+  // share its row; alone it spans the row so no gap is left beside it.
+  const hasCountdownNeighbor = tags.some(
+    (tag) =>
+      tag.tone === "funded" || tag.tone === "skill" || tag.tone === "neutral",
+  );
+  const clock = countdownItem(p);
   return (
     <>
-      {countdown}
-      {tagBlocks}
+      {clock?.render(hasCountdownNeighbor ? "col-span-2" : "col-span-full")}
+      {tags.map((tag) =>
+        tagItem(p, tag).render(tag.tone === "creator" ? "col-span-2" : undefined),
+      )}
     </>
   );
 }

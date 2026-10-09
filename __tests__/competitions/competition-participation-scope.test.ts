@@ -119,28 +119,26 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     );
     const header = parts.slice(
       parts.indexOf("export function CardBadgesRow"),
-      parts.indexOf("export function CardContextDataBlocks"),
+      parts.indexOf("export type CardContextItem"),
     );
+    expect(header.length).toBeGreaterThan(0);
 
     expect(header).not.toContain("p.tags.map");
     expect(header).not.toContain("CompetitionCountdown");
     expect(parts).toContain("<CompetitionInfoDataBlock");
     expect(parts).toContain("<CompetitionCountdownDataBlock");
-    expect(card).toContain("only=\"creator\"");
-    expect(card).toContain("only=\"other\"");
+    expect(card).toContain("gridContextItems(p)");
+    expect(card).toContain("packedSpanClasses(");
+    expect(card).not.toContain("grid-flow-row-dense");
     expect(list).toContain('<CardContextDataBlocks presentation={p} layout="list"');
-    // Host spans two cells in both views; private access is a ribbon, not a box.
-    expect(parts).toContain('tag.tone === "creator"');
-    expect(parts).toContain('layout === "grid"');
-    expect(parts).toContain('"col-span-full"');
-    expect(parts).toContain('"col-span-2"');
+    // Host and the clock need two cells; private access is a ribbon, not a box.
+    expect(parts).toContain('minSpan: tag.tone === "creator" ? 2 : 1');
     expect(parts).toContain('tag.tone !== "private"');
-    // Starts In shares a row with Funding when present; alone it goes full-row.
+    // Grid packing order: Host, then Starts In, then Funding on the clock's row.
+    expect(parts).toContain("[...host, ...(clock ? [clock] : []), ...rest]");
+    // List keeps its own rule: clock two cells beside Funding, else full-row.
     expect(parts).toContain(
       'hasCountdownNeighbor ? "col-span-2" : "col-span-full"',
-    );
-    expect(parts.indexOf("{countdown}")).toBeLessThan(
-      parts.indexOf("{tagBlocks}"),
     );
     // CTA: grid and list share 68px height; no reason caption under fillCell.
     expect(cta).toContain("!greyed && glow && !fillCell");
@@ -172,14 +170,14 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(list).toContain("fillCell");
     expect(card).toContain('className="h-full w-full"');
     expect(list).toContain('className="h-full w-full"');
-    // Grid order: metrics → Host → Funding/other → Starts In → CTA row.
-    const cardGridStart = card.indexOf("mt-auto grid grid-flow-row-dense");
-    const creator = card.indexOf('only="creator"', cardGridStart);
-    const other = card.indexOf('only="other"', cardGridStart);
+    // Grid order: metrics → packed context boxes → CTA row.
+    const cardGridStart = card.indexOf("mt-auto grid auto-rows-fr");
+    const metricsAt = card.indexOf("metrics.map(", cardGridStart);
+    const other = card.indexOf("context.map(", cardGridStart);
     const cardCta = card.indexOf("<CompetitionCTA", cardGridStart);
     expect(cardGridStart).toBeGreaterThan(-1);
-    expect(creator).toBeGreaterThan(cardGridStart);
-    expect(other).toBeGreaterThan(creator);
+    expect(metricsAt).toBeGreaterThan(cardGridStart);
+    expect(other).toBeGreaterThan(metricsAt);
     expect(cardCta).toBeGreaterThan(other);
     expect(card.slice(other, cardCta)).toContain(
       "col-span-full flex h-[68px] items-stretch justify-center",

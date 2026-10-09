@@ -5,14 +5,15 @@ import {
   CancelledRibbon,
   CardBackdrop,
   CardBadgesRow,
-  CardContextDataBlocks,
   CardHero,
   CompetitionTypeRibbon,
   PrivateRibbon,
   cardFrameStyle,
+  gridContextItems,
   hasMetricValue,
   isSettled,
 } from "./CompetitionCardParts";
+import { packedSpanClasses } from "@/lib/competitions/pack-card-grid";
 
 /**
  * Competition Arena card — owner reference anatomy (design-reference target).
@@ -32,6 +33,11 @@ export function ArenaCompetitionCard({
     hasMetricValue,
   );
   const accent = p.gameAccent;
+  const context = gridContextItems(p);
+  const spans = packedSpanClasses([
+    ...metrics.map(() => 1),
+    ...context.map((item) => item.minSpan),
+  ]);
 
   return (
     <article
@@ -68,25 +74,21 @@ export function ArenaCompetitionCard({
           ) : null}
 
           {/*
-            Reason: the number of boxes differs per game, so no fixed cell is
-            "the button's place". Host is full-width; Starts In is two cells
-            beside Funding (or full-row alone); the CTA takes its own centred
-            full-width row under the grid.
+            Reason: the number of boxes differs per game, so spans are packed
+            per card: each box gets the cells its text needs (Host and Starts
+            In need two) and the last box of any short row is widened, so no
+            row is left with a hole. The CTA takes its own full-width row.
           */}
-          <div className="mt-auto grid grid-flow-row-dense auto-rows-fr grid-cols-2 gap-2 @[420px]:grid-cols-3">
-            {metrics.map((m) => (
-              <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
+          <div className="mt-auto grid auto-rows-fr grid-cols-2 gap-2 @[420px]:grid-cols-3">
+            {metrics.map((m, i) => (
+              <CompetitionDataBlock
+                key={m.key}
+                metric={m}
+                accent={accent}
+                className={spans.at(i)}
+              />
             ))}
-            <CardContextDataBlocks
-              presentation={p}
-              layout="grid"
-              only="creator"
-            />
-            <CardContextDataBlocks
-              presentation={p}
-              layout="grid"
-              only="other"
-            />
+            {context.map((item, i) => item.render(spans.at(metrics.length + i)))}
             <div className="col-span-full flex h-[68px] items-stretch justify-center">
               <div className="aspect-[3/1] h-full max-w-full">
                 <CompetitionCTA
