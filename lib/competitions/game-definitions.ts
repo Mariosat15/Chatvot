@@ -219,4 +219,5 @@ export const COMPETITION_ICON = {
   trophyGold: `${ICON_BASE}/icon-trophy-gold.png`,
   gamepad: `${ICON_BASE}/icon-gamepad.png`,
   gm: `${ICON_BASE}/icon-gm.png`,
+  starbox: `${ICON_BASE}/icon-starbox.png`,
 } as const;

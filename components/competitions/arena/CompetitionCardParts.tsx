@@ -20,7 +20,7 @@ import { CompetitionStatusBadge } from "./CompetitionStatusBadge";
 
 const CONTEXT_BLOCK = {
   creator: { label: "Host", icon: COMPETITION_ICON.players },
-  funded: { label: "Funding", icon: COMPETITION_ICON.gm },
+  funded: { label: "Funding", icon: COMPETITION_ICON.starbox },
   private: { label: "Access", icon: COMPETITION_ICON.wallet },
   skill: { label: "Requirement", icon: COMPETITION_ICON.trophyGold },
   neutral: { label: "Details", icon: COMPETITION_ICON.live },
@@ -198,8 +198,10 @@ export function CardContextDataBlocks({
     );
 
   // Host and the countdown are two cells wide in both views (a GM name and a
-  // "1d 00:57:24" clock do not fit one cell), and the countdown leads so
-  // Funding sits beside it.
+  // "1d 00:57:24" clock do not fit one cell).
+  // Reason: grid puts Funding beside Host (dense gap) and Starts In on the
+  // next row under Host at the same two-cell width; list keeps countdown
+  // first so Funding still sits beside the clock.
   const countdown =
     only !== "creator" && p.countdown ? (
       <CompetitionCountdownDataBlock
@@ -210,24 +212,35 @@ export function CardContextDataBlocks({
       />
     ) : null;
 
+  const tagBlocks = tags.map((tag) => {
+    const context =
+      CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
+    return (
+      <CompetitionInfoDataBlock
+        key={`${tag.tone}-${tag.label}`}
+        icon={context.icon}
+        label={context.label}
+        value={tag.label}
+        explanation={contextExplanation(p, tag.tone, tag.label)}
+        accent={p.gameAccent}
+        className={tag.tone === "creator" ? "col-span-2" : undefined}
+      />
+    );
+  });
+
   return (
     <>
-      {countdown}
-      {tags.map((tag) => {
-        const context =
-          CONTEXT_BLOCK[tag.tone as keyof typeof CONTEXT_BLOCK] ?? CONTEXT_BLOCK.neutral;
-        return (
-          <CompetitionInfoDataBlock
-            key={`${tag.tone}-${tag.label}`}
-            icon={context.icon}
-            label={context.label}
-            value={tag.label}
-            explanation={contextExplanation(p, tag.tone, tag.label)}
-            accent={p.gameAccent}
-            className={tag.tone === "creator" ? "col-span-2" : undefined}
-          />
-        );
-      })}
+      {layout === "grid" ? (
+        <>
+          {tagBlocks}
+          {countdown}
+        </>
+      ) : (
+        <>
+          {countdown}
+          {tagBlocks}
+        </>
+      )}
     </>
   );
 }

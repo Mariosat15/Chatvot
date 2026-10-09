@@ -85,7 +85,7 @@ export function ArenaCompetitionListRow({
               final row (beside Host), right-aligned and one box tall, so it reads as the row's action rather than a lone banner.
             */}
             <div className="flex items-center justify-end [grid-column:span_2/-1]">
-              <div className="aspect-[3/1] h-[56px] max-w-full">
+              <div className="aspect-[3/1] h-[68px] max-w-full">
                 <CompetitionCTA
                   cta={p.cta}
                   glow={settled ? undefined : p.theme.glow}

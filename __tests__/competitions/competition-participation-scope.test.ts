@@ -132,21 +132,21 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     // Host spans two cells in both views; private access is a ribbon, not a box.
     expect(parts).toContain('tag.tone === "creator" ? "col-span-2"');
     expect(parts).toContain('tag.tone !== "private"');
-    // Countdown is two cells and leads the context, in both views, so
-    // Funding sits beside it.
+    // Grid: Funding then Starts In (beside Host / under Host). List: clock
+    // still leads so Funding sits beside it.
+    expect(parts).toContain('layout === "grid"');
+    expect(parts.indexOf("{tagBlocks}")).toBeGreaterThan(-1);
     expect(parts.indexOf("{countdown}")).toBeGreaterThan(-1);
-    expect(parts.indexOf("{countdown}")).toBeLessThan(
-      parts.indexOf("{tags.map((tag)"),
-    );
-    // CTA: grid card keeps a centred own row; the list row puts it in the
-    // last two cells, right-aligned and slightly shorter than a box. Never
-    // stretched, no blurring glow.
+    // CTA: grid and list share 68px height; no reason caption under fillCell.
     expect(cta).toContain("!greyed && glow && !fillCell");
+    expect(cta).toContain("fillCell ? \"\"");
     expect(list).toContain(
       'flex items-center justify-end [grid-column:span_2/-1]',
     );
-    expect(list).toContain('aspect-[3/1] h-[56px] max-w-full');
-    expect(parts).toContain('funded: { label: "Funding", icon: COMPETITION_ICON.gm }');
+    expect(list).toContain('aspect-[3/1] h-[68px] max-w-full');
+    expect(parts).toContain(
+      'funded: { label: "Funding", icon: COMPETITION_ICON.starbox }',
+    );
     expect(list).not.toContain("col-span-full flex h-[56px]");
     expect(card).toContain("col-span-full flex h-[68px] items-stretch justify-center");
     expect(card).toContain("<PrivateRibbon");
@@ -167,8 +167,7 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(list).toContain("fillCell");
     expect(card).toContain('className="h-full w-full"');
     expect(list).toContain('className="h-full w-full"');
-    // Grid order: metrics → two-cell Host → two-cell countdown + Funding →
-    // CTA on its own full-width, centred row (box count varies per game).
+    // Grid order: metrics → Host → Funding/other → Starts In → CTA row.
     const cardGridStart = card.indexOf("mt-auto grid grid-flow-row-dense");
     const creator = card.indexOf('only="creator"', cardGridStart);
     const other = card.indexOf('only="other"', cardGridStart);

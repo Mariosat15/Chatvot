@@ -34,7 +34,10 @@ export function CompetitionCTA({
   const asset = resolveCtaAsset(cta.variant) ?? COMPETITION_CTA_ASSET.join;
   const unavailable = cta.variant === "disabled" || cta.disabled;
   const greyed = unavailable && cta.variant !== "already_in";
-  const caption = cta.reason || (greyed ? cta.label : "");
+  // Reason: in-grid CTAs already match other cards' height; a caption under
+  // "Join GM to Enter" shrinks the artwork and duplicates the Private ribbon.
+  const caption =
+    fillCell ? "" : cta.reason || (greyed ? cta.label : "");
 
   const shell = `competitionCta relative block w-full ${
     fillCell ? "h-full max-w-none" : "aspect-[3/1] max-w-[300px]"
