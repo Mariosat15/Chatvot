@@ -984,6 +984,8 @@ Newest at the top.
 
 **Built:** green TRADING and gold GAME ribbon assets now resolve from the competition type, while cancelled/refunded cards retain only their cancellation ribbon. The list CTA fills its metric cell. In the grid card, Host occupies one cell in the former button position and the CTA occupies the two-column row below it. The shared CTA supports this full-cell treatment without changing other callers.
 
+**Amended same day:** the owner reported the button artwork looked stretched. The full-cell CTA used `object-fill`, which distorts the baked-in text; it now uses `object-contain`, so the clickable area still fills the cell while the art keeps its own proportions. A test forbids `object-fill` on the CTA.
+
 Focused tests pass **23/23**. **Never verified by eye.**
 
 ### 9 October 2026 - Host/access slots corrected; list CTA lowered; cancelled cards red

@@ -24,7 +24,10 @@ export function CompetitionCTA({
   cta: CompetitionCta;
   /** Game accent glow (rgba) behind the button */
   glow?: string;
-  /** Stretch the supplied artwork to the same footprint as a metric cell. */
+  /**
+   * Occupy a metric cell's footprint. The artwork stays `object-contain`:
+   * stretching it distorts the baked-in text and icon.
+   */
   fillCell?: boolean;
   className?: string;
 }) {
@@ -48,7 +51,7 @@ export function CompetitionCTA({
         alt=""
         fill
         loading="lazy"
-        className={fillCell ? "object-fill" : "object-contain"}
+        className="object-contain"
         style={!greyed && glow ? { filter: `drop-shadow(0 0 10px ${glow})` } : undefined}
         sizes="300px"
       />

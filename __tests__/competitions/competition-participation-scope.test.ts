@@ -101,6 +101,10 @@ describe("scopeCompetitionStatusesToParticipant", () => {
       "components/competitions/arena/ArenaCompetitionListRow.tsx",
       "utf8",
     );
+    const cta = readFileSync(
+      "components/competitions/arena/CompetitionCTA.tsx",
+      "utf8",
+    );
     const infoBlock = readFileSync(
       "components/competitions/arena/CompetitionInfoDataBlock.tsx",
       "utf8",
@@ -132,7 +136,10 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     expect(parts.indexOf('["creator", 1]')).toBeLessThan(
       parts.indexOf('["private", 2]'),
     );
-    // Reason: CTA must fill a metric cell, not retain its shorter 3:1 artwork box.
+    // Reason: CTA occupies the metric cell, but its artwork keeps its own
+    // proportions — `object-fill` visibly stretched the baked-in text.
+    expect(cta).not.toContain("object-fill");
+    expect(cta).toContain('className="object-contain"');
     expect(card).toContain("fillCell");
     expect(list).toContain("fillCell");
     expect(card).toContain('className="h-full w-full"');

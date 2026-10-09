@@ -4,6 +4,7 @@
 - **Wide list row:** the CTA stretches to the full width and height of the metric box beside it.
 - **Grid card:** Host moved into the former one-cell CTA position. The CTA moved into the former two-column Host position below it and fills that whole red-box footprint. Other context follows after the CTA.
 - Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **23/23**.
+- **Amended same day (owner: "the button looked stretched"):** the CTA still occupies the full cell, but its artwork is now `object-contain`, never `object-fill` — stretching distorted the baked-in text and icon. The art is centred at its own proportions inside the box; a test forbids `object-fill`.
 
 **Never verified by eye.**
 
