@@ -100,7 +100,6 @@ export const COMPETITION_CTA_ASSET = {
   join_gm: `${CTA_BASE}/btn-join-gm-r2.png`,
   results: `${CTA_BASE}/btn-view-results-r2.png`,
   already_in: `${CTA_BASE}/btn-already-in.png`,
-  cancelledRibbon: `${CTA_BASE}/ribbon-cancelled-r2.png`,
 } as const;
 
 // Reason: Map — request-supplied / variant keys must not walk Object.prototype.

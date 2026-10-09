@@ -65,9 +65,6 @@ export interface CompetitionPresentation {
   countdownLabel?: string;
   /** Live clock target: upcoming counts to the start, live counts to the end */
   countdown?: { kind: "starts" | "ends"; target: string };
-  /** Diagonal CANCELLED / REFUNDED sash on cancelled cards */
-  showCancelledRibbon: boolean;
-  cancelledRibbonLabel?: string;
   tags: CompetitionTag[];
   primaryMetrics: CompetitionMetric[];
   secondaryMetrics: CompetitionMetric[];

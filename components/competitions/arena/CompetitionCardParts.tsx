@@ -1,6 +1,5 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import { COMPETITION_CTA_ASSET } from "@/lib/competitions/game-artwork";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
 import type {
   CompetitionMetric,
@@ -34,10 +33,6 @@ const TAG_TONE = new Map<string, string>([
  */
 const SCRIM =
   "linear-gradient(90deg, rgba(4,9,24,.50) 0%, rgba(4,9,24,.82) 28%, rgba(4,9,24,.93) 42%, rgba(4,9,24,.94) 100%)";
-/** Soft edges so the hero melts into the card rather than ending in a hard box. */
-const HERO_MASK =
-  "radial-gradient(ellipse 72% 70% at 50% 50%, #000 62%, transparent 100%)";
-
 export function hasMetricValue(m: CompetitionMetric): boolean {
   return Boolean(m.value && m.value.trim() && m.value !== "-" && m.value !== "—");
 }
@@ -79,31 +74,7 @@ export function CardBackdrop({ presentation: p }: { presentation: CompetitionPre
   );
 }
 
-/** Supplied cancelled ribbon, pinned to the top-right corner. */
-export function CancelledRibbon({ presentation: p }: { presentation: CompetitionPresentation }) {
-  if (!p.showCancelledRibbon) return null;
-  return (
-    <>
-      {/* Reason: the ribbon art fills the top-right ~80% of a square 1024 canvas,
-          so a square box pins it to the corner at its own aspect. */}
-      <div
-        className="pointer-events-none absolute -right-[3px] -top-[2px] z-20 size-[118px]"
-        aria-hidden
-      >
-        <Image
-          src={COMPETITION_CTA_ASSET.cancelledRibbon}
-          alt=""
-          fill
-          className="object-contain object-right-top"
-          sizes="118px"
-        />
-      </div>
-      <span className="sr-only">{p.cancelledRibbonLabel || "CANCELLED"}</span>
-    </>
-  );
-}
-
-/** The whole game artwork (never cropped), with soft edges. */
+/** The game artwork filling its dedicated panel, with a fade into the content. */
 export function CardHero({
   presentation: p,
   className,
@@ -114,21 +85,21 @@ export function CardHero({
   sizes: string;
 }) {
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative overflow-hidden bg-black/25 ${className}`}>
+      <Image
+        src={p.gameArtwork}
+        alt={`${p.gameName} game artwork`}
+        fill
+        loading="lazy"
+        decoding="async"
+        className={`object-cover ${isSettled(p) ? "saturate-[.7]" : ""}`}
+        style={{ objectPosition: p.artworkObjectPosition }}
+        sizes={sizes}
+      />
       <div
-        className="absolute inset-0 [mask-image:var(--hero-mask)]"
-        style={{ ["--hero-mask" as string]: HERO_MASK }}
-      >
-        <Image
-          src={p.gameArtwork}
-          alt={p.gameName}
-          fill
-          loading="lazy"
-          decoding="async"
-          className={`object-contain object-center ${isSettled(p) ? "saturate-[.7]" : ""}`}
-          sizes={sizes}
-        />
-      </div>
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_65%,rgba(5,11,28,.82)_100%)]"
+        aria-hidden
+      />
     </div>
   );
 }
@@ -199,7 +170,7 @@ export function CardHeroWithStatus({
 }) {
   return (
     <div className={`relative ${className}`}>
-      <CardHero presentation={p} className="absolute inset-0" sizes={sizes} />
+      <CardHero presentation={p} className="h-full w-full" sizes={sizes} />
       <div className="absolute left-1.5 top-1.5 z-10">
         <CompetitionStatusBadge status={p.status} label={p.statusLabel} />
       </div>

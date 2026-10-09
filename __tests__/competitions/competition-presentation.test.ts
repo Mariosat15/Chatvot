@@ -118,7 +118,7 @@ describe("buildCompetitionPresentation", () => {
     expect(p.statusLabel).toBe("LIVE NOW");
   });
 
-  it("marks cancelled cards with a ribbon label (not a giant watermark)", () => {
+  it("represents cancellation with the status badge only", () => {
     const p = buildCompetitionPresentation(
       base({ status: "cancelled", cancellationReason: "refunded" }),
       {
@@ -128,8 +128,9 @@ describe("buildCompetitionPresentation", () => {
       },
     );
     expect(p.status === "cancelled" || p.status === "refunded").toBe(true);
-    expect(p.showCancelledRibbon).toBe(true);
-    expect(p.cancelledRibbonLabel).toMatch(/CANCELLED/i);
+    expect(p.statusLabel).toMatch(/REFUNDED|CANCELLED/i);
+    expect(p).not.toHaveProperty("showCancelledRibbon");
+    expect(p).not.toHaveProperty("cancelledRibbonLabel");
   });
 
   it("resolves Games/Dashboard play-card artwork for trading", () => {
@@ -142,22 +143,95 @@ describe("buildCompetitionPresentation", () => {
     expect(p.artworkObjectPosition).toBeTruthy();
   });
 
-  it("omits assets for a provider puzzle with no assetClasses", () => {
+  it("uses Circuit Sprint fields and never trading difficulty", () => {
     const p = buildCompetitionPresentation(
       base({
         name: "Circuit Sprint: Legendary Connect-A-Thon",
         gameType: "provider",
         gameKey: "provider:chartvolt:circuit-sprint",
         assetClasses: [],
-        gameSettings: { mode: "Time Trial", track: "Neon City" },
+        gameSettings: { mode: "Time Trial", gridSize: "medium" },
+        attemptsPolicy: "best_of_n",
+        attemptsAllowed: 3,
       }),
       {
         isRegistered: false,
         userBalance: 50,
         registrationClosed: false,
+        difficultyLabel: "Apprentice Trader",
       },
     );
     expect(p.gameId).toBe("circuitSprint");
-    expect(p.primaryMetrics.some((m) => m.key === "assets")).toBe(false);
+    expect(p.primaryMetrics.map((m) => m.key)).toEqual([
+      "prizePool",
+      "players",
+      "duration",
+      "boardSize",
+    ]);
+    expect(p.secondaryMetrics.map((m) => m.key)).toEqual([
+      "entryFee",
+      "mode",
+      "rounds",
+    ]);
+    expect([...p.primaryMetrics, ...p.secondaryMetrics].some((m) => m.key === "difficulty"))
+      .toBe(false);
+  });
+
+  it("uses Volt Velocity laps and track fields", () => {
+    const p = buildCompetitionPresentation(
+      base({
+        name: "Volt Velocity Invitational",
+        gameType: "provider",
+        gameKey: "provider:chartvolt:volt-velocity",
+        assetClasses: [],
+        playMode: "scheduled",
+        gameSettings: { trackId: "skyline", laps: 5 },
+      }),
+      {
+        isRegistered: false,
+        userBalance: 50,
+        registrationClosed: false,
+        difficultyLabel: "Expert",
+      },
+    );
+    expect(p.gameId).toBe("voltVelocity");
+    expect(p.secondaryMetrics.map((m) => [m.key, m.value])).toEqual([
+      ["entryFee", "10 ⚡"],
+      ["laps", "5"],
+      ["track", "Skyline"],
+    ]);
+    expect([...p.primaryMetrics, ...p.secondaryMetrics].some((m) => m.key === "difficulty"))
+      .toBe(false);
+  });
+
+  it("uses Volt Stack scoring instead of trading difficulty", () => {
+    const p = buildCompetitionPresentation(
+      base({
+        name: "Volt Stack: Battle for Glory!",
+        gameType: "provider",
+        gameKey: "provider:chartvolt:volt-stack",
+        assetClasses: [],
+        gameSettings: { mode: "Endless" },
+        attemptsPolicy: "best_of_n",
+        attemptsAllowed: 5,
+      }),
+      {
+        isRegistered: false,
+        userBalance: 50,
+        registrationClosed: false,
+        difficultyLabel: "Skilled Trader",
+      },
+    );
+    expect(p.primaryMetrics.map((m) => m.key)).toEqual([
+      "prizePool",
+      "players",
+      "duration",
+      "scoring",
+    ]);
+    expect(p.secondaryMetrics.map((m) => m.key)).toEqual([
+      "entryFee",
+      "mode",
+      "rounds",
+    ]);
   });
 });

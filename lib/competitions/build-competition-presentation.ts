@@ -139,6 +139,7 @@ function metricOrNull(
     ["rounds", "ROUNDS"],
     ["laps", "LAPS"],
     ["scoreTarget", "SCORE TARGET"],
+    ["scoring", "SCORING"],
   ]);
   const iconMap = new Map<MetricKey, string>([
     ["prizePool", COMPETITION_ICON.trophyGold],
@@ -155,6 +156,7 @@ function metricOrNull(
     ["rounds", COMPETITION_ICON.soon],
     ["laps", COMPETITION_ICON.bolt],
     ["scoreTarget", COMPETITION_ICON.prize],
+    ["scoring", COMPETITION_ICON.trophyGold],
   ]);
   return {
     key,
@@ -170,6 +172,7 @@ function buildMetric(
   key: MetricKey,
   c: CompetitionListItem,
   creditSymbol?: string,
+  scoreRule?: string,
 ): CompetitionMetric | null {
   const settings = c.gameSettings;
   const prize = Number(c.prizePoolCredits ?? c.prizePool ?? 0) || 0;
@@ -270,6 +273,8 @@ function buildMetric(
         key,
         settingsString(settings, ["scoreTarget", "targetScore"]),
       );
+    case "scoring":
+      return metricOrNull(key, scoreRule);
     default:
       return null;
   }
@@ -306,7 +311,7 @@ export function buildCompetitionPresentation(
   const { status, label } = resolveStatus(competition, isFull);
 
   const primaryMetrics = def.primaryMetrics
-    .map((k) => buildMetric(k, competition, opts.creditSymbol))
+    .map((k) => buildMetric(k, competition, opts.creditSymbol, def.scoreRule))
     .filter((m): m is CompetitionMetric => Boolean(m));
 
   // Inject difficulty into secondary when provided from calculateCompetitionDifficulty
@@ -315,7 +320,7 @@ export function buildCompetitionPresentation(
       if (k === "difficulty" && opts.difficultyLabel) {
         return metricOrNull("difficulty", opts.difficultyLabel);
       }
-      return buildMetric(k, competition, opts.creditSymbol);
+      return buildMetric(k, competition, opts.creditSymbol, def.scoreRule);
     })
     .filter((m): m is CompetitionMetric => Boolean(m));
 
@@ -382,9 +387,6 @@ export function buildCompetitionPresentation(
     gameName: def.label,
   });
 
-  const showCancelledRibbon =
-    status === "cancelled" || status === "refunded";
-
   return {
     id: String(competition._id),
     title: competition.name,
@@ -410,9 +412,6 @@ export function buildCompetitionPresentation(
         : competition.status === "active"
           ? { kind: "ends", target: String(competition.endTime) }
           : undefined,
-    showCancelledRibbon,
-    cancelledRibbonLabel:
-      status === "refunded" ? "CANCELLED / REFUNDED" : "CANCELLED",
     tags,
     primaryMetrics,
     secondaryMetrics,

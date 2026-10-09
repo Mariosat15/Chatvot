@@ -1,3 +1,18 @@
+# BUILT 9 Oct 2026 (eng, tenth pass) — artwork restored; one cancelled state; per-game boxes corrected
+
+- **The blank artwork panel was a component defect, not missing files.** `CardHeroWithStatus` put a relative `CardHero` inside an absolute zero-intrinsic-size wrapper. The shared hero now owns its dimensions directly, fills its panel with the resolved game artwork and uses `artworkObjectPosition`; the dedicated Trading, Circuit Sprint, Volt Stack and Volt Velocity assets were also opened directly and confirmed to load.
+- **There is one cancelled treatment.** The supplied diagonal ribbon and its presentation fields were removed; cancelled/refunded cards retain the existing top-left status badge. This supersedes the sixth pass's ribbon requirement at the owner's instruction.
+- **Difficulty is trading-only on cards.** It was explicitly listed in the Circuit Sprint, Volt Stack, provider and all-games definitions. Those entries were removed rather than hidden in the component.
+- **Known game cards carry their own real fields through `gameDefinitions`, not card branches:**
+  - Circuit Sprint: prize pool, players, duration, board size; entry fee, mode and attempts.
+  - Volt Velocity: prize pool, players, duration, mode; entry fee, laps and track.
+  - Volt Stack: prize pool, players, duration, scoring rule; entry fee, mode and attempts.
+  - Trading retains assets, leverage and difficulty.
+- Grid cards now stretch to their row, both metric rows use equal-height tracks, and the same shared artwork/status treatment is used by list view.
+- Focused verification: ESLint clean; `competition-presentation.test.ts` **13/13**. The repository-wide typecheck still has its existing unrelated failures and reports none in the changed competition files.
+
+**Never verified by eye.** The page redirects this browser session to sign-in; the individual game artwork files were verified visually.
+
 # BUILT 9 Oct 2026 (eng, ninth pass) — KPI tiles restyled; card made compact to the owner reference
 
 - **KPI tiles (LIVE NOW / STARTING SOON / PRIZE POOL)** in `ArenaKpiCards.tsx` now use the reference look: a tinted gradient tile in each tile's own colour, a strong coloured border with an outer and inner glow, a glowing ring around the icon, a coloured label with a text glow, the white value with its caption beside it, faint artwork on the right and a ringed arrow. **The wording is unchanged.**

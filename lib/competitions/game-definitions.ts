@@ -28,7 +28,8 @@ export type MetricKey =
   | "mode"
   | "rounds"
   | "laps"
-  | "scoreTarget";
+  | "scoreTarget"
+  | "scoring";
 
 export interface GameTheme {
   primary: string;
@@ -49,6 +50,8 @@ export interface GameDefinition {
   icon: string;
   primaryMetrics: MetricKey[];
   secondaryMetrics: MetricKey[];
+  /** Optional human-readable scoring rule for a title-specific card box. */
+  scoreRule?: string;
   /** Filter keys relevant to this game (assets only for trading, etc.) */
   filters: Array<"assets" | "difficulty" | "mode" | "track">;
 }
@@ -87,8 +90,8 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     artwork: "/assets/neon/overview/play-circuit-sprint.png",
     icon: `${ICON_BASE}/icon-games.png`,
     primaryMetrics: ["prizePool", "players", "duration", "boardSize"],
-    secondaryMetrics: ["entryFee", "mode", "difficulty"],
-    filters: ["difficulty", "mode"],
+    secondaryMetrics: ["entryFee", "mode", "rounds"],
+    filters: ["mode"],
   },
   voltVelocity: {
     id: "voltVelocity",
@@ -105,7 +108,7 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     icon: `${ICON_BASE}/icon-bolt.png`,
     primaryMetrics: ["prizePool", "players", "duration", "mode"],
     secondaryMetrics: ["entryFee", "laps", "track"],
-    filters: ["difficulty", "mode", "track"],
+    filters: ["mode", "track"],
   },
   voltStack: {
     id: "voltStack",
@@ -120,9 +123,10 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     },
     artwork: "/assets/neon/overview/play-volt-stack.png",
     icon: `${ICON_BASE}/icon-prize.png`,
-    primaryMetrics: ["prizePool", "players", "duration", "mode"],
-    secondaryMetrics: ["entryFee", "rounds", "difficulty"],
-    filters: ["difficulty", "mode"],
+    primaryMetrics: ["prizePool", "players", "duration", "scoring"],
+    secondaryMetrics: ["entryFee", "mode", "rounds"],
+    scoreRule: "Highest Score",
+    filters: ["mode"],
   },
   provider: {
     id: "provider",
@@ -138,8 +142,8 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     artwork: "/assets/neon/overview/play-generic.webp",
     icon: `${ICON_BASE}/icon-games.png`,
     primaryMetrics: ["prizePool", "players", "duration", "mode"],
-    secondaryMetrics: ["entryFee", "difficulty", "rounds"],
-    filters: ["difficulty"],
+    secondaryMetrics: ["entryFee", "rounds"],
+    filters: ["mode"],
   },
   all: {
     id: "all",
@@ -155,8 +159,8 @@ export const gameDefinitions: Record<CompetitionGameId, GameDefinition> = {
     artwork: "/assets/neon/overview/play-generic.webp",
     icon: `${ICON_BASE}/icon-trophy-gold.png`,
     primaryMetrics: ["prizePool", "players", "duration"],
-    secondaryMetrics: ["entryFee", "difficulty"],
-    filters: ["difficulty"],
+    secondaryMetrics: ["entryFee"],
+    filters: [],
   },
 };
 

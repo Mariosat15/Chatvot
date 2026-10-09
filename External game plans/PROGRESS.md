@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng)** — Owner rejected vertical Image-1 cards; rebuilt to Image-2 horizontal mini-dashboards (`FIXCOMP`). Play-* artwork, Join CTA asset, cancelled ribbon, server pagination (pageSize 10), skeletons, debounce, prefetch. Join GM still lobby-only. Tests: `competition-presentation.test.ts` (10). **Never verified by eye.** *(Card anatomy rebuilt again 9 Oct to the strict Image-1 brief — see work log + `FIXCOMP` top block; tests now 11.)*
+- **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, tenth pass)** — horizontal mini-dashboards (`FIXCOMP`); visible game artwork, one status badge (cancelled ribbon removed), equal-height metric tracks and per-title boxes (difficulty trading-only; Circuit board size; Velocity laps/track; Stack scoring). Join CTA assets and server pagination (pageSize 10) remain. Join GM still lobby-only. Tests: `competition-presentation.test.ts` (13). **Never verified by eye.**
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
 - **Games catalogue MOBILE launcher CODE-COMPLETE 8 Oct (eng)** — dedicated below-md tree (one card/row, featured first, swipe filters, View Game CTA); desktop shell extracted unchanged. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -976,6 +976,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 9 October 2026 - Competition cards: artwork, duplicate cancellation and per-game fields corrected
+
+**Owner report:** game artwork was blank, cancelled cards showed both a badge and a ribbon, metric boxes did not align, and provider-game cards incorrectly showed trading difficulty instead of each title's own fields.
+
+**Fixed:** the shared hero now owns a real-sized image layer and uses the resolved artwork position; the ribbon and its presentation state are removed; metric rows use equal-height tracks; and `gameDefinitions` now keeps difficulty on Trading only. Circuit Sprint exposes board size and attempts, Volt Velocity exposes laps and track, and Volt Stack exposes its scoring rule, mode and attempts. Both grid and list views use the same shared hero/status component.
+
+**Nothing was paid wrongly and nothing was backfilled.** ESLint is clean; `competition-presentation.test.ts` passes 13/13; the repository-wide typecheck has its existing unrelated failures and none in the changed competition files. **Never verified by eye** — the authenticated page redirects this browser session to sign-in; the individual artwork assets were opened and verified.
 
 ### 9 October 2026 - Difficulty filter covers every competition, not one page
 

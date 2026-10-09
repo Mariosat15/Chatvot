@@ -2,7 +2,6 @@ import type { CompetitionPresentation } from "@/lib/competitions/types";
 import { CompetitionDataBlock } from "./CompetitionDataBlock";
 import { CompetitionCTA } from "./CompetitionCTA";
 import {
-  CancelledRibbon,
   CardBackdrop,
   CardHeroWithStatus,
   CardTagsRow,
@@ -39,13 +38,12 @@ export function ArenaCompetitionCard({
 
   return (
     <article
-      className="@container relative overflow-hidden rounded-[18px] border-[1.5px]"
+      className="@container relative h-full overflow-hidden rounded-[18px] border-[1.5px]"
       style={cardFrameStyle(p)}
     >
       <CardBackdrop presentation={p} />
-      <CancelledRibbon presentation={p} />
 
-      <div className="relative z-10 flex flex-col gap-2.5 p-3 @[560px]:p-3.5">
+      <div className="relative z-10 flex h-full flex-col gap-2.5 p-3 @[560px]:p-3.5">
         <div className="grid grid-cols-1 gap-3 @[560px]:grid-cols-[32%_minmax(0,1fr)]">
           <CardHeroWithStatus
             presentation={p}
@@ -54,11 +52,7 @@ export function ArenaCompetitionCard({
           />
 
           <div className="flex min-w-0 flex-col gap-2">
-            <div
-              className={`flex items-start justify-between gap-2 ${
-                p.showCancelledRibbon ? "pr-[84px]" : ""
-              }`}
-            >
+            <div className="flex items-start justify-between gap-2">
               <h3
                 className="line-clamp-2 min-w-0 text-[17px] font-black leading-tight text-white @[560px]:text-[19px]"
                 style={{ textShadow: "0 1px 8px rgba(0,0,0,.6)" }}
@@ -78,7 +72,7 @@ export function ArenaCompetitionCard({
             ) : null}
 
             {primary.length > 0 ? (
-              <div className="mt-auto grid grid-cols-2 gap-2 @[560px]:grid-cols-[repeat(4,minmax(0,1fr))]">
+              <div className="mt-auto grid auto-rows-fr grid-cols-2 gap-2 @[560px]:grid-cols-[repeat(4,minmax(0,1fr))]">
                 {primary.map((m) => (
                   <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
                 ))}
@@ -87,7 +81,7 @@ export function ArenaCompetitionCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 items-stretch gap-2 @[560px]:grid-cols-[repeat(4,minmax(0,1fr))]">
+        <div className="mt-auto grid auto-rows-fr grid-cols-2 items-stretch gap-2 @[560px]:grid-cols-[repeat(4,minmax(0,1fr))]">
           {secondary.map((m) => (
             <CompetitionDataBlock key={m.key} metric={m} accent={accent} />
           ))}
