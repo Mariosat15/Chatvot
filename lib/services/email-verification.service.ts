@@ -6,7 +6,7 @@
 import crypto from "crypto";
 import { connectToDatabase } from "@/database/mongoose";
 import EmailTemplate from "@/database/models/email-template.model";
-import { getTransporter } from "@/lib/nodemailer";
+import { getTransporter, sendWelcomeEmail } from "@/lib/nodemailer";
 import { escapeHtml, renderChartVoltEmail } from "@/lib/nodemailer/chartvolt-email-layout";
 import { getEmailBrand } from "@/lib/nodemailer/email-brand";
 import { getSettings } from "@/lib/services/settings.service";
@@ -45,6 +45,30 @@ interface VerificationResult {
   success: boolean;
   error?: string;
   userId?: string;
+  /** The link had already been used and the account is verified - not a failure. */
+  alreadyVerified?: boolean;
+}
+
+/**
+ * Sends the welcome email once the address is proven, honouring the operator's switch.
+ *
+ * Reason: it used to go out at sign-up beside the verification email. Fire-and-forget:
+ * a failed welcome must never turn a successful verification into an error.
+ */
+async function sendWelcomeAfterVerification(email: string, name: string): Promise<void> {
+  try {
+    const template = (await EmailTemplate.findOne({ templateType: "welcome" }).lean()) as {
+      isActive?: boolean;
+      introText?: string;
+    } | null;
+    if (template?.isActive === false) return;
+    const intro =
+      template?.introText ||
+      "Thanks for joining! Your account is ready - pick a game or a competition and start playing.";
+    await sendWelcomeEmail({ email, name, intro });
+  } catch (error) {
+    console.warn("⚠️ Failed to send welcome email after verification:", error);
+  }
 }
 
 /**
@@ -231,10 +255,10 @@ export async function verifyEmailToken(
         .findOne({ $or: userQueries });
       if (userWithoutToken) {
         if (userWithoutToken.emailVerified === true) {
-          return {
-            success: false,
-            error: "Email is already verified. Please sign in.",
-          };
+          // Reason: Outlook's Safe Links (and other mail scanners) open the link before
+          // the player does, spending the token. The player's own click then lands here,
+          // and telling them the link is invalid would be false - the account is verified.
+          return { success: true, userId, alreadyVerified: true };
         }
         console.log(
           `📧 User found but token doesn't match. Stored token: ${userWithoutToken.emailVerificationToken?.substring(0, 10)}...`,
@@ -289,6 +313,10 @@ export async function verifyEmailToken(
         success: false,
         error: "Verification failed. Please try again.",
       };
+    }
+
+    if (typeof user.email === "string") {
+      void sendWelcomeAfterVerification(user.email, typeof user.name === "string" ? user.name : "");
     }
 
     return { success: true, userId };

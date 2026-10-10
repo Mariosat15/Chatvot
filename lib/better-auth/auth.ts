@@ -47,7 +47,11 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
           requireEmailVerification: false,
           minPasswordLength: 8,
           maxPasswordLength: 128,
-          autoSignIn: true,
+          // Reason: a player must verify their email and then sign in with their own
+          // credentials. Auto sign-in left an unverified session behind, so clicking the
+          // verification link bounced them through /sign-in to a dashboard that refused
+          // them until a refresh.
+          autoSignIn: false,
           // Reason: one hour matches the password_reset email copy default.
           resetPasswordTokenExpiresIn: 3600,
           // Reason: a stolen session must not survive a password reset.

@@ -17,6 +17,7 @@ import {
   DEFAULT_EMAIL_DISCLAIMER,
   finalizeEmailHtml,
 } from "./chartvolt-email-layout";
+import { htmlToPlainText } from "./html-to-text";
 
 export interface EmailBrand {
   platformName: string;
@@ -99,7 +100,8 @@ export async function getEmailBrand(): Promise<EmailBrand> {
 
 /**
  * Register the final pass on a transporter: every HTML email it sends gets the
- * dark `color-scheme` hint and the platform disclaimer.
+ * dark `color-scheme` hint and the platform disclaimer, plus a plain-text part
+ * when the sender supplied none.
  *
  * Reason: this is the single door shared by all senders (templates, operator
  * custom HTML, notification bridge, password reset, 2FA), so the disclaimer is
@@ -112,7 +114,9 @@ export async function applyEmailFinalizer<T extends Transporter>(transport: T): 
     try {
       const html = mail.data.html;
       if (typeof html === "string") {
-        mail.data.html = finalizeEmailHtml(html, brand.disclaimer);
+        const finalHtml = finalizeEmailHtml(html, brand.disclaimer);
+        mail.data.html = finalHtml;
+        if (!mail.data.text) mail.data.text = htmlToPlainText(finalHtml);
       }
     } catch (error) {
       console.warn("⚠️ [EMAIL] Could not finalize email HTML, sending as-is:", error);

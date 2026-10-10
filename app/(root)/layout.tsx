@@ -45,7 +45,9 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
           .collection("user")
           .findOne(query, { projection: { emailVerified: 1 } });
         const verified = user?.emailVerified === true;
-        emailVerifiedCache.set(userId, { verified, ts: now });
+        // Reason: only a "yes" is cached. A cached "no" outlived the click on the
+        // verification link and refused a now-verified player for five minutes.
+        if (verified) emailVerifiedCache.set(userId, { verified, ts: now });
         if (user && !verified) redirect("/verify-email-required");
       }
     } catch (error: unknown) {

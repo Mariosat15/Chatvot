@@ -5,6 +5,34 @@ import {
 } from "@/lib/services/email-verification.service";
 
 /**
+ * Ends any session the browser still holds, so the player signs in with their own
+ * credentials after verifying.
+ *
+ * Reason: accounts created while sign-up auto-signed players in carry an unverified
+ * session. Left alone, it outlives the verification and the dashboard's verified-state
+ * cache keeps refusing it until a refresh. Fails open - verification already succeeded.
+ */
+async function endLeftoverSession(
+  request: NextRequest,
+  response: NextResponse,
+): Promise<void> {
+  try {
+    const { auth } = await import("@/lib/better-auth/auth");
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session) return;
+    const signOutResponse = await auth.api.signOut({
+      headers: request.headers,
+      asResponse: true,
+    });
+    for (const cookie of signOutResponse.headers.getSetCookie()) {
+      response.headers.append("set-cookie", cookie);
+    }
+  } catch (error) {
+    console.warn("⚠️ Could not end session after email verification:", error);
+  }
+}
+
+/**
  * GET /api/auth/verify-email
  * Verify email with token from email link
  */
@@ -20,29 +48,21 @@ export async function GET(request: NextRequest) {
     const token = searchParams.get("token");
     const userId = searchParams.get("userId");
 
-    console.log("📧 Email verification request:", {
-      token: token?.substring(0, 10) + "...",
-      userId,
-    });
-
     if (!token || !userId) {
-      console.log("❌ Missing token or userId");
       return NextResponse.redirect(`${baseUrl}/sign-in?verification=invalid`);
     }
 
     const result = await verifyEmailToken(token, userId);
-    console.log("📧 Verification result:", result);
 
     if (result.success) {
-      // Redirect to sign-in with success message
-      console.log("✅ Email verified successfully, redirecting to sign-in");
-      return NextResponse.redirect(`${baseUrl}/sign-in?verification=success`);
+      const response = NextResponse.redirect(`${baseUrl}/email-verified`);
+      await endLeftoverSession(request, response);
+      return response;
     } else {
-      // Redirect to sign-in with error
       const errorParam = result.error?.includes("expired")
         ? "expired"
         : "invalid";
-      console.log("❌ Verification failed:", result.error);
+      console.warn("⚠️ Email verification failed:", result.error);
       return NextResponse.redirect(
         `${baseUrl}/sign-in?verification=${errorParam}`,
       );

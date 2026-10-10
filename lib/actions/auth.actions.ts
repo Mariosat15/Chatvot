@@ -4,8 +4,6 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
-import { sendWelcomeEmail } from "@/lib/nodemailer";
-import EmailTemplate from "@/database/models/email-template.model";
 import { sendVerificationEmail } from "@/lib/services/email-verification.service";
 import {
   validateRegistration,
@@ -365,24 +363,9 @@ export const signUpWithEmail = async ({
         }
       }
 
-      // Send welcome email (separate from verification)
-      try {
-        const template = (await EmailTemplate.findOne({
-          templateType: "welcome",
-        }).lean()) as { isActive?: boolean; introText?: string } | null;
-        if (template?.isActive !== false) {
-          const introText =
-            template?.introText ||
-            "Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.";
-          await sendWelcomeEmail({ email, name: fullName, intro: introText });
-          console.log(`✅ Welcome email sent to ${email}`);
-        } else {
-          console.log("📧 Welcome email is disabled in settings, skipping...");
-        }
-      } catch (emailError) {
-        console.error("⚠️ Failed to send welcome email:", emailError);
-        // Don't fail registration if email fails
-      }
+      // Reason: the welcome email is sent after verification (verifyEmailToken), not here.
+      // Two link-heavy emails to a brand-new address in the same second is a strong spam
+      // signal, and Outlook in particular then files the verification link as junk.
 
       // Auto-assign customer to employee (if enabled)
       try {

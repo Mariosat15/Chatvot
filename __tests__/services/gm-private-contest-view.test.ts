@@ -195,7 +195,13 @@ describe("private Game Master contest - who may view it (step 6)", () => {
       subscription(OTHER_GM, "OTHER"),
       subscription(PAUSED_GM, "PAUSED", { isPaused: true }),
     ]);
-    await db().collection("user").insertOne({ _id: new ObjectId(PLAYER), email: player.email });
+    await db().collection("user").insertMany([
+      { _id: new ObjectId(PLAYER), email: player.email },
+      // Reason: the gate names a Game Master to another player, so it must show the username
+      // and never the real name (usernames, 5 Oct 2026) - both are seeded so the test can tell.
+      { _id: new ObjectId(OWNER_GM), email: "owner@gm.test", name: "Master OWNER", username: "owner_gm" },
+      { _id: new ObjectId(OTHER_GM), email: "other@gm.test", name: "Master OTHER", username: "other_gm" },
+    ]);
   });
 
   describe("canViewContest", () => {
@@ -277,7 +283,7 @@ describe("private Game Master contest - who may view it (step 6)", () => {
       const sub = await GameMasterSubscription.collection.findOne({ userId: OWNER_GM });
       expect(gate).toEqual({
         state: "joinable",
-        gameMasterName: "Master OWNER",
+        gameMasterName: "owner_gm",
         gameMasterUserId: OWNER_GM,
         subscriptionId: String(sub!._id),
       });
@@ -288,7 +294,7 @@ describe("private Game Master contest - who may view it (step 6)", () => {
       await affiliateTo(OTHER_GM);
       const gate = await getPrivateContestGate({ gameMasterId: OWNER_GM, viewerUserId: PLAYER });
       expect(gate.state).toBe("locked");
-      expect(gate.currentGameMasterName).toBe("Master OTHER");
+      expect(gate.currentGameMasterName).toBe("other_gm");
       expect(gate.subscriptionId).toBeUndefined();
     });
 
