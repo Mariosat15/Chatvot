@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ChartVolt — Regulatory Position Paper &amp; Defence Memorandum</title>
+<style>
+  :root {
+    --navy: #0f2a43;
+    --navy-2: #16395c;
+    --gold: #b8912f;
+    --gold-light: #d9b96a;
+    --ink: #1c2733;
+    --muted: #5a6a7a;
+    --paper: #ffffff;
+    --parchment: #f7f4ec;
+    --green: #1d6b46;
+    --green-bg: #eef7f1;
+    --amber: #9a6b08;
+    --amber-bg: #fdf6e6;
+    --red: #8c2f39;
+    --red-bg: #faeef0;
+    --blue-bg: #eef3f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--paper); }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--ink);
+    font-size: 11.2pt;
+    line-height: 1.62;
+  }
+  @page { size: A4; margin: 0; }
+  .page {
+    width: 210mm;
+    min-height: 296mm;
+    padding: 22mm 20mm 20mm 20mm;
+    page-break-after: always;
+    position: relative;
+    background: var(--paper);
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ---------- COVER ---------- */
+  .cover {
+    background: linear-gradient(160deg, #0b2033 0%, #0f2a43 55%, #16395c 100%);
+    color: #eef2f6;
+    display: flex;
+    flex-direction: column;
+    padding: 30mm 24mm 24mm 24mm;
+  }
+  .cover .rule { height: 2px; background: linear-gradient(90deg, var(--gold), rgba(184,145,47,0)); margin: 10mm 0 8mm 0; }
+  .cover .firmline {
+    font-family: "Segoe UI", Arial, sans-serif;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    font-size: 9pt;
+    color: var(--gold-light);
+  }
+  .cover h1 {
+    font-size: 30pt;
+    font-weight: normal;
+    line-height: 1.22;
+    margin-top: 6mm;
+    color: #ffffff;
+  }
+  .cover h2 {
+    font-size: 13.5pt;
+    font-weight: normal;
+    font-style: italic;
+    color: #c8d4df;
+    margin-top: 6mm;
+    line-height: 1.5;
+  }
+  .cover .meta {
+    margin-top: auto;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 9.5pt;
+    color: #b9c6d2;
+    border-top: 1px solid rgba(217,185,106,0.45);
+    padding-top: 6mm;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3mm 10mm;
+  }
+  .cover .meta b { color: #ffffff; font-weight: 600; }
+  .cover .conf {
+    margin-top: 8mm;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 8.5pt;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold-light);
+  }
+  .logochip {
+    background: #ffffff;
+    border-radius: 2.5mm;
+    padding: 4mm 6mm;
+    width: fit-content;
+    margin-bottom: 8mm;
+    box-shadow: 0 1mm 4mm rgba(0,0,0,0.28);
+  }
+  .logochip img { height: 10.5mm; display: block; }
+  .logoline { display: flex; align-items: center; gap: 4mm; }
+  .logoline img { height: 8mm; }
+
+  /* Q&A blocks (banks & acquirers section) */
+  .qa {
+    border: 0.8px solid #d7dde3;
+    border-left: 3.5px solid var(--navy-2);
+    border-radius: 2mm;
+    padding: 3.6mm 5mm;
+    margin: 3.2mm 0;
+    page-break-inside: avoid;
+  }
+  .qa .q {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-weight: 700; font-size: 10pt;
+    color: var(--navy);
+    margin-bottom: 1.6mm;
+  }
+  .qa .q .qn { color: var(--gold); margin-right: 2mm; }
+  .qa .a { font-size: 10pt; text-align: justify; }
+
+  /* ---------- GENERIC ---------- */
+  .kicker {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 8.5pt;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 2mm;
+  }
+  h3.sec {
+    font-size: 16.5pt;
+    font-weight: normal;
+    color: var(--navy);
+    border-bottom: 2px solid var(--gold);
+    padding-bottom: 2.5mm;
+    margin-bottom: 6mm;
+  }
+  h4 {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 11pt;
+    color: var(--navy);
+    margin: 6mm 0 2.5mm 0;
+  }
+  p { margin-bottom: 3.2mm; text-align: justify; }
+  .para-num {
+    color: var(--gold);
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 9pt;
+    font-weight: 700;
+    margin-right: 2mm;
+  }
+  ul.tight { margin: 0 0 3.5mm 6mm; }
+  ul.tight li { margin-bottom: 1.6mm; text-align: justify; }
+  .small { font-size: 9.2pt; color: var(--muted); }
+  .footer {
+    position: absolute;
+    bottom: 9mm; left: 20mm; right: 20mm;
+    display: flex; justify-content: space-between;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 7.8pt; color: #8a97a5;
+    border-top: 0.5px solid #d7dde3;
+    padding-top: 2mm;
+  }
+
+  /* verdict / callout boxes */
+  .box {
+    border-radius: 2.5mm;
+    padding: 4.5mm 5.5mm;
+    margin: 4.5mm 0;
+    page-break-inside: avoid;
+    font-size: 10.6pt;
+  }
+  .box .box-title {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-weight: 700;
+    font-size: 9pt;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 1.8mm;
+  }
+  .box.verdict { background: var(--green-bg); border-left: 3.5px solid var(--green); }
+  .box.verdict .box-title { color: var(--green); }
+  .box.caution { background: var(--amber-bg); border-left: 3.5px solid var(--amber); }
+  .box.caution .box-title { color: var(--amber); }
+  .box.principle { background: var(--blue-bg); border-left: 3.5px solid var(--navy-2); }
+  .box.principle .box-title { color: var(--navy-2); }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; margin: 4mm 0 5mm 0; page-break-inside: avoid; }
+  th {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 8.6pt; letter-spacing: 0.06em; text-transform: uppercase;
+    background: var(--navy); color: #ffffff;
+    padding: 2.6mm 3mm; text-align: left; font-weight: 600;
+  }
+  td {
+    font-size: 9.6pt; padding: 2.6mm 3mm;
+    border-bottom: 0.6px solid #dde3e9; vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f7f9fb; }
+  .pill {
+    display: inline-block;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 8pt; font-weight: 700;
+    padding: 0.8mm 2.6mm; border-radius: 4mm;
+    white-space: nowrap;
+  }
+  .pill.no  { background: var(--green-bg); color: var(--green); border: 1px solid #bcdccb; }
+  .pill.yes { background: var(--red-bg); color: var(--red); border: 1px solid #e6c2c7; }
+  .pill.mid { background: var(--amber-bg); color: var(--amber); border: 1px solid #ecd9a8; }
+
+  /* diagrams */
+  .fig { margin: 5mm 0; page-break-inside: avoid; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .fig .cap {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 8.6pt; color: var(--muted);
+    text-align: center; margin-top: 2mm;
+  }
+  .fig .cap b { color: var(--navy); }
+
+  /* TOC */
+  .toc { margin-top: 6mm; }
+  .toc .row {
+    display: flex; align-items: baseline;
+    font-size: 11pt; margin-bottom: 3.4mm;
+  }
+  .toc .n {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: var(--gold); font-weight: 700; width: 12mm; font-size: 9.5pt;
+  }
+  .toc .dots { flex: 1; border-bottom: 1px dotted #b9c3cc; margin: 0 2.5mm; }
+  .toc .pg { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.5pt; color: var(--muted); }
+
+  .quoteblock {
+    border-left: 3px solid var(--gold);
+    background: var(--parchment);
+    padding: 4.5mm 5.5mm;
+    margin: 4.5mm 0;
+    font-style: italic;
+    font-size: 10.6pt;
+    page-break-inside: avoid;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================== COVER ============================== -->
+<div class="page cover">
+  <div class="firmline">Regulatory Position Paper</div>
+  <div class="rule"></div>
+  <h1>ChartVolt Platform<br/>Defence Memorandum on Licensing Status</h1>
+  <h2>Analysis of the platform under (i) MiFID&nbsp;II / ESMA financial-services frameworks and
+      (ii) EU member-state games-of-chance legislation, with particular reference to the payment
+      of monetary prizes to participants.</h2>
+  <div class="meta">
+    <div><b>Prepared for</b><br/>Management &amp; External Legal Counsel</div>
+    <div><b>Date</b><br/>11 August 2026</div>
+    <div><b>Subject platform</b><br/>ChartVolt — skill-based simulated trading tournaments</div>
+    <div><b>Status</b><br/>Draft for counsel review — not legal advice</div>
+  </div>
+  <div class="conf">Privileged &amp; Confidential — Prepared in Contemplation of Legal Review</div>
+</div>
+
+<!-- ============================== TOC + SCOPE ============================== -->
+<div class="page">
+  <div class="kicker">Contents</div>
+  <h3 class="sec">Table of Contents</h3>
+  <div class="toc">
+    <div class="row"><span class="n">I</span> Introduction, Scope and Reservations <span class="dots"></span><span class="pg">2</span></div>
+    <div class="row"><span class="n">II</span> Executive Summary of Conclusions <span class="dots"></span><span class="pg">3</span></div>
+    <div class="row"><span class="n">III</span> Factual Background — How the Platform Operates <span class="dots"></span><span class="pg">4</span></div>
+    <div class="row"><span class="n">IV</span> Question 1 — Is a Financial-Services (MiFID II) Licence Required? <span class="dots"></span><span class="pg">6</span></div>
+    <div class="row"><span class="n">V</span> Question 2 — Is a Gambling Licence Required? <span class="dots"></span><span class="pg">8</span></div>
+    <div class="row"><span class="n">VI</span> The Payout Objection — Characterisation of Prize Money <span class="dots"></span><span class="pg">10</span></div>
+    <div class="row"><span class="n">VII</span> Regulatory Precedents and Authorities <span class="dots"></span><span class="pg">11</span></div>
+    <div class="row"><span class="n">VIII</span> Other Regulatory Perimeters — Payments, AML, Consumer, Data, Advertising, Tax <span class="dots"></span><span class="pg">12</span></div>
+    <div class="row"><span class="n">IX</span> Anticipated Questions from Banks, Acquirers and Payment Partners <span class="dots"></span><span class="pg">14</span></div>
+    <div class="row"><span class="n">X</span> Residual Risk Factors and Recommended Safeguards <span class="dots"></span><span class="pg">16</span></div>
+    <div class="row"><span class="n">XI</span> Concluding Statement of Position <span class="dots"></span><span class="pg">17</span></div>
+  </div>
+
+  <div class="kicker" style="margin-top:12mm;">Section I</div>
+  <h3 class="sec">Introduction, Scope and Reservations</h3>
+  <p><span class="para-num">1.1</span>This memorandum sets out the regulatory position of the ChartVolt
+  platform (the “<b>Platform</b>”) in respect of two licensing questions that a competent authority may
+  raise: whether the Platform performs regulated investment services requiring authorisation under
+  Directive 2014/65/EU (“<b>MiFID II</b>”) or related ESMA-supervised frameworks; and whether the
+  Platform operates games of chance requiring a gambling licence under member-state law.</p>
+  <p><span class="para-num">1.2</span>The analysis is grounded in the Platform’s actual technical
+  implementation (verified at source-code level), the public positions of the European Securities and
+  Markets Authority (“<b>ESMA</b>”) and national competent authorities as at the date hereof, and the
+  established analytical tests applied to prize competitions in the European Union.</p>
+  <p><span class="para-num">1.3</span><b>Reservation.</b> This document is a structured position paper
+  prepared for review by licensed counsel in each jurisdiction of operation. It is not, and must not be
+  relied upon as, legal advice. Gambling law in particular is not harmonised at EU level and outcomes
+  differ by member state.</p>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== EXEC SUMMARY ============================== -->
+<div class="page">
+  <div class="kicker">Section II</div>
+  <h3 class="sec">Executive Summary of Conclusions</h3>
+
+  <div class="box verdict">
+    <div class="box-title">Conclusion 1 — No MiFID II / financial-services licence is required</div>
+    No financial instrument is created, distributed or intermediated. No order is received, transmitted
+    or executed on any market. The Platform is not a counterparty to any position and has no economic
+    exposure to trading outcomes. Live market prices are consumed exclusively as <i>data</i> to score a
+    simulation. This is consistent with the Czech National Bank’s October 2024 position that platforms
+    remaining wholly within a simulated model do not require authorisation, and with ESMA’s current
+    supervisory posture (July 2026).
+  </div>
+
+  <div class="box verdict">
+    <div class="box-title">Conclusion 2 — No gambling licence is required (predominance-of-skill jurisdictions)</div>
+    Of the three cumulative elements of gambling — stake, prize, and chance — the element of chance is
+    not satisfied in the manner required: every participant competes on identical virtual capital and
+    identical market data at the same time, so external randomness is a <i>common-mode</i> input that
+    cannot differentiate participants. Ranking is determined by relative decision quality across a
+    mandatory series of decisions. The correct legal analogue is the fantasy-sports / esports / chess
+    tournament, not a game of chance.
+  </div>
+
+  <div class="box principle">
+    <div class="box-title">The decisive structural fact</div>
+    Monetary outcomes on the Platform are a <b>step function of ordinal rank in a fixed, pre-published
+    prize pool</b>. A participant’s payout does not scale with the magnitude of simulated profit, with
+    price movement, or with any stake multiple. Maximum loss is capped at the entry fee; maximum gain is
+    capped at the published prize. This severs the payout from both (a) derivative-style market exposure
+    (MiFID II) and (b) stake-multiplied-by-chance mechanics (gambling law).
+  </div>
+
+  <div class="box caution">
+    <div class="box-title">Managed exposures (Section X)</div>
+    Four residual areas warrant counsel attention and product discipline: (1) short-duration head-to-head
+    challenges; (2) the e-money characterisation of the credits ledger; (3) outlier “any-chance”
+    jurisdictions; and (4) marketing terminology. None undermines the core position; each has a concrete
+    safeguard identified in Section X.
+  </div>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== FACTS + DIAGRAM 1 ============================== -->
+<div class="page">
+  <div class="kicker">Section III</div>
+  <h3 class="sec">Factual Background — How the Platform Operates</h3>
+
+  <p><span class="para-num">3.1</span>The following facts are established at source-code level and are
+  capable of technical demonstration to any authority.</p>
+
+  <ul class="tight">
+    <li><b>(A) Deposits.</b> Users purchase credits (1 credit = €1) exclusively through licensed payment
+    institutions (Nuvei, Stripe, Paddle, Atlas). The Platform never receives funds outside regulated payment rails.</li>
+    <li><b>(B) Entry.</b> A fixed, pre-published entry fee in credits buys <i>access</i> to a tournament.
+    Entry fees accumulate into that tournament’s prize pool; the Platform’s revenue is a disclosed fee that
+    does not depend on any participant’s result.</li>
+    <li><b>(C) Identical starting conditions.</b> Every participant receives an <i>identical</i> virtual
+    balance (e.g. 10,000 units of notional capital) recorded on a participant ledger that is segregated from
+    the credits wallet and has no monetary value.</li>
+    <li><b>(D) Simulation only.</b> Participants make simulated trading decisions scored against live market
+    <i>data</i>. No order leaves the Platform; there is no broker, no venue connection, no execution, and no
+    acquisition of any instrument. The price feed is read-only.</li>
+    <li><b>(E) Rank-based prizes.</b> At tournament end, participants are ranked by performance metrics of the
+    virtual account (e.g. return, win rate, profit factor) subject to minimum-activity rules. Prizes are paid
+    from the prize pool strictly by ordinal rank according to a distribution table published before entry.</li>
+    <li><b>(F) Withdrawals.</b> Credits (including prizes) are withdrawable in EUR through the same licensed
+    payment institutions, subject to mandatory KYC, AML-relevant fraud monitoring, device fingerprinting and
+    duplicate-identity detection.</li>
+  </ul>
+
+  <div class="fig">
+    <svg viewBox="0 0 1120 640" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+      <!-- Real money loop panel -->
+      <rect x="10" y="10" width="545" height="620" rx="14" fill="#eef7f1" stroke="#1d6b46" stroke-width="2"/>
+      <text x="282" y="44" text-anchor="middle" font-size="19" font-weight="700" fill="#1d6b46">REAL MONEY LOOP</text>
+      <text x="282" y="66" text-anchor="middle" font-size="12.5" fill="#3c6b53">All flows via licensed payment institutions</text>
+
+      <rect x="60" y="90" width="440" height="58" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="280" y="115" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">User deposits EUR</text>
+      <text x="280" y="135" text-anchor="middle" font-size="11.5" fill="#5a6a7a">Nuvei · Stripe · Paddle · Atlas (licensed PSPs)</text>
+
+      <line x1="280" y1="148" x2="280" y2="182" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
+
+      <rect x="60" y="186" width="440" height="58" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="280" y="211" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Credits wallet (1 credit = €1)</text>
+      <text x="280" y="231" text-anchor="middle" font-size="11.5" fill="#5a6a7a">Withdrawable · KYC enforced</text>
+
+      <line x1="280" y1="244" x2="280" y2="278" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
+      <text x="292" y="266" font-size="11.5" fill="#1d6b46" font-weight="600">fixed entry fee</text>
+
+      <rect x="60" y="282" width="440" height="66" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="280" y="308" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Tournament prize pool</text>
+      <text x="280" y="328" text-anchor="middle" font-size="11.5" fill="#5a6a7a">Sum of entry fees · distribution table published pre-entry</text>
+
+      <line x1="180" y1="348" x2="180" y2="384" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
+      <text x="190" y="370" font-size="11.5" fill="#1d6b46" font-weight="600">prize by RANK only</text>
+      <line x1="400" y1="348" x2="400" y2="384" stroke="#9a6b08" stroke-width="2.2" marker-end="url(#aa)"/>
+      <text x="410" y="370" font-size="11.5" fill="#9a6b08" font-weight="600">platform fee (fixed)</text>
+
+      <rect x="60" y="388" width="240" height="54" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="180" y="411" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Winner credits</text>
+      <text x="180" y="429" text-anchor="middle" font-size="11" fill="#5a6a7a">back to wallet</text>
+
+      <rect x="320" y="388" width="180" height="54" rx="9" fill="#fdf6e6" stroke="#9a6b08" stroke-width="1.5"/>
+      <text x="410" y="411" text-anchor="middle" font-size="13.5" font-weight="600" fill="#7c5606">Platform revenue</text>
+      <text x="410" y="429" text-anchor="middle" font-size="11" fill="#9a6b08">outcome-independent</text>
+
+      <line x1="180" y1="442" x2="180" y2="478" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
+      <rect x="60" y="482" width="240" height="54" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="180" y="505" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Withdrawal in EUR</text>
+      <text x="180" y="523" text-anchor="middle" font-size="11" fill="#5a6a7a">licensed PSP · KYC required</text>
+
+      <text x="282" y="590" text-anchor="middle" font-size="12.5" font-style="italic" fill="#3c6b53">Money is only ever: fee in → prize out, through regulated rails.</text>
+
+      <!-- Virtual loop panel -->
+      <rect x="575" y="10" width="535" height="620" rx="14" fill="#eef3f9" stroke="#16395c" stroke-width="2"/>
+      <text x="842" y="44" text-anchor="middle" font-size="19" font-weight="700" fill="#16395c">VIRTUAL LOOP</text>
+      <text x="842" y="66" text-anchor="middle" font-size="12.5" fill="#4a5f78">Simulation only — never convertible to money</text>
+
+      <rect x="625" y="90" width="440" height="66" rx="9" fill="#ffffff" stroke="#16395c" stroke-width="1.5"/>
+      <text x="845" y="116" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Identical virtual capital for every entrant</text>
+      <text x="845" y="136" text-anchor="middle" font-size="11.5" fill="#5a6a7a">e.g. 10,000 notional units — no monetary value</text>
+
+      <line x1="845" y1="156" x2="845" y2="190" stroke="#16395c" stroke-width="2.2" marker-end="url(#ab)"/>
+
+      <rect x="625" y="194" width="440" height="78" rx="9" fill="#ffffff" stroke="#16395c" stroke-width="1.5"/>
+      <text x="845" y="220" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Simulated decisions on live price DATA</text>
+      <text x="845" y="240" text-anchor="middle" font-size="11.5" fill="#5a6a7a">read-only feed · no orders · no broker · no venue</text>
+      <text x="845" y="258" text-anchor="middle" font-size="11.5" fill="#5a6a7a">no execution · no instrument acquired</text>
+
+      <line x1="845" y1="272" x2="845" y2="306" stroke="#16395c" stroke-width="2.2" marker-end="url(#ab)"/>
+
+      <rect x="625" y="310" width="440" height="66" rx="9" fill="#ffffff" stroke="#16395c" stroke-width="1.5"/>
+      <text x="845" y="336" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Virtual performance = a SCORE</text>
+      <text x="845" y="356" text-anchor="middle" font-size="11.5" fill="#5a6a7a">return · win rate · profit factor · min-activity rules</text>
+
+      <line x1="845" y1="376" x2="845" y2="410" stroke="#16395c" stroke-width="2.2" marker-end="url(#ab)"/>
+
+      <rect x="625" y="414" width="440" height="66" rx="9" fill="#16395c"/>
+      <text x="845" y="440" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffffff">ORDINAL RANK vs other participants</text>
+      <text x="845" y="460" text-anchor="middle" font-size="11.5" fill="#c3d0de">1st · 2nd · 3rd — relative skill, identical conditions</text>
+
+      <text x="842" y="560" text-anchor="middle" font-size="12.5" font-style="italic" fill="#4a5f78">The score itself is never exchanged for money —</text>
+      <text x="842" y="580" text-anchor="middle" font-size="12.5" font-style="italic" fill="#4a5f78">only the rank maps to a pre-published prize.</text>
+
+      <!-- Cross-connections -->
+      <path d="M 500 315 C 560 315 560 123 625 123" fill="none" stroke="#b8912f" stroke-width="2.4" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <text x="560" y="105" text-anchor="middle" font-size="11.5" font-weight="700" fill="#b8912f">entry grants access</text>
+
+      <path d="M 625 447 C 540 447 540 315 500 315" fill="none" stroke="#b8912f" stroke-width="2.4" stroke-dasharray="7 5" marker-end="url(#ao)"/>
+      <text x="562" y="475" text-anchor="middle" font-size="11.5" font-weight="700" fill="#b8912f">rank → prize share</text>
+
+      <defs>
+        <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1d6b46"/></marker>
+        <marker id="ab" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#16395c"/></marker>
+        <marker id="aa" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#9a6b08"/></marker>
+        <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#b8912f"/></marker>
+      </defs>
+    </svg>
+    <div class="cap"><b>Figure 1.</b> The two segregated loops. The virtual loop produces only a score; the real-money loop only ever moves fee-in / prize-out through licensed payment institutions.</div>
+  </div>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== MIFID ============================== -->
+<div class="page">
+  <div class="kicker">Section IV</div>
+  <h3 class="sec">Question 1 — Is a Financial-Services (MiFID II) Licence Required?</h3>
+
+  <p><span class="para-num">4.1</span>MiFID II authorisation attaches to the performance of investment
+  services or activities <i>in relation to financial instruments</i> (Art. 4(1)(2) and Annex I).
+  Both limbs must be present. Neither is.</p>
+
+  <table>
+    <tr><th style="width:34%">MiFID II trigger</th><th>Platform reality (technically verifiable)</th><th style="width:13%">Engaged?</th></tr>
+    <tr><td>Financial instrument (transferable security, derivative, CFD — Annex I, Section C)</td>
+        <td>Virtual positions are database records with no contractual right to any asset, cash flow or settlement. They cannot be redeemed, transferred, assigned or settled.</td>
+        <td><span class="pill no">NO</span></td></tr>
+    <tr><td>Reception &amp; transmission / execution of orders</td>
+        <td>No order ever leaves the Platform. There is no broker connection, no trading venue membership, no execution infrastructure. Prices are consumed as read-only data.</td>
+        <td><span class="pill no">NO</span></td></tr>
+    <tr><td>Dealing on own account</td>
+        <td>The Platform is not a counterparty to any position and carries zero economic exposure to participants’ simulated results. Its fee is fixed and outcome-independent.</td>
+        <td><span class="pill no">NO</span></td></tr>
+    <tr><td>Portfolio management / investment advice</td>
+        <td>None offered; no personal recommendations; no discretionary management.</td>
+        <td><span class="pill no">NO</span></td></tr>
+    <tr><td>Safeguarding of instruments / client assets</td>
+        <td>Only EUR credits are held, moving exclusively through licensed payment institutions.</td>
+        <td><span class="pill no">NO</span></td></tr>
+  </table>
+
+  <h4>The economic-substance (CFD recharacterisation) test</h4>
+  <p><span class="para-num">4.2</span>ESMA’s public statement of 24 February 2026
+  (ESMA35-243228190-8024) directs firms and supervisors to assess the <i>economic substance</i> of novel
+  products against the CFD definition: does the arrangement confer leveraged monetary exposure to the
+  price movement of an underlying? Applied to the Platform, the answer is structurally negative:</p>
+  <ul class="tight">
+    <li>A CFD payout is <b>continuous in the price</b> of the underlying — twice the favourable movement
+    yields twice the money. A Platform payout is a <b>step function of ordinal rank</b> in a fixed pool:
+    first place receives the same published prize whether the winning virtual return was +0.5% or +50%.</li>
+    <li>Maximum loss is the entry fee, fixed before entry; it cannot be increased by any market movement.
+    There is no margining of money, no negative balance, no stake at market risk.</li>
+    <li>The counterparty to the participant’s monetary outcome is <b>the field of other entrants</b>
+    (via the pool), not the operator and not the market.</li>
+  </ul>
+
+  <h4>Regulatory posture</h4>
+  <p><span class="para-num">4.3</span>The Czech National Bank stated in October 2024 that platforms
+  operating on demonstration/simulated accounts <b>do not require authorisation as regulated entities
+  provided they remain within the simulated model</b>. As at July 2026, ESMA is not engaged in
+  substantive discussions on regulating retail simulated-trading models (confirmed publicly by the
+  chair of ESMA’s Risk Standing Committee). The Platform sits <i>further</i> from the regulatory
+  perimeter than the profit-split “prop firm” models those statements addressed, because it pays
+  rank-based tournament prizes rather than a percentage of simulated profit.</p>
+
+  <div class="box verdict">
+    <div class="box-title">Position on Question 1</div>
+    The Platform performs no investment service in relation to any financial instrument. No MiFID II or
+    ESMA-supervised authorisation is required. The critical maintenance condition: the Platform must
+    remain wholly within the simulated model — no order routing, no bridge to live brokerage, and no
+    payout that scales with simulated profit.
+  </div>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== GAMBLING + DIAGRAM 2 ============================== -->
+<div class="page">
+  <div class="kicker">Section V</div>
+  <h3 class="sec">Question 2 — Is a Gambling Licence Required?</h3>
+
+  <p><span class="para-num">5.1</span>Across EU member states, gambling regulation attaches where three
+  elements are cumulatively present: a <b>stake</b>, a <b>prize</b>, and an outcome determined wholly or
+  predominantly by <b>chance</b>. The Platform concedes the first two. The defence rests — soundly — on
+  the third.</p>
+
+  <div class="fig">
+    <svg viewBox="0 0 1120 360" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+      <rect x="20" y="30" width="330" height="250" rx="14" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
+      <circle cx="185" cy="95" r="34" fill="#8c2f39"/>
+      <text x="185" y="103" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff">1</text>
+      <text x="185" y="160" text-anchor="middle" font-size="17" font-weight="700" fill="#8c2f39">STAKE</text>
+      <text x="185" y="188" text-anchor="middle" font-size="12.5" fill="#6b3a41">Entry fee — present</text>
+      <text x="185" y="208" text-anchor="middle" font-size="12.5" fill="#6b3a41">(fixed &amp; capped)</text>
+      <text x="185" y="252" text-anchor="middle" font-size="13" font-weight="700" fill="#8c2f39">CONCEDED</text>
+
+      <rect x="395" y="30" width="330" height="250" rx="14" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
+      <circle cx="560" cy="95" r="34" fill="#8c2f39"/>
+      <text x="560" y="103" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff">2</text>
+      <text x="560" y="160" text-anchor="middle" font-size="17" font-weight="700" fill="#8c2f39">PRIZE</text>
+      <text x="560" y="188" text-anchor="middle" font-size="12.5" fill="#6b3a41">Prize pool — present</text>
+      <text x="560" y="208" text-anchor="middle" font-size="12.5" fill="#6b3a41">(published pre-entry)</text>
+      <text x="560" y="252" text-anchor="middle" font-size="13" font-weight="700" fill="#8c2f39">CONCEDED</text>
+
+      <rect x="770" y="30" width="330" height="250" rx="14" fill="#eef7f1" stroke="#1d6b46" stroke-width="2.5"/>
+      <circle cx="935" cy="95" r="34" fill="#1d6b46"/>
+      <text x="935" y="103" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff">3</text>
+      <text x="935" y="160" text-anchor="middle" font-size="17" font-weight="700" fill="#1d6b46">CHANCE</text>
+      <text x="935" y="188" text-anchor="middle" font-size="12.5" fill="#2e5b44">Outcome determined by</text>
+      <text x="935" y="208" text-anchor="middle" font-size="12.5" fill="#2e5b44">relative skill — identical conditions</text>
+      <text x="935" y="252" text-anchor="middle" font-size="13" font-weight="700" fill="#1d6b46">NOT SATISFIED</text>
+
+      <text x="560" y="330" text-anchor="middle" font-size="14.5" font-weight="600" fill="#16395c">All three elements must be present. Element 3 fails → no game of chance.</text>
+    </svg>
+    <div class="cap"><b>Figure 2.</b> The cumulative three-element test for games of chance.</div>
+  </div>
+
+  <h4>Why chance does not determine the outcome</h4>
+  <p><span class="para-num">5.2</span><b>Randomness is common-mode, not differentiating.</b> In a game of
+  chance (roulette, lottery, card deals) randomness is applied <i>unequally</i> to participants and
+  directly selects the winner. On the Platform, every participant faces the <i>same</i> market data at the
+  <i>same</i> time with the <i>same</i> virtual capital. The exogenous uncertainty of markets moves
+  identically for all entrants; it therefore cannot rank them. The only differentiating input is each
+  participant’s decisions: instrument selection, timing, position sizing, leverage, stop-loss and
+  take-profit placement, and sustained risk management.</p>
+  <p><span class="para-num">5.3</span><b>Structural skill safeguards.</b> Tournament rules enforce a
+  minimum number of decisions (minimum-trade thresholds), apply disqualification standards, and rank by
+  sustained performance metrics (return, win rate, profit factor) across the contest period — a winner
+  must outperform the field across a series of decisions, not on a single random event.</p>
+  <p><span class="para-num">5.4</span><b>The correct analogues.</b> Chess opens, fantasy-sports leagues and
+  esports tournaments all combine entry fees, prize pools and substantial exogenous uncertainty, and are
+  treated across the EU as skill competitions falling outside games-of-chance licensing where skill
+  predominates. Poker is treated more strictly precisely because concealed randomised information (the
+  deal) is distributed <i>unequally</i> among players — a feature the Platform does not have: all
+  information is public and identical.</p>
+  <p><span class="para-num">5.5</span><b>The strictest EU regulator did not classify this model as
+  gambling.</b> Belgium — the only member state to ban retail CFDs outright — examined paid
+  simulated-trading challenges (FSMA, March 2024). The FSMA issued a consumer warning describing the
+  sector as a “shadow investment game”, but pursued no games-of-chance classification under the Belgian
+  Gaming Act and no licensing enforcement. Even at the most restrictive end of the EU spectrum, neither
+  regulatory hook was found to apply.</p>
+
+  <div class="box verdict">
+    <div class="box-title">Position on Question 2</div>
+    In predominance-of-skill jurisdictions the Platform operates lawful prize competitions, not games of
+    chance. The element of chance fails because identical conditions neutralise randomness as a ranking
+    factor; outcomes are determined by relative skill across a mandated series of decisions.
+  </div>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== PAYOUT + DIAGRAM 3 ============================== -->
+<div class="page">
+  <div class="kicker">Section VI</div>
+  <h3 class="sec">The Payout Objection — Characterisation of Prize Money</h3>
+
+  <p><span class="para-num">6.1</span>The anticipated objection is: <i>“the operator pays participants
+  money determined by outcomes; therefore a licence is required.”</i> The objection conflates the act of
+  paying with the legal character of the payment. Paying money is not itself a licensable activity; the
+  question is always <b>what the payment is</b>. There are only three candidate characterisations, and
+  two fail on the Platform’s mechanics:</p>
+
+  <div class="fig">
+    <svg viewBox="0 0 1120 470" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+      <rect x="330" y="20" width="460" height="64" rx="10" fill="#16395c"/>
+      <text x="560" y="47" text-anchor="middle" font-size="15.5" font-weight="700" fill="#ffffff">A participant receives money.</text>
+      <text x="560" y="68" text-anchor="middle" font-size="12.5" fill="#c3d0de">What is that payment, in law?</text>
+
+      <line x1="560" y1="84" x2="190" y2="140" stroke="#8a97a5" stroke-width="2" marker-end="url(#gray)"/>
+      <line x1="560" y1="84" x2="560" y2="140" stroke="#8a97a5" stroke-width="2" marker-end="url(#gray)"/>
+      <line x1="560" y1="84" x2="930" y2="140" stroke="#8a97a5" stroke-width="2" marker-end="url(#gray)"/>
+
+      <rect x="30" y="146" width="330" height="150" rx="12" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
+      <text x="195" y="176" text-anchor="middle" font-size="14.5" font-weight="700" fill="#8c2f39">Investment proceeds?</text>
+      <text x="195" y="204" text-anchor="middle" font-size="12" fill="#5c3a40">Requires an instrument held and</text>
+      <text x="195" y="223" text-anchor="middle" font-size="12" fill="#5c3a40">payout scaling with market movement.</text>
+      <text x="195" y="250" text-anchor="middle" font-size="12" fill="#5c3a40">Here: no instrument, no exposure,</text>
+      <text x="195" y="269" text-anchor="middle" font-size="12" fill="#5c3a40">payout fixed per rank.</text>
+
+      <rect x="395" y="146" width="330" height="150" rx="12" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
+      <text x="560" y="176" text-anchor="middle" font-size="14.5" font-weight="700" fill="#8c2f39">Gambling winnings?</text>
+      <text x="560" y="204" text-anchor="middle" font-size="12" fill="#5c3a40">Requires outcome determined by</text>
+      <text x="560" y="223" text-anchor="middle" font-size="12" fill="#5c3a40">chance and stake-multiplied returns.</text>
+      <text x="560" y="250" text-anchor="middle" font-size="12" fill="#5c3a40">Here: identical conditions, skill ranking,</text>
+      <text x="560" y="269" text-anchor="middle" font-size="12" fill="#5c3a40">fixed pool, no odds, no multiplier.</text>
+
+      <rect x="760" y="146" width="330" height="150" rx="12" fill="#eef7f1" stroke="#1d6b46" stroke-width="2.5"/>
+      <text x="925" y="176" text-anchor="middle" font-size="14.5" font-weight="700" fill="#1d6b46">Tournament prize ✓</text>
+      <text x="925" y="204" text-anchor="middle" font-size="12" fill="#2e5b44">Fixed award from a pre-published</text>
+      <text x="925" y="223" text-anchor="middle" font-size="12" fill="#2e5b44">pool, allocated by ordinal rank in a</text>
+      <text x="925" y="242" text-anchor="middle" font-size="12" fill="#2e5b44">skill contest — the chess-open /</text>
+      <text x="925" y="261" text-anchor="middle" font-size="12" fill="#2e5b44">fantasy-league / esports model.</text>
+
+      <text x="195" y="330" text-anchor="middle" font-size="16" font-weight="800" fill="#8c2f39">FAILS</text>
+      <text x="560" y="330" text-anchor="middle" font-size="16" font-weight="800" fill="#8c2f39">FAILS</text>
+      <text x="925" y="330" text-anchor="middle" font-size="16" font-weight="800" fill="#1d6b46">HOLDS</text>
+
+      <rect x="230" y="370" width="660" height="72" rx="10" fill="#f7f4ec" stroke="#b8912f" stroke-width="2"/>
+      <text x="560" y="399" text-anchor="middle" font-size="13.5" font-weight="600" fill="#7c5606">Prize competitions with entry fees are lawful without a licence across the EU</text>
+      <text x="560" y="421" text-anchor="middle" font-size="13.5" font-weight="600" fill="#7c5606">where skill predominates — the payment of the prize changes nothing.</text>
+
+      <defs>
+        <marker id="gray" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#8a97a5"/></marker>
+      </defs>
+    </svg>
+    <div class="cap"><b>Figure 3.</b> Characterisation of the payout: two theories fail on the mechanics; the tournament-prize characterisation holds.</div>
+  </div>
+
+  <p><span class="para-num">6.2</span>Three further features reinforce the prize characterisation:
+  (i) the payer of last resort is economically the <i>field of entrants</i> (the pool), with the operator’s
+  fee fixed regardless of outcomes — the operator does not profit from participant losses on any position;
+  (ii) each participant’s worst case is the loss of a known fixed fee — there is no open-ended downside as
+  in leveraged trading, and no stake-times-odds mechanic as in betting; and (iii) the entire monetary
+  perimeter (deposit, prize, withdrawal) is executed by authorised payment institutions with mandatory KYC
+  and AML-relevant monitoring already in production.</p>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== PRECEDENTS ============================== -->
+<div class="page">
+  <div class="kicker">Section VII</div>
+  <h3 class="sec">Regulatory Precedents and Authorities</h3>
+
+  <table>
+    <tr><th style="width:19%">Authority</th><th style="width:15%">Date</th><th>Position</th><th style="width:22%">Relevance to Platform</th></tr>
+    <tr>
+      <td><b>Czech National Bank</b> (CNB)</td><td>Oct 2024</td>
+      <td>Platforms operating on demo/simulated accounts do not require authorisation as regulated entities, provided they remain within the simulated model.</td>
+      <td>Direct support: the Platform is wholly simulated and — unlike the profit-split firms addressed — pays rank-based prizes.</td>
+    </tr>
+    <tr>
+      <td><b>ESMA</b></td><td>Feb 2026</td>
+      <td>Statement ESMA35-243228190-8024: supervisors assess economic substance of novel products against the CFD definition (leveraged monetary exposure to an underlying).</td>
+      <td>The Platform passes the substance test: rank-based step-function payout, no monetary market exposure, capped fee.</td>
+    </tr>
+    <tr>
+      <td><b>ESMA / CySEC</b> (chair, Risk Standing Committee)</td><td>Jul 2026</td>
+      <td>Retail simulated-trading is not an ESMA regulatory priority; no substantive discussions under way.</td>
+      <td>No pending EU framework contradicts the position; monitoring obligation noted.</td>
+    </tr>
+    <tr>
+      <td><b>Belgium — FSMA</b></td><td>Mar 2024</td>
+      <td>Consumer warning describing paid simulated-trading challenges as a “shadow investment game”; no licensing enforcement and no classification under the Belgian Gaming Act.</td>
+      <td>The strictest EU regulator found neither financial-licensing breach nor a games-of-chance classification.</td>
+    </tr>
+    <tr>
+      <td><b>Italy — CONSOB</b></td><td>Jul 2024</td>
+      <td>Public criticism of retail “challenge” models as “a type of finance video game”; consumer-protection framing, no licensing reclassification.</td>
+      <td>Confirms the perceived character of the activity as a game/competition, not an investment service.</td>
+    </tr>
+    <tr>
+      <td><b>Industry restructuring</b></td><td>2025</td>
+      <td>Leading simulated-trading operators restructured payouts and terminology (e.g. away from profit-split language) to remain clearly within the demo-model perimeter recognised by the CNB.</td>
+      <td>The Platform’s rank-based prize design already sits on the safe side of the line the industry moved toward.</td>
+    </tr>
+  </table>
+
+  <div class="box principle">
+    <div class="box-title">Distinguishing the Platform from “prop firm” models</div>
+    Regulatory friction in this sector has concentrated on models that (a) pay participants a percentage
+    of simulated profit — mimicking a derivative payoff — or (b) bridge successful participants into live
+    brokerage arrangements. The Platform does neither: prizes are fixed rank-based awards from a
+    peer-funded pool, and no pathway to real-market execution exists anywhere in the product.
+  </div>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== OTHER REGULATORS ============================== -->
+<div class="page">
+  <div class="kicker">Section VIII</div>
+  <h3 class="sec">Other Regulatory Perimeters — Payments, AML, Consumer, Data, Advertising, Tax</h3>
+
+  <p><span class="para-num">8.1</span>Beyond the two principal licensing questions, five further
+  regulatory perimeters could be raised by an authority, bank or counterparty. Each is addressed below
+  with the Platform’s position and, where relevant, the safeguard already in production.</p>
+
+  <h4>A. Payment services and electronic money (PSD2 / EMD2)</h4>
+  <p><span class="para-num">8.2</span>The credits ledger (1 credit = €1, redeemable) is the Platform’s
+  most substantive secondary question. The position: the Platform does not <i>execute payment
+  transactions</i>, issue payment instruments, or acquire transactions — every movement of funds is
+  executed by authorised payment institutions (Nuvei, Stripe, Paddle, Atlas) under their own licences.
+  Credits function as (i) consideration for a service (tournament entry) and (ii) a prize ledger, not as
+  a means of payment to third parties: credits can be spent only <i>on the Platform itself</i> and
+  transferred to no other person or merchant. This materially distinguishes the ledger from e-money
+  issued “for the purpose of making payment transactions” to parties other than the issuer
+  (Art. 2(2) EMD2). Redemption flows back to the depositing customer via the original payment method
+  where possible.</p>
+  <div class="box caution">
+    <div class="box-title">Counsel action</div>
+    A payments-law opinion should be obtained to confirm the characterisation in each operating
+    jurisdiction, and to assess whether structural options (agent-of-payee arrangements, safeguarding
+    accounts, or an EMI partnership at scale) are warranted as the ledger grows.
+  </div>
+
+  <h4>B. Anti-money-laundering and counter-terrorist financing (AMLD)</h4>
+  <p><span class="para-num">8.3</span>The Platform is not an “obliged entity” under the AML Directives:
+  it is neither a credit/financial institution nor a “provider of gambling services” (per Sections IV–V).
+  Nevertheless the Platform <b>voluntarily operates a full AML-relevant control stack</b>, which is both a
+  defence-in-depth and the direct answer to bank due-diligence: mandatory KYC before any withdrawal;
+  duplicate-identity detection across KYC documents; device fingerprinting and multi-account detection;
+  IP intelligence (VPN / proxy / Tor / datacenter detection with configurable blocking); risk scoring
+  with automatic restriction; withdrawal routing back to the originating payment method; and a full,
+  reconciled transaction ledger. Closed-loop credits with capped entry fees and rank-based prizes offer
+  very limited layering utility to a money launderer — value cannot be transferred between users.</p>
+
+  <h4>C. Consumer protection (UCPD / Consumer Rights Directive)</h4>
+  <p><span class="para-num">8.4</span>Contest terms, entry fees, prize tables and eligibility rules are
+  published before entry; maximum loss is the entry fee; contests that fail to start (e.g. minimum
+  participants not reached) are automatically refunded in full — an implemented, audited flow, not a
+  policy promise. Marketing must avoid earnings claims and urgency mechanics; the terminology policy in
+  Section X applies. The 14-day withdrawal right for digital services is handled by express consent to
+  immediate performance at entry, with the statutory exception for contracts fully performed
+  (a completed tournament) — standard practice for paid online competitions.</p>
+
+  <h4>D. Data protection (GDPR)</h4>
+  <p><span class="para-num">8.5</span>The fraud-prevention stack (device fingerprinting, IP intelligence,
+  duplicate-KYC matching) processes personal data on the lawful basis of legitimate interest
+  (fraud prevention — Recital 47 GDPR expressly recognises it), and KYC on legal-obligation/contract
+  bases. Recommended hygiene: a documented DPIA covering the fingerprinting and IP-intelligence stack,
+  retention schedules for KYC artefacts, and processor agreements with the KYC and IP-intelligence
+  vendors. None of this affects licensing; it is raised because banks and regulators increasingly ask
+  for it in the same breath.</p>
+
+  <h4>E. Advertising standards and tax</h4>
+  <p><span class="para-num">8.6</span><b>Advertising:</b> the Platform must not advertise in the style of
+  gambling (odds, “win big”, bonus-bet mechanics) or of investment services (returns, income claims) —
+  both would invite the exact recharacterisations rebutted in Sections IV–VI. Positioning is
+  “skill tournament with published prizes”. <b>Tax:</b> the Platform’s revenue (its fee) is a standard
+  service supply subject to VAT — an invoicing and VAT module is already in production; prize money is in
+  general taxable in the hands of recipients under their domestic law, with no withholding obligation
+  asserted for the operator (to be confirmed per jurisdiction alongside the counsel review).</p>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== BANKS & ACQUIRERS ============================== -->
+<div class="page">
+  <div class="kicker">Section IX</div>
+  <h3 class="sec">Anticipated Questions from Banks, Acquirers and Payment Partners</h3>
+
+  <p><span class="para-num">9.1</span>Acquirer underwriting applies the card schemes’ own classification
+  logic, which — like the legal analysis — turns on <i>mechanics</i>, not labels. The controlling
+  distinction in the Visa Merchant Data Standards is between <b>MCC 7995</b> (betting and
+  <i>games of chance</i> to win prizes of monetary value) and <b>MCC 5816</b> (Digital Goods — Games,
+  expressly including <i>skilled game wagering</i>, e.g. daily fantasy sports). Acquirers apply a
+  dominant-factor review: does skill or chance primarily determine the outcome, and do skilled
+  participants demonstrably outperform unskilled participants over repeated play?</p>
+
+  <table>
+    <tr><th style="width:12%">MCC</th><th style="width:38%">Scheme description</th><th>Applicability to the Platform</th></tr>
+    <tr><td><b>7995</b></td><td>Betting, lottery, casino chips, wagers, games of chance for monetary prizes</td>
+        <td><span class="pill no">NOT APPLICABLE</span> — no chance-based wagering; no RNG determines outcomes; identical conditions with skill ranking (Section V)</td></tr>
+    <tr><td><b>5816</b></td><td>Digital Goods — Games; skilled game wagering (e.g. daily fantasy sports)</td>
+        <td><span class="pill mid">CLOSEST FIT</span> — entry-fee skill tournaments with monetary prizes; note this MCC sits on Visa’s high-integrity-risk list, so acquirer registration and enhanced monitoring may still apply</td></tr>
+    <tr><td><b>7994</b></td><td>Skill games merchants (region-dependent)</td>
+        <td><span class="pill mid">ALTERNATIVE</span> — usable in some regions unless any operating jurisdiction regulates the activity as gambling, in which case scheme rules force 7995 — hence the jurisdiction matrix and geo-blocking in Section X</td></tr>
+    <tr><td><b>6211</b></td><td>High-Integrity-Risk Financial Trading Platforms</td>
+        <td><span class="pill no">NOT APPLICABLE</span> — no financial trading of real value occurs; the trading is a simulation used solely for scoring (Section IV)</td></tr>
+  </table>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q1</span>“Are you a gambling merchant?”</div>
+    <div class="a">No. The product is a skill-based tournament (Sections III &amp; V): identical starting
+    conditions, no RNG-determined outcomes, ranking by sustained decision quality, prizes by ordinal rank
+    from a pre-published pool. Skilled participants demonstrably outperform unskilled ones over repeated
+    play — leaderboard and per-participant performance histories are available as evidence. This
+    memorandum, and counsel opinions where obtained, are available for underwriting files.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q2</span>“Are you a trading/CFD/prop-firm merchant? Those are restricted.”</div>
+    <div class="a">No. Distinguish on three facts: (i) no customer money is ever exposed to a market — the
+    trading is a simulation and the maximum loss is a fixed entry fee; (ii) no payout scales with simulated
+    profit (the profit-split feature that has drawn scrutiny to prop firms is absent — prizes are fixed by
+    rank); (iii) there is no brokerage bridge, order routing or instrument anywhere in the product. The
+    Czech National Bank’s October 2024 position confirms wholly simulated models sit outside authorisation.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q3</span>“Where is your licence?”</div>
+    <div class="a">None is required: no financial instrument or investment service (Section IV) and no game
+    of chance (Section V). The same answer was reached even by Belgium’s FSMA — the strictest EU regulator
+    in this domain — which issued only a consumer warning and pursued no licensing action against
+    comparable simulated-trading models. Jurisdiction-specific counsel confirmations can be provided.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q4</span>“What is your chargeback exposure and how do you manage it?”</div>
+    <div class="a">A dedicated chargeback-management system is in production: PSP dispute webhooks are
+    ingested automatically; the affected account is immediately restricted; a case file is opened with full
+    evidence (KYC identity, device fingerprint, IP history, session logs, the signed entry and the complete
+    credit ledger); representment evidence is generated; and won/lost outcomes reconcile automatically,
+    including credit clawback. Declined payments never credit the ledger (single-use payment sessions), and
+    deposits map 1:1 to auditable ledger entries.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q5</span>“What are your AML / source-of-funds controls?”</div>
+    <div class="a">KYC is mandatory before any withdrawal; withdrawals route back to the originating payment
+    method where scheme rules allow (card refund to the depositing card); duplicate-identity detection runs
+    across KYC documents; device fingerprinting, multi-account detection and IP intelligence (VPN/proxy/Tor/
+    datacenter) gate entries; risk scoring can automatically restrict accounts. Credits are strictly
+    closed-loop — value cannot move between users, which removes the layering utility that attracts abuse
+    to wallet products.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q6</span>“What exactly does the cardholder buy, and what do you pay out?”</div>
+    <div class="a">The cardholder buys platform credits used as fixed tournament entry fees (a service, VAT
+    invoiced). Payouts are (i) rank-based tournament prizes from pre-published pools and (ii) redemption of a
+    customer’s own unspent balance. Nothing else leaves the platform. Prize liability is always fully funded
+    by the pool of collected entry fees — there is no leverage, no float risk, and no open-ended liability.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q7</span>“What is your refund policy?”</div>
+    <div class="a">Published and implemented in code: contests that do not start (e.g. minimum participants
+    not met) refund entry fees automatically and in full; cancelled contests refund all participants;
+    voluntary deposit refunds are supported through an admin flow with credit clawback and full
+    reconciliation. Refund and dispute data are available to the acquirer on request.</div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span class="qn">Q8</span>“Which MCC do you expect, and will you accept scheme registration?”</div>
+    <div class="a">The Platform presents as MCC 5816 (skilled game wagering) or the acquirer’s preferred
+    skill-competition classification, and accepts that scheme high-integrity-risk registration and
+    enhanced monitoring may apply to that category — a cost and monitoring matter, not a legality one. The
+    Platform will not accept classification under 7995, which would misstate the mechanics, and commits to
+    geo-restricting any jurisdiction whose law treats the activity as gambling so that scheme rules never
+    force a 7995 classification.</div>
+  </div>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== RISKS ============================== -->
+<div class="page">
+  <div class="kicker">Section X</div>
+  <h3 class="sec">Residual Risk Factors and Recommended Safeguards</h3>
+
+  <p><span class="para-num">10.1</span>A credible defence anticipates the attack. The following exposures
+  are identified candidly, each with a concrete safeguard. None disturbs the core conclusions.</p>
+
+  <table>
+    <tr><th style="width:4%">#</th><th style="width:26%">Exposure</th><th style="width:12%">Severity</th><th>Safeguard</th></tr>
+    <tr>
+      <td>1</td>
+      <td>Short-duration head-to-head (1v1) challenges with minimal activity thresholds may be argued to resemble wagers.</td>
+      <td><span class="pill mid">MEDIUM</span></td>
+      <td>Enforce higher minimum-decision thresholds and minimum durations for 1v1 formats; present head-to-head play as a skill duel with full statistics.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Credits ledger (1:1 EUR, redeemable) may attract e-money (EMD2) analysis independent of both licences discussed.</td>
+      <td><span class="pill mid">MEDIUM</span></td>
+      <td>Obtain a payments-law opinion; all issuance/redemption already flows through authorised payment institutions; consider structural options (agent-of-payee, limited-network) with counsel.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>A minority of jurisdictions apply an “any element of chance” test rather than predominance of skill.</td>
+      <td><span class="pill mid">MEDIUM</span></td>
+      <td>Jurisdiction-by-jurisdiction access controls (geo-restriction capability exists in the Platform’s IP-intelligence layer); maintain a jurisdiction matrix with counsel.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Marketing language (“bet”, “win big”, “jackpot”) could invite gambling characterisation regardless of mechanics.</td>
+      <td><span class="pill mid">LOW–MED</span></td>
+      <td>Terminology policy: compete, skill, rank, tournament, prize. Periodic marketing audit against the policy.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>Any future bridge to real-market execution, or any payout scaling with simulated profit, would collapse both defences.</td>
+      <td><span class="pill yes">CRITICAL</span></td>
+      <td>Architectural red line: read-only price data; rank-based prizes only; no brokerage integration; product-governance sign-off required for any change touching the payout formula.</td>
+    </tr>
+  </table>
+
+  <div class="box caution">
+    <div class="box-title">Standing governance recommendation</div>
+    Maintain this memorandum as a living document. Any change to (i) prize distribution mechanics,
+    (ii) contest duration/minimum-activity rules, (iii) the credits ledger, or (iv) the introduction of new
+    game formats should be re-tested against Sections IV–VI before release. Pure games of chance introduced
+    as contest formats would reverse the Section V conclusion for those formats.
+  </div>
+  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
+</div>
+
+<!-- ============================== CONCLUSION ============================== -->
+<div class="page">
+  <div class="kicker">Section XI</div>
+  <h3 class="sec">Concluding Statement of Position</h3>
+
+  <div class="quoteblock">
+    ChartVolt operates skill-based simulated-trading tournaments. Participants pay a fixed, capped entry
+    fee for access to a competition in which every participant receives an identical virtual balance and
+    identical live market data, and is ranked solely on the relative quality of their decisions. No
+    financial instrument is created; no order is executed on any market; the operator bears no exposure to
+    trading outcomes; and monetary prizes are fixed, rank-based awards from a transparent, pre-published
+    prize pool — not returns on investment, and not stakes multiplied by chance. All funds move exclusively
+    through licensed payment institutions with mandatory know-your-customer verification.
+    <br/><br/>
+    Accordingly, the Platform falls outside the scope of MiFID II and ESMA-supervised authorisation — no
+    instrument, no investment service, consistent with the Czech National Bank’s October 2024 position on
+    wholly simulated models and with ESMA’s current supervisory posture — and outside member-state
+    games-of-chance legislation in predominance-of-skill jurisdictions, consistent with the treatment of
+    fantasy-sports, esports and chess competitions, and with the absence of any gaming-law classification
+    of comparable models even by Belgium, the European Union’s most restrictive financial regulator in
+    this domain.
+  </div>
+
+  <h4>Conditions on which this position depends</h4>
+  <ul class="tight">
+    <li>The Platform remains wholly within the simulated model — no order routing, no brokerage bridge.</li>
+    <li>Prizes remain fixed, rank-based awards from pre-published pools — never a function of simulated profit magnitude.</li>
+    <li>Entry fees remain fixed and capped; participants can never lose more than the fee.</li>
+    <li>All money movement remains within authorised payment institutions with KYC/AML controls.</li>
+    <li>Contest rules preserve the skill profile: identical starting conditions, minimum-activity thresholds, sustained-performance ranking.</li>
+  </ul>
+
+  <h4>Reservations</h4>
+  <p class="small">This memorandum is a regulatory position paper prepared from the Platform’s verified
+  technical implementation and publicly available regulatory statements as at 11 August 2026. It does not
+  constitute legal advice and does not create a lawyer–client relationship. Gambling law is not harmonised
+  in the European Union and member-state analysis is required before reliance in any specific jurisdiction.
+  The positions of ESMA and national competent authorities may change; the monitoring obligation described
+  in Section X applies.</p>
+
+  <div style="margin-top:14mm; border-top: 1px solid #d7dde3; padding-top:5mm; display:flex; justify-content:space-between; align-items:center;">
+    <div class="small">ChartVolt — Regulatory Defence Memorandum<br/>Version 1.1 — 11 August 2026</div>
+    <div class="small" style="text-align:right;">Prepared for review by licensed counsel<br/>Privileged &amp; Confidential</div>
+  </div>
+</div>
+
+</body>
+</html>

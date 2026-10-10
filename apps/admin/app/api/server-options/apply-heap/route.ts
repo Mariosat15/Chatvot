@@ -1,0 +1,60 @@
+import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+
+const execAsync = promisify(exec);
+
+const PM2_APP_NAME = process.env.PM2_ADMIN_APP_NAME || "chartvolt-admin";
+
+/**
+ * POST /api/server-options/apply-heap
+ * Restarts the admin PM2 process so it picks up the 4 GB heap from ecosystem.config.js and package.json.
+ * Does NOT run "pm2 set" from inside this process (that process gets killed on restart and would fail with SIGINT).
+ * Requires admin auth with server-options access or super admin.
+ */
+export async function POST() {
+  try {
+    // Reason: guardSection already enforces server-options (or super admin).
+    // Same undeclared-`auth` leftover as heap-info — would 500 on every Apply.
+    const guard = await guardSection("server-options");
+    if (!guard.ok) return guard.response;
+
+    const restart = `pm2 restart ${PM2_APP_NAME}`;
+
+    try {
+      await execAsync(restart, { timeout: 15000 });
+    } catch (err: unknown) {
+      const sig = err && typeof err === "object" && "signal" in err ? (err as { signal: string }).signal : null;
+      // When we restart ourselves, PM2 kills this process so the exec gets SIGINT. Restart still succeeded.
+      if (sig === "SIGINT" || sig === "SIGTERM") {
+        return NextResponse.json({
+          success: true,
+          message: `${PM2_APP_NAME} restarted. This tab may have disconnected; reload to confirm.`,
+        });
+      }
+      console.error("[apply-heap] pm2 restart failed:", err);
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "PM2 restart failed. Is the app running under PM2 with this name? Check PM2_ADMIN_APP_NAME env.",
+          detail: err instanceof Error ? err.message : String(err),
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `${PM2_APP_NAME} restarted (4 GB heap from config). This tab may disconnect briefly.`,
+    });
+  } catch (error) {
+    console.error("[apply-heap] error:", error);
+    return NextResponse.json(
+      { success: false, message: "Server error" },
+      { status: 500 }
+    );
+  }
+}

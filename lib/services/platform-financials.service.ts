@@ -1,10 +1,10 @@
-import { connectToDatabase } from '@/database/mongoose';
-import { PlatformTransaction, PlatformBalanceSnapshot } from '@/database/models/platform-financials.model';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import CreditConversionSettings from '@/database/models/credit-conversion-settings.model';
-import VATPayment from '@/database/models/vat-payment.model';
-import { UserPurchase } from '@/database/models/marketplace/user-purchase.model';
+import { connectToDatabase } from "@/database/mongoose";
+import { PlatformTransaction } from "@/database/models/platform-financials.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
+import VATPayment from "@/database/models/vat-payment.model";
+import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
 
 /**
  * Platform Financials Service
@@ -16,11 +16,57 @@ export interface UnclaimedPoolParams {
   competitionName: string;
   poolAmount: number;
   // Note: 'partial_unclaimed' was removed - when there are fewer winners than prizes,
-  // the extra % is REDISTRIBUTED to existing winners as bonus, not kept by platform
-  reason: 'no_participants' | 'all_disqualified' | 'no_qualified_winners' | 'competition_cancelled';
+  // the extra % is REDISTRIBUTED to existing winners, not kept by platform
+  reason:
+    | "no_participants"
+    | "all_disqualified"
+    | "no_qualified_winners"
+    | "competition_cancelled";
   winnersCount: number;
   expectedWinnersCount: number;
   description?: string;
+  /**
+   * Which contest shape this pool came from. Defaults to `"competition"`, which is what
+   * every caller meant before 9 September 2026 - the parameter names still say
+   * `competitionId` for that reason, and renaming them would be a wide diff for no gain.
+   *
+   * IT EXISTS BECAUSE A CHALLENGE COULD NOT BE RECORDED HERE AT ALL. `sourceType` was
+   * hard-coded to `"competition"`, so the worker's two challenge paths had no way to use
+   * this writer and hand-rolled a raw insert instead - which is how they came to book a
+   * 1:1 euro figure while every other row on the platform's books used the real rate.
+   */
+  sourceType?: "competition" | "challenge";
+  /**
+   * Set only by the worker's test-run paths, which tag every document they create so the
+   * cleanup job can find it again. Omitting it from this writer is what kept those two
+   * paths on a raw insert, so it is carried rather than dropped: routing them through
+   * here and losing the tag would leave test rows on the platform's real books for ever.
+   */
+  testRunId?: string;
+  /**
+   * The pot BEFORE the platform fee, when that differs from `poolAmount`.
+   *
+   * Defaults to `poolAmount`, which is what both competition callers want - settlement
+   * already netted the fee off and there is nothing else to record. THE CHALLENGE PATH
+   * NEEDS THE TWO SEPARATELY: it books the winner's would-be prize as the amount and the
+   * doubled entry fee as the original pool, and collapsing them onto one parameter would
+   * have made the challenge row claim the platform kept the gross pot.
+   */
+  originalPoolAmount?: number;
+  /**
+   * Join the caller's transaction instead of writing on its own.
+   *
+   * PASSED BY THE CHALLENGE FINALIZE PATH AND BY NOBODY ELSE, and the asymmetry is
+   * deliberate rather than an oversight. Challenge finalization decides the winner, moves
+   * the money and records this row in one transaction, so an abort must take the row with
+   * it. Competition settlement has always called this writer outside its transaction, and
+   * pulling it inside would change when the row becomes visible on a screen an operator
+   * reconciles from - a behaviour change with no defect behind it.
+   *
+   * The duplicate check runs inside the same session when one is given, so it sees the
+   * caller's own uncommitted writes rather than a stale view of the collection.
+   */
+  session?: import("mongoose").ClientSession;
 }
 
 export interface AdminWithdrawalParams {
@@ -36,51 +82,181 @@ export interface AdminWithdrawalParams {
 
 export const PlatformFinancialsService = {
   /**
-   * Record unclaimed pool funds when competition ends without winners
+   * Record unclaimed pool funds when a contest ends without winners.
+   *
+   * THE ONE WRITER OF AN UNCLAIMED-POOL ROW, since 9 September 2026 (task document 7).
+   *
+   * COUNT THE WRITERS. The task document named four raw-driver inserts in
+   * `worker/jobs/early-end-check.job.ts`; there were SIX, because
+   * `challenge-finalize.actions.ts` carries its own in each app - found by grepping for
+   * `unclaimed_pool` rather than by reading the file the document pointed at. That is the
+   * same finding as four competition entry paths where the plan said two, ten finalize
+   * sites where it said five, and six raw inserts where R7 said one.
+   *
+   * They were not merely duplicated, they were WRONG in a way nothing could report. Every
+   * one booked `amountEUR` equal to the credit figure - the worker's four carried a comment
+   * reading "Simplified - in production use conversion rate" - so with the shipped rate of
+   * 100 credits to the euro every row overstated its euro value by a factor of a hundred,
+   * on the screens an operator reconciles platform funds from. Note the harm is a wrong
+   * REPORT and never a wrong payment: nothing pays out of this collection.
+   *
+   * NOT RETROACTIVE, AND NOTHING WAS BACKFILLED. Rows already written hold the inflated
+   * euro figure, and they cannot be corrected by a rule - the rate could legitimately have
+   * changed since. Which historical rows to restate is an owner decision.
+   *
+   * IDEMPOTENT ON `(sourceType, sourceId, transactionType)`. Task document 7 asks for this
+   * in terms, and it is not theoretical: both apps run `checkAndFinalizeCompetitions` on
+   * an every-minute cron, the early-end job runs beside them, and an operator can trigger
+   * completion by hand. A duplicate row does not double a payment - nothing pays out of
+   * here - but it doubles the platform's recorded holdings, which is the figure the
+   * unclaimed total on the financial dashboard is summed from.
+   *
+   * A DUPLICATE RETURNS QUIETLY RATHER THAN THROWING. A retried cron delivery has done
+   * nothing wrong, and throwing here would abort a settlement that had already succeeded -
+   * the same reasoning as the duplicate money-request rule: report success with nothing
+   * done, rather than inviting a third attempt.
    */
   recordUnclaimedPool: async (params: UnclaimedPoolParams): Promise<void> => {
     await connectToDatabase();
-    
+
+    const sourceType = params.sourceType ?? "competition";
+
+    // Reason: checked before the conversion read, so a duplicate costs one indexed query
+    // rather than a settings round trip as well. `findOne` rather than a unique index
+    // because `platformtransactions` holds every transaction type and a partial unique
+    // index across a shared collection is a migration on live financial data - which is a
+    // separate decision, recorded at the foot of this function.
+    const existing = await PlatformTransaction.findOne({
+      transactionType: "unclaimed_pool",
+      sourceType,
+      sourceId: params.competitionId,
+    })
+      .select("_id")
+      .session(params.session ?? null)
+      .lean();
+
+    if (existing) {
+      console.log(
+        `💰 [PLATFORM] Unclaimed pool already recorded for ${sourceType} ${params.competitionId} - not recording a second time`,
+      );
+      return;
+    }
+
     const conversionSettings = await CreditConversionSettings.getSingleton();
     const eurAmount = params.poolAmount / conversionSettings.eurToCreditsRate;
-    
-    await PlatformTransaction.create({
-      transactionType: 'unclaimed_pool',
+
+    const doc = {
+      transactionType: "unclaimed_pool",
       amount: params.poolAmount,
       amountEUR: eurAmount,
-      sourceType: 'competition',
+      sourceType,
       sourceId: params.competitionId,
       sourceName: params.competitionName,
       unclaimedReason: params.reason,
-      originalPoolAmount: params.poolAmount,
+      originalPoolAmount: params.originalPoolAmount ?? params.poolAmount,
       winnersCount: params.winnersCount,
       expectedWinnersCount: params.expectedWinnersCount,
-      description: params.description || `Unclaimed pool from ${params.competitionName}: ${params.reason.replace('_', ' ')}`,
-    });
-    
-    console.log(`💰 [PLATFORM] Recorded unclaimed pool: ${params.poolAmount} credits (€${eurAmount.toFixed(2)}) from ${params.competitionName}`);
-    console.log(`   Reason: ${params.reason}, Winners: ${params.winnersCount}/${params.expectedWinnersCount}`);
+      description:
+        params.description ||
+        `Unclaimed pool from ${params.competitionName}: ${params.reason.replace("_", " ")}`,
+      ...(params.testRunId ? { testRunId: params.testRunId } : {}),
+    };
+
+    // Reason: `create([doc], { session })` rather than `create(doc, { session })` - the
+    // single-document overload treats a second argument as another document to insert, so
+    // the session would be stored as a row and the write would escape the transaction.
+    if (params.session) {
+      await PlatformTransaction.create([doc], { session: params.session });
+    } else {
+      await PlatformTransaction.create(doc);
+    }
+
+    console.log(
+      `💰 [PLATFORM] Recorded unclaimed pool: ${params.poolAmount} credits (€${eurAmount.toFixed(2)}) from ${params.competitionName}`,
+    );
+    console.log(
+      `   Reason: ${params.reason}, Winners: ${params.winnersCount}/${params.expectedWinnersCount}`,
+    );
   },
-  
+
+  /**
+   * Record retained GM fee (when GM subscription is inactive)
+   * These fees would have gone to the GM but are kept by platform
+   */
+  recordRetainedGmFee: async (params: {
+    sourceType: "competition" | "challenge";
+    sourceId: string;
+    sourceName: string;
+    gameMasterId: string;
+    gameMasterEmail?: string;
+    referredUsersCount: number;
+    amount: number; // Amount that would have been paid to GM
+    originalFeePercentage: number;
+    subscriptionStatus: string;
+    referredUserIds?: string[];
+  }): Promise<void> => {
+    await connectToDatabase();
+
+    const conversionSettings = await CreditConversionSettings.getSingleton();
+    const eurAmount = params.amount / conversionSettings.eurToCreditsRate;
+
+    await PlatformTransaction.create({
+      transactionType: "retained_gm_fee",
+      amount: params.amount,
+      amountEUR: eurAmount,
+      sourceType: params.sourceType,
+      sourceId: params.sourceId,
+      sourceName: params.sourceName,
+      retainedGmFeeDetails: {
+        gameMasterId: params.gameMasterId,
+        gameMasterEmail: params.gameMasterEmail,
+        referredUsersCount: params.referredUsersCount,
+        originalFeePercentage: params.originalFeePercentage,
+        subscriptionStatus: params.subscriptionStatus,
+        referredUserIds: params.referredUserIds,
+      },
+      description: `Retained GM fee: ${params.referredUsersCount} referral(s) from inactive GM (${params.subscriptionStatus}) - ${params.sourceName}`,
+    });
+
+    console.log(
+      `💰 [PLATFORM] Retained GM fee: ${params.amount} credits (€${eurAmount.toFixed(2)}) from inactive GM ${params.gameMasterId}`,
+    );
+    console.log(
+      `   ${params.sourceType.charAt(0).toUpperCase() + params.sourceType.slice(1)}: ${params.sourceName}, Referrals: ${params.referredUsersCount}, Status: ${params.subscriptionStatus}`,
+    );
+  },
+
   /**
    * Record platform fee earnings
    */
   recordPlatformFee: async (params: {
     amount: number;
-    sourceType: 'competition' | 'user_deposit' | 'user_withdrawal';
+    sourceType:
+      | "competition"
+      | "challenge"
+      | "user_deposit"
+      | "user_withdrawal";
     sourceId?: string;
     sourceName?: string;
     description: string;
+    // Reason: Flag set at recording time so the financial dashboard can
+    // distinguish admin-created vs GM-created competition fees without joins.
+    isGmCreated?: boolean;
   }): Promise<void> => {
     await connectToDatabase();
-    
+
     const conversionSettings = await CreditConversionSettings.getSingleton();
     const eurAmount = params.amount / conversionSettings.eurToCreditsRate;
-    
-    const transactionType = params.sourceType === 'user_deposit' ? 'deposit_fee' 
-      : params.sourceType === 'user_withdrawal' ? 'withdrawal_fee' 
-      : 'platform_fee';
-    
+
+    const transactionType =
+      params.sourceType === "user_deposit"
+        ? "deposit_fee"
+        : params.sourceType === "user_withdrawal"
+          ? "withdrawal_fee"
+          : params.sourceType === "challenge"
+            ? "challenge_platform_fee"
+            : "platform_fee";
+
     await PlatformTransaction.create({
       transactionType,
       amount: params.amount,
@@ -89,11 +265,14 @@ export const PlatformFinancialsService = {
       sourceId: params.sourceId,
       sourceName: params.sourceName,
       description: params.description,
+      ...(params.isGmCreated !== undefined && { isGmCreated: params.isGmCreated }),
     });
-    
-    console.log(`💵 [PLATFORM] Recorded fee: ${params.amount} credits (€${eurAmount.toFixed(2)}) - ${params.description}`);
+
+    console.log(
+      `💵 [PLATFORM] Recorded fee: ${params.amount} credits (€${eurAmount.toFixed(2)}) - ${params.description}`,
+    );
   },
-  
+
   /**
    * Record deposit fee (platform and bank fees)
    */
@@ -106,15 +285,15 @@ export const PlatformFinancialsService = {
     transactionId: string;
   }): Promise<void> => {
     console.log(`💵 [PLATFORM] Recording deposit fee...`, params);
-    
+
     await connectToDatabase();
-    
+
     // Record platform deposit fee income
     const transaction = await PlatformTransaction.create({
-      transactionType: 'deposit_fee',
+      transactionType: "deposit_fee",
       amount: params.platformFeeAmount,
       amountEUR: params.platformFeeAmount,
-      sourceType: 'user_deposit',
+      sourceType: "user_deposit",
       sourceId: params.transactionId,
       userId: params.userId,
       feeDetails: {
@@ -125,13 +304,13 @@ export const PlatformFinancialsService = {
       },
       description: `Deposit fee: €${params.platformFeeAmount.toFixed(2)} (Bank: €${params.bankFeeAmount.toFixed(2)}, Net: €${params.netEarning.toFixed(2)})`,
     });
-    
+
     console.log(`✅ [PLATFORM] Deposit fee recorded: ID=${transaction._id}`);
     console.log(`   Platform Fee: €${params.platformFeeAmount.toFixed(2)}`);
     console.log(`   Bank Fee: €${params.bankFeeAmount.toFixed(2)}`);
     console.log(`   Net Earning: €${params.netEarning.toFixed(2)}`);
   },
-  
+
   /**
    * Record withdrawal fee (platform and bank fees)
    */
@@ -144,13 +323,13 @@ export const PlatformFinancialsService = {
     transactionId: string;
   }): Promise<void> => {
     await connectToDatabase();
-    
+
     // Record platform withdrawal fee income
     await PlatformTransaction.create({
-      transactionType: 'withdrawal_fee',
+      transactionType: "withdrawal_fee",
       amount: params.platformFeeAmount,
       amountEUR: params.platformFeeAmount,
-      sourceType: 'user_withdrawal',
+      sourceType: "user_withdrawal",
       sourceId: params.transactionId,
       userId: params.userId,
       feeDetails: {
@@ -161,22 +340,64 @@ export const PlatformFinancialsService = {
       },
       description: `Withdrawal fee: €${params.platformFeeAmount.toFixed(2)} (Bank: €${params.bankFeeAmount.toFixed(2)}, Net: €${params.netEarning.toFixed(2)})`,
     });
-    
-    console.log(`💵 [PLATFORM] Withdrawal fee: €${params.platformFeeAmount.toFixed(2)} - Bank: €${params.bankFeeAmount.toFixed(2)} = Net: €${params.netEarning.toFixed(2)}`);
+
+    console.log(
+      `💵 [PLATFORM] Withdrawal fee: €${params.platformFeeAmount.toFixed(2)} - Bank: €${params.bankFeeAmount.toFixed(2)} = Net: €${params.netEarning.toFixed(2)}`,
+    );
   },
-  
+
+  /**
+   * Record a refund paid back to a customer.
+   * Reason: a refund is real money leaving the platform bank (same economic
+   * effect as a chargeback loss), so it must reduce the theoretical bank
+   * balance. Stored as a negative-EUR PlatformTransaction and subtracted in
+   * getFinancialStats(). Recorded once, when the refund is confirmed completed.
+   */
+  recordRefund: async (params: {
+    userId: string;
+    amountEUR: number; // gross amount refunded to the customer (always treated as a positive magnitude)
+    transactionId: string; // original deposit WalletTransaction id
+    refundId?: string; // PSP refund identifier
+    provider?: string; // e.g. "atlas"
+    description?: string;
+  }): Promise<void> => {
+    await connectToDatabase();
+
+    const magnitude = Math.abs(params.amountEUR);
+
+    await PlatformTransaction.create({
+      transactionType: "refund",
+      amount: -magnitude,
+      amountEUR: -magnitude,
+      sourceType: "user_deposit",
+      sourceId: params.transactionId,
+      userId: params.userId,
+      description:
+        params.description ||
+        `Refund to customer: €${magnitude.toFixed(2)}${params.provider ? ` via ${params.provider}` : ""}`,
+      notes: params.refundId ? `Refund ID: ${params.refundId}` : undefined,
+    });
+
+    console.log(
+      `💸 [PLATFORM] Recorded refund outflow: €${magnitude.toFixed(2)} (deposit ${params.transactionId}${params.refundId ? `, refund ${params.refundId}` : ""})`,
+    );
+  },
+
   /**
    * Record admin withdrawal (converting platform credits to real money)
    */
-  recordAdminWithdrawal: async (params: AdminWithdrawalParams): Promise<{ success: boolean; transaction?: any; error?: string }> => {
+  recordAdminWithdrawal: async (
+    params: AdminWithdrawalParams,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<{ success: boolean; transaction?: any; error?: string }> => {
     await connectToDatabase();
-    
+
     try {
       const transaction = await PlatformTransaction.create({
-        transactionType: 'admin_withdrawal',
+        transactionType: "admin_withdrawal",
         amount: -params.amount, // Negative because platform is losing credits
         amountEUR: -params.amountEUR,
-        sourceType: 'manual',
+        sourceType: "manual",
         bankDetails: {
           accountNumber: params.accountLastFour,
           bankName: params.bankName,
@@ -188,16 +409,18 @@ export const PlatformFinancialsService = {
         processedBy: params.adminId,
         processedByEmail: params.adminEmail,
       });
-      
-      console.log(`🏦 [PLATFORM] Admin withdrawal recorded: €${params.amountEUR.toFixed(2)} by ${params.adminEmail}`);
-      
+
+      console.log(
+        `🏦 [PLATFORM] Admin withdrawal recorded: €${params.amountEUR.toFixed(2)} by ${params.adminEmail}`,
+      );
+
       return { success: true, transaction };
     } catch (error) {
-      console.error('Error recording admin withdrawal:', error);
-      return { success: false, error: 'Failed to record withdrawal' };
+      console.error("Error recording admin withdrawal:", error);
+      return { success: false, error: "Failed to record withdrawal" };
     }
   },
-  
+
   /**
    * Get comprehensive platform financial stats
    */
@@ -206,212 +429,297 @@ export const PlatformFinancialsService = {
     totalUserCredits: number;
     totalUserCreditsEUR: number;
     activeWalletsCount: number;
-    
+
     // Platform Earnings by Category (Gross - what platform charged users)
     totalUnclaimedPools: number;
-    totalPlatformFees: number;           // Competition platform fees
-    totalChallengeFees: number;          // Challenge platform fees
-    totalMarketplaceSales: number;       // Marketplace item purchases
-    marketplacePurchases: number;        // Number of marketplace purchases
-    totalDepositFeesGross: number;       // Platform deposit fees charged to users
-    totalWithdrawalFeesGross: number;    // Platform withdrawal fees charged to users
-    
+    totalPlatformFees: number; // Competition platform fees
+    totalChallengeFees: number; // Challenge platform fees
+    totalMarketplaceSales: number; // Marketplace item purchases
+    marketplacePurchases: number; // Number of marketplace purchases
+    totalDepositFeesGross: number; // Platform deposit fees charged to users
+    totalWithdrawalFeesGross: number; // Platform withdrawal fees charged to users
+    totalRetainedGmFees: number; // GM fees retained due to inactive subscriptions
+    retainedGmFeesCount: number; // Number of inactive GM fee instances
+
     // Bank Fees (what payment providers charge platform)
-    totalBankDepositFees: number;       // Stripe/bank fees on deposits
-    totalBankWithdrawalFees: number;    // Bank fees on payouts
-    totalBankFees: number;              // Total bank fees
-    
+    totalBankDepositFees: number; // Stripe/bank fees on deposits
+    totalBankWithdrawalFees: number; // Bank fees on payouts
+    totalBankFees: number; // Total bank fees
+
     // Net Earnings (what platform actually keeps)
-    netDepositEarnings: number;         // Deposit fees - bank deposit fees
-    netWithdrawalEarnings: number;      // Withdrawal fees - bank withdrawal fees
-    totalGrossEarnings: number;         // All platform fees charged
-    totalNetEarnings: number;           // Gross - bank fees
+    netDepositEarnings: number; // Deposit fees - bank deposit fees
+    netWithdrawalEarnings: number; // Withdrawal fees - bank withdrawal fees
+    totalGrossEarnings: number; // All platform fees charged
+    totalNetEarnings: number; // Gross - bank fees
     totalNetEarningsEUR: number;
-    
+
     // Admin Withdrawals
     totalAdminWithdrawals: number;
     totalAdminWithdrawalsEUR: number;
-    
+
     // Net Platform Position
     platformNetCredits: number;
     platformNetEUR: number;
-    
+
     // Bank Reconciliation
     totalUserDeposits: number;
     totalUserWithdrawals: number;
-    theoreticalBankBalance: number; // What should be in bank
-    
+    totalChargebackLoss: number; // EUR — platform funds lost to lost chargebacks
+    totalRefunds: number; // EUR — money paid back to customers (reduces bank)
+    theoreticalBankBalance: number; // What should be in bank (already minus chargeback losses & refunds)
+
     // Risk Metrics
     coverageRatio: number;
     maxWithdrawalLiability: number;
-    
+
     // VAT Tracking
     totalVATCollected: number;
     totalVATPaid: number;
     outstandingVAT: number;
-    
+
     // Conversion Rate
     conversionRate: number;
   }> => {
     await connectToDatabase();
-    
+
     const conversionSettings = await CreditConversionSettings.getSingleton();
     const conversionRate = conversionSettings.eurToCreditsRate;
-    
+
     // Get all user wallet balances (what we owe users)
     const walletAggregation = await CreditWallet.aggregate([
       {
         $group: {
           _id: null,
-          totalCredits: { $sum: '$creditBalance' },
-          totalDeposited: { $sum: '$totalDeposited' },
-          totalWithdrawn: { $sum: '$totalWithdrawn' },
-          count: { $sum: { $cond: [{ $gt: ['$creditBalance', 0] }, 1, 0] } },
+          totalCredits: { $sum: "$creditBalance" },
+          totalDeposited: { $sum: "$totalDeposited" },
+          totalWithdrawn: { $sum: "$totalWithdrawn" },
+          count: { $sum: { $cond: [{ $gt: ["$creditBalance", 0] }, 1, 0] } },
         },
       },
     ]);
-    
+
     const walletStats = walletAggregation[0] || {
       totalCredits: 0,
       totalDeposited: 0,
       totalWithdrawn: 0,
       count: 0,
     };
-    
+
     // Get platform earnings by type with fee breakdown
     const platformEarnings = await PlatformTransaction.aggregate([
       {
         $group: {
-          _id: '$transactionType',
-          total: { $sum: '$amount' },
-          totalEUR: { $sum: '$amountEUR' },
+          _id: "$transactionType",
+          total: { $sum: "$amount" },
+          totalEUR: { $sum: "$amountEUR" },
           count: { $sum: 1 },
-          totalPlatformFees: { $sum: '$feeDetails.platformFee' },
-          totalBankFees: { $sum: '$feeDetails.bankFee' },
-          totalNetEarnings: { $sum: '$feeDetails.netEarning' },
+          totalPlatformFees: { $sum: "$feeDetails.platformFee" },
+          totalBankFees: { $sum: "$feeDetails.bankFee" },
+          totalNetEarnings: { $sum: "$feeDetails.netEarning" },
         },
       },
     ]);
-    
+
     // Get marketplace sales
     const marketplaceAggregation = await UserPurchase.aggregate([
       {
         $group: {
           _id: null,
-          totalSales: { $sum: '$pricePaid' },
+          totalSales: { $sum: "$pricePaid" },
           purchaseCount: { $sum: 1 },
         },
       },
     ]);
-    const marketplaceSales = marketplaceAggregation[0] || { totalSales: 0, purchaseCount: 0 };
-    
+    const marketplaceSales = marketplaceAggregation[0] || {
+      totalSales: 0,
+      purchaseCount: 0,
+    };
+
     // Process earnings
-    let totalUnclaimedPools = 0;
-    let totalPlatformFees = 0;       // Competition fees
-    let totalChallengeFees = 0;      // Challenge fees
-    let totalMarketplaceSales = marketplaceSales.totalSales;
-    let marketplacePurchases = marketplaceSales.purchaseCount;
-    let totalDepositFeesGross = 0;
-    let totalWithdrawalFeesGross = 0;
-    let totalBankDepositFees = 0;
-    let totalBankWithdrawalFees = 0;
-    let netDepositEarnings = 0;
-    let netWithdrawalEarnings = 0;
-    let totalAdminWithdrawals = 0;
-    let totalAdminWithdrawalsEUR = 0;
-    
+    // Reason: ALL summary totals below are in EUR for consistent financial reporting.
+    // PlatformTransaction stores `amount` (credits for comp/challenge/unclaimed/GM fees,
+    // EUR for deposit/withdrawal fees) and `amountEUR` (always EUR).
+    // We use `earning.totalEUR` for credit-based types to get proper EUR values.
+    let totalUnclaimedPools = 0; // EUR
+    let totalPlatformFees = 0; // EUR — Competition platform fees
+    let totalChallengeFees = 0; // EUR — Challenge platform fees
+    const totalMarketplaceSales = marketplaceSales.totalSales / conversionRate; // EUR
+    const marketplacePurchases = marketplaceSales.purchaseCount;
+    let totalDepositFeesGross = 0; // EUR — already stored in EUR
+    let totalWithdrawalFeesGross = 0; // EUR — already stored in EUR
+    let totalBankDepositFees = 0; // EUR
+    let totalBankWithdrawalFees = 0; // EUR
+    let netDepositEarnings = 0; // EUR
+    let netWithdrawalEarnings = 0; // EUR
+    let totalAdminWithdrawals = 0; // Credits (for credit display)
+    let totalAdminWithdrawalsEUR = 0; // EUR
+    let totalRetainedGmFees = 0; // EUR
+    let retainedGmFeesCount = 0;
+
     for (const earning of platformEarnings) {
       switch (earning._id) {
-        case 'unclaimed_pool':
-          totalUnclaimedPools = earning.total;
+        case "unclaimed_pool":
+          // Reason: Use totalEUR because `amount` is in credits for unclaimed pools
+          totalUnclaimedPools = earning.totalEUR;
           break;
-        case 'platform_fee':
-          totalPlatformFees = earning.total;
+        case "platform_fee":
+          // Reason: Use totalEUR because `amount` is in credits for competition fees
+          totalPlatformFees = earning.totalEUR;
           break;
-        case 'challenge_platform_fee':
-          totalChallengeFees = earning.total;
+        case "challenge_platform_fee":
+          // Reason: Use totalEUR because `amount` is in credits for challenge fees
+          totalChallengeFees = earning.totalEUR;
           break;
-        case 'deposit_fee':
-          totalDepositFeesGross = earning.totalPlatformFees || earning.total;
+        case "deposit_fee":
+          // Reason: For deposit fees, amount and amountEUR are both EUR
+          totalDepositFeesGross = earning.totalPlatformFees || earning.totalEUR;
           totalBankDepositFees = earning.totalBankFees || 0;
-          netDepositEarnings = earning.totalNetEarnings || (totalDepositFeesGross - totalBankDepositFees);
+          netDepositEarnings =
+            earning.totalNetEarnings ||
+            totalDepositFeesGross - totalBankDepositFees;
           break;
-        case 'withdrawal_fee':
-          totalWithdrawalFeesGross = earning.totalPlatformFees || earning.total;
+        case "withdrawal_fee":
+          // Reason: For withdrawal fees, amount and amountEUR are both EUR
+          totalWithdrawalFeesGross = earning.totalPlatformFees || earning.totalEUR;
           totalBankWithdrawalFees = earning.totalBankFees || 0;
-          netWithdrawalEarnings = earning.totalNetEarnings || (totalWithdrawalFeesGross - totalBankWithdrawalFees);
+          netWithdrawalEarnings =
+            earning.totalNetEarnings ||
+            totalWithdrawalFeesGross - totalBankWithdrawalFees;
           break;
-        case 'admin_withdrawal':
+        case "admin_withdrawal":
           totalAdminWithdrawals = Math.abs(earning.total);
           totalAdminWithdrawalsEUR = Math.abs(earning.totalEUR);
           break;
+        case "retained_gm_fee":
+          // Reason: Use totalEUR because `amount` is in credits for retained GM fees
+          totalRetainedGmFees = earning.totalEUR;
+          retainedGmFeesCount = earning.count;
+          break;
       }
     }
-    
-    // Calculate totals (including challenge fees and marketplace sales)
+
+    // Chargeback losses: sum of PlatformTransaction.transactionType === "chargeback_loss"
+    // These rows are written with negative amount/amountEUR when an admin
+    // completes a chargeback against the platform bank leg. We take the
+    // absolute value so the dashboard can surface a positive "loss" figure
+    // and subtract it from the theoretical bank balance below.
+    let totalChargebackLoss = 0; // EUR
+    try {
+      const chargebackAgg = await PlatformTransaction.aggregate([
+        { $match: { transactionType: "chargeback_loss" } },
+        {
+          $group: {
+            _id: null,
+            totalEUR: { $sum: "$amountEUR" },
+          },
+        },
+      ]);
+      totalChargebackLoss = Math.abs(chargebackAgg[0]?.totalEUR || 0);
+    } catch (e) {
+      console.error("⚠️ [financials] chargeback_loss aggregation failed:", e);
+    }
+
+    // Refunds: money paid back to customers — real cash leaving the bank.
+    // Stored as negative-EUR "refund" rows; subtracted from the bank balance
+    // below (same treatment as chargeback losses / payouts).
+    let totalRefunds = 0; // EUR (positive magnitude)
+    try {
+      const refundAgg = await PlatformTransaction.aggregate([
+        { $match: { transactionType: "refund" } },
+        { $group: { _id: null, totalEUR: { $sum: "$amountEUR" } } },
+      ]);
+      totalRefunds = Math.abs(refundAgg[0]?.totalEUR || 0);
+    } catch (e) {
+      console.error("⚠️ [financials] refund aggregation failed:", e);
+    }
+
+    // Reason: All values below are now consistently in EUR
     const totalBankFees = totalBankDepositFees + totalBankWithdrawalFees;
-    const totalGrossEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + totalDepositFeesGross + totalWithdrawalFeesGross;
-    const totalNetEarnings = totalUnclaimedPools + totalPlatformFees + totalChallengeFees + totalMarketplaceSales + netDepositEarnings + netWithdrawalEarnings;
+    const totalGrossEarnings =
+      totalUnclaimedPools +
+      totalPlatformFees +
+      totalChallengeFees +
+      totalMarketplaceSales +
+      totalDepositFeesGross +
+      totalWithdrawalFeesGross +
+      totalRetainedGmFees;
+    const totalNetEarnings =
+      totalUnclaimedPools +
+      totalPlatformFees +
+      totalChallengeFees +
+      totalMarketplaceSales +
+      netDepositEarnings +
+      netWithdrawalEarnings +
+      totalRetainedGmFees;
     const totalNetEarningsEUR = totalNetEarnings;
-    
-    const platformNetCredits = totalNetEarnings - totalAdminWithdrawals;
+
+    const platformNetCredits = totalNetEarnings - totalAdminWithdrawalsEUR;
     const platformNetEUR = platformNetCredits;
-    
+
     // Get VAT data
     // Total VAT collected from all deposits
     const vatCollectedAggregation = await WalletTransaction.aggregate([
       {
         $match: {
-          transactionType: 'deposit',
-          status: 'completed',
-          'metadata.vatAmount': { $gt: 0 },
+          transactionType: "deposit",
+          status: "completed",
+          "metadata.vatAmount": { $gt: 0 },
         },
       },
       {
         $group: {
           _id: null,
-          totalVAT: { $sum: '$metadata.vatAmount' },
+          totalVAT: { $sum: "$metadata.vatAmount" },
         },
       },
     ]);
     const totalVATCollected = vatCollectedAggregation[0]?.totalVAT || 0;
-    
+
     // Total VAT paid to government
     const vatPaidAggregation = await VATPayment.aggregate([
-      { $match: { status: 'paid' } },
+      { $match: { status: "paid" } },
       {
         $group: {
           _id: null,
-          totalPaid: { $sum: '$vatAmountEUR' },
+          totalPaid: { $sum: "$vatAmountEUR" },
         },
       },
     ]);
     const totalVATPaid = vatPaidAggregation[0]?.totalPaid || 0;
     const outstandingVAT = totalVATCollected - totalVATPaid;
-    
-    // Bank reconciliation: 
-    // What we HAVE = Money received from users - Bank fees taken - Money paid out + Platform fees (from contests)
+
+    // Bank reconciliation (ALL values in EUR):
+    // What we HAVE = Money received from users - Bank fees taken - Money paid out
     // IMPORTANT: Bank fees (Stripe, etc.) are DEDUCTED from what we receive, so subtract them!
-    // Competition/Challenge fees are earned from prize pools, which come from entry fees (already in deposits)
-    const totalMoneyReceivedGross = walletStats.totalDeposited + totalDepositFeesGross + totalVATCollected;
-    const totalMoneyPaidOut = walletStats.totalWithdrawn + totalAdminWithdrawalsEUR + totalVATPaid;
-    // FIXED: Subtract bank fees because they reduce what we actually have in bank
-    // Add competition/challenge fees as they represent earnings from the platform (not deducted from user wallets directly)
-    const theoreticalBankBalance = totalMoneyReceivedGross - totalBankFees - totalMoneyPaidOut;
-    
+    // Reason: walletStats.totalDeposited is already in EUR (tracked as eurAmount on deposit).
+    // walletStats.totalWithdrawn is in CREDITS (tracked as amountCredits), so we convert to EUR.
+    const totalUserWithdrawalsEUR = walletStats.totalWithdrawn / conversionRate;
+    const totalMoneyReceivedGross =
+      walletStats.totalDeposited + totalDepositFeesGross + totalVATCollected;
+    const totalMoneyPaidOut =
+      totalUserWithdrawalsEUR + totalAdminWithdrawalsEUR + totalVATPaid;
+    // Reason: chargeback losses are real funds already pulled from the
+    // acquirer — subtract them so the theoretical bank balance doesn't get
+    // flagged as drift by reconciliation when clawbacks are applied.
+    const theoreticalBankBalance =
+      totalMoneyReceivedGross -
+      totalBankFees -
+      totalMoneyPaidOut -
+      totalChargebackLoss -
+      totalRefunds;
+
     // Coverage ratio: How much of total liabilities can be covered
     // Liabilities = User credit balances + Outstanding VAT
     const totalUserCreditsEUR = walletStats.totalCredits / conversionRate;
     const totalLiabilities = totalUserCreditsEUR + outstandingVAT;
-    const coverageRatio = totalLiabilities > 0 
-      ? theoreticalBankBalance / totalLiabilities 
-      : 1;
-    
+    const coverageRatio =
+      totalLiabilities > 0 ? theoreticalBankBalance / totalLiabilities : 1;
+
     return {
       totalUserCredits: walletStats.totalCredits,
       totalUserCreditsEUR,
       activeWalletsCount: walletStats.count,
-      
+
       // Gross earnings (what platform charged users)
       totalUnclaimedPools,
       totalPlatformFees,
@@ -420,65 +728,73 @@ export const PlatformFinancialsService = {
       marketplacePurchases,
       totalDepositFeesGross,
       totalWithdrawalFeesGross,
-      
+      totalRetainedGmFees,
+      retainedGmFeesCount,
+
       // Bank fees (what providers charge platform)
       totalBankDepositFees,
       totalBankWithdrawalFees,
       totalBankFees,
-      
+
       // Net earnings (what platform actually keeps)
       netDepositEarnings,
       netWithdrawalEarnings,
       totalGrossEarnings,
       totalNetEarnings,
       totalNetEarningsEUR,
-      
+
       totalAdminWithdrawals,
       totalAdminWithdrawalsEUR,
-      
+
       platformNetCredits,
       platformNetEUR,
-      
-      totalUserDeposits: walletStats.totalDeposited,
-      totalUserWithdrawals: walletStats.totalWithdrawn,
+
+      totalUserDeposits: walletStats.totalDeposited, // EUR
+      totalUserWithdrawals: totalUserWithdrawalsEUR, // EUR (converted from credits)
+      totalChargebackLoss,
+      totalRefunds,
       theoreticalBankBalance,
-      
+
       coverageRatio,
       maxWithdrawalLiability: totalUserCreditsEUR,
-      
+
       // VAT Tracking
       totalVATCollected,
       totalVATPaid,
       outstandingVAT,
-      
+
       conversionRate,
     };
   },
-  
+
   /**
    * Get platform transaction history with filters
    */
-  getTransactionHistory: async (params: {
-    type?: string;
-    limit?: number;
-    skip?: number;
-    startDate?: Date;
-    endDate?: Date;
-  } = {}): Promise<{ transactions: any[]; total: number }> => {
+  getTransactionHistory: async (
+    params: {
+      type?: string;
+      limit?: number;
+      skip?: number;
+      startDate?: Date;
+      endDate?: Date;
+    } = {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Promise<{ transactions: any[]; total: number }> => {
     await connectToDatabase();
-    
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
-    
-    if (params.type && params.type !== 'all') {
+
+    if (params.type && params.type !== "all") {
       query.transactionType = params.type;
     }
-    
+
     if (params.startDate || params.endDate) {
       query.createdAt = {};
       if (params.startDate) query.createdAt.$gte = params.startDate;
       if (params.endDate) query.createdAt.$lte = params.endDate;
     }
-    
+
     const [transactions, total] = await Promise.all([
       PlatformTransaction.find(query)
         .sort({ createdAt: -1 })
@@ -487,10 +803,10 @@ export const PlatformFinancialsService = {
         .lean(),
       PlatformTransaction.countDocuments(query),
     ]);
-    
+
     return { transactions, total };
   },
-  
+
   /**
    * Get unclaimed pools summary
    */
@@ -498,36 +814,42 @@ export const PlatformFinancialsService = {
     totalAmount: number;
     totalAmountEUR: number;
     byReason: Record<string, { count: number; amount: number }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recentPools: any[];
   }> => {
     await connectToDatabase();
-    
+
     const conversionSettings = await CreditConversionSettings.getSingleton();
-    
+
     const summary = await PlatformTransaction.aggregate([
-      { $match: { transactionType: 'unclaimed_pool' } },
+      { $match: { transactionType: "unclaimed_pool" } },
       {
         $group: {
-          _id: '$unclaimedReason',
+          _id: "$unclaimedReason",
           count: { $sum: 1 },
-          amount: { $sum: '$amount' },
+          amount: { $sum: "$amount" },
         },
       },
     ]);
-    
-    const recentPools = await PlatformTransaction.find({ transactionType: 'unclaimed_pool' })
+
+    const recentPools = await PlatformTransaction.find({
+      transactionType: "unclaimed_pool",
+    })
       .sort({ createdAt: -1 })
       .limit(10)
       .lean();
-    
+
     const byReason: Record<string, { count: number; amount: number }> = {};
     let totalAmount = 0;
-    
+
     for (const item of summary) {
-      byReason[item._id || 'unknown'] = { count: item.count, amount: item.amount };
+      byReason[item._id || "unknown"] = {
+        count: item.count,
+        amount: item.amount,
+      };
       totalAmount += item.amount;
     }
-    
+
     return {
       totalAmount,
       totalAmountEUR: totalAmount / conversionSettings.eurToCreditsRate,
@@ -538,4 +860,3 @@ export const PlatformFinancialsService = {
 };
 
 export default PlatformFinancialsService;
-

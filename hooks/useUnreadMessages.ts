@@ -1,0 +1,70 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import useLiveTopic from "@/hooks/useLiveTopic";
+
+// Reason (7 Oct 2026): sidebar mounts this for every signed-in user. 10s was
+// ~6k Mongo reads/min at 1k online; 30s plus visibility/BroadcastChannel is enough.
+const POLL_INTERVAL = 30000;
+
+/**
+ * Hook that polls /api/messaging/unread for the current user's unread message count.
+ * Uses BroadcastChannel so multiple tabs stay in sync instantly.
+ */
+export function useUnreadMessages() {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const channelRef = useRef<BroadcastChannel | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/messaging/unread");
+      if (res.ok) {
+        const data = await res.json();
+        const count = data.unreadCount ?? 0;
+        setUnreadCount(count);
+        // Broadcast to other tabs/components
+        try {
+          channelRef.current?.postMessage({ unreadCount: count });
+        } catch { /* BroadcastChannel not supported */ }
+      }
+    } catch {
+      // Silent fail — non-critical
+    }
+  }, []);
+
+  useEffect(() => {
+    // BroadcastChannel for cross-tab sync
+    try {
+      const bc = new BroadcastChannel("chartvolt-unread-messages");
+      bc.onmessage = (event) => {
+        if (typeof event.data?.unreadCount === "number") {
+          setUnreadCount(event.data.unreadCount);
+        }
+      };
+      channelRef.current = bc;
+    } catch { /* BroadcastChannel not supported in this browser */ }
+
+    refresh();
+
+    const interval = setInterval(() => {
+      if (!document.hidden) refresh();
+    }, POLL_INTERVAL);
+
+    const handleVisibility = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      try { channelRef.current?.close(); } catch {}
+    };
+  }, [refresh]);
+
+  // Live: a new message or a read receipt updates the badge at once; the 30s
+  // poll above stays as the safety net, so this adds no timer of its own.
+  useLiveTopic("messages", refresh, { fallbackMs: 0 });
+
+  return { unreadCount, refresh };
+}

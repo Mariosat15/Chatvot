@@ -1,692 +1,486 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Trophy, Users, Clock, TrendingUp, Zap, LayoutGrid, List, Filter, Search, X, ChevronDown, Target, Award, Flame, Crown, Sparkles, SlidersHorizontal, RefreshCw } from 'lucide-react';
-import CompetitionCard from '@/components/trading/CompetitionCard';
-import WalletBalanceDisplay from '@/components/trading/WalletBalanceDisplay';
-import UTCClock from '@/components/trading/UTCClock';
-import LiveStatusIndicator from '@/components/trading/LiveStatusIndicator';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import Link from 'next/link';
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import useLiveTopic from "@/hooks/useLiveTopic";
+import type { DifficultyLevel } from "@/lib/utils/competition-difficulty";
+import type { TitleLevel } from "@/lib/constants/levels";
+import type { CompetitionListItem } from "@/lib/competitions/types";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  COMPETITIONS_PAGE_SIZE,
+  type BrowseCompetitionsResult,
+} from "@/lib/competitions/browse-types";
+import { CompetitionsArena } from "@/components/competitions/arena/CompetitionsArena";
+import { MobileCompetitionsArena } from "@/components/competitions/arena/mobile/MobileCompetitionsArena";
+import { useMobileArenaPages } from "@/components/competitions/arena/mobile/useMobileArenaPages";
 
-// Auto-refresh interval (10 seconds for real-time updates)
-const AUTO_REFRESH_INTERVAL = 10000;
+const SEARCH_DEBOUNCE_MS = 350;
 
-interface Competition {
-  _id: string;
-  name: string;
-  description: string;
-  status: 'upcoming' | 'active' | 'completed' | 'cancelled';
-  entryFee?: number;
-  entryFeeCredits?: number;
-  prizePool?: number;
-  prizePoolCredits?: number;
-  startingCapital?: number;
-  startingTradingPoints?: number;
-  currentParticipants: number;
-  maxParticipants: number;
-  minParticipants?: number;
-  startTime: string;
-  endTime: string;
-  assetClasses: string[];
-  rules?: {
-    rankingMethod: string;
-    minimumTrades?: number;
+interface Competition extends CompetitionListItem {
+  riskLimits?: {
+    enabled?: boolean;
+    maxDrawdownPercent?: number;
+    dailyLossLimitPercent?: number;
   };
-  levelRequirement?: {
-    enabled: boolean;
-    minLevel: number;
-    maxLevel?: number;
-  };
+  createdAt?: string;
+  registrationDeadline?: string;
+  playWindowEnd?: string;
+  bannerUrl?: string;
 }
 
 interface CompetitionsPageContentProps {
-  initialCompetitions: Competition[];
+  initialBrowse: BrowseCompetitionsResult;
   initialBalance: number;
-  userInCompetitionIds: string[];
+  levelLadder: TitleLevel[];
 }
 
-// Storage key for filter preferences
-const FILTER_STORAGE_KEY = 'competition-filters';
+const FILTER_STORAGE_KEY = "competition-filters-v2";
 
 interface SavedFilters {
-  viewMode: 'card' | 'list';
-  statusFilter: string[];
-  rankingFilter: string[];
-  assetFilter: string[];
-  sortBy: 'prize' | 'start' | 'participants' | 'entry';
+  viewMode: "grid" | "list";
+  statusFilter: string;
+  assetFilter: string;
+  difficultyFilter: string;
+  sortBy: string;
+  gameFilter: string;
 }
 
-// Load saved filters from localStorage
-const loadSavedFilters = (): Partial<SavedFilters> => {
-  if (typeof window === 'undefined') return {};
+function loadSavedFilters(): Partial<SavedFilters> {
+  if (typeof window === "undefined") return {};
   try {
     const saved = localStorage.getItem(FILTER_STORAGE_KEY);
     return saved ? JSON.parse(saved) : {};
   } catch {
     return {};
   }
-};
+}
 
-// Save filters to localStorage
-const saveFilters = (filters: SavedFilters) => {
-  if (typeof window === 'undefined') return;
+function saveFilters(filters: SavedFilters) {
+  if (typeof window === "undefined") return;
   try {
     localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
   } catch {
     // Ignore storage errors
   }
-};
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(t);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+function buildQuery(params: {
+  page: number;
+  status: string;
+  game: string;
+  asset: string;
+  q: string;
+  sort: string;
+  difficulty: string;
+}): string {
+  const sp = new URLSearchParams();
+  sp.set("page", String(params.page));
+  sp.set("limit", String(COMPETITIONS_PAGE_SIZE));
+  sp.set("status", params.status || "active,upcoming");
+  sp.set("game", params.game || "all");
+  sp.set("sort", params.sort || "featured");
+  if (params.asset) sp.set("asset", params.asset);
+  if (params.q.trim()) sp.set("q", params.q.trim());
+  if (params.difficulty) sp.set("difficulty", params.difficulty);
+  return sp.toString();
+}
 
 export default function CompetitionsPageContent({
-  initialCompetitions,
+  initialBrowse,
   initialBalance,
-  userInCompetitionIds,
+  levelLadder,
 }: CompetitionsPageContentProps) {
-  // Use server-fetched data as initial state - make mutable for auto-refresh
-  const [competitions, setCompetitions] = useState<Competition[]>(initialCompetitions);
+  const { settings } = useAppSettings();
+  
+  const [items, setItems] = useState<Competition[]>(
+    (initialBrowse.items as Competition[]) || [],
+  );
   const [userBalance, setUserBalance] = useState(initialBalance);
-  const [userInCompetitionIdsState, setUserInCompetitionIdsState] = useState<string[]>(userInCompetitionIds);
-  const userInCompetitions = useMemo(() => new Set(userInCompetitionIdsState), [userInCompetitionIdsState]);
-  
-  // Auto-refresh state (always enabled - no toggle needed)
+  const [userInCompetitionIdsState, setUserInCompetitionIdsState] = useState<
+    string[]
+  >(initialBrowse.userInCompetitionIds || []);
+  const userInCompetitions = useMemo(
+    () => new Set(userInCompetitionIdsState.map(String)),
+    [userInCompetitionIdsState],
+  );
+
+  const [page, setPage] = useState(initialBrowse.page || 1);
+  const [pageSize] = useState(initialBrowse.pageSize || COMPETITIONS_PAGE_SIZE);
+  const [totalItems, setTotalItems] = useState(initialBrowse.totalItems || 0);
+  const [totalPages, setTotalPages] = useState(initialBrowse.totalPages || 1);
+  const [hasNextPage, setHasNextPage] = useState(
+    initialBrowse.hasNextPage || false,
+  );
+  const [hasPreviousPage, setHasPreviousPage] = useState(
+    initialBrowse.hasPreviousPage || false,
+  );
+  const [kpis, setKpis] = useState(initialBrowse.kpis);
+
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  
-  // Load saved preferences on mount
+  const [loadError, setLoadError] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
-  
-  // View & Filter State - with defaults that will be overridden by saved values
-  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string[]>(['active', 'upcoming']);
-  const [rankingFilter, setRankingFilter] = useState<string[]>([]);
-  const [assetFilter, setAssetFilter] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<'prize' | 'start' | 'participants' | 'entry'>('prize');
 
-  // Fetch fresh data
-  const refreshData = useCallback(async (showSpinner = true) => {
-    if (showSpinner) setIsRefreshing(true);
-    try {
-      const [competitionsRes, walletRes] = await Promise.all([
-        fetch('/api/competitions'),
-        fetch('/api/wallet/balance'),
-      ]);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS);
+  const [statusFilter, setStatusFilter] = useState("active,upcoming");
+  const [assetFilter, setAssetFilter] = useState("");
+  const [difficultyFilter, setDifficultyFilter] = useState("");
+  const [gameFilter, setGameFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("featured");
+  const [platformLeverage, setPlatformLeverage] = useState(100);
+  const [availableAssets, setAvailableAssets] = useState<string[]>([]);
 
-      if (competitionsRes.ok) {
-        const data = await competitionsRes.json();
-        setCompetitions(data.competitions || []);
-        setUserInCompetitionIdsState(data.userInCompetitionIds || []);
+  const prefetchCache = useRef(new Map<string, BrowseCompetitionsResult>());
+  const skipNextFetch = useRef(true);
+
+  useEffect(() => {
+    const fetchRiskSettings = async () => {
+      try {
+        const res = await fetch("/api/trading/risk-settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.maxLeverage) {
+            setPlatformLeverage(data.settings.maxLeverage);
+          }
+        }
+      } catch {
+        // default
       }
+    };
+    fetchRiskSettings();
+  }, []);
 
-      if (walletRes.ok) {
-        const walletData = await walletRes.json();
-        setUserBalance(walletData.balance ?? initialBalance);
-      }
-
-      setLastRefresh(new Date());
-    } catch (error) {
-      console.error('Error refreshing competitions:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [initialBalance]);
-
-  // Load saved filters on mount
   useEffect(() => {
     const saved = loadSavedFilters();
-    if (saved.viewMode) setViewMode(saved.viewMode);
+    if (saved.viewMode === "list" || saved.viewMode === "grid") {
+      setViewMode(saved.viewMode);
+    }
     if (saved.statusFilter) setStatusFilter(saved.statusFilter);
-    if (saved.rankingFilter) setRankingFilter(saved.rankingFilter);
-    if (saved.assetFilter) setAssetFilter(saved.assetFilter);
+    if (typeof saved.assetFilter === "string") setAssetFilter(saved.assetFilter);
+    if (typeof saved.difficultyFilter === "string") {
+      setDifficultyFilter(saved.difficultyFilter);
+    }
     if (saved.sortBy) setSortBy(saved.sortBy);
+    if (saved.gameFilter) setGameFilter(saved.gameFilter);
     setIsHydrated(true);
   }, []);
 
-  // Auto-refresh interval (always on)
   useEffect(() => {
-    const interval = setInterval(() => {
-      refreshData(false); // Silent refresh (no spinner)
-    }, AUTO_REFRESH_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, [refreshData]);
-
-  // Refresh when tab becomes visible again
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refreshData(false);
-      }
-    };
-
-    const handleFocus = () => {
-      refreshData(false);
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [refreshData]);
-
-  // Save filters whenever they change
-  useEffect(() => {
-    if (!isHydrated) return; // Don't save until initial load is complete
+    if (!isHydrated) return;
     saveFilters({
       viewMode,
       statusFilter,
-      rankingFilter,
       assetFilter,
+      difficultyFilter,
       sortBy,
+      gameFilter,
     });
-  }, [viewMode, statusFilter, rankingFilter, assetFilter, sortBy, isHydrated]);
+  }, [
+    viewMode,
+    statusFilter,
+    assetFilter,
+    difficultyFilter,
+    sortBy,
+    gameFilter,
+    isHydrated,
+  ]);
 
-  // Available filters
-  const availableRankingMethods = useMemo(() => {
-    const methods = new Set(competitions.map(c => c.rules?.rankingMethod).filter(Boolean));
-    return Array.from(methods);
-  }, [competitions]);
-
-  const availableAssets = useMemo(() => {
-    const assets = new Set(competitions.flatMap(c => c.assetClasses || []));
-    return Array.from(assets);
-  }, [competitions]);
-
-  // Apply filters to competitions
-  const applyFilters = (comps: Competition[]) => {
-    let result = [...comps];
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(c => 
-        c.name.toLowerCase().includes(query) ||
-        c.description?.toLowerCase().includes(query)
-      );
-    }
-
-    // Ranking method filter
-    if (rankingFilter.length > 0) {
-      result = result.filter(c => rankingFilter.includes(c.rules?.rankingMethod || ''));
-    }
-
-    // Asset filter
-    if (assetFilter.length > 0) {
-      result = result.filter(c => 
-        c.assetClasses?.some(asset => assetFilter.includes(asset))
-      );
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'prize':
-          return (b.prizePool || b.prizePoolCredits || 0) - (a.prizePool || a.prizePoolCredits || 0);
-        case 'start':
-          return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
-        case 'participants':
-          return b.currentParticipants - a.currentParticipants;
-        case 'entry':
-          return (a.entryFee || a.entryFeeCredits || 0) - (b.entryFee || b.entryFeeCredits || 0);
-        default:
-          return 0;
+  const applyBrowseResult = useCallback((data: BrowseCompetitionsResult) => {
+    setItems((data.items as Competition[]) || []);
+    setUserInCompetitionIdsState(data.userInCompetitionIds || []);
+    setPage(data.page);
+    setTotalItems(data.totalItems);
+    setTotalPages(data.totalPages);
+    setHasNextPage(data.hasNextPage);
+    setHasPreviousPage(data.hasPreviousPage);
+    setKpis(data.kpis);
+    const assets = new Set<string>();
+    for (const c of data.items as Competition[]) {
+      for (const a of c.assetClasses || []) {
+        if (a) assets.add(a);
       }
+    }
+    if (assets.size > 0) {
+      setAvailableAssets(Array.from(assets).sort());
+    }
+  }, []);
+
+  const fetchPage = useCallback(
+    async (
+      nextPage: number,
+      opts?: { showSkeleton?: boolean; spinner?: boolean },
+    ) => {
+      const query = buildQuery({
+        page: nextPage,
+        status: statusFilter,
+        game: gameFilter,
+        asset: assetFilter,
+        q: debouncedSearch,
+        sort: sortBy,
+        difficulty: difficultyFilter,
+      });
+      const cached = prefetchCache.current.get(query);
+      if (cached) {
+        applyBrowseResult(cached);
+        prefetchCache.current.delete(query);
+        return;
+      }
+
+      if (opts?.showSkeleton) setIsLoading(true);
+      if (opts?.spinner) setIsRefreshing(true);
+      try {
+        const [competitionsRes, walletRes] = await Promise.all([
+          fetch(`/api/competitions?${query}`),
+          fetch("/api/wallet/balance"),
+        ]);
+
+        if (competitionsRes.ok) {
+          const data = (await competitionsRes.json()) as BrowseCompetitionsResult;
+          applyBrowseResult(data);
+          setLoadError(false);
+        } else {
+          setLoadError(true);
+        }
+
+        if (walletRes.ok) {
+          const walletData = await walletRes.json();
+          setUserBalance(walletData.balance ?? initialBalance);
+        }
+      } catch (error) {
+        console.error("Error refreshing competitions:", error);
+        setLoadError(true);
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [
+      statusFilter,
+      gameFilter,
+      assetFilter,
+      debouncedSearch,
+      sortBy,
+      difficultyFilter,
+      applyBrowseResult,
+      initialBalance,
+    ],
+  );
+
+  // Prefetch next page after a successful load
+  useEffect(() => {
+    if (!hasNextPage || isLoading) return;
+    const next = page + 1;
+    const query = buildQuery({
+      page: next,
+      status: statusFilter,
+      game: gameFilter,
+      asset: assetFilter,
+      q: debouncedSearch,
+      sort: sortBy,
+      difficulty: difficultyFilter,
     });
+    if (prefetchCache.current.has(query)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/competitions?${query}`);
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as BrowseCompetitionsResult;
+        if (!cancelled) prefetchCache.current.set(query, data);
+      } catch {
+        // prefetch is best-effort
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    page,
+    hasNextPage,
+    isLoading,
+    statusFilter,
+    gameFilter,
+    assetFilter,
+    debouncedSearch,
+    sortBy,
+    difficultyFilter,
+  ]);
 
-    return result;
-  };
+  // Refetch when filters / debounced search / page change (skip first hydrate with SSR data)
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (skipNextFetch.current) {
+      skipNextFetch.current = false;
+      // Reason: localStorage may restore filters that diverge from the SSR seed.
+      const diverged =
+        statusFilter !== "active,upcoming" ||
+        gameFilter !== "all" ||
+        sortBy !== "featured" ||
+        Boolean(assetFilter) ||
+        Boolean(difficultyFilter) ||
+        Boolean(debouncedSearch.trim());
+      if (!diverged) return;
+    }
+    prefetchCache.current.clear();
+    void fetchPage(page, { showSkeleton: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isHydrated,
+    page,
+    statusFilter,
+    gameFilter,
+    assetFilter,
+    debouncedSearch,
+    sortBy,
+    difficultyFilter,
+  ]);
 
-  // Separate upcoming competitions (always shown first)
-  const upcomingCompetitions = useMemo(() => {
-    if (!statusFilter.includes('upcoming')) return [];
-    return applyFilters(competitions.filter(c => c.status === 'upcoming'));
-  }, [competitions, searchQuery, rankingFilter, assetFilter, sortBy, statusFilter]);
+  // Live: re-read the current page when a competition is created, published,
+  // starts, ends, is cancelled or gains a player. Reason: the old soft poll
+  // returned without rescheduling once the tab was hidden, so the list froze
+  // for good after the player switched tabs. The hook re-reads on return to
+  // the tab and keeps a slow safety-net poll.
+  const refreshLive = useCallback(() => {
+    prefetchCache.current.clear();
+    void fetchPage(page, { showSkeleton: false });
+  }, [fetchPage, page]);
+  useLiveTopic("competitions", refreshLive, {
+    fallbackMs: 30_000,
+    enabled: isHydrated,
+  });
 
-  // Other filtered competitions (active, completed, cancelled)
-  const otherCompetitions = useMemo(() => {
-    const otherStatuses = statusFilter.filter(s => s !== 'upcoming');
-    if (otherStatuses.length === 0) return [];
-    return applyFilters(competitions.filter(c => otherStatuses.includes(c.status)));
-  }, [competitions, searchQuery, statusFilter, rankingFilter, assetFilter, sortBy]);
-
-  // Total count for display
-  const totalFilteredCount = upcomingCompetitions.length + otherCompetitions.length;
-
-  // Stats
-  const activeCount = competitions.filter(c => c.status === 'active').length;
-  const upcomingCount = competitions.filter(c => c.status === 'upcoming').length;
-  const totalPrizePool = competitions
-    .filter(c => ['active', 'upcoming'].includes(c.status))
-    .reduce((sum, c) => sum + (c.prizePool || c.prizePoolCredits || 0), 0);
+  const resetToPage1 = useCallback(() => {
+    setPage(1);
+  }, []);
 
   const clearFilters = () => {
-    setSearchQuery('');
-    setStatusFilter(['active', 'upcoming']);
-    setRankingFilter([]);
-    setAssetFilter([]);
+    setSearchQuery("");
+    setStatusFilter("active,upcoming");
+    setAssetFilter("");
+    setDifficultyFilter("");
+    setGameFilter("all");
+    setSortBy("featured");
+    resetToPage1();
   };
 
-  const hasActiveFilters = searchQuery || rankingFilter.length > 0 || assetFilter.length > 0 || 
-    statusFilter.length !== 2 || !statusFilter.includes('active') || !statusFilter.includes('upcoming');
+  const hasActiveFilters = Boolean(
+    searchQuery ||
+      assetFilter ||
+      difficultyFilter ||
+      (gameFilter && gameFilter !== "all") ||
+      statusFilter !== "active,upcoming" ||
+      sortBy !== "featured",
+  );
 
-  const RANKING_LABELS: Record<string, string> = {
-    pnl: '💰 Profit & Loss',
-    roi: '📈 ROI',
-    total_capital: '💎 Total Capital',
-    win_rate: '🎯 Win Rate',
-    total_wins: '🏆 Total Wins',
-    profit_factor: '⚡ Profit Factor',
+  const showAssets =
+    gameFilter === "trading" || gameFilter === "all";
+
+  const queryForPage = useCallback(
+    (p: number) =>
+      buildQuery({
+        page: p,
+        status: statusFilter,
+        game: gameFilter,
+        asset: assetFilter,
+        q: debouncedSearch,
+        sort: sortBy,
+        difficulty: difficultyFilter,
+      }),
+    [statusFilter, gameFilter, assetFilter, debouncedSearch, sortBy, difficultyFilter],
+  );
+
+  const mobilePages = useMobileArenaPages({
+    baseItems: items,
+    page,
+    totalPages,
+    resetKey: queryForPage(page),
+    queryForPage,
+  });
+
+  const mobileUserInCompetitions = useMemo(
+    () => new Set([...userInCompetitions, ...mobilePages.extraRegisteredIds]),
+    [userInCompetitions, mobilePages.extraRegisteredIds],
+  );
+
+  const resetting = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setPage(1);
+  };
+
+  // Reason: one set of filter handlers for both layouts, so a filter change on
+  // the phone resets exactly what it resets on desktop.
+  const filterProps = {
+    userBalance,
+    creditSymbol: settings?.credits?.symbol,
+    levelLadder,
+    platformLeverage,
+    selectedGameId: gameFilter,
+    searchQuery,
+    onSearchChange: resetting(setSearchQuery),
+    statusValue: statusFilter,
+    onStatusChange: resetting(setStatusFilter),
+    gameValue: gameFilter,
+    onGameChange: resetting(setGameFilter),
+    assetValue: assetFilter,
+    onAssetChange: resetting(setAssetFilter),
+    showAssets,
+    assetOptions: availableAssets.map((a) => ({ value: a, label: a.toUpperCase() })),
+    difficultyValue: difficultyFilter,
+    onDifficultyChange: resetting((v) => setDifficultyFilter(v as DifficultyLevel | "")),
+    sortValue: sortBy,
+    onSortChange: resetting(setSortBy),
+    hasActiveFilters,
+    onClear: clearFilters,
+    liveNow: kpis.liveNow,
+    startingSoon: kpis.startingSoon,
+    totalPrizePool: kpis.totalPrizePool,
+    isLoading,
+    isRefreshing,
+    onRefresh: () => fetchPage(page, { spinner: true }),
   };
 
   return (
-    <div className="flex min-h-screen flex-col gap-6 p-4 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-yellow-500/30 rounded-full blur-xl animate-pulse"></div>
-            <div className="relative rounded-full bg-gradient-to-br from-yellow-500 to-amber-600 p-4 shadow-xl shadow-yellow-500/30">
-              <Trophy className="h-8 w-8 text-yellow-900" />
-            </div>
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-gray-100 flex items-center gap-2">
-              Trading Arena
-              <Sparkles className="h-6 w-6 text-yellow-500" />
-            </h1>
-            <p className="text-sm text-gray-400">
-              Compete with traders worldwide • Win massive prizes
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          <UTCClock />
-          <WalletBalanceDisplay balance={userBalance} />
-          <Link href="/wallet">
-            <Button className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-gray-900 font-bold h-[72px] px-6 rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 hover:scale-105 transition-all">
-              <Zap className="mr-2 h-5 w-5" />
-              Add Credits
-            </Button>
-          </Link>
-          
-          {/* Live Status Indicator */}
-          <LiveStatusIndicator onRefresh={async () => refreshData(false)} />
-        </div>
+    <>
+      <div className="md:hidden">
+        <MobileCompetitionsArena
+          {...filterProps}
+          competitions={mobilePages.items}
+          userInCompetitions={mobileUserInCompetitions}
+          totalItems={totalItems}
+          hasMore={mobilePages.hasMore}
+          isLoadingMore={mobilePages.isLoadingMore}
+          loadMoreError={mobilePages.loadMoreError}
+          onLoadMore={mobilePages.loadMore}
+          loadError={loadError}
+        />
       </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600/20 via-blue-500/10 to-transparent border border-blue-500/30 p-6 group hover:border-blue-500/50 transition-colors">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform"></div>
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
-                <Flame className="h-3 w-3" />
-                Live Now
-              </p>
-              <p className="mt-2 text-4xl font-black text-gray-100">{activeCount}</p>
-              <p className="text-xs text-gray-500">Active competitions</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <TrendingUp className="h-7 w-7 text-blue-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-600/20 via-yellow-500/10 to-transparent border border-yellow-500/30 p-6 group hover:border-yellow-500/50 transition-colors">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform"></div>
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                Starting Soon
-              </p>
-              <p className="mt-2 text-4xl font-black text-gray-100">{upcomingCount}</p>
-              <p className="text-xs text-gray-500">Reserve your spot</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-              <Clock className="h-7 w-7 text-yellow-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-600/20 via-green-500/10 to-transparent border border-green-500/30 p-6 group hover:border-green-500/50 transition-colors">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 rounded-full blur-3xl group-hover:scale-150 transition-transform"></div>
-          <div className="relative flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
-                <Crown className="h-3 w-3" />
-                Prize Pool
-              </p>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400">
-                  {totalPrizePool.toFixed(0)}
-                </span>
-                <Zap className="h-5 w-5 text-green-400" />
-              </div>
-              <p className="text-xs text-gray-500">Available to win</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <Trophy className="h-7 w-7 text-green-400" />
-            </div>
-          </div>
-        </div>
+      <div className="hidden md:block">
+        <CompetitionsArena
+          {...filterProps}
+          competitions={items}
+          userInCompetitions={userInCompetitions}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          totalPages={totalPages}
+          hasNextPage={hasNextPage}
+          hasPreviousPage={hasPreviousPage}
+          onPageChange={setPage}
+        />
       </div>
-
-      {/* Filter Bar */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-gray-800/50 border border-gray-700/50 rounded-2xl p-4">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search competitions..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-gray-900/50 border-gray-700 text-gray-100 rounded-xl"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Status Filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl">
-                <Filter className="h-4 w-4 mr-2" />
-                Status
-                {statusFilter.length > 0 && statusFilter.length < 4 && (
-                  <Badge className="ml-2 bg-yellow-500/20 text-yellow-400 text-[10px]">{statusFilter.length}</Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-gray-800 border-gray-700">
-              <DropdownMenuLabel className="text-gray-400">Competition Status</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-gray-700" />
-              {['active', 'upcoming', 'completed', 'cancelled'].map((status) => (
-                <DropdownMenuCheckboxItem
-                  key={status}
-                  checked={statusFilter.includes(status)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setStatusFilter([...statusFilter, status]);
-                    } else {
-                      setStatusFilter(statusFilter.filter(s => s !== status));
-                    }
-                  }}
-                  className="text-gray-300"
-                >
-                  {status === 'active' && '🔴 Live'}
-                  {status === 'upcoming' && '🟡 Upcoming'}
-                  {status === 'completed' && '🟢 Completed'}
-                  {status === 'cancelled' && '⚫ Cancelled'}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Ranking Filter */}
-          {availableRankingMethods.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl">
-                  <Target className="h-4 w-4 mr-2" />
-                  Type
-                  {rankingFilter.length > 0 && (
-                    <Badge className="ml-2 bg-blue-500/20 text-blue-400 text-[10px]">{rankingFilter.length}</Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-gray-800 border-gray-700">
-                <DropdownMenuLabel className="text-gray-400">Competition Type</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-gray-700" />
-                {availableRankingMethods.map((method) => (
-                  <DropdownMenuCheckboxItem
-                    key={method}
-                    checked={rankingFilter.includes(method)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setRankingFilter([...rankingFilter, method]);
-                      } else {
-                        setRankingFilter(rankingFilter.filter(m => m !== method));
-                      }
-                    }}
-                    className="text-gray-300"
-                  >
-                    {RANKING_LABELS[method] || method}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {/* Asset Filter */}
-          {availableAssets.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl">
-                  <SlidersHorizontal className="h-4 w-4 mr-2" />
-                  Assets
-                  {assetFilter.length > 0 && (
-                    <Badge className="ml-2 bg-purple-500/20 text-purple-400 text-[10px]">{assetFilter.length}</Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="bg-gray-800 border-gray-700">
-                <DropdownMenuLabel className="text-gray-400">Asset Classes</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-gray-700" />
-                {availableAssets.map((asset) => (
-                  <DropdownMenuCheckboxItem
-                    key={asset}
-                    checked={assetFilter.includes(asset)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setAssetFilter([...assetFilter, asset]);
-                      } else {
-                        setAssetFilter(assetFilter.filter(a => a !== asset));
-                      }
-                    }}
-                    className="text-gray-300"
-                  >
-                    {asset === 'forex' && '💱 Forex'}
-                    {asset === 'crypto' && '₿ Crypto'}
-                    {asset === 'stocks' && '📊 Stocks'}
-                    {asset === 'indices' && '📈 Indices'}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-
-          {/* Sort */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="bg-gray-900/50 border-gray-700 text-gray-300 rounded-xl">
-                <ChevronDown className="h-4 w-4 mr-2" />
-                Sort
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-gray-800 border-gray-700">
-              <DropdownMenuLabel className="text-gray-400">Sort By</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-gray-700" />
-              {[
-                { value: 'prize', label: '🏆 Prize Pool (High to Low)' },
-                { value: 'start', label: '⏰ Start Time (Soonest)' },
-                { value: 'participants', label: '👥 Participants (Most)' },
-                { value: 'entry', label: '💰 Entry Fee (Lowest)' },
-              ].map((option) => (
-                <DropdownMenuCheckboxItem
-                  key={option.value}
-                  checked={sortBy === option.value}
-                  onCheckedChange={() => setSortBy(option.value as any)}
-                  className="text-gray-300"
-                >
-                  {option.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              onClick={clearFilters}
-              className="text-gray-400 hover:text-gray-200"
-            >
-              <X className="h-4 w-4 mr-1" />
-              Clear
-            </Button>
-          )}
-
-          {/* View Toggle */}
-          <div className="flex items-center bg-gray-900/50 rounded-xl border border-gray-700 p-1">
-            <button
-              onClick={() => setViewMode('card')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'card'
-                  ? 'bg-yellow-500 text-gray-900'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-yellow-500 text-gray-900'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Results Count */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">
-          Showing <span className="font-bold text-gray-200">{totalFilteredCount}</span> competitions
-        </p>
-      </div>
-
-      {/* Upcoming Competitions - Always First */}
-      {upcomingCompetitions.length > 0 && (
-        <section>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/30">
-              <Clock className="h-5 w-5 text-yellow-500" />
-              <h2 className="text-xl font-bold text-gray-100">Starting Soon</h2>
-              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
-                {upcomingCompetitions.length}
-              </Badge>
-            </div>
-          </div>
-
-          <div className={viewMode === 'card' 
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-            : 'flex flex-col gap-3'
-          }>
-            {upcomingCompetitions.map((competition) => (
-              <CompetitionCard
-                key={competition._id}
-                competition={competition}
-                userBalance={userBalance}
-                isCompleted={false}
-                isUserIn={userInCompetitions.has(competition._id)}
-                viewMode={viewMode}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Other Competitions (Active, Completed, Cancelled) */}
-      {otherCompetitions.length > 0 && (
-        <section>
-          {upcomingCompetitions.length > 0 && (
-            <div className="flex items-center gap-3 mb-4 mt-8">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-500/20 to-cyan-500/10 border border-blue-500/30">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
-                <h2 className="text-xl font-bold text-gray-100">
-                  {statusFilter.includes('active') && statusFilter.includes('completed') 
-                    ? 'All Competitions' 
-                    : statusFilter.includes('active') 
-                    ? 'Live Competitions'
-                    : statusFilter.includes('completed')
-                    ? 'Completed'
-                    : 'Other Competitions'}
-                </h2>
-                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                  {otherCompetitions.length}
-                </Badge>
-              </div>
-            </div>
-          )}
-
-          <div className={viewMode === 'card' 
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-            : 'flex flex-col gap-3'
-          }>
-            {otherCompetitions.map((competition) => (
-              <CompetitionCard
-                key={competition._id}
-                competition={competition}
-                userBalance={userBalance}
-                isCompleted={competition.status === 'completed'}
-                isUserIn={userInCompetitions.has(competition._id)}
-                viewMode={viewMode}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Empty State */}
-      {totalFilteredCount === 0 && (
-        <div className="py-20 text-center">
-          <div className="mx-auto w-24 h-24 bg-gray-800/50 rounded-full flex items-center justify-center mb-6 border border-gray-700">
-            <Trophy className="h-12 w-12 text-gray-600" />
-          </div>
-          <h3 className="text-2xl font-bold text-gray-300 mb-2">
-            No Competitions Found
-          </h3>
-          <p className="text-gray-500 mb-6">
-            {hasActiveFilters 
-              ? 'Try adjusting your filters to see more competitions'
-              : 'Check back soon for new trading competitions!'}
-          </p>
-          {hasActiveFilters && (
-            <Button onClick={clearFilters} variant="outline" className="border-gray-600 text-gray-300">
-              Clear Filters
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
-

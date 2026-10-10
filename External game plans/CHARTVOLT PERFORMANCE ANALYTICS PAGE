@@ -1,0 +1,1277 @@
+TASK: REBUILD CHARTVOLT PERFORMANCE ANALYTICS PAGE TO MATCH THE REFERENCE IMAGE
+
+IMPORTANT:
+The attached reference image is the target layout.
+
+DO NOT:
+- create a different dashboard
+- simplify away sections
+- move sections into a different order
+- use generic admin-dashboard styling
+- stack every game vertically
+- use random icons
+- replace the neon ChartVolt visual language
+- hardcode the values shown in the reference
+
+USE:
+- the existing ChartVolt backend/data
+- current analytics calculations
+- current game performance data
+- current trading data
+- current competition data
+- current 1v1 data
+- the ChartVolt transparent PNG icons/assets already provided
+
+The reference image is a VISUAL SPECIFICATION.
+
+==================================================
+1. PAGE STRUCTURE — EXACT ORDER
+==================================================
+
+Build the desktop page in this exact order:
+
+1. Main navigation
+2. Performance Analytics hero/header
+3. Performance Highlights
+4. Game Performance carousel
+5. Performance Trend chart
+6. Trading Performance
+7. Bottom row:
+   - 1v1 Challenge Performance
+   - Competition Performance
+   - Market Holidays
+
+Do NOT change this hierarchy.
+
+==================================================
+2. MAIN PAGE WIDTH
+==================================================
+
+The analytics content must occupy the main app content area.
+
+Recommended:
+
+max-width: 100%
+width: 100%
+
+Desktop page padding:
+16px to 24px
+
+Section gap:
+10px to 14px
+
+The design is intentionally COMPACT.
+
+Do not create huge vertical spaces between sections.
+
+==================================================
+3. PAGE BACKGROUND
+==================================================
+
+Use the existing ChartVolt image for background.
+
+
+
+ use a bright full-page background image.
+
+The DATA must remain the focus.
+
+==================================================
+4. HERO / PAGE HEADER
+==================================================
+
+Top-left:
+
+[analytics icon]
+
+Performance Analytics
+
+Subtitle:
+
+Track your gaming performance, compare stats, and improve across all ChartVolt experiences.
+
+"Performance" = white
+"Analytics" = purple/magenta gradient
+
+Right side:
+
+DATE RANGE
+[ Last 30 Days ▼ ]
+
+FILTER
+[ All Games ▼ ]
+
+The two filters must be compact dark-glass controls.
+
+Recommended height:
+44–48px
+
+Do not make them oversized.
+
+==================================================
+5. PERFORMANCE HIGHLIGHTS
+==================================================
+
+Immediately below the hero.
+
+Section title:
+
+Performance Highlights
+
+Subtitle:
+
+Key metrics across all games and competitions
+
+Right:
+
+View All Games →
+
+Then create ONE horizontal row of 8 cards:
+
+1. Win Rate
+2. Avg ROI
+3. Avg Play Time
+4. Active Days
+5. Best Score
+6. Competitions Won
+7. 1v1 Wins
+8. Consistency
+
+Every card must have:
+
+- same height
+- same padding
+- same alignment
+- same border radius
+- same card background
+- one colored circular visual/icon
+- metric title
+- large value
+- change percentage
+
+Example structure:
+
+[ circular icon ]
+Win Rate
+68%
+↑ +12%
+
+Do not create eight visually unrelated card types.
+
+==================================================
+6. PERFORMANCE HIGHLIGHT COLORS
+==================================================
+
+Use controlled accent colors:
+
+Win Rate:
+cyan / mint
+
+Avg ROI:
+pink / red
+
+Avg Play Time:
+purple
+
+Active Days:
+blue
+
+Best Score:
+gold
+
+Competitions Won:
+magenta
+
+1v1 Wins:
+cyan / teal
+
+Consistency:
+blue-violet
+
+These colors should also be reflected in the supplied ChartVolt icons.
+
+Glow should be subtle.
+
+==================================================
+7. GAME PERFORMANCE SECTION
+==================================================
+
+Next section:
+
+Game Performance
+
+Subtitle:
+
+Compare your performance across different ChartVolt game modes.
+
+Right side:
+
+View All Games →
+
+IMPORTANT:
+This must be a CAROUSEL.
+
+Do NOT show every game vertically.
+
+Desktop:
+show 3 cards at once.
+
+Left arrow outside/alongside card row.
+
+Right arrow outside/alongside card row.
+
+Example:
+
+[ < ] [ Volt Stack ] [ Volt Velocity ] [ Circuit Sprint ] [ > ]
+
+As future games are added, users navigate horizontally.
+
+This is essential.
+
+==================================================
+8. GAME CARDS
+==================================================
+
+Each game card must have a DIFFERENT accent color but identical structure.
+
+Volt Stack:
+cyan
+
+Volt Velocity:
+magenta/purple
+
+Circuit Sprint:
+orange/gold
+
+Future games:
+assign one accent theme from approved ChartVolt colors.
+
+Each card includes:
+
+TOP:
+
+[ Game Icon ]
+Game Name
+small status chip: Active
+
+right:
+View Details →
+
+subtitle/tagline
+
+BOTTOM METRICS:
+
+Rounds
+Score
+Avg Duration
+Competitions
+
+And on the right side:
+small sparkline trend chart
+
+Example:
+
+VOLT STACK
+Build. Stack. Profit.
+
+Rounds        Score        Avg Duration       Competitions
+8             1,240        5m 28s             3
+
+sparkline →
+
+The cards should look like premium game-selection cards, not basic statistic boxes.
+
+==================================================
+9. GAME CARD DIMENSIONS
+==================================================
+
+All cards must be:
+
+same height
+same internal spacing
+same metric alignment
+
+Use approximately:
+
+border-radius:
+14–18px
+
+background:
+dark navy glass
+
+border:
+1px solid card accent color at low opacity
+
+Top/right light edge:
+subtle accent glow
+
+Do not overdo bloom.
+
+==================================================
+10. CAROUSEL ARROWS
+==================================================
+
+Use the supplied neon arrow style.
+
+Left arrow:
+cyan
+
+Right arrow:
+gold/orange
+
+Large enough to clearly communicate navigation.
+
+Desktop:
+roughly 48–56px wide.
+
+Hover:
+slightly stronger glow.
+
+Pressed:
+slight scale reduction.
+
+==================================================
+11. PERFORMANCE TREND SECTION
+==================================================
+
+Place immediately below Game Performance.
+
+This is the MAIN chart.
+
+Title:
+
+Performance Trend
+
+Subtitle:
+
+Overall performance across all ChartVolt games, 1v1 challenges, competitions and trading.
+
+IMPORTANT:
+This graph is GLOBAL.
+
+It is NOT just game performance.
+
+It must combine:
+
+- Overall Score
+- Trading P&L / trading performance
+- Game Performance
+- Competitions
+- 1v1 Challenges
+
+==================================================
+12. PERFORMANCE TREND CONTROLS
+==================================================
+
+Top-right of chart area:
+
+Legend / toggle chips:
+
+Overall Score
+Trading P&L
+Game Performance
+Competitions
+1v1 Challenges
+
+Then:
+
+metric dropdown:
+[ Score ▼ ]
+
+Then:
+
+7D
+30D
+90D
+All
+
+30D selected by default in reference.
+
+All controls must be aligned on one clean horizontal toolbar.
+
+==================================================
+13. PERFORMANCE TREND CHART
+==================================================
+
+Use a multi-line chart.
+
+Suggested ChartVolt colors:
+
+Overall:
+electric cyan
+
+Trading:
+purple
+
+Games:
+gold/orange
+
+Competitions:
+magenta
+
+1v1:
+teal
+
+Chart styling:
+
+- dark background
+- subtle blue grid
+- thin axes
+- smooth lines
+- glowing data points
+- very light area glow only if needed
+- no huge gradients covering the chart
+
+Hover tooltip:
+
+Date
+Overall Score
+Trading P&L
+Game Performance
+Competitions
+1v1 Challenges
+
+Tooltip should be dark glass with cyan border.
+
+==================================================
+14. CHART MUST BE READABLE
+==================================================
+
+Do NOT:
+
+- use tiny axis labels
+- use very faint lines
+- use an oversized graph that pushes other content down
+- make all five series the same color
+
+Recommended chart height:
+220–280px on desktop.
+
+==================================================
+15. TRADING PERFORMANCE SECTION
+==================================================
+
+Below Performance Trend.
+
+Title:
+
+Trading Performance
+
+Subtitle:
+
+Your trading performance and analytics.
+
+Right side:
+
+7D
+30D
+90D
+All
+
+Then ONE horizontal row of equal cards:
+
+1. Win Rate
+2. Net ROI
+3. Trade ROI
+4. Profit Factor
+5. Avg Win
+6. Avg Loss
+7. Best Trade
+8. Worst Trade
+
+Keep this section compact.
+
+==================================================
+16. TRADING METRIC CARDS
+==================================================
+
+Each card contains:
+
+small circular gauge or visual
+large value
+label
+
+Example:
+
+[ circular gauge ]
+-65.4%
+Net ROI
+
+Use meaningful colors:
+
+positive:
+green / cyan
+
+negative:
+red / pink
+
+neutral:
+blue / gray
+
+Best trade:
+gold
+
+Worst trade:
+orange/red
+
+Do not use meaningless random colors.
+
+==================================================
+17. DO NOT REINTRODUCE OLD TRADING PANELS
+==================================================
+
+DO NOT add:
+
+Top Symbols
+
+Trading Performance by Hour
+
+They were intentionally removed.
+
+Trading performance should remain the compact metric row shown in the reference.
+
+==================================================
+18. BOTTOM ROW
+==================================================
+
+Use a 3-column desktop grid:
+
+LEFT:
+1v1 Challenge Performance
+
+CENTER:
+Competition Performance
+
+RIGHT:
+Market Holidays
+
+Approximate proportion:
+
+1fr
+1fr
+0.9fr
+
+Keep all three aligned vertically.
+
+==================================================
+19. 1V1 CHALLENGE PERFORMANCE
+==================================================
+
+Header:
+
+[ crossed swords icon ]
+
+1v1 Challenge Performance
+
+Subtitle:
+
+Your head-to-head challenge statistics.
+
+Right:
+[ All 1v1 Challenges ▼ ]
+
+Top metrics:
+
+1v1 Wins
+Total Challenges
+Win Rate
+Best 1v1 Score
+
+Then progress bars:
+
+Win Rate
+Average Profit
+Average Score
+
+Use teal/cyan/green/orange ChartVolt colors.
+
+==================================================
+20. COMPETITION PERFORMANCE
+==================================================
+
+This card MUST MATCH the 1v1 card.
+
+Same:
+
+- height
+- header structure
+- padding
+- metric box dimensions
+- progress bar structure
+- typography
+- dropdown placement
+
+Metrics:
+
+Competitions Won
+Total Participations
+Placement Rate
+Best Competition Score
+
+Progress bars:
+
+Win Rate
+Top 3 Rate
+Average Score
+
+Competition accent:
+gold / blue / purple.
+
+==================================================
+21. IMPORTANT ALIGNMENT RULE
+==================================================
+
+1v1 Challenge Performance
+AND
+Competition Performance
+
+MUST look like sibling components.
+
+Do not create different layouts for them.
+
+Implement one reusable component such as:
+
+<PerformanceSummaryPanel />
+
+with different data and colors.
+
+==================================================
+22. MARKET HOLIDAYS
+==================================================
+
+Header:
+
+Market Holidays
+
+Subtitle:
+
+Upcoming market holidays that may affect game schedules.
+
+Right:
+View Calendar →
+
+Rows contain:
+
+date tile
+holiday name
+market / country
+time remaining
+chevron
+
+Example:
+
+MAY
+27
+
+Memorial Day
+🇺🇸 US Markets
+In 26 days
+>
+
+Use magenta/pink accent.
+
+Rows should be compact.
+
+Do not turn this into a giant calendar.
+
+==================================================
+23. ICON STYLE
+==================================================
+
+Use the supplied ChartVolt glossy/neon icon family.
+
+Examples already supplied:
+
+- trophy
+- wallet
+- star
+- gift
+- performance arrows
+- chart
+- calendar
+- lightning
+- clock
+- analytics bars
+- target
+- crossed swords
+
+Style characteristics:
+
+- glossy glass
+- dark colored inner plate
+- bright neon border
+- soft outer glow
+- rounded-square or circular base
+- high-resolution PNG
+- transparent outer background
+
+Do NOT use:
+
+basic Lucide icons as the main graphical elements.
+
+Lucide may be used for tiny utility controls only.
+
+==================================================
+24. ICON SIZING
+==================================================
+
+Page title icon:
+40–48px
+
+Section icon:
+24–32px
+
+Metric graphic:
+42–54px
+
+Small stat icon:
+18–26px
+
+Do not randomly scale icons.
+
+==================================================
+25. REUSABLE COMPONENTS
+==================================================
+
+Build proper reusable components.
+
+Suggested structure:
+
+PerformanceAnalyticsPage
+
+PerformanceHeader
+GlobalAnalyticsFilters
+
+PerformanceHighlights
+HighlightMetricCard
+
+GamePerformanceSection
+GameCarousel
+GamePerformanceCard
+CarouselArrow
+
+PerformanceTrendSection
+PerformanceTrendChart
+ChartLegendToggle
+PeriodSelector
+MetricSelector
+
+TradingPerformanceSection
+TradingMetricCard
+
+PerformanceBottomGrid
+ChallengePerformanceCard
+CompetitionPerformanceCard
+MarketHolidaysCard
+
+==================================================
+26. DATA STRUCTURE
+==================================================
+
+Game cards should be data driven.
+
+Example:
+
+const games = [
+ {
+   id,
+   name,
+   icon,
+   accent,
+   tagline,
+   rounds,
+   score,
+   avgDuration,
+   competitions,
+   sparkline
+ }
+]
+
+Do not manually create:
+
+<Game1 />
+<Game2 />
+<Game3 />
+
+The component must automatically support future games.
+
+==================================================
+27. GAME SCALABILITY
+==================================================
+
+This is CRITICAL.
+
+When there are:
+
+3 games
+5 games
+10 games
+20 games
+
+the page height should NOT keep increasing.
+
+The Game Performance carousel handles scale.
+
+Desktop:
+3 visible.
+
+Tablet:
+2 visible.
+
+Mobile:
+1 visible.
+
+Use:
+
+CSS grid/flex + transform
+
+or
+
+Embla / Swiper if already available.
+
+Do not introduce a heavy dependency unnecessarily.
+
+==================================================
+28. GLOBAL FILTERS
+==================================================
+
+Date Range and All Games filter at the top must control:
+
+Performance Highlights
+Game Performance
+Performance Trend
+Trading Performance
+1v1 Performance
+Competition Performance
+
+Market Holidays can remain calendar-based.
+
+Do not create unrelated date states in each section unless required.
+
+==================================================
+29. VISUAL LANGUAGE
+==================================================
+
+Reference styling:
+
+BACKGROUND:
+#020817
+#041025
+#07172c
+
+CYAN:
+#00d9ff
+
+BLUE:
+#168cff
+
+PURPLE:
+#9d39ff
+
+MAGENTA:
+#ff36ca
+
+GOLD:
+#ffc51b
+
+ORANGE:
+#ff7b17
+
+GREEN:
+#00e6a3
+
+RED:
+#ff4b67
+
+TEXT PRIMARY:
+#f5f8ff
+
+TEXT SECONDARY:
+#8ea4c5
+
+==================================================
+30. CARD BACKGROUND
+==================================================
+
+Main cards should use something close to:
+
+background:
+linear-gradient(
+  135deg,
+  rgba(6,20,45,.97),
+  rgba(3,12,30,.96)
+);
+
+border:
+1px solid rgba(0,185,255,.35);
+
+box-shadow:
+inset 0 1px 0 rgba(255,255,255,.03);
+
+Avoid strong permanent shadows everywhere.
+
+==================================================
+31. SECTION HEADER
+==================================================
+
+Every section should follow one format:
+
+[ icon ] Section Title                 right controls
+         short subtitle
+
+This consistency is very important.
+
+==================================================
+32. TYPOGRAPHY
+==================================================
+
+Page title:
+30–34px
+
+Section title:
+17–20px
+
+Metric:
+17–22px
+
+Metric labels:
+11–13px
+
+Descriptions:
+12–14px
+
+Charts:
+11–12px
+
+Avoid microscopic labels like the old page.
+
+==================================================
+33. SPACING SYSTEM
+==================================================
+
+Use 8px base spacing.
+
+Examples:
+
+section gap:
+12–16px
+
+card gap:
+8–12px
+
+card padding:
+12–16px
+
+section padding:
+10–14px
+
+Do not create arbitrary spacing.
+
+==================================================
+34. RESPONSIVE TABLET
+==================================================
+
+At approximately 768–1100px:
+
+Highlights:
+4 cards per row or horizontally scrollable
+
+Games:
+2 visible
+
+Bottom:
+1v1 + Competition on same row if possible
+Market Holidays underneath
+
+Chart controls may wrap cleanly.
+
+==================================================
+35. MOBILE VERSION
+==================================================
+
+DO NOT SHRINK THE DESKTOP PAGE.
+
+Build a dedicated responsive arrangement.
+
+Mobile structure:
+
+Header
+
+Performance Highlights
+horizontal snap carousel
+
+Game Performance
+one game card at a time
+
+Performance Trend
+full width
+
+Trading Performance
+horizontal metric carousel or 2-column cards
+
+1v1 Performance
+
+Competition Performance
+
+Market Holidays
+
+No horizontal page overflow.
+
+==================================================
+36. PERFORMANCE HIGHLIGHTS MOBILE
+==================================================
+
+Use horizontal scroll-snap cards.
+
+Example:
+
+[ Win Rate ][ ROI ][ Play Time ] →
+
+Do not stack all 8 vertically.
+
+==================================================
+37. TRADING PERFORMANCE MOBILE
+==================================================
+
+Prefer:
+
+2 columns
+
+or horizontal scroll-snap.
+
+Do not stack eight full-width cards.
+
+==================================================
+38. CHART MOBILE
+==================================================
+
+Chart height:
+240–280px
+
+Allow legend/toggles to horizontally scroll.
+
+Do not compress the chart until it becomes unreadable.
+
+==================================================
+39. ANIMATIONS
+==================================================
+
+Use restrained motion only.
+
+Examples:
+
+card hover:
+translateY(-2px)
+
+arrow hover:
+slight glow increase
+
+chart:
+smooth initial draw
+
+metric:
+small number transition
+
+Do not animate the entire dashboard continuously.
+
+==================================================
+40. INTERACTION STATES
+==================================================
+
+Every clickable component requires:
+
+default
+hover
+pressed
+focus-visible
+disabled where relevant
+
+Do not rely only on glow.
+
+==================================================
+41. ACCESSIBILITY
+==================================================
+
+Charts must have accessible labels.
+
+Carousel arrows:
+
+aria-label="Previous games"
+aria-label="Next games"
+
+Game cards must be keyboard navigable.
+
+Color must not be the ONLY meaning indicator.
+
+==================================================
+42. PERFORMANCE
+==================================================
+
+Do not render enormous image assets at original resolution.
+
+Use optimized versions.
+
+Icon display sizes can remain 24–64px while source PNGs may be retina-ready.
+
+Lazy-load game artwork outside initial viewport if necessary.
+
+==================================================
+43. CHART LIBRARY
+==================================================
+
+Use the project's current chart library if possible.
+
+If using Recharts:
+
+ResponsiveContainer
+LineChart
+CartesianGrid
+XAxis
+YAxis
+Tooltip
+Legend
+Line
+
+Use custom tooltip matching ChartVolt.
+
+Do NOT change chart library just because of the redesign unless necessary.
+
+==================================================
+44. SPARKLINES
+==================================================
+
+Game cards need tiny sparklines.
+
+No axes.
+
+No legend.
+
+Only:
+
+line
+small points
+subtle area glow
+
+They are visual summaries only.
+
+==================================================
+45. EMPTY STATES
+==================================================
+
+Do not show:
+
+0 0 0 0
+
+without explanation if there is no data.
+
+Use proper empty state:
+
+"No activity for this period."
+
+with a small relevant ChartVolt icon.
+
+==================================================
+46. LOADING STATES
+==================================================
+
+Each major section should have a skeleton:
+
+Highlight cards
+Game cards
+Chart
+Trading metrics
+Bottom summaries
+
+Avoid one giant spinner covering the whole page.
+
+==================================================
+47. ERROR STATES
+==================================================
+
+If one section fails:
+
+do not break the entire page.
+
+Show:
+
+"Unable to load performance data."
+
+inside that section.
+
+Provide Retry where appropriate.
+
+==================================================
+48. NUMBER FORMATTING
+==================================================
+
+Use consistent formatting.
+
+Examples:
+
+4320
+→
+4,320
+
+12.4000
+→
+12.4%
+
+2180
+→
+2,180
+
+Currency/Volt values:
+follow ChartVolt's current Volts formatting.
+
+Do not mix formatting conventions.
+
+==================================================
+49. TREND INDICATORS
+==================================================
+
+Positive:
+
+↑ +12%
+
+green
+
+Negative:
+
+↓ -5.2%
+
+red
+
+Neutral:
+
+— 0%
+
+muted gray
+
+Do not show green arrows for negative values.
+
+==================================================
+50. FINAL DESKTOP VISUAL ORDER
+==================================================
+
+The finished desktop page should visually read:
+
+┌─────────────────────────────────────────┐
+│ PERFORMANCE ANALYTICS         FILTERS   │
+├─────────────────────────────────────────┤
+│ PERFORMANCE HIGHLIGHTS                 │
+│ KPI KPI KPI KPI KPI KPI KPI KPI        │
+├─────────────────────────────────────────┤
+│ GAME PERFORMANCE                       │
+│ <  GAME   GAME   GAME  >               │
+├─────────────────────────────────────────┤
+│ PERFORMANCE TREND                      │
+│                                        │
+│              MAIN CHART                │
+│                                        │
+├─────────────────────────────────────────┤
+│ TRADING PERFORMANCE                    │
+│ KPI KPI KPI KPI KPI KPI KPI KPI        │
+├──────────────┬──────────────┬───────────┤
+│ 1V1          │ COMPETITION  │ HOLIDAYS  │
+│ PERFORMANCE  │ PERFORMANCE  │           │
+└──────────────┴──────────────┴───────────┘

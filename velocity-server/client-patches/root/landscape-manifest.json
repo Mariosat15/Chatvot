@@ -1,0 +1,18 @@
+{
+  "sha256": {
+    "LICENSE.txt": "08429b403672f3aa040518fa65d625157cc14c3f063aac9c644790a6906eba6b",
+    "SOURCES.json": "279c1f1d0c1eff69ac872effa6761d1accf104569739972eae9f213ecf781550",
+    "rock_3_diff_4k.webp": "b36ce183264acc9b5bcffd167db129ec5be1f9becaed037ed48959da4726453d",
+    "rock_3_nor_gl_4k.webp": "79be39f629a7e23de0ed0fe1330c67abf8507312f4d2c8c1767e01a4248f3017",
+    "rock_3_rough_4k.webp": "1f261d5a2579f8f8684145a255bc46b7344548166872b6ee19ef926c78953842",
+    "rock_face_diff_4k.webp": "160722597822a44a73ff71a709fcf086383de3bf558c2ccc8f9a7e6f93f7536a",
+    "rock_face_nor_gl_4k.webp": "4ae3fcbfd5f57dbbaabf29386b577df0904ec5ed0984a1d3cf10a92c0fe6bbcf",
+    "rock_face_rough_4k.webp": "523a37842928db3281045b7555949164d48f2154e556bd773261072b17110e81",
+    "rock_3_diff_2k.webp": "c45d004ddc731180161dee77431d3a7c6ab672693deae4acac5c8cd18e3582f3",
+    "rock_3_nor_gl_2k.webp": "94b4564763cd5507bcf0ccebaa9e165725eae529a4513bde0dd5299b30572003",
+    "rock_3_rough_2k.webp": "90498ee22532355a39ce96e74e7097329c421b035548c9ad53cdf6c3678aa12d",
+    "rock_face_diff_2k.webp": "e18db9fc9c757e35391727b3616bf291ee488a4010f6c9ad5e3d834fd21efaf3",
+    "rock_face_nor_gl_2k.webp": "7ccfc49ddbc1f2793c9e0242d417f5d4b5dc6fb0a03a6edea26cebac19b8de17",
+    "rock_face_rough_2k.webp": "79722ab9df8d13779c324e0f8d11e3987cdcefc3c4360d3fdf8552cb6c92b230"
+  }
+}

@@ -1,0 +1,435 @@
+/**
+ * Maps a competition document + viewer state into one presentation object
+ * consumed by both grid cards and list rows.
+ */
+
+import { formatVolts } from "@/lib/utils/format-volts";
+import {
+  isSponsoredContest,
+  sponsoredContestCopy,
+} from "@/lib/utils/sponsored-contest-copy";
+import { COMPETITION_ICON, resolveGameDefinition } from "./game-definitions";
+import { resolveCompetitionArtwork } from "./game-artwork";
+import { getCompetitionCTA } from "./competition-cta";
+import type {
+  CompetitionListItem,
+  CompetitionMetric,
+  CompetitionPresentation,
+  CompetitionStatusKey,
+  CompetitionTag,
+} from "./types";
+import type { MetricKey } from "./game-definitions";
+import type { TitleLevel } from "@/lib/constants/levels";
+import { resolveLevelName } from "@/lib/utils/level-title";
+
+function formatDuration(start: string | Date, end: string | Date): string {
+  const ms = new Date(end).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const totalMin = Math.round(ms / 60_000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours < 24) return mins ? `${hours}h ${mins}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remH = hours % 24;
+  return remH ? `${days}d ${remH}h` : `${days}d`;
+}
+
+function formatCountdown(start: string | Date, now = Date.now()): string | undefined {
+  const t = new Date(start).getTime() - now;
+  if (!Number.isFinite(t) || t <= 0) return undefined;
+  const totalMin = Math.floor(t / 60_000);
+  if (totalMin < 60) return `Starts in ${Math.max(1, totalMin)}m`;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours < 48) return `Starts in ${hours}h ${mins}m`;
+  const days = Math.floor(hours / 24);
+  return `Starts in ${days}d`;
+}
+
+function settingsString(
+  settings: Record<string, unknown> | undefined,
+  keys: string[],
+): string | undefined {
+  if (!settings) return undefined;
+  // Reason: Map lookup — object indexing trips security/detect-object-injection.
+  const map = new Map(Object.entries(settings));
+  for (const k of keys) {
+    const v = map.get(k);
+    if (v == null || v === "") continue;
+    if (typeof v === "number" && Number.isFinite(v)) return String(v);
+    if (typeof v === "string" && v.trim()) return humanize(v);
+    if (typeof v === "boolean") return v ? "Yes" : "No";
+  }
+  return undefined;
+}
+
+/** "best_of_n" / "neon-loop" / "medium" → "Best Of N" / "Neon Loop" / "Medium". */
+function humanize(raw: string): string {
+  return raw
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function attemptsLabel(c: CompetitionListItem): string | undefined {
+  const n = Number(c.attemptsAllowed ?? 0);
+  if (c.attemptsPolicy === "single") return "1 Attempt";
+  if (c.attemptsPolicy === "best_of_n") return n > 1 ? `Best of ${n}` : "Best Of";
+  if (c.attemptsPolicy === "sum_of_n") return n > 1 ? `Sum of ${n}` : "Sum Of";
+  return undefined;
+}
+
+/** `provider:<providerKey>:<gameCode>` → gameCode. */
+function gameCodeOf(c: CompetitionListItem): string | undefined {
+  if (c.gameCode) return c.gameCode;
+  const parts = String(c.gameKey || "").split(":");
+  return parts.length >= 3 ? parts.slice(2).join(":") : undefined;
+}
+
+function resolveStatus(
+  c: CompetitionListItem,
+  isFull: boolean,
+): { status: CompetitionStatusKey; label: string } {
+  if (c.status === "cancelled") {
+    const refunded =
+      c.refunded === true || /refund/i.test(String(c.cancellationReason || ""));
+    return refunded
+      ? { status: "refunded", label: "REFUNDED" }
+      : { status: "cancelled", label: "CANCELLED" };
+  }
+  if (c.status === "completed") {
+    return { status: "completed", label: "COMPLETED" };
+  }
+  if (c.isPrivate || (c.privateAccess && c.privateAccess !== "member")) {
+    if (c.status === "active") {
+      return { status: "live", label: "LIVE NOW" };
+    }
+    return { status: "private_gm", label: "PRIVATE • GM ONLY" };
+  }
+  if (c.status === "active") {
+    if (isFull) return { status: "full", label: "FULL" };
+    return { status: "live", label: "LIVE NOW" };
+  }
+  if (c.status === "upcoming") {
+    return { status: "starting_soon", label: "STARTING SOON" };
+  }
+  return { status: "open", label: "OPEN" };
+}
+
+function metricOrNull(
+  key: MetricKey,
+  value: string | undefined,
+  opts?: { subvalue?: string; emphasize?: boolean; icon?: string },
+): CompetitionMetric | null {
+  if (!value || !value.trim() || value === "-" || value === "—") return null;
+  // Reason: Map lookup — object indexing trips security/detect-object-injection.
+  const labels = new Map<MetricKey, string>([
+    ["prizePool", "PRIZE POOL"],
+    ["players", "PLAYERS"],
+    ["duration", "DURATION"],
+    ["assets", "ASSETS"],
+    ["entryFee", "ENTRY FEE"],
+    ["leverage", "LEVERAGE"],
+    ["difficulty", "DIFFICULTY"],
+    ["startingCapital", "STARTING CAPITAL"],
+    ["track", "TRACK"],
+    ["boardSize", "BOARD SIZE"],
+    ["mode", "MODE"],
+    ["rounds", "ROUNDS"],
+    ["laps", "LAPS"],
+    ["scoreTarget", "SCORE TARGET"],
+    ["scoring", "SCORING"],
+  ]);
+  const iconMap = new Map<MetricKey, string>([
+    ["prizePool", COMPETITION_ICON.trophyGold],
+    ["players", COMPETITION_ICON.players],
+    ["duration", COMPETITION_ICON.clock],
+    ["assets", COMPETITION_ICON.volts],
+    ["entryFee", COMPETITION_ICON.volts],
+    ["leverage", COMPETITION_ICON.bolt],
+    ["difficulty", COMPETITION_ICON.live],
+    ["startingCapital", COMPETITION_ICON.wallet],
+    ["track", COMPETITION_ICON.soon],
+    ["boardSize", COMPETITION_ICON.gamepad],
+    ["mode", COMPETITION_ICON.bolt],
+    ["rounds", COMPETITION_ICON.soon],
+    ["laps", COMPETITION_ICON.bolt],
+    ["scoreTarget", COMPETITION_ICON.prize],
+    ["scoring", COMPETITION_ICON.trophyGold],
+  ]);
+  return {
+    key,
+    icon: opts?.icon || iconMap.get(key) || COMPETITION_ICON.bolt,
+    label: labels.get(key) || key,
+    value,
+    subvalue: opts?.subvalue,
+    emphasize: opts?.emphasize,
+  };
+}
+
+function buildMetric(
+  key: MetricKey,
+  c: CompetitionListItem,
+  creditSymbol?: string,
+  scoreRule?: string,
+): CompetitionMetric | null {
+  const settings = c.gameSettings;
+  const prize = Number(c.prizePoolCredits ?? c.prizePool ?? 0) || 0;
+  const entry = Number(c.entryFeeCredits ?? c.entryFee ?? 0) || 0;
+  const symbol = creditSymbol;
+
+  switch (key) {
+    case "prizePool":
+      return metricOrNull(
+        key,
+        formatVolts(prize, { symbol }),
+        { emphasize: true },
+      );
+    case "players": {
+      const cur = Number(c.currentParticipants ?? 0);
+      const max = Number(c.maxParticipants ?? 0);
+      if (!max && !cur) return null;
+      return metricOrNull(key, max ? `${cur} / ${max}` : String(cur));
+    }
+    case "duration": {
+      const d = formatDuration(c.startTime, c.endTime);
+      return metricOrNull(key, d || undefined);
+    }
+    case "assets": {
+      const assets = c.assetClasses?.filter(Boolean) ?? [];
+      if (!assets.length) return null;
+      const shown = assets.slice(0, 3).map((a) => a.toUpperCase());
+      const extra = assets.length - shown.length;
+      return metricOrNull(
+        key,
+        shown.join(", "),
+        extra > 0 ? { subvalue: `+${extra} more` } : undefined,
+      );
+    }
+    case "entryFee":
+      // Reason: a GM-funded contest stores the per-seat fee the GM pays, so showing it
+      // would quote the player a price they never pay.
+      if (isSponsoredContest(c.fundingMode)) {
+        return metricOrNull(key, "FREE", { subvalue: "GM pays" });
+      }
+      return metricOrNull(
+        key,
+        entry <= 0 ? "FREE" : formatVolts(entry, { symbol }),
+      );
+    case "leverage": {
+      const lev =
+        c.leverage?.max ??
+        c.leverage?.default ??
+        c.leverageAllowed;
+      if (!lev) return null;
+      return metricOrNull(key, `1:${lev}`);
+    }
+    case "difficulty": {
+      // Derived later by caller via difficultyFilter labels — keep optional from settings
+      const fromSettings = settingsString(settings, [
+        "difficulty",
+        "difficultyLabel",
+      ]);
+      return metricOrNull(key, fromSettings);
+    }
+    case "startingCapital": {
+      const cap = Number(c.startingCapital ?? c.startingTradingPoints ?? 0);
+      if (!cap) return null;
+      return metricOrNull(key, cap.toLocaleString());
+    }
+    case "track":
+      return metricOrNull(
+        key,
+        settingsString(settings, ["track", "trackId", "trackName", "map", "mapName"]),
+      );
+    case "boardSize":
+      return metricOrNull(
+        key,
+        settingsString(settings, [
+          "boardSize",
+          "gridSize",
+          "board",
+          "size",
+        ]),
+      );
+    case "mode":
+      return metricOrNull(
+        key,
+        settingsString(settings, ["mode", "playMode", "gameMode"]) ||
+          (c.playMode ? humanize(String(c.playMode)) : undefined) ||
+          attemptsLabel(c),
+      );
+    case "rounds":
+      return metricOrNull(
+        key,
+        settingsString(settings, ["rounds", "boardCount", "bestOf", "attempts"]) ||
+          attemptsLabel(c),
+      );
+    case "laps":
+      return metricOrNull(key, settingsString(settings, ["laps", "lapCount"]));
+    case "scoreTarget":
+      return metricOrNull(
+        key,
+        settingsString(settings, ["scoreTarget", "targetScore"]),
+      );
+    case "scoring":
+      return metricOrNull(key, scoreRule);
+    default:
+      return null;
+  }
+}
+
+export interface BuildPresentationOptions {
+  isRegistered: boolean;
+  userBalance: number;
+  registrationClosed: boolean;
+  creditSymbol?: string;
+  levelLadder?: TitleLevel[];
+  /** Optional precomputed difficulty label */
+  difficultyLabel?: string;
+  now?: number;
+}
+
+export function buildCompetitionPresentation(
+  competition: CompetitionListItem,
+  opts: BuildPresentationOptions,
+): CompetitionPresentation {
+  const gameCode = gameCodeOf(competition);
+  const def = resolveGameDefinition({
+    gameType: competition.gameType,
+    gameKey: competition.gameKey,
+    gameCode,
+    name: competition.name,
+  });
+
+  const prize = Number(competition.prizePoolCredits ?? competition.prizePool ?? 0) || 0;
+  const entry = Number(competition.entryFeeCredits ?? competition.entryFee ?? 0) || 0;
+  const current = Number(competition.currentParticipants ?? 0);
+  const max = Number(competition.maxParticipants ?? 0);
+  const isFull = max > 0 && current >= max;
+  const { status, label } = resolveStatus(competition, isFull);
+
+  const primaryMetrics = def.primaryMetrics
+    .map((k) => buildMetric(k, competition, opts.creditSymbol, def.scoreRule))
+    .filter((m): m is CompetitionMetric => Boolean(m));
+
+  // Inject difficulty into secondary when provided from calculateCompetitionDifficulty
+  const secondaryMetrics = def.secondaryMetrics
+    .map((k) => {
+      if (k === "difficulty" && opts.difficultyLabel) {
+        return metricOrNull("difficulty", opts.difficultyLabel);
+      }
+      return buildMetric(k, competition, opts.creditSymbol, def.scoreRule);
+    })
+    .filter((m): m is CompetitionMetric => Boolean(m));
+
+  const tags: CompetitionTag[] = [];
+  const creatorName =
+    competition.privateGameMasterName ||
+    competition.gameMasterName ||
+    competition.createdByName ||
+    "";
+  const isGm =
+    Boolean(competition.gameMasterId) ||
+    Boolean(competition.isPrivate) ||
+    Boolean(competition.privateGameMasterName) ||
+    competition.createdByType === "gamemaster";
+
+  if (isGm && creatorName) {
+    tags.push({
+      label: `GM: ${creatorName}`,
+      tone: "creator",
+    });
+  } else {
+    tags.push({ label: "Admin", tone: "creator" });
+  }
+  if (competition.levelRequirement?.enabled && competition.levelRequirement.minLevel) {
+    const lvl = Number(competition.levelRequirement.minLevel);
+    const name = opts.levelLadder
+      ? resolveLevelName(lvl, opts.levelLadder)
+      : `Level ${lvl}`;
+    tags.push({ label: name, tone: "skill" });
+  }
+
+  const isPrivateContest =
+    Boolean(competition.isPrivate) ||
+    Boolean(competition.privateAccess) ||
+    competition.visibility === "gm_private";
+  if (isPrivateContest) {
+    tags.push({ label: "Private", tone: "private" });
+  }
+
+  // Reason: read the stored `fundingMode`, never infer it — "private + free" was a guess
+  // that both missed real sponsored contests and could label a free one as funded.
+  const gmFunded = isSponsoredContest(competition.fundingMode);
+  if (gmFunded) {
+    tags.unshift({ label: "GM", tone: "funded" });
+  }
+
+  const cta = getCompetitionCTA({
+    competition,
+    isRegistered: opts.isRegistered,
+    userBalance: opts.userBalance,
+    registrationClosed: opts.registrationClosed,
+  });
+
+  const desc = (competition.description || "").trim();
+  const shortDesc =
+    desc.length > 160 ? `${desc.slice(0, 157).trimEnd()}…` : desc;
+
+  const art = resolveCompetitionArtwork({
+    gameId: def.id,
+    gameCode,
+    bannerUrl: competition.bannerUrl,
+    gameName: def.label,
+  });
+
+  return {
+    id: String(competition._id),
+    title: competition.name,
+    description: shortDesc,
+    gameId: def.id,
+    gameName: def.label,
+    gameArtwork: art.src,
+    artworkObjectPosition: art.objectPosition,
+    gameAccent: def.accent,
+    gameIcon: def.icon,
+    theme: def.theme,
+    creatorName: creatorName || "Admin",
+    creatorType: isGm ? "gm" : "admin",
+    status,
+    statusLabel: label,
+    countdownLabel:
+      competition.status === "upcoming"
+        ? formatCountdown(competition.startTime, opts.now)
+        : undefined,
+    countdown:
+      competition.status === "upcoming"
+        ? { kind: "starts", target: String(competition.startTime) }
+        : competition.status === "active"
+          ? { kind: "ends", target: String(competition.endTime) }
+          : undefined,
+    tags,
+    primaryMetrics,
+    secondaryMetrics,
+    prizePool: prize,
+    entryFee: entry,
+    visibility: isPrivateContest ? "private" : "public",
+    gmFunded,
+    gmFundedNote: gmFunded ? sponsoredContestCopy(creatorName).detail : undefined,
+    cta,
+  };
+}
+
+/**
+ * Adapter: only meaningful, populated fields for a competition card.
+ * Reason: cards must not hardcode trading tiles — empty/irrelevant keys stay out.
+ */
+export function getCompetitionDisplayFields(
+  competition: CompetitionListItem,
+  opts: BuildPresentationOptions,
+): CompetitionMetric[] {
+  const p = buildCompetitionPresentation(competition, opts);
+  return [...p.primaryMetrics, ...p.secondaryMetrics];
+}

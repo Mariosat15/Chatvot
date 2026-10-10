@@ -1,0 +1,68 @@
+---
+globs: apps/admin/**
+description: Admin panel application rules for ChartVolt
+---
+
+# Admin Panel — ChartVolt
+
+## 🏗️ Architecture Overview
+
+- **Location:** `apps/admin/` — a **separate** Next.js application.
+- **Port:** Runs on a different port than the main app (typically 3001).
+- **Auth:** JWT-based admin authentication (different from main app's `better-auth`).
+- **Shared models:** Admin has its **own copy** of database models in `apps/admin/database/models/`.
+
+## 📁 Key Structure
+
+```
+apps/admin/
+├── app/                    # Next.js App Router pages
+│   ├── api/               # Admin API routes
+│   └── (dashboard)/       # Dashboard pages
+├── components/admin/      # Admin UI components
+├── database/models/       # Mongoose models (MIRRORED from main app)
+├── lib/actions/           # Admin server actions (MIRRORED from main app)
+└── middleware.ts           # JWT auth middleware
+```
+
+## 🔄 Model & Action Mirroring (CRITICAL)
+
+The admin app maintains its own copies of:
+
+- `apps/admin/database/models/` ← mirrors → `database/models/`
+- `apps/admin/lib/actions/trading/` ← mirrors → `lib/actions/trading/`
+
+**When you change a model or action in one, you MUST update the other.**
+
+Key mirrored files:
+- `whitelabel.model.ts` — App-wide settings (branding, API keys, SEO)
+- `order.actions.ts` — Order placement/cancellation
+- `position.actions.ts` — Position management
+
+## 📐 Admin Panel Sections
+
+| Section | Component | Purpose |
+|---|---|---|
+| Market Settings | `MarketSettingsSection.tsx` | Per-symbol spreads, leverage, trading hours |
+| Market Data | `MarketDataSection.tsx` | Price feed config, Massive.com API key |
+| Images / Branding | `ImagesSection.tsx` | Logos, favicons, SEO/OG metadata |
+| MDB Cluster | (settings) | MongoDB pool sizes and connection config |
+| Competitions | (management) | Create/edit/end competitions |
+| Users | (management) | User restrictions, KYC, notes |
+| Wallets | (management) | Deposits, withdrawals, balances |
+| Fraud | (detection) | Fraud scores, device tracking |
+
+## 🔌 Admin API Routes
+
+- `apps/admin/app/api/images/route.ts` — Branding images + SEO settings (GET/PUT).
+- `apps/admin/app/api/market-settings/` — Trading symbol configuration.
+- `apps/admin/app/api/trading/` — Admin trading operations.
+- Admin routes use `AdminAuth` middleware — not `better-auth`.
+
+## ⚠️ Rules
+
+1. **Never change admin models without updating main app models** (and vice versa).
+2. **Admin-only features** (user bans, competition management, financial reports) must have proper authorization checks.
+3. **The admin app runs as a separate PM2 process** with `IS_ADMIN=true` — this affects MongoDB pool size allocation.
+4. **Settings changes** (spreads, market hours, API keys) stored in WhiteLabel take effect **immediately** — no restart required for the main app to pick them up (it re-reads from DB).
+5. **Test admin changes** by checking both the admin UI and the main app behavior — settings flow: Admin UI → MongoDB → Main App reads on next request.

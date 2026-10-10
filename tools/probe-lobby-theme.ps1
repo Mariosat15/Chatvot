@@ -1,0 +1,376 @@
+﻿# Probes for the guards that keep both competition lobbies built from one design kit.
+#
+# WHAT CHANGED HERE, AND WHY IT MATTERS TO THE HARNESS. The previous version of this file probed
+# a guard that compared class strings between two lobby files. Those guards are gone: the kit
+# replaced them, because pairwise comparison between five screens is twenty comparisons and the
+# first one nobody adds is silent. The probes below therefore aim at a different property - that
+# the kit is the single definition and neither screen has chrome of its own.
+#
+# Harness rules, every one of which has produced a false result on this codebase before:
+#   * -LiteralPath on the READ as well as the write, or a path containing `[id]` matches
+#     nothing while Set-Content happily truncates the file.
+#   * UTF-8 without a BOM both ways, or emoji in the touched files come back as mojibake.
+#   * Refuse to write empty content.
+#   * Match with newlines relaxed, substitute as a plain string.
+#   * Name the expected failing test, run it alone with -t, and treat "no test matched" as a
+#     BROKEN PROBE rather than as a pass. A probe aimed at the wrong test is indistinguishable
+#     from a guard that does not work.
+#   * The -t filter is a REGEX, so the fragments below avoid `[`, `(` and `|`, and use `.`
+#     where the real test name has a bracket.
+
+$ErrorActionPreference = 'Continue'
+
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$Suite = '__tests__/games/provider-play-ui.test.ts'
+
+$LOBBY = 'components/games/ProviderContestLobby.tsx'
+$BOARD = 'components/games/ProviderLeaderboard.tsx'
+$TOKENS = 'components/neon/tokens.ts'
+$CARDS = 'components/neon/Cards.tsx'
+$HERO = 'components/trading/lobby/TradingLobbyHero.tsx'
+$SIDEBAR = 'components/trading/lobby/TradingLobbySidebar.tsx'
+# Moved out of `components/trading/lobby/` on 7 Sep 2026 - the game lobby renders it too, and
+# the ARITHMETIC moved again the same day into the projection module, which the admin prize
+# sidebar also reads. Both probes below aim at the calculation, so they follow it.
+$PRIZES = 'lib/utils/prize-projection.ts'
+$TRADING_BOARD = 'components/trading/CompetitionLeaderboard.tsx'
+$ARENA_LAYOUT = 'components/games/arena/GameArenaLayout.tsx'
+# The `[id]` in this path is why every read here uses -LiteralPath: PowerShell treats it as a
+# wildcard character class, so `Get-Content` matches nothing and a careless write truncates.
+$PLAY_PAGE = 'app/(root)/competitions/[id]/play/page.tsx'
+
+function Read-Source([string]$Path) {
+  $resolved = (Resolve-Path -LiteralPath $Path).Path
+  $text = [System.IO.File]::ReadAllText($resolved, $Utf8NoBom)
+  if ([string]::IsNullOrWhiteSpace($text)) { throw "Read of $Path returned nothing." }
+  return $text
+}
+
+function Write-Source([string]$Path, [string]$Text) {
+  if ([string]::IsNullOrWhiteSpace($Text)) { throw "Refusing to write empty content to $Path." }
+  $resolved = (Resolve-Path -LiteralPath $Path).Path
+  [System.IO.File]::WriteAllText($resolved, $Text, $Utf8NoBom)
+}
+
+function To-Pattern([string]$Literal) {
+  return [Regex]::Escape($Literal) -replace '(\\r)?\\n', '\r?\n'
+}
+
+$probes = @(
+  # ---- The kit owns the chrome, and nothing outside it spells the chrome out ----------------
+  @{
+    Name = 'the game lobby hand-rolls a panel instead of using the token'
+    File = $LOBBY
+    From = 'className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}'
+    To   = 'className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#1B2540] bg-[#0A0F1F]/80 px-4 py-3"'
+    # THE NAME OF THIS TEST HAS CHANGED TWICE AND BOTH TIMES THE PROBE WENT QUIET. It once
+    # carried the class string, so the fragment was the hex; the `it.each` label is now
+    # numbered (`owns kit literal %i ...`), so no test name contains a colour at all and four
+    # probes here reported PROBE BROKEN against four working guards. That is the reading to
+    # carry: a probe naming a test that no longer exists is indistinguishable from a guard
+    # that does not work, so match the stable part of the name and nothing decorative.
+    Test = 'owns kit literal'
+  },
+  @{
+    Name = 'the trading sidebar hand-rolls a panel instead of using the kit'
+    File = $SIDEBAR
+    From = '<NeonPanel icon={Target} accent="players" title="Schedule (UTC)">'
+    To   = '<div className="rounded-xl border border-[#1B2540] bg-[#0A0F1F]/80 p-4"><NeonPanel icon={Target} accent="players" title="Schedule (UTC)">'
+    Test = 'owns kit literal'
+  },
+  @{
+    Name = 'the game board hand-rolls the row shell'
+    File = $BOARD
+    From = '${neonRowClasses('
+    To   = '${"border-[#161E36] bg-[#080C18]/80 " + neonRowClasses('
+    Test = 'owns kit literal'
+  },
+  @{
+    Name = 'the kit stops defining the panel shell at all'
+    File = $TOKENS
+    From = '"rounded-xl border border-[#1B2540] bg-[#0A0F1F]/80 backdrop-blur-sm"'
+    To   = '"rounded-xl border border-gray-800 bg-gray-900/40"'
+    Test = 'owns kit literal'
+  },
+
+  # ---- Both heroes are the same component, four figures across -----------------------------
+  @{
+    Name = 'the game lobby grows its own hero instead of the shared one'
+    File = $LOBBY
+    From = '<NeonHero'
+    To   = '<div className="p-6"><NeonHeroReplacement'
+    Test = 'dresses both heroes with the same component'
+  },
+  @{
+    Name = 'the trading hero grows its own instead of the shared one'
+    File = $HERO
+    From = '<NeonHero'
+    To   = '<div className="p-6"><NeonHeroReplacement'
+    Test = 'dresses both heroes with the same component'
+  },
+  # ---- The arena's hero is picked by game, off the arena ------------------------------------
+  #
+  # This is the defect itself, restored: every title wore the generic trophy because nothing
+  # told the resolver which game it was.
+  @{
+    Name = 'the page asks for the hero with nothing'
+    File = $PLAY_PAGE
+    From = 'providerBanner(contest?.gameConfig?.gameCode)'
+    To   = 'providerBanner(undefined)'
+    Test = 'picks the arena.s hero by game, in the one place allowed to know the game'
+  },
+  # Resolving correctly and then not handing it over is the same screen, differently wrong.
+  @{
+    Name = 'the page resolves the hero and never passes it'
+    File = $PLAY_PAGE
+    From = 'banner={banner}'
+    To   = 'minParticipants={contest?.minParticipants}'
+    Test = 'picks the arena.s hero by game, in the one place allowed to know the game'
+  },
+  # And the layout taking the decision back, which is what `game-content-editor.test.ts`
+  # forbids for a different and better reason - a screen that can name a game can special-case
+  # one. Two guards on one property from two directions, deliberately.
+  @{
+    Name = 'the layout resolves its own hero again'
+    File = $ARENA_LAYOUT
+    From = 'import type { NeonHeroBanner } from "@/components/neon/Hero";'
+    To   = 'import { providerBanner } from "@/components/neon/banners";
+import type { NeonHeroBanner } from "@/components/neon/Hero";'
+    Test = 'picks the arena.s hero by game, in the one place allowed to know the game'
+  },
+
+  @{
+    Name = 'the game hero widens to five figures across'
+    File = $LOBBY
+    From = 'className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4"'
+    To   = 'className="grid grid-cols-2 gap-3 md:grid-cols-5 sm:gap-4"'
+    Test = 'draws every figure with the same stat card, four across'
+  },
+  @{
+    Name = 'the trading hero writes its own figure markup beside the cards'
+    File = $HERO
+    From = '<StatCard'
+    To   = '<div className="grid-cols-4" /><StatCard'
+    Test = 'draws every figure with the same stat card, four across'
+  },
+
+  # ---- Both boards share the row shell and the column headings -----------------------------
+  @{
+    Name = 'the trading board writes its own column headings'
+    File = $TRADING_BOARD
+    From = 'NEON_TABLE_HEAD'
+    To   = '"px-3 py-2 text-left text-xs text-gray-500"'
+    Test = 'gives both leaderboards the same row shell and column headings'
+  },
+  @{
+    Name = 'the trading board writes its own row shell'
+    File = $TRADING_BOARD
+    From = 'neonRowClasses({'
+    To   = 'ownRowClasses({'
+    Test = 'gives both leaderboards the same row shell and column headings'
+  },
+
+  # ---- The icon set is the sheet's, on every screen -----------------------------------------
+  @{
+    # RE-AIMED 7 Sep 2026, and the reason is worth more than the probe. This used to swap
+    # `icon={Trophy}` for `icon={GameIcon}` and reported GREEN - read at the time as the guard
+    # not doing its job. It is not: the guard was deliberately narrowed the same day to
+    # `<GameIcon name="` (see the test's own comment), and a component reference in an `icon`
+    # PROP cannot match that pattern. The mutation is caught, just not here - every `icon` prop
+    # in the kit is typed `LucideIcon` and `GameIcon` requires a `name`, so the compiler refuses
+    # it. Aiming a structural probe at something the TYPE system owns is indistinguishable from
+    # a guard that has stopped working, and it is why this one read as a hole for a few minutes.
+    # A probe must inject the shape its test claims to catch: the screen choosing a 3D glyph as
+    # its own chrome, which is an ELEMENT, not a prop.
+    Name = 'the game lobby reverts to the 3D icon set'
+    File = $LOBBY
+    From = '<div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">'
+    To   = '<GameIcon name="trophy" size={22} /><div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">'
+    Test = 'uses the flat icon set from the sheet'
+  },
+  @{
+    Name = 'the board reverts to the 3D rank medals'
+    File = $BOARD
+    # The call gained `size` and `style` when the board was rebuilt to the owner's leaderboard
+    # reference on 11 Sep 2026, so the old pattern stopped matching and this probe reported
+    # DID NOT APPLY - which reads like a broken harness rather than a moved target.
+    From = '<NeonRankBadge rank={row.currentRank} size="sm" style="plates" />'
+    To   = '<RankIcon rank={row.currentRank} size={22} />'
+    Test = 'uses the flat icon set from the sheet'
+  },
+  @{
+    Name = 'the icon tile stops being a single definition'
+    File = $CARDS
+    From = 'export function IconTile('
+    To   = 'function IconTileLocal('
+    Test = 'uses the flat icon set from the sheet'
+  },
+
+  # ---- Time, wording, and class interpolation ----------------------------------------------
+  @{
+    Name = 'the UTC clock is dropped from the game lobby header'
+    File = $LOBBY
+    From = '<UTCClock />'
+    To   = '<span className="text-xs text-gray-500">UTC</span>'
+    Test = 'reuses the trading lobby.s time components'
+  },
+  @{
+    Name = 'the game lobby formats the remaining time itself'
+    File = $LOBBY
+    From = 'const countdownTarget = isActive ? competition.endTime : competition.startTime;'
+    To   = 'const countdownTarget = Math.floor((Date.now() % (1000 * 60 * 60)) / 1000);'
+    Test = 'reuses the trading lobby.s time components'
+  },
+  @{
+    Name = 'the count pill is copied from the trading board verbatim'
+    File = $LOBBY
+    From = '{leaderboard.length} players'
+    To   = '{leaderboard.length} traders'
+    Test = 'says players, never traders'
+  },
+  @{
+    Name = 'the kit interpolates an accent into a class string'
+    File = $TOKENS
+    From = 'export function accentClasses('
+    To   = 'export function unusedAccentClasses(accent: NeonAccent) { return { tile: `bg-${accent}-500/10`, text: "", surface: "" }; }
+export function accentClasses('
+    Test = 'builds no Tailwind class by interpolation'
+  },
+  @{
+    Name = 'the trading accordions interpolate an accent'
+    File = $SIDEBAR
+    From = '<NeonAccordion sections={sections} />'
+    To   = '<div className={`border-${sections.length}-500/30`} /><NeonAccordion sections={sections} />'
+    Test = 'builds no Tailwind class by interpolation'
+  },
+  @{
+    Name = 'the trading performance dashboard is rendered on the game lobby'
+    File = $LOBBY
+    From = '<ProviderLeaderboard'
+    To   = '<CompetitionDashboard /><ProviderLeaderboard'
+    Test = 'renders no trading panel on the game lobby'
+  },
+
+  # ---- The sidebar's decisions stay open, and the money did not move -----------------------
+  @{
+    Name = 'the prize table is buried inside the accordion'
+    File = $SIDEBAR
+    # `unit` became `creditSymbol` when amounts were relabelled into credits, so this probe had
+    # been silently unapplied since. Same class as the badge above.
+    From = '<PrizeTable competition={competition} creditSymbol={creditSymbol} />'
+    To   = '<span data-moved="PrizeTable" />'
+    Test = 'keeps the trading sidebar.s decisions open'
+  },
+  @{
+    Name = 'the entry control is pushed below the reference material'
+    File = $SIDEBAR
+    From = '<CompetitionEntryButton'
+    To   = '<EntryButtonMovedBelow'
+    Test = 'keeps the trading sidebar.s decisions open'
+  },
+  @{
+    # RE-AIMED, NOT REPAIRED, AND THE DIFFERENCE IS THE POINT. This probe used to inject a
+    # wrong denominator into the equal-share bonus - and that expression no longer exists,
+    # because task document 6 replaced equal shares with proportional normalisation on 9 Sep
+    # 2026. Its guard was deliberately dropped rather than re-pinned to the new text, which the
+    # test says in full: a verbatim assertion cannot survive a behaviour change, and re-pinning
+    # one looks identical to the test still working.
+    #
+    # So this now aims at a surviving assertion that nothing else probed - the pool the whole
+    # projection is computed from. Reading a different field is a silent money change: every
+    # figure on the table still renders, and every one of them is wrong.
+    Name = 'the projection reads a different pool than the one that gets paid'
+    File = $PRIZES
+    From = 'competition.prizePool || competition.prizePoolCredits || 0'
+    To   = 'competition.prizePoolCredits || competition.prizePool || 0'
+    Test = 'moves no money computation while restyling or relocating the prize table'
+  },
+  @{
+    Name = 'the platform fee stops being deducted from a prize'
+    File = $PRIZES
+    From = '(1 - platformFeePercentage)'
+    To   = '(1 - 0)'
+    Test = 'moves no money computation while restyling or relocating the prize table'
+  },
+
+  # ---- The reference's bottom band, which survives a slot that renders nothing --------------
+  #
+  # All three slots are absent in the common case - no title carries rules text until the
+  # catalogue is re-synced, the feature cards are written per title, and a contest nobody has
+  # played has no activity. These two probes are the reason the band could be built at all: the
+  # first attempt was reverted because a grid column holding a null child is still a column.
+  @{
+    Name = 'the band is a grid again, so an absent panel leaves a hole'
+    File = $ARENA_LAYOUT
+    From = 'className="mt-5 flex flex-wrap gap-5"'
+    To   = 'className="mt-5 grid gap-5 lg:grid-cols-3"'
+    Test = 'hides an empty slot rather than leaving a column for it'
+  },
+  @{
+    # Only ONE slot loses the guard, which is the interesting mutation: a bare match for
+    # `empty:hidden` is satisfied by the rules slot alone while the activity panel - the one
+    # absent until somebody plays - renders an empty third of the page.
+    Name = 'one slot loses its empty guard'
+    File = $ARENA_LAYOUT
+    From = '<div className="min-w-[280px] flex-1 empty:hidden">{activity}</div>'
+    To   = '<div className="min-w-[280px] flex-1">{activity}</div>'
+    Test = 'hides an empty slot rather than leaving a column for it'
+  }
+)
+
+$failures = 0
+
+foreach ($probe in $probes) {
+  Write-Host ''
+  Write-Host "PROBE: $($probe.Name)" -ForegroundColor Cyan
+
+  $original = Read-Source $probe.File
+
+  if ($original -notmatch (To-Pattern $probe.From)) {
+    Write-Host "  DID NOT APPLY - pattern not found in $($probe.File)" -ForegroundColor Yellow
+    $failures++
+    continue
+  }
+
+  $broken = $original.Replace($probe.From, $probe.To)
+  if ($broken -eq $original) {
+    Write-Host "  DID NOT APPLY - $($probe.File) unchanged" -ForegroundColor Yellow
+    $failures++
+    continue
+  }
+
+  Write-Source $probe.File $broken
+
+  try {
+    $raw = & npx vitest run $Suite -t "$($probe.Test)" 2>&1
+    $out = (($raw | Out-String) -replace '\s+', ' ')
+  } finally {
+    Write-Source $probe.File $original
+  }
+
+  if ($out -match 'No test files found|Tests\s+no tests') {
+    Write-Host "  PROBE BROKEN - no test matched `"$($probe.Test)`"" -ForegroundColor Magenta
+    $failures++
+  } elseif ($out -match 'Tests\s+(\d+)\s+failed') {
+    $red = [int]$Matches[1]
+    if ($red -le 2) {
+      Write-Host "  RED as expected ($red failed)" -ForegroundColor Green
+    } else {
+      Write-Host "  RED but $red tests failed - blast radius larger than expected" -ForegroundColor Yellow
+      $failures++
+    }
+  } elseif ($out -notmatch 'Tests\s+\d+\s+passed') {
+    Write-Host "  PROBE BROKEN - no test matched `"$($probe.Test)`"" -ForegroundColor Magenta
+    $failures++
+  } else {
+    Write-Host '  GREEN - the guard is not doing its job' -ForegroundColor Red
+    $failures++
+  }
+}
+
+Write-Host ''
+if ($failures -eq 0) {
+  Write-Host "All $($probes.Count) probes behaved as expected." -ForegroundColor Green
+} else {
+  Write-Host "$failures of $($probes.Count) probes did not behave as expected." -ForegroundColor Red
+}

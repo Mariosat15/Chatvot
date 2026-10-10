@@ -1,0 +1,207 @@
+/* ChartVolt patch layer (28 Sep 2026). Loaded LAST by tools/build.mjs, after style.css and ui-polish.css.
+   Reason: the vendor sheets stack many overlapping media-query overrides; rather than edit them, every
+   rule here is scoped with an id (and, for the race HUD, html body[data-state][data-mode]) so it wins
+   regardless of which vendor breakpoint also matches. See CHARTVOLT-PATCHES.md. */
+
+/* ---------- Start screen (hangar): never scrolls, launch always visible ---------- */
+html #hangar.cv-hangar{position:absolute;inset:0;display:grid;box-sizing:border-box;overflow:hidden;
+  grid-template-columns:minmax(280px,32%) minmax(0,1fr) minmax(260px,27%);
+  grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"intro stage ship" "dock dock dock";
+  gap:16px 22px;padding:var(--cv-hangar-top,110px) 28px 18px;align-items:start;
+  background:linear-gradient(90deg,#030914f0,#050e1dc4 24%,#05101c00 44%,#05101c00 66%,#050e1dcc 82%,#030914ee),
+    linear-gradient(0deg,#030914f5,#03091400 38%)}
+/* Reason (6 Oct 2026, owner): fullscreen / large viewports scale mute·pause·settings up to
+   68px while hangar top padding stayed 88px, so the buttons sat on the ship panel. Reserve
+   space from the header row (logo + actions) and keep hangar action buttons at a fixed size. */
+html body[data-state=hangar]{
+  --cv-hangar-top:max(110px,calc(24px + 70px + 20px));
+}
+@media (min-width:1100px) and (min-height:650px){
+  html body[data-state=hangar]{
+    --cv-hangar-top:max(128px,calc(2.4vh + 70px + 24px));
+  }
+}
+html body[data-state=hangar] header .actions button{
+  width:48px;height:48px;min-width:48px;
+}
+html body[data-state=hangar] header .actions button svg{width:22px;height:22px}
+#hangar .cv-intro{grid-area:intro;min-height:0;overflow:hidden}
+#hangar .cv-intro h1{font-size:clamp(30px,3.4vw,56px);line-height:.95;margin:10px 0 14px;white-space:normal}
+#hangar .cv-intro h1 em{display:block}
+#hangar .cv-intro .rule{margin:0 0 12px}
+#hangar .cv-intro .track-choice{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+#hangar .cv-intro .track-choice>div{flex:1 1 100%;min-width:0}
+#hangar .cv-intro .track-choice button{min-height:38px;padding:0 14px;border-radius:8px}
+
+#hangar .cv-ship{grid-area:ship;min-height:0;max-height:100%;overflow-y:auto;scrollbar-width:thin;box-sizing:border-box;
+  padding:16px 18px;border:1px solid var(--edge);border-radius:12px;background:#071524d6;backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 #b5eaff22,0 12px 32px #0006}
+#hangar .cv-ship .selection{display:grid;gap:4px;margin:0 0 8px}
+#hangar .cv-ship #shipName{font-size:26px;font-weight:800;letter-spacing:1.5px;color:#f1fdff}
+#hangar .cv-ship #shipDescription{margin:0 0 12px;font-size:12px;line-height:1.45;color:var(--muted)}
+#hangar .cv-ship #shipStats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;margin:0 0 12px}
+#hangar .cv-ship #shipTradeoffs{margin:0 0 10px}
+#hangar .cv-ship .personal-best{margin:0}
+
+/* Reason (6 Oct 2026, owner): eight 1fr columns squeezed names to "VANGU"/"TEMPE".
+   Two rows of four keep every ship label readable in the practice/arena frame. */
+#hangar .cv-dock{grid-area:dock;display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,240px);gap:14px 18px;align-items:end;
+  padding:14px 16px;border:1px solid var(--edge);border-radius:14px;background:#061321e0;backdrop-filter:blur(10px);
+  box-shadow:0 -10px 40px #0005}
+#hangar .cv-label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 8px;
+  font:10px ui-monospace,monospace;letter-spacing:2px;color:var(--muted)}
+#hangar .cv-label b{color:#e8fbff;font-weight:700}
+#hangar .cv-fleet .ship-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:3px 0 0}
+#hangar .ship-picker button{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;
+  min-height:68px;min-width:0;padding:10px 12px 10px 16px;margin:0;text-align:left;overflow:hidden;
+  font:800 12px/1.15 Arial,Helvetica,sans-serif;letter-spacing:.5px;color:#e8fbff;white-space:nowrap;text-overflow:ellipsis;
+  border:1px solid #6bcce945;border-radius:9px;cursor:pointer;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--paint) 26%,#0b1c2c),#06121f 78%);
+  transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+#hangar .ship-picker button i{position:absolute;left:0;top:8px;bottom:8px;width:4px;height:auto;margin:0;border-radius:0 3px 3px 0;
+  background:var(--paint);box-shadow:0 0 12px var(--paint)}
+#hangar .ship-picker button span{display:block;margin:0 0 4px;font:9px ui-monospace,monospace;letter-spacing:1px;color:var(--muted)}
+#hangar .ship-picker button:hover:not(:disabled){transform:translateY(-2px);border-color:#9fe8ffaa}
+#hangar .ship-picker button[aria-pressed=true]{transform:translateY(-3px);border-color:var(--paint);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--paint) 48%,#0b1c2c),#07162a 82%);
+  box-shadow:0 0 0 1px var(--paint),0 0 24px color-mix(in srgb,var(--paint) 50%,transparent)}
+#hangar .ship-picker button[aria-pressed=true] span{color:#f1fdff}
+#hangar .ship-picker button:disabled{opacity:.5;cursor:default}
+
+#hangar .cv-launch{display:grid;gap:8px}
+#hangar .cv-launch #play{width:100%;min-height:62px;margin:0;border:0;border-radius:11px;cursor:pointer;
+  font:800 16px/1 Arial,Helvetica,sans-serif;letter-spacing:2px;color:#03121d;
+  background:linear-gradient(90deg,#3de1ff,#7af0c8);box-shadow:0 0 30px #3de1ff66;animation:cv-launch-glow 2.4s ease-in-out infinite}
+#hangar .cv-launch #play:disabled{opacity:.55;animation:none;cursor:default}
+#hangar .cv-keys{font:10px/1.6 ui-monospace,monospace;color:var(--muted);text-align:center}
+#hangar .cv-keys b{color:#e8fbff}
+@keyframes cv-launch-glow{0%,100%{box-shadow:0 0 22px #3de1ff55}50%{box-shadow:0 0 40px #3de1ffaa}}
+
+/* Lobby list (multiplayer) sits over the empty centre of the hangar, not over the controls. */
+html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:calc(var(--cv-hangar-top,110px) + 8px);transform:translateX(-50%);
+  width:min(300px,30vw);max-height:calc(100dvh - 330px);overflow:auto}
+
+/* Tablet / narrow window: two columns, fleet above the launch button. */
+@media (max-width:900px){
+  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"intro ship" "dock dock";padding:var(--cv-hangar-top,110px) 22px 18px}
+  #hangar .cv-dock{grid-template-columns:minmax(0,1fr)}
+  html body[data-state=hangar][data-mode] #liveStandings{top:auto;bottom:calc(100% - var(--cv-hangar-top,110px));opacity:0;pointer-events:none}
+}
+@media (max-width:900px) and (min-height:900px){
+  html #hangar.cv-hangar{grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"intro ship" "stage stage" "dock dock"}
+  #hangar .cv-fleet .ship-picker{grid-template-columns:repeat(4,minmax(0,1fr))}
+  html body[data-state=hangar][data-mode] #liveStandings{top:auto;bottom:auto;opacity:1;pointer-events:auto}
+}
+
+/* Phone portrait: one column; ships become a swipe strip. */
+@media (max-width:600px){
+  html body[data-state=hangar]{--cv-hangar-top:max(74px,calc(12px + 44px + 14px))}
+  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;
+    grid-template-areas:"intro" "stage" "ship" "dock";gap:10px;padding:var(--cv-hangar-top,74px) 12px 12px}
+  #hangar .cv-intro .eyebrow{display:none}
+  #hangar .cv-intro h1{font-size:28px;margin:0 0 8px}
+  #hangar .cv-ship{padding:10px 12px;max-height:34dvh}
+  #hangar .cv-ship #shipName{font-size:19px}
+  #hangar .cv-ship #shipDescription{display:none}
+  #hangar .cv-dock{padding:10px;gap:10px}
+  #hangar .cv-keys{display:none}
+}
+@media (max-width:600px),(max-height:500px){
+  #hangar .cv-fleet .ship-picker{display:grid;grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:104px;
+    overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:3px 2px 2px}
+  #hangar .cv-fleet .ship-picker::-webkit-scrollbar{display:none}
+  #hangar .ship-picker button{scroll-snap-align:start;min-height:54px}
+  #hangar .cv-launch #play{min-height:52px;font-size:14px}
+}
+
+/* Phone landscape / very short windows. */
+@media (max-height:500px){
+  html body[data-state=hangar]{--cv-hangar-top:max(58px,calc(8px + 44px + 10px))}
+  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;
+    grid-template-areas:"intro ship" "dock dock";gap:8px 14px;padding:var(--cv-hangar-top,58px) 14px 10px}
+  #hangar .cv-intro .eyebrow,#hangar .cv-ship #shipDescription,#hangar .cv-keys,#hangar .cv-label span{display:none}
+  #hangar .cv-intro h1{font-size:24px;margin:0 0 6px}
+  #hangar .cv-intro .rule{margin:0 0 6px}
+  #hangar .cv-ship{padding:8px 12px}
+  #hangar .cv-ship #shipName{font-size:17px}
+  #hangar .cv-dock{grid-template-columns:minmax(0,1fr) 200px;padding:8px 10px}
+}
+
+/* ---------- Power-up pickup: banner + equipment-slot pulse ---------- */
+#pickupFlash{position:absolute;left:50%;top:22%;z-index:30;display:flex;align-items:center;gap:12px;padding:8px 22px 8px 8px;
+  border-radius:999px;border:1px solid var(--pickup,#65e7ff);pointer-events:none;visibility:hidden;opacity:0;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--pickup,#65e7ff) 42%,#061321),#061321e8);
+  box-shadow:0 0 30px color-mix(in srgb,var(--pickup,#65e7ff) 55%,transparent);
+  color:#effcff;font:800 13px/1 Arial,Helvetica,sans-serif;letter-spacing:2px;white-space:nowrap;transform:translateX(-50%)}
+#pickupFlash b{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--pickup,#65e7ff);color:#03121d;font-size:18px}
+#pickupFlash.show{visibility:visible;animation:cv-pickup 1.5s ease-out forwards}
+@keyframes cv-pickup{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}12%{opacity:1;transform:translate(-50%,0) scale(1.08)}
+  24%{transform:translate(-50%,0) scale(1)}78%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px) scale(.96)}}
+.item-slot.got{animation:cv-slot .9s ease-out}
+@keyframes cv-slot{0%{box-shadow:0 0 0 0 var(--pickup-slot,#65e7ff)}30%{scale:1.06;box-shadow:0 0 0 3px var(--pickup-slot,#65e7ff),0 0 34px var(--pickup-slot,#65e7ff)}
+  100%{scale:1}}
+@media (prefers-reduced-motion:reduce){
+  #pickupFlash.show{animation:cv-pickup-still 1.5s linear forwards}
+  .item-slot.got{animation:none;outline:2px solid var(--pickup-slot,#65e7ff)}
+  #hangar .cv-launch #play{animation:none}
+}
+@keyframes cv-pickup-still{0%,85%{opacity:1}100%{opacity:0}}
+/* ---------- Brand: the Volt Velocity logo (keyed PNG-style webp, no panel behind it) ---------- */
+html body[data-state] header .brand{padding:0;border:0;border-radius:0;background:none;box-shadow:none;clip-path:none;backdrop-filter:none;line-height:0}
+html body[data-state] header .brand img{display:block;width:auto;height:clamp(44px,7.2vh,70px);filter:drop-shadow(0 6px 14px #000b)}
+html body[data-state=racing] header .brand img,html body[data-state=countdown] header .brand img{height:clamp(34px,5vh,50px)}
+@media (max-width:600px),(max-height:500px){html body[data-state] header .brand img{height:36px}}
+/* Hidden while driving wherever the top of the screen is needed for the lap and map panels. */
+@media (max-width:900px),(max-height:700px){
+  html body[data-state=racing] header .brand,html body[data-state=countdown] header .brand{opacity:0;pointer-events:none}
+}
+
+/* ---------- Race HUD look: one consistent glass panel style ---------- */
+html body[data-state][data-mode] #hud :is(.race-stats,.map,.integrity,.speed,.item-slot),
+html body[data-state][data-mode] :is(.skill-panel,#liveStandings){
+  border:1px solid #86dcff30;border-top:2px solid #5fe3f4b0;border-radius:12px;clip-path:none;
+  background:linear-gradient(165deg,#0d2536eb,#050d17f0 72%);box-shadow:inset 0 1px 0 #d4f6ff14,0 12px 32px #0009}
+html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6px}
+
+/* CHARTVOLT PATCH (28 Sep 2026): race HUD on a mouse-and-keyboard screen.
+   Every panel is anchored to its corner and scaled by --cv-hud (set by src/hud-layout.js from the
+   window size: 1 on a large monitor, down to .62 in a small embedded frame). Panels start at the
+   screen edge; hud-layout.js then stacks any that collide (equipment above hull, map and live
+   position below the top buttons), so no breakpoint needs to know how tall its neighbours are.
+   CHARTVOLT PATCH (28 Sep 2026, owner): the on-screen controls, analog pad included, are shown on
+   a computer too and work with the mouse; the rule that hid them until a touch was seen is gone.
+   hud-layout.js treats the pads as fixed, so the bottom panels move up clear of them. */
+@media (hover:hover) and (pointer:fine){
+  html body[data-state][data-mode] #hud .race-stats{top:18px;left:22px;right:auto;bottom:auto;transform:scale(var(--cv-hud,1));transform-origin:top left}
+  html body[data-state][data-mode] #hud .map{top:18px;right:22px;left:auto;bottom:auto;transform:scale(var(--cv-hud,1));transform-origin:top right}
+  html body[data-state][data-mode] #hud .integrity{left:22px;bottom:22px;top:auto;right:auto;transform:scale(var(--cv-hud,1));transform-origin:bottom left}
+  html body[data-state][data-mode] #hud .speed{right:22px;bottom:22px;top:auto;left:auto;transform:scale(var(--cv-hud,1));transform-origin:bottom right}
+  html body[data-state][data-mode] #hud .item-slot{left:22px;bottom:22px;top:auto;right:auto;width:260px;min-width:0;padding:9px 14px;transform:scale(var(--cv-hud,1));transform-origin:bottom left}
+  html body[data-state][data-mode] .skill-panel{top:14px;padding:6px 14px;height:auto;transform:translateX(-50%) scale(calc(var(--cv-hud,1) * .85));transform-origin:top center}
+  html body[data-state][data-mode] .skill-panel .meter{margin:4px 0 0}
+  html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{left:auto;right:22px;top:18px;bottom:auto;width:230px;min-height:0;max-height:calc((100dvh - 330px) / var(--cv-hud,1));overflow:hidden;transform:scale(var(--cv-hud,1));transform-origin:top right}
+}
+/* Phones held sideways: both side columns are full (lap and hull on the left, map, speed and boost
+   on the right, touch pads below), so live position sits beside the lap panel at the top of the
+   sky, showing only the leading rows. */
+@media (pointer:coarse) and (max-height:500px){
+  html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{left:208px;right:auto;top:60px;bottom:auto;width:146px;min-height:0;max-height:84px;padding:5px 9px;overflow:hidden}
+  html body[data-state]:not([data-state=hangar])[data-mode] #raceOrder li:nth-child(n+3){display:none}
+}
+/* Short desktop windows: with the logo gone the lap panel takes the very top corner. */
+@media (hover:hover) and (pointer:fine) and (max-height:700px){
+  html body[data-state][data-mode] #hud :is(.race-stats,.map){top:12px}
+  html body[data-state][data-mode] #hud :is(.integrity,.speed,.item-slot){bottom:12px}
+  html body[data-state][data-mode] #hud :is(.race-stats,.integrity,.item-slot){left:12px}
+  html body[data-state][data-mode] #hud :is(.map,.speed){right:12px}
+  html body[data-state][data-mode] .skill-panel{top:8px}
+  html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{right:12px;top:12px}
+}
+/* Tablets (touch, wider than a phone): the touch pad owns the bottom ~160px, so the hull, equipment
+   and speed panels start on a row just above it (hud-layout.js still separates them if they meet). */
+@media (pointer:coarse) and (min-width:601px) and (min-height:801px){
+  html body[data-state][data-mode] #hud .integrity{bottom:178px}
+  html body[data-state][data-mode] #hud .item-slot{bottom:178px;width:240px;min-width:0}
+  html body[data-state][data-mode] #hud .speed{bottom:178px}
+  html body[data-state][data-mode] .skill-panel{top:22px;transform:translateX(-50%) scale(.8);transform-origin:top center}
+}

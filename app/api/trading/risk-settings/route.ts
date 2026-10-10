@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { getTradingRiskSettings } from '@/lib/actions/trading/risk-settings.actions';
+import { NextResponse } from "next/server";
+import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.actions";
 
 /**
  * Public API to get current trading risk settings
@@ -18,21 +18,21 @@ export async function GET() {
       {
         headers: {
           // Disable caching - always get fresh data
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
         },
-      }
+      },
     );
   } catch (error) {
-    console.error('Error fetching risk settings:', error);
+    console.error("Error fetching risk settings:", error);
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to fetch risk settings',
+        message: "Failed to fetch risk settings",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

@@ -1,0 +1,125 @@
+---
+description: Testing rules — Vitest patterns, what to test, naming conventions
+globs:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "vitest.config.*"
+  - "lib/services/**"
+  - "lib/actions/**"
+---
+
+# Testing — ChartVolt
+
+## 🧪 Framework
+
+- **Vitest** for unit and integration tests.
+- **React Testing Library** for component tests (if needed).
+- Test files live next to the code they test: `foo.ts` → `foo.test.ts`.
+- Run tests: `npm test` or `npx vitest`.
+
+## 📐 What to Test (Priority Order)
+
+### Must Test (Critical Business Logic)
+1. **Trading calculations** — PnL, margin, pip values, spread calculations (`pnl-calculator.service.ts`).
+2. **Order validation** — Guard chain logic (market hours, restrictions, balance).
+3. **Competition scoring** — Rank calculation, ROI formulas, tie-breaking.
+4. **XP/Level calculations** — `xp-level.service.ts` formulas.
+5. **Badge evaluation** — `badge-evaluation.service.ts` trigger conditions.
+6. **Input validation** — All server actions' input checks.
+7. **Price normalization** — Symbol key format conversions.
+
+### Should Test (Important Logic)
+- Candle aggregation — timeframe rollup logic.
+- Date/time utilities — market hours, timezone handling.
+- Permission checks — role-based access control.
+- Fraud scoring — suspicion score calculation.
+
+### Don't Test (Framework/Library Code)
+- React component rendering (unless complex conditional logic).
+- Mongoose model definitions.
+- Next.js route handlers (test the underlying service instead).
+- Third-party library behavior.
+
+## 📝 Test Structure
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+describe("calculatePnL", () => {
+  // Group by scenario
+  describe("long positions", () => {
+    it("returns positive PnL when price rises", () => {
+      const result = calculatePnL({ direction: "buy", entryPrice: 1.1000, currentPrice: 1.1050, lotSize: 1 });
+      expect(result.pnl).toBeGreaterThan(0);
+    });
+
+    it("returns negative PnL when price falls", () => {
+      const result = calculatePnL({ direction: "buy", entryPrice: 1.1000, currentPrice: 1.0950, lotSize: 1 });
+      expect(result.pnl).toBeLessThan(0);
+    });
+  });
+
+  // Edge cases
+  describe("edge cases", () => {
+    it("handles zero lot size", () => { ... });
+    it("handles NaN input gracefully", () => { ... });
+    it("handles extremely large values", () => { ... });
+  });
+});
+```
+
+## 🎯 Naming Conventions
+
+- **File names**: `[module].test.ts` or `[module].spec.ts`
+- **Describe blocks**: Use the function/module name.
+- **It blocks**: Start with a verb: "returns", "throws", "handles", "prevents", "calculates".
+- **Test data**: Use realistic values from the trading domain (e.g., real forex pair prices).
+
+## 🔧 Mocking
+
+```typescript
+// Mock MongoDB — use in-memory or vi.mock
+vi.mock("@/database/mongoose", () => ({
+  connectToDatabase: vi.fn(),
+}));
+
+// Mock external services
+vi.mock("@/lib/services/redis.service", () => ({
+  getRedisClient: vi.fn(() => null), // Simulate Redis down
+}));
+
+// Mock auth session
+vi.mock("@/lib/better-auth/auth", () => ({
+  getAuth: vi.fn(() => ({
+    api: {
+      getSession: vi.fn(() => ({ user: { id: "test-user-id", role: "user" } })),
+    },
+  })),
+}));
+```
+
+## ⚠️ Anti-Patterns
+
+- **Don't test implementation details** — test behavior, not internal state.
+- **Don't write flaky tests** — no `setTimeout`, no real network calls.
+- **Don't over-mock** — if you mock everything, you're testing the mocks.
+- **Don't ignore edge cases** — NaN, undefined, empty strings, negative numbers, huge numbers.
+- **Don't write tests after bugs** without also writing the fix — regression tests are valuable.
+
+## 🏃 Running Tests
+
+```bash
+# Run all tests
+npx vitest
+
+# Run specific file
+npx vitest pnl-calculator
+
+# Run in watch mode
+npx vitest --watch
+
+# Run with coverage
+npx vitest --coverage
+```

@@ -1,24 +1,27 @@
-'use server';
+"use server";
+/* eslint-disable */
 
-import { revalidatePath } from 'next/cache';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { connectToDatabase } from '@/database/mongoose';
-import CreditWallet from '@/database/models/trading/credit-wallet.model';
-import WalletTransaction from '@/database/models/trading/wallet-transaction.model';
-import mongoose from 'mongoose';
+import { revalidatePath } from "next/cache";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { connectToDatabase } from "@/database/mongoose";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { getUserFinancialSummary } from "@/lib/services/user-financial-summary.service";
+import mongoose from "mongoose";
+import { isValidObjectId } from "@/lib/utils/url-validator";
 
 // Get or create user's credit wallet
 export const getOrCreateWallet = async () => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
     // Try to find existing wallet
-    let wallet = await CreditWallet.findOne({ userId: session.user.id });
+    let wallet = await CreditWallet.findOne({ userId: session.user.id }).lean();
 
     // Create wallet if doesn't exist
     if (!wallet) {
@@ -31,20 +34,20 @@ export const getOrCreateWallet = async () => {
         totalWonFromCompetitions: 0,
         isActive: true,
         kycVerified: false,
-        withdrawalEnabled: false,
+        withdrawalEnabled: true, // Enable withdrawals by default - admin settings control actual eligibility
       });
-      
+
       console.log(`✅ Created new wallet for user ${session.user.id}`);
     }
 
     return JSON.parse(JSON.stringify(wallet));
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
+    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
       throw error;
     }
-    console.error('Error getting/creating wallet:', error);
-    throw new Error('Failed to get wallet');
+    console.error("Error getting/creating wallet:", error);
+    throw new Error("Failed to get wallet");
   }
 };
 
@@ -52,12 +55,12 @@ export const getOrCreateWallet = async () => {
 export const getWalletBalance = async () => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
-    
+    const wallet = await CreditWallet.findOne({ userId: session.user.id }).lean() as any;
+
     if (!wallet) {
       return { balance: 0, isActive: false };
     }
@@ -70,114 +73,185 @@ export const getWalletBalance = async () => {
     };
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
+    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
       throw error;
     }
-    console.error('Error getting wallet balance:', error);
-    throw new Error('Failed to get balance');
+    console.error("Error getting wallet balance:", error);
+    throw new Error("Failed to get balance");
   }
 };
 
 // Get wallet transaction history
-export const getWalletTransactions = async (limit: number = 50) => {
+// Reason: limit=0 means "fetch all" — Mongoose .limit(0) returns all docs.
+export const getWalletTransactions = async (limit: number = 0) => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
-    const transactions = await WalletTransaction.find({
+    const query = WalletTransaction.find({
       userId: session.user.id,
-    })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
+    }).sort({ createdAt: -1 });
 
-    return JSON.parse(JSON.stringify(transactions));
+    // Reason: Mongoose .limit(0) is equivalent to no limit
+    if (limit > 0) query.limit(limit);
+
+    const transactions = await query.lean();
+
+    // For withdrawals, get actual status from WithdrawalRequest (source of truth)
+    // Batch-fetch all withdrawal requests at once instead of per-transaction (N+1 fix)
+    const WithdrawalRequest = (
+      await import("@/database/models/withdrawal-request.model")
+    ).default;
+
+    const withdrawalIds = transactions
+      .filter((t: any) => t.transactionType === "withdrawal" && t.metadata?.withdrawalRequestId)
+      .map((t: any) => t.metadata.withdrawalRequestId);
+
+    const withdrawalReqs = withdrawalIds.length > 0
+      ? await WithdrawalRequest.find({ _id: { $in: withdrawalIds } }).lean()
+      : [];
+    const withdrawalMap = new Map(
+      withdrawalReqs.map((w: any) => [w._id.toString(), w])
+    );
+
+    const enrichedTransactions = transactions.map((t: any) => {
+      if (
+        t.transactionType === "withdrawal" &&
+        t.metadata?.withdrawalRequestId
+      ) {
+        const withdrawalReq = withdrawalMap.get(t.metadata.withdrawalRequestId.toString());
+        if (withdrawalReq) {
+          let actualStatus = t.status;
+          if (withdrawalReq.status === "completed")
+            actualStatus = "completed";
+          else if (
+            withdrawalReq.status === "rejected" ||
+            withdrawalReq.status === "failed"
+          )
+            actualStatus = "failed";
+          else if (withdrawalReq.status === "cancelled")
+            actualStatus = "cancelled";
+          else actualStatus = "pending";
+
+          return {
+            ...t,
+            status: actualStatus,
+            failureReason:
+              withdrawalReq.rejectionReason || withdrawalReq.failureReason,
+          };
+        }
+      }
+      return t;
+    });
+
+    return JSON.parse(JSON.stringify(enrichedTransactions));
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
+    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
       throw error;
     }
-    console.error('Error getting transactions:', error);
-    throw new Error('Failed to get transactions');
+    console.error("Error getting transactions:", error);
+    throw new Error("Failed to get transactions");
   }
 };
 
 // Create a pending deposit transaction (called before Stripe payment)
-export const initiateDeposit = async (amount: number, currency: string = 'EUR') => {
+export const initiateDeposit = async (
+  amount: number,
+  currency: string = "EUR",
+) => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
     // ✅ CHECK USER RESTRICTIONS
     console.log(`🔐 Checking deposit restrictions for user ${session.user.id}`);
-    const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
-    const restrictionCheck = await canUserPerformAction(session.user.id, 'deposit');
-    
+    const { canUserPerformAction } =
+      await import("@/lib/services/user-restriction.service");
+    const restrictionCheck = await canUserPerformAction(
+      session.user.id,
+      "deposit",
+    );
+
     console.log(`   Restriction check result:`, restrictionCheck);
-    
+
     if (!restrictionCheck.allowed) {
       console.log(`   ❌ Deposit blocked due to restrictions`);
-      throw new Error(restrictionCheck.reason || 'You are not allowed to deposit');
+      throw new Error(
+        restrictionCheck.reason || "You are not allowed to deposit",
+      );
     }
-    
+
     console.log(`   ✅ User allowed to deposit`);
 
     // Validate amount
     if (amount <= 0 || amount > 10000) {
-      throw new Error('Invalid amount (min: €0.01, max: €10,000)');
+      throw new Error("Invalid amount (min: €0.01, max: €10,000)");
     }
 
     const wallet = await getOrCreateWallet();
 
     // Get centralized fee settings (for tracking platform earnings)
-    const CreditConversionSettings = (await import('@/database/models/credit-conversion-settings.model')).default;
+    const CreditConversionSettings = (
+      await import("@/database/models/credit-conversion-settings.model")
+    ).default;
     const feeSettings = await CreditConversionSettings.getSingleton();
-    
+
     // Platform deposit fee (charged to card, NOT deducted from credits)
-    const platformDepositFeePercentage = feeSettings.platformDepositFeePercentage || 0;
-    
+    const platformDepositFeePercentage =
+      feeSettings.platformDepositFeePercentage || 0;
+
     // Bank fees (what Stripe charges us) - for tracking purposes
-    const bankDepositFeePercentage = feeSettings.bankDepositFeePercentage || 2.9;
-    const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.30;
-    
-    // User receives FULL credits (fees are charged to their card, not deducted)
-    const creditsToReceive = amount; // 1 EUR = 1 Credit - FULL amount
+    const bankDepositFeePercentage =
+      feeSettings.bankDepositFeePercentage || 2.9;
+    const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.3;
+
+    // Reason: Convert EUR base to credits using configured rate from DB.
+    const eurToCreditsRate = feeSettings.eurToCreditsRate || 1;
+    const creditsToReceive = Math.round(amount * eurToCreditsRate * 100) / 100;
     const platformFeeAmount = (amount * platformDepositFeePercentage) / 100;
-    
+
     // Calculate bank fees (what Stripe takes from the total charged)
     const totalCharged = amount + platformFeeAmount; // This is charged to card (without VAT for now, VAT added in frontend)
     const bankFeePercentage = (totalCharged * bankDepositFeePercentage) / 100;
     const bankFeeTotal = bankFeePercentage + bankDepositFeeFixed;
-    
+
     // Net platform earnings = Platform fee charged to user - Bank fee we pay
     const netPlatformEarning = platformFeeAmount - bankFeeTotal;
 
     console.log(`💰 Deposit calculation (fees charged to card):`);
-    console.log(`   Credits Value: €${amount}`);
-    console.log(`   Credits to User: ${creditsToReceive} (FULL - fees charged to card)`);
-    console.log(`   Platform Fee (${platformDepositFeePercentage}%): +€${platformFeeAmount.toFixed(2)} charged to card`);
-    console.log(`   Bank Fee (${bankDepositFeePercentage}% + €${bankDepositFeeFixed}): €${bankFeeTotal.toFixed(2)}`);
+    console.log(`   EUR Base: €${amount} → Credits: ${creditsToReceive} (rate: ${eurToCreditsRate})`);
+    console.log(
+      `   Credits to User: ${creditsToReceive} (fees charged to card)`,
+    );
+    console.log(
+      `   Platform Fee (${platformDepositFeePercentage}%): +€${platformFeeAmount.toFixed(2)} charged to card`,
+    );
+    console.log(
+      `   Bank Fee (${bankDepositFeePercentage}% + €${bankDepositFeeFixed}): €${bankFeeTotal.toFixed(2)}`,
+    );
     console.log(`   Net Platform Earning: €${netPlatformEarning.toFixed(2)}`);
 
     // Create pending transaction with FULL credits
     // Note: Total charged will be updated when payment intent is created (includes VAT)
     const transaction = await WalletTransaction.create({
       userId: session.user.id,
-      transactionType: 'deposit',
+      transactionType: "deposit",
       amount: creditsToReceive, // User receives FULL credits
       balanceBefore: wallet.creditBalance,
       balanceAfter: wallet.creditBalance + creditsToReceive,
       currency: currency,
-      exchangeRate: 1, // 1 EUR = 1 Credit
-      status: 'pending',
+      exchangeRate: eurToCreditsRate,
+      status: "pending",
       description: `Purchase of ${creditsToReceive} credits`, // Updated with fees when charged
       metadata: {
-        eurAmount: amount, // Base credits value
+        eurAmount: amount,
         creditsReceived: creditsToReceive,
+        exchangeRate: eurToCreditsRate,
         // Platform fees (charged to card)
         platformDepositFeePercentage: platformDepositFeePercentage,
         platformFeeAmount: parseFloat(platformFeeAmount.toFixed(2)),
@@ -187,24 +261,43 @@ export const initiateDeposit = async (amount: number, currency: string = 'EUR') 
         bankFeeTotal: parseFloat(bankFeeTotal.toFixed(2)),
         // Net calculations
         netPlatformEarning: parseFloat(netPlatformEarning.toFixed(2)),
-        paymentProvider: 'stripe',
+        paymentProvider: "stripe",
       },
     });
 
     return JSON.parse(JSON.stringify(transaction));
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
+    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
       throw error;
     }
-    console.error('Error initiating deposit:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to initiate deposit');
+    console.error("Error initiating deposit:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Failed to initiate deposit",
+    );
   }
 };
 
 // Complete a deposit after successful Stripe payment
-export const completeDeposit = async (transactionId: string, paymentId: string, paymentMethod: string) => {
+export const completeDeposit = async (
+  transactionId: string,
+  paymentId: string,
+  paymentMethod: string,
+  cardDetails?: {
+    brand?: string;
+    last4?: string;
+    expMonth?: number;
+    expYear?: number;
+    country?: string;
+    fingerprint?: string;
+  },
+) => {
   try {
+    // Validate transactionId to prevent NoSQL injection
+    if (!isValidObjectId(transactionId)) {
+      throw new Error("Invalid transaction ID format");
+    }
+
     await connectToDatabase();
 
     // Start MongoDB transaction for ACID compliance
@@ -213,19 +306,33 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
 
     try {
       // Get transaction
-      const transaction = await WalletTransaction.findById(transactionId).session(mongoSession);
+      const transaction =
+        await WalletTransaction.findById(transactionId).session(mongoSession);
       if (!transaction) {
-        throw new Error('Transaction not found');
+        throw new Error("Transaction not found");
       }
 
-      if (transaction.status !== 'pending') {
-        throw new Error('Transaction already processed');
+      // ATOMIC IDEMPOTENT CLAIM: move pending/processing → completed in a single
+      // conditional write, so only ONE caller can ever credit this deposit — even
+      // if the payment provider delivers the same webhook multiple times at once.
+      // Reason: every processor (Stripe, Nuvei, Paddle, Atlas, and any future PSP)
+      // funnels through completeDeposit, so this single guard makes them all safe
+      // without per-processor idempotency code. The wallet $inc below only runs
+      // for the caller that wins this claim; a duplicate delivery modifies nothing
+      // and is rejected as "already processed".
+      const depositClaim = await WalletTransaction.updateOne(
+        { _id: transaction._id, status: { $in: ["pending", "processing"] } },
+        { $set: { status: "completed", processedAt: new Date() } },
+        { session: mongoSession },
+      );
+      if (depositClaim.modifiedCount === 0) {
+        throw new Error("Transaction already processed");
       }
 
       // User receives FULL credits (fees were charged to card, not deducted)
       const creditsToAdd = transaction.amount; // Full credits amount
       const eurAmount = transaction.metadata?.eurAmount || transaction.amount;
-      
+
       // Update wallet balance - user receives FULL credits
       await CreditWallet.findOneAndUpdate(
         { userId: transaction.userId },
@@ -235,45 +342,70 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
             totalDeposited: eurAmount, // Track base EUR deposited (not including fees)
           },
         },
-        { session: mongoSession }
+        { session: mongoSession },
       );
 
-      // Update transaction
-      transaction.status = 'completed';
+      // Update transaction with payment info and card details
+      transaction.status = "completed";
       transaction.paymentId = paymentId;
       transaction.paymentMethod = paymentMethod;
       transaction.processedAt = new Date();
+
+      // Store card details for potential refunds/withdrawals
+      if (cardDetails) {
+        transaction.metadata = {
+          ...transaction.metadata,
+          paymentIntentId: paymentId,
+          cardBrand: cardDetails.brand,
+          cardLast4: cardDetails.last4,
+          cardExpMonth: cardDetails.expMonth,
+          cardExpYear: cardDetails.expYear,
+          cardCountry: cardDetails.country,
+          cardFingerprint: cardDetails.fingerprint,
+        };
+      }
+
       await transaction.save({ session: mongoSession });
 
       // Commit transaction
       await mongoSession.commitTransaction();
 
       // Get fee settings to calculate/verify fee amounts
-      const CreditConversionSettings = (await import('@/database/models/credit-conversion-settings.model')).default;
+      const CreditConversionSettings = (
+        await import("@/database/models/credit-conversion-settings.model")
+      ).default;
       const feeSettings = await CreditConversionSettings.getSingleton();
-      
+
       // Try to get fee from metadata first, otherwise calculate from current settings
       let platformFeeAmount = transaction.metadata?.platformFeeAmount;
       let bankFeeTotal = transaction.metadata?.bankFeeTotal;
-      let platformDepositFeePercentage = transaction.metadata?.platformDepositFeePercentage;
-      
+      let platformDepositFeePercentage =
+        transaction.metadata?.platformDepositFeePercentage;
+
       // If metadata doesn't have fees (old deposit), calculate from current settings
       if (platformFeeAmount === undefined || platformFeeAmount === null) {
-        platformDepositFeePercentage = feeSettings.platformDepositFeePercentage || 0;
+        platformDepositFeePercentage =
+          feeSettings.platformDepositFeePercentage || 0;
         platformFeeAmount = (eurAmount * platformDepositFeePercentage) / 100;
-        
-        const bankDepositFeePercentage = feeSettings.bankDepositFeePercentage || 2.9;
-        const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.30;
-        bankFeeTotal = (eurAmount * bankDepositFeePercentage / 100) + bankDepositFeeFixed;
-        
-        console.log(`⚠️ Fee calculated from current settings (deposit had no fee metadata)`);
+
+        const bankDepositFeePercentage =
+          feeSettings.bankDepositFeePercentage || 2.9;
+        const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.3;
+        bankFeeTotal =
+          (eurAmount * bankDepositFeePercentage) / 100 + bankDepositFeeFixed;
+
+        console.log(
+          `⚠️ Fee calculated from current settings (deposit had no fee metadata)`,
+        );
       }
-      
+
       const netPlatformEarning = platformFeeAmount - bankFeeTotal;
 
       console.log(`✅ Purchase completed:`);
       console.log(`   EUR paid: €${eurAmount}`);
-      console.log(`   Credits added: ${creditsToAdd} (after ${platformDepositFeePercentage}% fee)`);
+      console.log(
+        `   Credits added: ${creditsToAdd} (after ${platformDepositFeePercentage}% fee)`,
+      );
       console.log(`   Platform Fee: €${platformFeeAmount.toFixed(2)}`);
       console.log(`   Bank Fee: €${bankFeeTotal.toFixed(2)}`);
       console.log(`   Net Platform Earning: €${netPlatformEarning.toFixed(2)}`);
@@ -283,7 +415,8 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
       // Always record if there's a platform fee OR if we calculated one
       if (platformFeeAmount > 0) {
         try {
-          const { PlatformFinancialsService } = await import('@/lib/services/platform-financials.service');
+          const { PlatformFinancialsService } =
+            await import("@/lib/services/platform-financials.service");
           console.log(`💵 Recording deposit fee to PlatformTransaction...`);
           await PlatformFinancialsService.recordDepositFee({
             userId: transaction.userId,
@@ -295,51 +428,70 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
           });
           console.log(`✅ Deposit fee recorded successfully`);
         } catch (error) {
-          console.error('❌ Error recording deposit fee:', error);
+          console.error("❌ Error recording deposit fee:", error);
         }
       } else {
         console.log(`ℹ️ No platform fee to record (fee is 0%)`);
       }
 
-      // Evaluate badges for the user (fire and forget - don't wait)
+      // Evaluate badges for the user (MUST complete - not fire and forget)
+      console.log(
+        `🏅 Starting badge evaluation for user ${transaction.userId} after deposit...`,
+      );
       try {
-        const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
-        evaluateUserBadges(transaction.userId).then(result => {
-          if (result.newBadges.length > 0) {
-            console.log(`🏅 User earned ${result.newBadges.length} new badges after deposit`);
-          }
-        }).catch(err => console.error('Error evaluating badges:', err));
+        const { evaluateUserBadges } =
+          await import("@/lib/services/badge-evaluation.service");
+        const result = await evaluateUserBadges(transaction.userId);
+        if (result.newBadges.length > 0) {
+          console.log(
+            `🏅 User earned ${result.newBadges.length} new badges after deposit`,
+          );
+        } else {
+          console.log(`🏅 Badge evaluation complete - no new badges earned`);
+        }
       } catch (error) {
-        console.error('Error importing badge service:', error);
+        console.error(
+          "❌ Error evaluating badges for user:",
+          transaction.userId,
+          error,
+        );
+        // Don't fail the deposit if badge evaluation fails, but log prominently
       }
 
       // Create and send invoice (fire and forget)
       try {
-        const InvoiceSettings = (await import('@/database/models/invoice-settings.model')).default;
+        const InvoiceSettings = (
+          await import("@/database/models/invoice-settings.model")
+        ).default;
         const invoiceSettings = await InvoiceSettings.getSingleton();
-        
-        console.log(`📄 Invoice settings: sendInvoiceOnPurchase=${invoiceSettings.sendInvoiceOnPurchase}`);
-        
+
+        console.log(
+          `📄 Invoice settings: sendInvoiceOnPurchase=${invoiceSettings.sendInvoiceOnPurchase}`,
+        );
+
         if (invoiceSettings.sendInvoiceOnPurchase) {
-          const { InvoiceService } = await import('@/lib/services/invoice.service');
-          const { inngest } = await import('@/lib/inngest/client');
-          const { getUserById } = await import('@/lib/utils/user-lookup');
-          
+          const { InvoiceService } =
+            await import("@/lib/services/invoice.service");
+          const { sendInvoiceEmail } = await import("@/lib/nodemailer");
+          const { getUserById } = await import("@/lib/utils/user-lookup");
+
           // Get user info from database (not session, as this may be called from webhook)
           const userId = transaction.userId.toString();
           const user = await getUserById(userId);
-          
-          const customerName = user?.name || 'Customer';
-          const customerEmail = user?.email || '';
-          
-          console.log(`📄 User for invoice: ${customerName} <${customerEmail}>`);
-          
+
+          const customerName = user?.name || "Customer";
+          const customerEmail = user?.email || "";
+
+          console.log(
+            `📄 User for invoice: ${customerName} <${customerEmail}>`,
+          );
+
           if (customerEmail) {
             console.log(`📄 Creating invoice for deposit...`);
-            
+
             // Get the actual VAT amount that was charged (VAT applies only to credits, not fee)
             const actualVatAmount = transaction.metadata?.vatAmount || 0;
-            
+
             // Build line items - credits value is eurAmount (the full credits amount)
             // Fee is separate and not subject to VAT
             const invoiceLineItems = [
@@ -347,81 +499,124 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
                 description: `Credit Purchase - ${creditsToAdd.toFixed(2)} Credits`,
                 quantity: 1,
                 unitPrice: eurAmount, // Full credits amount (VAT applies to this)
-              }
+              },
             ];
-            
+
             // Add platform fee as separate line item if present (not subject to VAT)
             if (platformFeeAmount > 0) {
               invoiceLineItems.push({
-                description: 'Platform Processing Fee',
+                description: "Platform Processing Fee",
                 quantity: 1,
                 unitPrice: platformFeeAmount,
               });
             }
-            
-            console.log(`📄 Invoice line items: Credits €${eurAmount}, Fee €${platformFeeAmount}, VAT €${actualVatAmount}`);
-            
+
+            console.log(
+              `📄 Invoice line items: Credits €${eurAmount}, Fee €${platformFeeAmount}, VAT €${actualVatAmount}`,
+            );
+
             // Create invoice with actual VAT amount (VAT only on credits, not on fee)
             const { invoice } = await InvoiceService.createInvoice({
               userId: userId,
               customerName,
               customerEmail,
               transactionId: transaction._id.toString(),
-              transactionType: 'deposit',
+              transactionType: "deposit",
               paymentMethod: paymentMethod,
               paymentId: paymentId,
               lineItems: invoiceLineItems,
-              currency: 'EUR',
+              currency: "EUR",
               actualVatAmount: actualVatAmount, // Use actual VAT charged (only on credits)
             });
-            
+
             console.log(`📄 Invoice ${invoice.invoiceNumber} created`);
-            
-            // Send invoice email via Inngest
-            await inngest.send({
-              name: 'app/invoice.created',
-              data: {
-                invoiceId: invoice._id.toString(),
+
+            // Send invoice email directly (replaces Inngest)
+            try {
+              await sendInvoiceEmail({
+                invoiceId: (invoice._id as unknown as string).toString(),
                 customerEmail,
                 customerName,
-                invoiceNumber: invoice.invoiceNumber,
-              },
-            });
-            
-            console.log(`📧 Invoice email queued for ${customerEmail}`);
+              });
+              console.log(`📧 Invoice email sent to ${customerEmail}`);
+            } catch (emailError) {
+              console.error("⚠️ Failed to send invoice email:", emailError);
+              // Don't fail the deposit if email fails
+            }
           } else {
-            console.log(`⚠️ No email found for user ${userId}, skipping invoice`);
+            console.log(
+              `⚠️ No email found for user ${userId}, skipping invoice`,
+            );
           }
         } else {
           console.log(`ℹ️ Invoice sending disabled in settings`);
         }
       } catch (error) {
-        console.error('❌ Error creating invoice:', error);
+        console.error("❌ Error creating invoice:", error);
         // Don't throw - deposit already succeeded
       }
 
       // Send notification to user about successful deposit
       try {
-        const { notificationService } = await import('@/lib/services/notification.service');
-        
+        const { notificationService } =
+          await import("@/lib/services/notification.service");
+
         // Get wallet balance for notification
-        const wallet = await CreditWallet.findOne({ userId: transaction.userId });
+        const wallet = await CreditWallet.findOne({
+          userId: transaction.userId,
+        }).lean() as any;
         const newBalance = wallet?.creditBalance || creditsToAdd;
-        
+
         await notificationService.notifyDepositCompleted(
           transaction.userId,
           eurAmount,
-          newBalance
+          newBalance,
         );
-        console.log(`🔔 Deposit notification sent to user ${transaction.userId}`);
+        console.log(
+          `🔔 Deposit notification sent to user ${transaction.userId}`,
+        );
       } catch (error) {
-        console.error('❌ Error sending deposit notification:', error);
+        console.error("❌ Error sending deposit notification:", error);
         // Don't throw - deposit already succeeded
       }
 
-      revalidatePath('/wallet');
+      // Send deposit completed email to user
+      try {
+        const { sendDepositCompletedEmail } = await import("@/lib/nodemailer");
+        const { getUserById } = await import("@/lib/utils/user-lookup");
 
-      return { success: true, transaction: JSON.parse(JSON.stringify(transaction)) };
+        const userId = transaction.userId.toString();
+        const user = await getUserById(userId);
+        const wallet = await CreditWallet.findOne({
+          userId: transaction.userId,
+        }).lean() as any;
+        const newBalance = wallet?.creditBalance || creditsToAdd;
+
+        if (user?.email) {
+          await sendDepositCompletedEmail({
+            email: user.email,
+            name: user.name || user.email.split("@")[0],
+            credits: creditsToAdd,
+            amount:
+              transaction.metadata?.totalCharged ||
+              eurAmount + (platformFeeAmount || 0),
+            paymentMethod: paymentMethod || "Card",
+            transactionId: transaction._id.toString().slice(-8).toUpperCase(),
+            newBalance: newBalance,
+          });
+          console.log(`📧 Deposit confirmation email sent to ${user.email}`);
+        }
+      } catch (error) {
+        console.error("❌ Error sending deposit email:", error);
+        // Don't throw - deposit already succeeded
+      }
+
+      revalidatePath("/wallet");
+
+      return {
+        success: true,
+        transaction: JSON.parse(JSON.stringify(transaction)),
+      };
     } catch (error) {
       // Rollback on error
       await mongoSession.abortTransaction();
@@ -430,262 +625,60 @@ export const completeDeposit = async (transactionId: string, paymentId: string, 
       mongoSession.endSession();
     }
   } catch (error) {
-    console.error('Error completing deposit:', error);
-    throw new Error('Failed to complete deposit');
+    console.error("Error completing deposit:", error);
+    throw new Error("Failed to complete deposit");
   }
 };
 
-// Initiate withdrawal request (will be processed manually or via Stripe)
-export const initiateWithdrawal = async (creditsAmount: number) => {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
-
-    await connectToDatabase();
-
-    // ✅ CHECK USER RESTRICTIONS
-    console.log(`🔐 Checking withdrawal restrictions for user ${session.user.id}`);
-    const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
-    const restrictionCheck = await canUserPerformAction(session.user.id, 'withdraw');
-    
-    console.log(`   Restriction check result:`, restrictionCheck);
-    
-    if (!restrictionCheck.allowed) {
-      console.log(`   ❌ Withdrawal blocked due to restrictions`);
-      throw new Error(restrictionCheck.reason || 'You are not allowed to withdraw');
-    }
-    
-    console.log(`   ✅ User allowed to withdraw`);
-
-    // Get conversion settings
-    const CreditConversionSettings = (await import('@/database/models/credit-conversion-settings.model')).default;
-    const conversionSettings = await CreditConversionSettings.getSingleton();
-    const { 
-      eurToCreditsRate, 
-      minimumWithdrawal, 
-      platformWithdrawalFeePercentage,
-      bankWithdrawalFeePercentage,
-      bankWithdrawalFeeFixed,
-      withdrawalFeePercentage // fallback
-    } = conversionSettings;
-    
-    // Use platform withdrawal fee (with fallback to legacy field)
-    const actualPlatformFeePercentage = platformWithdrawalFeePercentage ?? withdrawalFeePercentage ?? 2;
-
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
-    if (!wallet) throw new Error('Wallet not found');
-
-    // Validate KYC
-    if (!wallet.kycVerified) {
-      throw new Error('KYC verification required for withdrawals');
-    }
-
-    // Validate withdrawal enabled
-    if (!wallet.withdrawalEnabled) {
-      throw new Error('Withdrawals not enabled for this account');
-    }
-
-    // Validate amount
-    if (creditsAmount <= 0) {
-      throw new Error('Invalid amount');
-    }
-
-    // Calculate EUR gross amount
-    const eurGross = creditsAmount / eurToCreditsRate;
-    
-    // Calculate platform withdrawal fee (what we charge user)
-    const platformFeeAmountEUR = eurGross * (actualPlatformFeePercentage / 100);
-    const feeAmountCredits = Math.ceil(platformFeeAmountEUR * eurToCreditsRate);
-    
-    // Calculate bank withdrawal fee (what bank charges us for payout)
-    const bankFeePercentageAmount = eurGross * ((bankWithdrawalFeePercentage ?? 0.25) / 100);
-    const bankFeeTotalEUR = bankFeePercentageAmount + (bankWithdrawalFeeFixed ?? 0.25);
-    
-    // Calculate net EUR user receives
-    const eurNet = eurGross - platformFeeAmountEUR;
-    
-    // Calculate net platform earning from this withdrawal
-    const netPlatformEarningEUR = platformFeeAmountEUR - bankFeeTotalEUR;
-    
-    // Total credits to deduct (withdrawal + fee)
-    const totalCreditsDeducted = creditsAmount + feeAmountCredits;
-    
-    console.log(`💸 Withdrawal calculation:`);
-    console.log(`   Credits: ${creditsAmount}`);
-    console.log(`   EUR Gross: €${eurGross.toFixed(2)}`);
-    console.log(`   Platform Fee (${actualPlatformFeePercentage}%): €${platformFeeAmountEUR.toFixed(2)}`);
-    console.log(`   Bank Fee (${bankWithdrawalFeePercentage ?? 0.25}% + €${bankWithdrawalFeeFixed ?? 0.25}): €${bankFeeTotalEUR.toFixed(2)}`);
-    console.log(`   Net to User: €${eurNet.toFixed(2)}`);
-    console.log(`   Net Platform Earning: €${netPlatformEarningEUR.toFixed(2)}`);
-
-    // Validate sufficient balance for withdrawal + fee
-    if (totalCreditsDeducted > wallet.creditBalance) {
-      throw new Error(`Insufficient balance. Need ${totalCreditsDeducted} Credits (${creditsAmount} + ${feeAmountCredits} fee), but you have ${wallet.creditBalance} Credits`);
-    }
-
-    // Minimum withdrawal check
-    const minCredits = minimumWithdrawal * eurToCreditsRate;
-    if (creditsAmount < minCredits) {
-      throw new Error(`Minimum withdrawal is ${minCredits} Credits (€${minimumWithdrawal})`);
-    }
-
-    // Start MongoDB transaction
-    const mongoSession = await mongoose.startSession();
-    mongoSession.startTransaction();
-
-    try {
-      // Deduct credits + fee from wallet
-      await CreditWallet.findOneAndUpdate(
-        { userId: session.user.id },
-        {
-          $inc: {
-            creditBalance: -totalCreditsDeducted,
-            totalWithdrawn: creditsAmount, // Track only the withdrawal amount, not fee
-          },
-        },
-        { session: mongoSession }
-      );
-
-      // Create withdrawal transaction (for the amount user requested)
-      const withdrawalTransaction = await WalletTransaction.create(
-        [
-          {
-            userId: session.user.id,
-            transactionType: 'withdrawal',
-            amount: -creditsAmount,
-            balanceBefore: wallet.creditBalance,
-            balanceAfter: wallet.creditBalance - totalCreditsDeducted,
-            currency: 'EUR',
-            exchangeRate: eurToCreditsRate,
-            status: 'pending',
-            description: `Withdrawal of ${creditsAmount} Credits (€${eurNet.toFixed(2)} net)`,
-            metadata: {
-              creditsAmount,
-              eurGross: eurGross.toFixed(2),
-              eurNet: eurNet.toFixed(2),
-              // Platform fees
-              platformFeePercentage: actualPlatformFeePercentage,
-              platformFeeAmountEUR: parseFloat(platformFeeAmountEUR.toFixed(2)),
-              feeAmountCredits,
-              // Bank fees
-              bankFeePercentage: bankWithdrawalFeePercentage ?? 0.25,
-              bankFeeFixed: bankWithdrawalFeeFixed ?? 0.25,
-              bankFeeTotalEUR: parseFloat(bankFeeTotalEUR.toFixed(2)),
-              // Net calculations
-              netPlatformEarningEUR: parseFloat(netPlatformEarningEUR.toFixed(2)),
-              totalCreditsDeducted,
-            },
-          },
-        ],
-        { session: mongoSession }
-      );
-
-      // Create separate transaction record for the withdrawal fee (platform revenue)
-      await WalletTransaction.create(
-        [
-          {
-            userId: session.user.id,
-            transactionType: 'withdrawal_fee',
-            amount: -feeAmountCredits,
-            balanceBefore: wallet.creditBalance - creditsAmount,
-            balanceAfter: wallet.creditBalance - totalCreditsDeducted,
-            currency: 'EUR',
-            exchangeRate: eurToCreditsRate,
-            status: 'completed',
-            description: `Withdrawal fee (${actualPlatformFeePercentage}%) for ${creditsAmount} Credits`,
-            metadata: {
-              withdrawalTransactionId: withdrawalTransaction[0]._id,
-              platformFeePercentage: actualPlatformFeePercentage,
-              creditsCharged: feeAmountCredits,
-              eurValue: platformFeeAmountEUR.toFixed(2),
-              bankFeeEUR: bankFeeTotalEUR.toFixed(2),
-              netPlatformEarningEUR: netPlatformEarningEUR.toFixed(2),
-            },
-          },
-        ],
-        { session: mongoSession }
-      );
-
-      await mongoSession.commitTransaction();
-
-      console.log(`💸 Withdrawal initiated: ${creditsAmount} Credits (€${eurNet.toFixed(2)} net) for user ${session.user.id}, fee: ${feeAmountCredits} Credits`);
-      
-      // Send withdrawal initiated notification
-      try {
-        const { notificationService } = await import('@/lib/services/notification.service');
-        await notificationService.notifyWithdrawalInitiated(session.user.id, eurNet);
-      } catch (notifError) {
-        console.error('Error sending withdrawal notification:', notifError);
-      }
-      
-      // Record withdrawal fee in platform financials (fire and forget)
-      if (platformFeeAmountEUR > 0) {
-        try {
-          const { PlatformFinancialsService } = await import('@/lib/services/platform-financials.service');
-          await PlatformFinancialsService.recordWithdrawalFee({
-            userId: session.user.id,
-            withdrawalAmount: eurGross,
-            platformFeeAmount: platformFeeAmountEUR,
-            bankFeeAmount: bankFeeTotalEUR,
-            netEarning: netPlatformEarningEUR,
-            transactionId: withdrawalTransaction[0]._id.toString(),
-          });
-        } catch (error) {
-          console.error('Error recording withdrawal fee:', error);
-        }
-      }
-
-      revalidatePath('/wallet');
-
-      return {
-        success: true,
-        message: `Withdrawal request submitted. You will receive €${eurNet.toFixed(2)}`,
-        transaction: JSON.parse(JSON.stringify(withdrawalTransaction[0])),
-        breakdown: {
-          creditsWithdrawn: creditsAmount,
-          feeCredits: feeAmountCredits,
-          totalDeducted: totalCreditsDeducted,
-          eurGross: eurGross.toFixed(2),
-          eurFee: feeAmountEUR.toFixed(2),
-          eurNet: eurNet.toFixed(2),
-        },
-      };
-    } catch (error) {
-      await mongoSession.abortTransaction();
-      throw error;
-    } finally {
-      mongoSession.endSession();
-    }
-  } catch (error) {
-    // Re-throw redirect errors so Next.js can handle them
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
-      throw error;
-    }
-    console.error('Error initiating withdrawal:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to initiate withdrawal');
-  }
+/**
+ * @deprecated DISABLED legacy withdrawal path — do not use.
+ *
+ * Reason: this path debited the wallet and created a `withdrawal`
+ * WalletTransaction WITHOUT creating a `WithdrawalRequest`. Reconciliation
+ * treats `WithdrawalRequest` as the single source of truth for withdrawals
+ * (see lib/services/reconciliation-math.ts), so a withdrawal made this way is
+ * invisible to the expected-balance math and would surface as a phantom
+ * `balance_mismatch`. It is unused in production (all withdrawals go through
+ * `POST /api/wallet/withdraw` for manual and `POST /api/nuvei/withdrawal` for
+ * automatic payouts). Kept as a guarded no-op stub so any accidental future
+ * import can never corrupt wallet balances or reconciliation.
+ */
+export const initiateWithdrawal = async (_creditsAmount: number) => {
+  return {
+    success: false as const,
+    error:
+      "This withdrawal path is disabled. Use the current withdrawal flow (POST /api/wallet/withdraw or /api/nuvei/withdrawal).",
+  };
 };
 
 // Cancel a pending deposit (payment failed, canceled, or expired)
 export const cancelDeposit = async (
-  transactionId: string, 
-  status: 'failed' | 'cancelled' | 'expired' = 'cancelled',
-  reason?: string
+  transactionId: string,
+  status: "failed" | "cancelled" | "expired" = "cancelled",
+  reason?: string,
 ) => {
   try {
+    // Validate transactionId to prevent NoSQL injection
+    if (!isValidObjectId(transactionId)) {
+      console.error(`❌ Invalid transactionId format: ${transactionId}`);
+      return { success: false, error: "Invalid transaction ID format" };
+    }
+
     await connectToDatabase();
 
     // Find and update the transaction
     const transaction = await WalletTransaction.findById(transactionId);
-    
+
     if (!transaction) {
       console.log(`⚠️ Transaction ${transactionId} not found for cancellation`);
-      return { success: false, error: 'Transaction not found' };
+      return { success: false, error: "Transaction not found" };
     }
 
-    if (transaction.status !== 'pending') {
-      console.log(`⚠️ Transaction ${transactionId} is not pending (status: ${transaction.status})`);
-      return { success: false, error: 'Transaction already processed' };
+    if (transaction.status !== "pending") {
+      console.log(
+        `⚠️ Transaction ${transactionId} is not pending (status: ${transaction.status})`,
+      );
+      return { success: false, error: "Transaction already processed" };
     }
 
     // Update transaction status
@@ -697,12 +690,15 @@ export const cancelDeposit = async (
     console.log(`✅ Deposit cancelled/failed:`);
     console.log(`   Transaction: ${transactionId}`);
     console.log(`   Status: ${status}`);
-    console.log(`   Reason: ${reason || 'N/A'}`);
+    console.log(`   Reason: ${reason || "N/A"}`);
 
-    return { success: true, transaction: JSON.parse(JSON.stringify(transaction)) };
+    return {
+      success: true,
+      transaction: JSON.parse(JSON.stringify(transaction)),
+    };
   } catch (error) {
-    console.error('Error cancelling deposit:', error);
-    return { success: false, error: 'Failed to cancel deposit' };
+    console.error("Error cancelling deposit:", error);
+    return { success: false, error: "Failed to cancel deposit" };
   }
 };
 
@@ -710,12 +706,17 @@ export const cancelDeposit = async (
 export const getWalletStats = async () => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
-    
+    // Reason: Use shared getUserFinancialSummary service as SINGLE SOURCE OF TRUTH.
+    // Eliminates drift between user dashboard, admin dashboard, and profile.
+    const [wallet, fs] = await Promise.all([
+      CreditWallet.findOne({ userId: session.user.id }),
+      getUserFinancialSummary(session.user.id),
+    ]);
+
     if (!wallet) {
       return {
         currentBalance: 0,
@@ -725,40 +726,40 @@ export const getWalletStats = async () => {
         totalWonFromCompetitions: 0,
         totalSpentOnChallenges: 0,
         totalWonFromChallenges: 0,
+        totalSpentOnMarketplace: 0,
         netProfitFromCompetitions: 0,
         netProfitFromChallenges: 0,
         roi: 0,
+        totalGMEarnings: fs.gmEarnings,
+        totalAdminAdjustments: fs.adminAdjustments,
       };
     }
-
-    const netProfitCompetitions = wallet.totalWonFromCompetitions - wallet.totalSpentOnCompetitions;
-    const netProfitChallenges = (wallet.totalWonFromChallenges || 0) - (wallet.totalSpentOnChallenges || 0);
-    const totalSpent = wallet.totalSpentOnCompetitions + (wallet.totalSpentOnChallenges || 0);
-    const roi = totalSpent > 0
-      ? ((netProfitCompetitions + netProfitChallenges) / totalSpent) * 100
-      : 0;
 
     return {
       currentBalance: wallet.creditBalance,
       totalDeposited: wallet.totalDeposited,
       totalWithdrawn: wallet.totalWithdrawn,
-      totalSpentOnCompetitions: wallet.totalSpentOnCompetitions,
-      totalWonFromCompetitions: wallet.totalWonFromCompetitions,
-      totalSpentOnChallenges: wallet.totalSpentOnChallenges || 0,
-      totalWonFromChallenges: wallet.totalWonFromChallenges || 0,
-      netProfitFromCompetitions: netProfitCompetitions,
-      netProfitFromChallenges: netProfitChallenges,
-      roi: roi,
+      totalSpentOnCompetitions: fs.netCompetitionSpent,
+      totalWonFromCompetitions: fs.competitionWins,
+      totalSpentOnChallenges: fs.netChallengeSpent,
+      totalWonFromChallenges: fs.challengeWins,
+      totalSpentOnMarketplace: fs.marketplaceSpent,
+      netProfitFromCompetitions: fs.competitionWins - fs.netCompetitionSpent,
+      netProfitFromChallenges: fs.challengeWins - fs.netChallengeSpent,
+      roi: fs.roi,
       kycVerified: wallet.kycVerified,
       withdrawalEnabled: wallet.withdrawalEnabled,
+      totalGMEarnings: fs.gmEarnings,
+      // Reason: Admin adjustments are tracked separately so users can see
+      // manual credit/debit activity on their wallet without affecting ROI stats.
+      totalAdminAdjustments: fs.adminAdjustments,
     };
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them
-    if (error instanceof Error && error.message.includes('NEXT_REDIRECT')) {
+    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
       throw error;
     }
-    console.error('Error getting wallet stats:', error);
-    throw new Error('Failed to get wallet stats');
+    console.error("Error getting wallet stats:", error);
+    throw new Error("Failed to get wallet stats");
   }
 };
-

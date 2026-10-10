@@ -1,0 +1,5 @@
+# What is SERVED is the packed build in volt-velocity/ (commit it). The .gz is only the input to
+# tools/games/pack-velocity-client.ts; older builds of this service unpacked it beside itself as
+# volt-velocity-client.html, which may still be lying around on a server - never commit that.
+volt-velocity-client.html
+*.tmp

@@ -1,0 +1,236 @@
+{
+  "source": "volt-velocity-client.html.gz",
+  "assets": [
+    {
+      "file": "aaa8e03385172fd2.webp",
+      "type": "image/webp",
+      "bytes": 84498,
+      "originalBytes": 84498,
+      "note": "559x231 kept"
+    },
+    {
+      "file": "028584ec004c0b38.webp",
+      "type": "image/webp",
+      "bytes": 555468,
+      "originalBytes": 555468,
+      "note": "1536x1024 kept"
+    },
+    {
+      "file": "3683971b9d292b4a.webp",
+      "type": "image/webp",
+      "bytes": 363010,
+      "originalBytes": 363010,
+      "note": "1254x1254 kept"
+    },
+    {
+      "file": "a7fdc6e39749530d.glb",
+      "type": "application/octet-stream",
+      "bytes": 2579020,
+      "originalBytes": 2579020,
+      "note": "copied"
+    },
+    {
+      "file": "2eb1b83a2d28ad9e.glb",
+      "type": "application/octet-stream",
+      "bytes": 2910128,
+      "originalBytes": 2910128,
+      "note": "copied"
+    },
+    {
+      "file": "90498ee22532355a.webp",
+      "type": "image/webp",
+      "bytes": 519466,
+      "originalBytes": 519466,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "94b4564763cd5507.webp",
+      "type": "image/webp",
+      "bytes": 1645930,
+      "originalBytes": 1645930,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "c45d004ddc731180.webp",
+      "type": "image/webp",
+      "bytes": 1368402,
+      "originalBytes": 1368402,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "79722ab9df8d1377.webp",
+      "type": "image/webp",
+      "bytes": 17446,
+      "originalBytes": 17446,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "7ccfc49ddbc1f279.webp",
+      "type": "image/webp",
+      "bytes": 1419396,
+      "originalBytes": 1419396,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "e18db9fc9c757e35.webp",
+      "type": "image/webp",
+      "bytes": 389814,
+      "originalBytes": 389814,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "80bd6e75fa77cec7.webp",
+      "type": "image/webp",
+      "bytes": 651720,
+      "originalBytes": 651720,
+      "note": "1536x1024 kept"
+    },
+    {
+      "file": "2b986fedf86b3cb8.webp",
+      "type": "image/webp",
+      "bytes": 113390,
+      "originalBytes": 1123142,
+      "note": "8192x4096 -> 4096x2048"
+    },
+    {
+      "file": "0389fb2a92a21382.webp",
+      "type": "image/webp",
+      "bytes": 244916,
+      "originalBytes": 1692340,
+      "note": "8192x4096 -> 4096x2048"
+    },
+    {
+      "file": "13fe4e60d928a3a8.webp",
+      "type": "image/webp",
+      "bytes": 245254,
+      "originalBytes": 427734,
+      "note": "4096x2048 re-encoded"
+    },
+    {
+      "file": "b270cc19dd50eb79.webp",
+      "type": "image/webp",
+      "bytes": 118230,
+      "originalBytes": 280070,
+      "note": "4096x2048 re-encoded"
+    },
+    {
+      "file": "bdb6d9cbfbaff06f.webp",
+      "type": "image/webp",
+      "bytes": 780446,
+      "originalBytes": 780446,
+      "note": "4096x2048 kept"
+    },
+    {
+      "file": "62a17b2f37bef18c.webp",
+      "type": "image/webp",
+      "bytes": 1489474,
+      "originalBytes": 1489474,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "56196ac7e2fd8019.webp",
+      "type": "image/webp",
+      "bytes": 1693028,
+      "originalBytes": 1693028,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "1fdba8b3899aa911.webp",
+      "type": "image/webp",
+      "bytes": 1077322,
+      "originalBytes": 1077322,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "b41bf18cd64eb4ef.webp",
+      "type": "image/webp",
+      "bytes": 521116,
+      "originalBytes": 521116,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "350ad8093d91b2d3.webp",
+      "type": "image/webp",
+      "bytes": 353250,
+      "originalBytes": 353250,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "d85fc5087221ef1c.webp",
+      "type": "image/webp",
+      "bytes": 304810,
+      "originalBytes": 304810,
+      "note": "2048x2048 kept"
+    },
+    {
+      "file": "206c67e3a1b99228.hdr",
+      "type": "application/octet-stream",
+      "bytes": 1173154,
+      "originalBytes": 1173154,
+      "note": "copied"
+    },
+    {
+      "file": "b3314ffdf23d0e45.webp",
+      "type": "image/webp",
+      "bytes": 482202,
+      "originalBytes": 482202,
+      "note": "1942x809 kept"
+    },
+    {
+      "file": "d66e08231e9c09ca.hdr",
+      "type": "application/octet-stream",
+      "bytes": 4171959,
+      "originalBytes": 4171959,
+      "note": "copied"
+    },
+    {
+      "file": "019b65b1ac11436f.webp",
+      "type": "image/webp",
+      "bytes": 367722,
+      "originalBytes": 367722,
+      "note": "1024x1024 kept"
+    },
+    {
+      "file": "fc2cc03135f0d329.webp",
+      "type": "image/webp",
+      "bytes": 240256,
+      "originalBytes": 240256,
+      "note": "1024x1024 kept"
+    },
+    {
+      "file": "7573da2ce574b9fc.webp",
+      "type": "image/webp",
+      "bytes": 18304,
+      "originalBytes": 26040,
+      "note": "256x256 re-encoded"
+    },
+    {
+      "file": "aaa63379ea0a9bba.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1746592,
+      "originalBytes": 1746592,
+      "note": "copied"
+    },
+    {
+      "file": "0eb6fe2e093f337f.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1829661,
+      "originalBytes": 1829661,
+      "note": "copied"
+    },
+    {
+      "file": "f5230581ece7cb45.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1601351,
+      "originalBytes": 1601351,
+      "note": "copied"
+    },
+    {
+      "file": "561b315574118caa.mp3",
+      "type": "audio/mpeg",
+      "bytes": 1801449,
+      "originalBytes": 1801449,
+      "note": "copied"
+    }
+  ]
+}

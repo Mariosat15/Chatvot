@@ -1,0 +1,758 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
+import { ObjectId } from "mongodb";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { getPublicName } from "@/lib/utils/user-lookup";
+import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
+import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
+import { contestGameLabel } from "@/lib/games";
+import {
+  checkGameMasterCanCreate,
+  checkRouteCanCreateGameType,
+  clampMinParticipants,
+  resolveCreationLimits,
+} from "@/lib/services/gamemaster/game-permissions";
+import { countGameMasterActiveCompetitions } from "@/lib/services/gamemaster/active-competitions";
+import { createGameMasterProviderCompetition } from "@/lib/services/gamemaster/create-provider-competition";
+import { resolveGameMasterPlatformFeePercentage } from "@/lib/services/gamemaster/platform-fee";
+import { checkVisibilityAllowed } from "@/lib/services/gamemaster/visibility-permission";
+import {
+  COMPETITION_VISIBILITIES,
+  resolveCompetitionVisibility,
+} from "@/lib/services/gamemaster/competition-visibility";
+import { isGmPrivateContestsEnabled } from "@/lib/services/gamemaster/gm-program-flags";
+import {
+  checkRouteFunding,
+  fundingRefusalStatus,
+} from "@/lib/services/gamemaster/funding-permission";
+import { insertGameMasterCompetition } from "@/lib/services/gamemaster/free-private-create";
+import { applyGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults-apply";
+import { loadGameMasterCompetitionDefaults } from "@/lib/services/gamemaster/competition-defaults.service";
+import {
+  gameMasterScheduleError,
+  START_IN_PAST_TOLERANCE_MS,
+} from "@/lib/services/gamemaster/contest-start-guard";
+
+/**
+ * GET /api/gamemaster/competitions
+ * Get competitions created by this Game Master
+ */
+export async function GET() {
+  try {
+    await connectToDatabase();
+
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const userId = session.user.id;
+    const db = mongoose.connection.db;
+
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    // Check if user is a Game Master
+    const subscription = await GameMasterSubscription.findOne({
+      userId,
+      status: "active",
+    });
+    if (!subscription) {
+      return NextResponse.json(
+        { success: false, error: "Not a Game Master" },
+        { status: 403 },
+      );
+    }
+
+    // Get CURRENT package settings (not cached subscription limits)
+    let currentLimits = {
+      maxCompetitionsPerDay: subscription.limits?.maxCompetitionsPerDay || 1,
+      maxUsersPerCompetition: subscription.limits?.maxUsersPerCompetition || 50,
+      canCreateCompetitions:
+        subscription.limits?.canCreateCompetitions !== false,
+    };
+
+    let packageAllowedVisibility: unknown;
+    let hasPackage = false;
+    if (subscription.packageId) {
+      const currentPackage = await MarketplaceItem.findById(
+        subscription.packageId,
+      ).lean();
+      if (currentPackage?.gameMasterConfig) {
+        hasPackage = true;
+        packageAllowedVisibility = currentPackage.gameMasterConfig.allowedVisibility;
+        currentLimits = {
+          maxCompetitionsPerDay:
+            currentPackage.gameMasterConfig.maxCompetitionsPerDay || 1,
+          maxUsersPerCompetition:
+            currentPackage.gameMasterConfig.maxUsersPerCompetition || 50,
+          canCreateCompetitions:
+            currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+        };
+      }
+    }
+
+    // Get competitions created by this Game Master
+    const competitions = await db
+      .collection("competitions")
+      .find({ gameMasterId: userId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .toArray();
+
+    // Reason: the form offers exactly what the POST would accept, by asking the same rule
+    // about each value - a second copy of the precedence here would drift from the gate.
+    const privateContestsEnabled = await isGmPrivateContestsEnabled();
+    const creatableVisibilities = COMPETITION_VISIBILITIES.filter(
+      (requested) =>
+        checkVisibilityAllowed({
+          requested,
+          hasPackage,
+          packageAllowed: packageAllowedVisibility,
+          cachedAllowed: subscription.limits?.allowedVisibility,
+          privateContestsEnabled,
+        }).ok,
+    );
+
+    return NextResponse.json({
+      success: true,
+      competitions: competitions.map((c) => ({
+        id: c._id.toString(),
+        name: c.name,
+        status: c.status,
+        entryFee: c.entryFee,
+        prizePool: c.prizePool,
+        currentParticipants: c.currentParticipants || 0,
+        maxParticipants: c.maxParticipants,
+        startTime: c.startTime,
+        endTime: c.endTime,
+        createdAt: c.createdAt,
+        visibility: resolveCompetitionVisibility(c.visibility),
+      })),
+      limits: {
+        creatableVisibilities,
+        maxCompetitionsPerDay: currentLimits.maxCompetitionsPerDay,
+        maxUsersPerCompetition: currentLimits.maxUsersPerCompetition,
+        canCreateCompetitions: currentLimits.canCreateCompetitions,
+        currentPeriodCreated: subscription.currentPeriodCompetitionsCreated,
+        remaining: currentLimits.canCreateCompetitions
+          ? currentLimits.maxCompetitionsPerDay -
+            (subscription.currentPeriodCompetitionsCreated || 0)
+          : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching GM competitions:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * POST /api/gamemaster/competitions
+ * Create a new competition as Game Master
+ */
+export async function POST(request: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const userId = session.user.id;
+    const requestBody = await request.json();
+
+    // Reason: the admin's defaults are applied BEFORE anything below reads the body, so every
+    // later check - prize pool, package cap, provider pre-flight - sees the competition that
+    // will actually be stored. A locked option is overwritten whatever the request said; an
+    // open one is validated and refused, never clamped. Same call as the admin-hosted copy.
+    const defaultsGame = requestBody?.gameType === "provider" ? "provider" : "trading";
+    const withDefaults = applyGameMasterCompetitionDefaults(
+      requestBody,
+      await loadGameMasterCompetitionDefaults(),
+      defaultsGame,
+    );
+    if (!withDefaults.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: withDefaults.errors[0],
+          errors: withDefaults.errors,
+        },
+        { status: 400 },
+      );
+    }
+    // Reason: the body was `any` from `request.json()` before the defaults existed, and the
+    // trading path below parses its fields itself; re-typing all of them is not this change.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = withDefaults.body as Record<string, any>;
+
+    const {
+      name,
+      description,
+      entryFee,
+      startingCapital,
+      minParticipants,
+      maxParticipants,
+      startTime,
+      endTime,
+      leverage,
+      assetClasses,
+      prizeDistribution,
+      rules,
+      levelRequirement,
+      riskLimits,
+      difficulty,
+    } = body;
+    // platformFeePercentage from the body is deliberately ignored — see resolve below.
+
+    // Trading-specific required fields are checked after the game-type branch below.
+    // Provider contests do not carry startingCapital, so enforcing it here would refuse
+    // every game contest before the permission gate ran.
+
+    const db = mongoose.connection.db;
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    // Get subscription to check limits
+    const subscription = await db
+      .collection("gamemastersubscriptions")
+      .findOne({
+        userId,
+        status: "active",
+      });
+
+    if (!subscription) {
+      return NextResponse.json(
+        { success: false, error: "No active Game Master subscription" },
+        { status: 403 },
+      );
+    }
+
+    // Check if subscription is expired
+    if (new Date(subscription.endDate) < new Date()) {
+      return NextResponse.json(
+        { success: false, error: "Your Game Master subscription has expired" },
+        { status: 403 },
+      );
+    }
+
+    // The CURRENT package, not the cached limits. Reason: the cache is what this Game
+    // Master bought and the package is what the operator currently offers, so reading the
+    // cache first is how a tightened tier is bypassed by everyone already subscribed. It
+    // stays a fallback because a package can be DELETED while somebody is subscribed to it.
+    let packageConfig = null;
+    if (subscription.packageId) {
+      try {
+        const currentPackage = await db.collection("marketplaceitems").findOne({
+          _id: new ObjectId(subscription.packageId),
+        });
+        packageConfig = currentPackage?.gameMasterConfig ?? null;
+      } catch (e) {
+        console.error("Error fetching package:", e);
+      }
+    }
+
+    // One rule, shared with the admin-hosted copy of this route. Before this existed the
+    // two disagreed about every question it answers - see `game-permissions.ts`.
+    const effectiveLimits = resolveCreationLimits({
+      limits: subscription.limits,
+      packageConfig,
+      override: subscription.competitionCreationOverride,
+      overrideLimits: subscription.overrideLimits,
+    });
+
+    // Check daily competition limit
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const lastResetDate = new Date(subscription.lastCompetitionResetDate);
+    lastResetDate.setHours(0, 0, 0, 0);
+
+    // Reset daily counter if it's a new day
+    if (today > lastResetDate) {
+      await db.collection("gamemastersubscriptions").updateOne(
+        { _id: subscription._id },
+        {
+          $set: {
+            currentPeriodCompetitionsCreated: 0,
+            lastCompetitionResetDate: new Date(),
+          },
+        },
+      );
+      subscription.currentPeriodCompetitionsCreated = 0;
+    }
+
+    // Permission to create, then the game, then concurrent-active + daily quota.
+    const activeCompetitions = await countGameMasterActiveCompetitions(
+      db,
+      userId,
+    );
+    const verdict = checkGameMasterCanCreate({
+      limits: effectiveLimits,
+      requestedGameType: body.gameType,
+      competitionsCreatedToday: subscription.currentPeriodCompetitionsCreated,
+      activeCompetitions,
+    });
+
+    if (!verdict.ok) {
+      // Reason the daily / active caps keep 429 while the other refusals are 403: the existing
+      // client branches on the status to decide whether to say "try again tomorrow" / "finish
+      // a contest first", and a quota is genuinely rate limiting rather than a permission
+      // problem. Matches the admin create route.
+      return NextResponse.json(
+        {
+          success: false,
+          error: verdict.message,
+          reason: verdict.reason,
+          ...(verdict.reason === "daily_limit_reached"
+            ? {
+                dailyLimit: effectiveLimits.maxCompetitionsPerDay,
+                created: subscription.currentPeriodCompetitionsCreated,
+              }
+            : {}),
+          ...(verdict.reason === "active_limit_reached"
+            ? {
+                activeLimit: effectiveLimits.maxActiveCompetitions,
+                active: activeCompetitions,
+              }
+            : {}),
+        },
+        {
+          status:
+            verdict.reason === "daily_limit_reached" ||
+            verdict.reason === "active_limit_reached"
+              ? 429
+              : 403,
+        },
+      );
+    }
+
+    // Separately from whether this Game Master is PERMITTED the game: can this route build
+    // one? Trading and provider both can (23 Sep 2026). Provider still needs a catalogue
+    // title and settings - see `createGameMasterProviderCompetition` - never a bare
+    // `contestGameLabel("provider")`, which would stamp an immutable wrong key.
+    const capability = checkRouteCanCreateGameType(verdict.gameType);
+    if (!capability.ok) {
+      return NextResponse.json(
+        { success: false, error: capability.message, reason: capability.reason },
+        { status: 400 },
+      );
+    }
+
+    // Public or private (step 5). The current package decides, then the cached limits, then
+    // public only - an admin creation override never widens it. Resolved ONCE and stamped
+    // explicitly on the insert: the raw driver applies no schema default (R7).
+    const visibilityVerdict = checkVisibilityAllowed({
+      requested: body.visibility,
+      hasPackage: packageConfig !== null,
+      packageAllowed: packageConfig?.allowedVisibility,
+      cachedAllowed: subscription.limits?.allowedVisibility,
+      privateContestsEnabled: await isGmPrivateContestsEnabled(),
+    });
+    if (!visibilityVerdict.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: visibilityVerdict.message,
+          reason: visibilityVerdict.reason,
+          decidedBy: visibilityVerdict.decidedBy,
+        },
+        { status: visibilityVerdict.reason === "visibility_unknown" ? 400 : 403 },
+      );
+    }
+
+    // Normal or Game Master-funded (Free Private Competitions, 2 Oct 2026). Checked after
+    // visibility because a funded contest must be private, and resolved ONCE so both the
+    // trading insert and the provider builder stamp the same answer.
+    const fundingVerdict = await checkRouteFunding({
+      requested: body.fundingMode,
+      visibility: visibilityVerdict.visibility,
+      packageConfig,
+      cachedLimits: subscription.limits,
+      entryFee: body.entryFee,
+      maxParticipants: body.maxParticipants,
+      maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
+    });
+    if (!fundingVerdict.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: fundingVerdict.message,
+          reason: fundingVerdict.reason,
+        },
+        { status: fundingRefusalStatus(fundingVerdict.reason) },
+      );
+    }
+
+    if (verdict.gameType === "provider") {
+      const providerResult = await createGameMasterProviderCompetition({
+        body,
+        userId,
+        gameMasterName: await getPublicName(session.user.id),
+        maxUsersPerCompetition: effectiveLimits.maxUsersPerCompetition,
+        visibility: visibilityVerdict.visibility,
+        adminFilled: withDefaults.adminFilled,
+        fundingMode: fundingVerdict.fundingMode,
+      });
+
+      if (!providerResult.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: providerResult.error,
+            errors: providerResult.errors,
+            warnings: providerResult.warnings,
+            competitionId: providerResult.competitionId,
+          },
+          { status: 400 },
+        );
+      }
+
+      await db.collection("gamemastersubscriptions").updateOne(
+        { _id: subscription._id },
+        {
+          $inc: {
+            currentPeriodCompetitionsCreated: 1,
+            totalCompetitionsCreated: 1,
+          },
+          $set: { updatedAt: new Date() },
+        },
+      );
+
+      return NextResponse.json({
+        success: true,
+        competition: {
+          id: providerResult.competitionId,
+          slug: providerResult.slug,
+          status: "upcoming",
+        },
+        warnings: providerResult.warnings,
+        fundingMode: fundingVerdict.fundingMode,
+        fundingReserve: providerResult.fundingReserve,
+        limits: {
+          dailyRemaining: Math.max(
+            0,
+            effectiveLimits.maxCompetitionsPerDay -
+              (subscription.currentPeriodCompetitionsCreated ?? 0) -
+              1,
+          ),
+          maxParticipants: effectiveLimits.maxUsersPerCompetition,
+        },
+        message: "Competition created successfully!",
+      });
+    }
+
+    // Trading path below — startingCapital and market fields are required here only.
+    if (
+      !name ||
+      !entryFee ||
+      !startingCapital ||
+      !maxParticipants ||
+      !startTime ||
+      !endTime
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Missing required fields" },
+        { status: 400 },
+      );
+    }
+
+    // Reason: the wizard refuses a past start, but the route is the only check a direct
+    // request cannot skip.
+    const scheduleError = gameMasterScheduleError(
+      new Date(startTime),
+      new Date(endTime),
+      new Date(),
+      START_IN_PAST_TOLERANCE_MS,
+    );
+    if (scheduleError) {
+      return NextResponse.json({ success: false, error: scheduleError }, { status: 400 });
+    }
+
+    // Check max participants limit
+    const effectiveMaxParticipants = Math.min(
+      parseInt(maxParticipants),
+      effectiveLimits.maxUsersPerCompetition,
+    );
+
+    // Calculate prize pool — fee is admin-controlled, never from the GM body.
+    const entryFeeNum = parseFloat(entryFee);
+    const platformFee = await resolveGameMasterPlatformFeePercentage();
+    const estimatedPrizePool =
+      effectiveMaxParticipants * entryFeeNum * (1 - platformFee / 100);
+
+    // Build allowed symbols based on asset classes
+    const allowedSymbols: string[] = [];
+    const assetClassesArray: string[] = [];
+
+    // Handle both array and object format for assetClasses
+    if (Array.isArray(assetClasses)) {
+      if (assetClasses.includes("forex")) {
+        allowedSymbols.push(
+          "EUR/USD",
+          "GBP/USD",
+          "USD/JPY",
+          "USD/CHF",
+          "AUD/USD",
+          "USD/CAD",
+          "NZD/USD",
+        );
+        assetClassesArray.push("forex");
+      }
+      if (assetClasses.includes("crypto")) {
+        allowedSymbols.push("BTC/USD", "ETH/USD", "XRP/USD", "SOL/USD");
+        assetClassesArray.push("crypto");
+      }
+      if (assetClasses.includes("stocks")) {
+        allowedSymbols.push("AAPL", "GOOGL", "MSFT", "TSLA", "AMZN");
+        assetClassesArray.push("stocks");
+      }
+    } else {
+      if (assetClasses?.forex !== false) {
+        allowedSymbols.push(
+          "EUR/USD",
+          "GBP/USD",
+          "USD/JPY",
+          "USD/CHF",
+          "AUD/USD",
+          "USD/CAD",
+          "NZD/USD",
+        );
+        assetClassesArray.push("forex");
+      }
+      if (assetClasses?.crypto) {
+        allowedSymbols.push("BTC/USD", "ETH/USD", "XRP/USD", "SOL/USD");
+        assetClassesArray.push("crypto");
+      }
+      if (assetClasses?.stocks) {
+        allowedSymbols.push("AAPL", "GOOGL", "MSFT", "TSLA", "AMZN");
+        assetClassesArray.push("stocks");
+      }
+    }
+
+    // Default rules if not provided
+    const defaultRules = {
+      rankingMethod: "pnl",
+      tieBreaker1: "trades_count",
+      minimumTrades: 1,
+      disqualifyOnLiquidation: true,
+      tiePrizeDistribution: "split_equally",
+    };
+
+    // Reason: Generate a unique slug from the competition name.
+    // The Competition model has a unique index on slug — null/missing slug
+    // causes E11000 duplicate key errors on the second insert.
+    const baseSlug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    let slug = baseSlug || `comp-${Date.now()}`;
+    let counter = 1;
+
+    while (await db.collection("competitions").findOne({ slug })) {
+      counter++;
+      slug = `${baseSlug}-${counter}`;
+    }
+
+    // Create competition
+    const competition = {
+      _id: new ObjectId(),
+      name,
+      description: description || "",
+      slug,
+      status: "upcoming",
+      entryFee: entryFeeNum,
+      startingCapital: parseFloat(startingCapital),
+      // Reason: Start at 0 — actual prize pool is built incrementally via $inc
+      // when each user enters (competition.actions.ts enterCompetition).
+      // Setting this to estimatedPrizePool caused double-counting: the estimate
+      // was stored here AND each entry fee was added on top, inflating the pool
+      // far beyond what was actually collected.
+      prizePool: 0,
+      estimatedPrizePool, // For display purposes only (client shows this before users join)
+      // Reason this is clamped rather than `parseInt(minParticipants) || 2`: that expression
+      // is wrong in exactly one direction and it is the direction that matters. `"1"` parses
+      // to 1, which is TRUTHY, so it passed straight through - and `minParticipants: 1`
+      // means the auto-cancel-and-refund below the minimum can never fire, so a single
+      // player pays an entry fee and takes the pot back minus the platform fee. That is a
+      // paid solo game, which no paid format on this platform may be. `"0"` and `""` were
+      // caught only by luck, being falsy.
+      minParticipants: clampMinParticipants(minParticipants),
+      maxParticipants: effectiveMaxParticipants,
+      currentParticipants: 0,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      registrationDeadline: new Date(startTime),
+      allowedSymbols:
+        allowedSymbols.length > 0
+          ? allowedSymbols
+          : ["EUR/USD", "GBP/USD", "USD/JPY"],
+      assetClasses:
+        assetClassesArray.length > 0 ? assetClassesArray : ["forex"],
+      leverage: leverage || 30,
+      platformFeePercentage: platformFee,
+      prizeDistribution: prizeDistribution || [
+        { rank: 1, percentage: 70 },
+        { rank: 2, percentage: 20 },
+        { rank: 3, percentage: 10 },
+      ],
+      // Game Master fields
+      gameMasterId: userId,
+      gameMasterName: await getPublicName(session.user.id),
+      visibility: visibilityVerdict.visibility,
+      createdBy: userId,
+      // Competition rules (use provided or defaults)
+      rules: rules
+        ? {
+            rankingMethod: rules.rankingMethod || defaultRules.rankingMethod,
+            tieBreaker1: rules.tieBreaker1 || defaultRules.tieBreaker1,
+            tieBreaker2: rules.tieBreaker2,
+            minimumTrades: rules.minimumTrades ?? defaultRules.minimumTrades,
+            minimumWinRate: rules.minimumWinRate,
+            disqualifyOnLiquidation:
+              rules.disqualifyOnLiquidation ??
+              defaultRules.disqualifyOnLiquidation,
+            tiePrizeDistribution:
+              rules.tiePrizeDistribution || defaultRules.tiePrizeDistribution,
+          }
+        : defaultRules,
+      // Level requirement
+      levelRequirement: levelRequirement?.enabled
+        ? {
+            enabled: true,
+            minLevel: levelRequirement.minLevel || 1,
+            maxLevel: levelRequirement.maxLevel,
+          }
+        : { enabled: false },
+      // Risk limits
+      riskLimits: riskLimits?.enabled
+        ? {
+            enabled: true,
+            maxDrawdownPercent: riskLimits.maxDrawdownPercent || 50,
+            dailyLossLimitPercent: riskLimits.dailyLossLimitPercent || 20,
+            equityCheckEnabled: riskLimits.equityCheckEnabled || false,
+            equityDrawdownPercent: riskLimits.equityDrawdownPercent || 30,
+          }
+        : { enabled: false },
+      // Difficulty setting
+      difficulty: difficulty
+        ? {
+            mode: difficulty.mode || "auto",
+            manualLevel: difficulty.manualLevel,
+          }
+        : { mode: "auto" },
+      // Reason: These fields are required by the Mongoose schema but since we use
+      // raw insertOne (bypassing Mongoose), defaults don't apply.
+      competitionType: "time_based",
+      maxPositionSize: 20,
+      maxOpenPositions: 10,
+      allowShortSelling: false,
+      marginCallThreshold: 100,
+      // Reason: same bypass, for the game label (risk R7).
+      //
+      // The type comes from the GATE's resolved value, not from the request body and not
+      // from a literal. Taking it from the body would let a caller be admitted as one game
+      // and written as another; hard-coding it would let a future widening of
+      // `allowedGameTypes` grant a game that is then stored with the wrong label. Two gates
+      // have already run on this value: the Game Master's `allowedGameTypes`, and what this
+      // route can actually build - so it can only be trading today, and it will follow the
+      // allow-list correctly when that changes.
+      ...contestGameLabel(verdict.gameType),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const inserted = await insertGameMasterCompetition(db, competition, {
+      fundingMode: fundingVerdict.fundingMode,
+      gameMasterUserId: userId,
+    });
+    if (!inserted.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: inserted.message,
+          reason: "insufficient_balance",
+          required: inserted.required,
+          available: inserted.available,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Update subscription counters
+    await db.collection("gamemastersubscriptions").updateOne(
+      { _id: subscription._id },
+      {
+        $inc: {
+          currentPeriodCompetitionsCreated: 1,
+          totalCompetitionsCreated: 1,
+        },
+        $set: { updatedAt: new Date() },
+      },
+    );
+
+    return NextResponse.json({
+      success: true,
+      competition: {
+        id: competition._id.toString(),
+        name: competition.name,
+        status: competition.status,
+        startTime: competition.startTime,
+        endTime: competition.endTime,
+        entryFee: competition.entryFee,
+        prizePool: competition.prizePool,
+        maxParticipants: competition.maxParticipants,
+        fundingMode: fundingVerdict.fundingMode,
+        fundingReserve: inserted.reserve,
+      },
+      limits: {
+        // Reason `Math.max(0, ...)`: `currentPeriodCompetitionsCreated` is incremented by
+        // the write above, and a cap lowered by an operator after a Game Master had already
+        // created several contests makes this arithmetic negative. "-2 remaining today" is
+        // not a fact about anything.
+        dailyRemaining: Math.max(
+          0,
+          effectiveLimits.maxCompetitionsPerDay -
+            (subscription.currentPeriodCompetitionsCreated ?? 0) -
+            1,
+        ),
+        maxParticipants: effectiveLimits.maxUsersPerCompetition,
+      },
+      message: "Competition created successfully!",
+    });
+  } catch (error) {
+    console.error("Error creating competition:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}

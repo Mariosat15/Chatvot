@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Circuit wire preview — thicker + smooth glow</title>
+    <style>
+      /*
+        PREVIEW ONLY — not loaded by the game. Open this file (or /play/wire-preview.html)
+        to judge the new tube before we wire it into board.js.
+      */
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #020b1c;
+        color: #eaf4ff;
+        font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+      }
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 28px 20px 48px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 1.25rem;
+        letter-spacing: 0.04em;
+      }
+      p {
+        margin: 0 0 22px;
+        color: #7fa6d6;
+        max-width: 52rem;
+      }
+      .card {
+        border: 1px solid rgba(42, 156, 255, 0.35);
+        border-radius: 16px;
+        background:
+          linear-gradient(180deg, rgba(14, 56, 110, 0.35), rgba(8, 32, 72, 0.55)),
+          #071a3a;
+        padding: 18px;
+        margin-bottom: 18px;
+      }
+      .card h2 {
+        margin: 0 0 12px;
+        font-size: 0.72rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #8fb6e0;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        shape-rendering: geometricPrecision;
+      }
+      .note {
+        margin-top: 10px;
+        font-size: 0.8rem;
+        color: #6a8fb8;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        margin-top: 12px;
+        font-size: 0.8rem;
+        color: #9ec0e4;
+      }
+      .swatch {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .swatch i {
+        width: 28px;
+        height: 6px;
+        border-radius: 99px;
+        box-shadow: 0 0 10px currentColor;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Neon wire preview</h1>
+      <p>
+        Slightly thicker than the live game, with an SVG blur bloom so the tube stays smooth
+        instead of looking pixelated on screen. This page is a preview only — say if you want
+        this look (or thicker / thinner) and then we put it into the game.
+      </p>
+
+      <section class="card">
+        <h2>Proposed tube — soft bloom + casing + filament</h2>
+        <!--
+          Ratios vs a ~56px cell (medium board feel):
+            halo stroke ~ 0.58 cell (+ feGaussianBlur)  — soft outer light, not a hard fat bar
+            casing      ~ 0.26 cell
+            filament    ~ 0.10 cell
+          Live game today is roughly 0.44 / 0.16 / 0.055 without blur (reads thin + aliased).
+        -->
+        <svg viewBox="0 0 860 220" xmlns="http://www.w3.org/2000/svg" aria-label="Proposed neon wires">
+          <defs>
+            <pattern id="grid" width="56" height="56" patternUnits="userSpaceOnUse">
+              <path
+                d="M56 0H0V56"
+                fill="none"
+                stroke="rgba(88,186,255,0.18)"
+                stroke-width="1"
+              />
+            </pattern>
+            <!-- Soft bloom: blur kills the jaggy edge that a flat low-opacity stroke shows. -->
+            <filter id="neon-bloom" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+            <filter id="neon-bloom-soft" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="5.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <rect width="860" height="220" fill="#061428" />
+          <rect width="860" height="220" fill="url(#grid)" />
+
+          <!-- Purple horizontal (image-3 style) -->
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline
+              points="48,48 780,48"
+              stroke="#c44dff"
+              stroke-width="32"
+              opacity="0.55"
+              filter="url(#neon-bloom-soft)"
+            />
+            <polyline points="48,48 780,48" stroke="#c44dff" stroke-width="14" opacity="0.9" />
+            <polyline points="48,48 780,48" stroke="#f6e9ff" stroke-width="5.5" opacity="0.98" />
+            <circle cx="780" cy="48" r="7" fill="#f6e9ff" opacity="0.95" />
+            <circle cx="780" cy="48" r="14" fill="#c44dff" opacity="0.35" filter="url(#neon-bloom)" />
+          </g>
+
+          <!-- Cyan bent path (board-like turns) -->
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline
+              points="48,118 220,118 220,170 520,170 520,118 780,118"
+              stroke="#1ae8ff"
+              stroke-width="32"
+              opacity="0.5"
+              filter="url(#neon-bloom-soft)"
+            />
+            <polyline
+              points="48,118 220,118 220,170 520,170 520,118 780,118"
+              stroke="#1ae8ff"
+              stroke-width="14"
+              opacity="0.92"
+            />
+            <polyline
+              points="48,118 220,118 220,170 520,170 520,118 780,118"
+              stroke="#f0fbff"
+              stroke-width="5.5"
+              opacity="0.98"
+            />
+          </g>
+
+          <!-- Amber short segment -->
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <polyline
+              points="48,198 400,198"
+              stroke="#ffb300"
+              stroke-width="28"
+              opacity="0.5"
+              filter="url(#neon-bloom-soft)"
+            />
+            <polyline points="48,198 400,198" stroke="#ffb300" stroke-width="12" opacity="0.92" />
+            <polyline points="48,198 400,198" stroke="#fff6d8" stroke-width="4.5" opacity="0.98" />
+          </g>
+        </svg>
+        <div class="legend">
+          <span class="swatch"><i style="background:#c44dff;color:#c44dff"></i> Violet</span>
+          <span class="swatch"><i style="background:#1ae8ff;color:#1ae8ff"></i> Cyan</span>
+          <span class="swatch"><i style="background:#ffb300;color:#ffb300"></i> Amber</span>
+        </div>
+        <p class="note">
+          Soft outer glow = blurred SVG filter (smooth). Middle = coloured tube. Centre = bright
+          filament. Tip node on the violet line matches your reference image.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>What is live today (for comparison) — thin, no blur</h2>
+        <svg viewBox="0 0 860 100" xmlns="http://www.w3.org/2000/svg" aria-label="Current live wire style">
+          <rect width="860" height="100" fill="#061428" />
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Approx current ratios at ~56px cell: halo 25, casing 9, core 3 -->
+            <polyline points="48,50 780,50" stroke="#c44dff" stroke-width="25" opacity="0.22" />
+            <polyline points="48,50 780,50" stroke="#c44dff" stroke-width="9" opacity="0.72" />
+            <polyline points="48,50 780,50" stroke="#f4fbff" stroke-width="3" opacity="0.95" />
+          </g>
+        </svg>
+        <p class="note">
+          Thin flat strokes alias on many screens — that is the “pixelised” look. The proposed
+          card above keeps a bit more body and adds blur so the edge stays soft.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

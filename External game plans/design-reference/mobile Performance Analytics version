@@ -1,0 +1,1431 @@
+BUILT (eng, 9 Oct 2026): Empty Game Performance cards omitted when the player has no
+plays; shown cards always use Overview play art (desktop + mobile). Never verified by eye.
+
+TASK: REBUILD CHARTVOLT PERFORMANCE ANALYTICS PAGE FOR MOBILE
+
+We already have a desktop Performance Analytics page.
+
+DO NOT simply shrink the desktop Performance Analytics page.
+DO NOT stack every desktop section vertically without restructuring it.
+DO NOT force the large desktop charts and KPI rows into a phone screen.
+DO NOT render every game one after another down the page.
+
+Create a dedicated MOBILE PERFORMANCE experience that feels like a premium gaming + trading analytics app inside ChartVolt.
+
+The desktop Performance page must remain unchanged.
+
+Use the SAME real ChartVolt backend data and calculations.
+
+==================================================
+1. MAIN OBJECTIVE
+==================================================
+
+Build a completely dedicated mobile Performance Analytics layout for screens below 768px.
+
+The mobile Performance page must:
+
+- Be easy to understand at a glance.
+- Show the user's most important performance first.
+- Combine gaming, trading, competitions and 1v1 performance.
+- Support many future ChartVolt games without endless vertical scrolling.
+- Feel like a premium native gaming analytics app.
+- Keep the ChartVolt dark neon style.
+- Use the existing ChartVolt neon icon assets.
+- Use real backend performance data.
+- Be fully responsive.
+- Be retina-ready.
+- Be touch-friendly.
+- Use mobile-specific charts.
+- Avoid tiny desktop graphs.
+- Avoid excessive statistics.
+- Avoid horizontal page overflow.
+- Use clear hierarchy and natural visual flow.
+
+Desktop stays exactly as it is.
+
+Use separate mobile layout components.
+
+Example:
+
+<div className="hidden md:block">
+   <DesktopPerformanceAnalytics />
+</div>
+
+<div className="block md:hidden">
+   <MobilePerformanceAnalytics />
+</div>
+
+Share DATA / API / calculations.
+
+Do NOT share the desktop layout.
+
+==================================================
+2. BREAKPOINTS
+==================================================
+
+Mobile:
+max-width: 768px
+
+Desktop:
+min-width: 769px
+
+Primary mobile widths to test:
+
+360px
+375px
+390px
+393px
+412px
+430px
+
+The design must work naturally across all these widths.
+
+DO NOT use CSS transform: scale() to shrink desktop.
+
+==================================================
+3. REQUIRED MOBILE PAGE ORDER
+==================================================
+
+Use this exact visual order:
+
+1. Mobile Performance Header
+2. Performance Summary / Highlights
+3. Game Performance Carousel
+4. Overall Performance Trend
+5. Performance Mode Selector
+6. Trading Performance
+7. 1v1 Challenge Performance
+8. Competition Performance
+9. Market Holidays / Events
+10. Bottom Navigation
+
+This order is important.
+
+The first mobile screen should immediately answer:
+
+- How am I performing overall?
+- Am I improving or declining?
+- What is my win rate?
+- What is my best/current score?
+- Which games am I strongest in?
+
+==================================================
+4. MOBILE HEADER
+==================================================
+
+Create a compact mobile header.
+
+LEFT:
+
+Performance Analytics icon
+Title:
+Performance
+
+Optional short subtitle:
+Track your progress across ChartVolt.
+
+RIGHT:
+
+Date/range filter icon
+Game filter icon
+Notifications / avatar if already part of mobile app shell
+
+Do NOT show the full desktop navigation.
+
+Recommended header height:
+60–68px.
+
+Keep this section compact.
+
+==================================================
+5. MOBILE PERFORMANCE HERO / SUMMARY
+==================================================
+
+Instead of starting with eight tiny desktop cards, create one strong mobile performance summary.
+
+Example:
+
+PERFORMANCE
+
+Overall Performance
+76%
+
+↑ +14% this period
+
+Then show 2–3 secondary metrics:
+
+Win Rate
+68%
+
+Competitions Won
+6
+
+1v1 Wins
+8
+
+Use actual data.
+
+The summary card should include:
+
+- ChartVolt analytics icon
+- overall score / consistency / selected primary metric
+- trend indicator
+- small sparkline
+- date range
+- subtle neon glow
+
+Style:
+
+dark navy glass
+cyan / purple edge
+small gold accent where appropriate
+
+Recommended height:
+140–170px.
+
+Do NOT overload this hero card.
+
+==================================================
+6. PERFORMANCE HIGHLIGHTS
+==================================================
+
+Below the main performance card, create:
+
+PERFORMANCE HIGHLIGHTS
+
+Do NOT show all eight desktop KPI cards in one squeezed row.
+
+Use horizontally swipeable cards.
+
+Cards:
+
+Win Rate
+Avg ROI
+Avg Play Time
+Active Days
+Best Score
+Competitions Won
+1v1 Wins
+Consistency
+
+Each card contains:
+
+icon
+label
+main value
+change %
+
+Recommended width:
+55–65% of viewport
+
+Use:
+
+overflow-x-auto
+scroll-snap-type: x mandatory
+
+Example:
+
+[ Win Rate ] [ Avg ROI ] [ Play Time ] →
+
+Use the existing colored icon theme:
+
+Win Rate = cyan/green
+ROI = pink/red
+Play Time = purple
+Active Days = blue
+Best Score = gold
+Competitions = magenta
+1v1 = cyan
+Consistency = blue/violet
+
+==================================================
+7. GAME PERFORMANCE
+==================================================
+
+Create:
+
+GAME PERFORMANCE
+
+Subtitle:
+See how you're performing across your ChartVolt games.
+
+IMPORTANT:
+
+Do NOT stack every game vertically.
+
+Use a ONE-CARD-AT-A-TIME swipe carousel.
+
+Example:
+
+             2 / 8
+
+       [ VOLT STACK CARD ]
+
+        ● ○ ○ ○ ○
+
+< Previous              Next >
+
+Or support direct swipe gestures.
+
+Each game card should include:
+
+game icon
+game name
+status
+tagline
+
+Rounds
+Score
+Avg Duration
+Competitions
+
+Small sparkline
+
+View Details button
+
+Future games must automatically appear in this carousel.
+
+==================================================
+8. GAME CARD MOBILE DESIGN
+==================================================
+
+Each game card should feel like a premium playable-game card.
+
+Approximate width:
+100%
+
+Card height:
+180–220px
+
+Recommended style:
+
+border-radius: 18px
+
+background:
+linear-gradient(
+  135deg,
+  rgba(7, 20, 46, .98),
+  rgba(3, 9, 25, .98)
+)
+
+Use game-specific accents:
+
+Volt Stack:
+cyan / electric blue
+
+Volt Velocity:
+purple / magenta
+
+Circuit Sprint:
+orange / gold
+
+Future games:
+use approved ChartVolt accent palette.
+
+Do not change the card structure per game.
+
+==================================================
+9. GAME SCALABILITY
+==================================================
+
+This is CRITICAL.
+
+The user may eventually have:
+
+3 games
+5 games
+10 games
+20 games
+30 games
+
+Do NOT let the page become longer every time another game is added.
+
+Use:
+
+single-card carousel
+horizontal swipe
+pagination indicator
+previous / next buttons where appropriate
+
+Desktop:
+3 visible
+
+Tablet:
+2 visible
+
+Mobile:
+1 visible
+
+The mobile page height must remain manageable.
+
+==================================================
+10. OVERALL PERFORMANCE TREND
+==================================================
+
+This is the MAIN analytics chart.
+
+Title:
+
+PERFORMANCE TREND
+
+Subtitle:
+
+See how your overall ChartVolt performance changes over time.
+
+This chart MUST include performance across:
+
+- Games
+- Trading
+- Competitions
+- 1v1 Challenges
+- Overall Score
+
+Do not make this a game-only chart.
+
+==================================================
+11. PERFORMANCE TREND MOBILE CHART
+==================================================
+
+Do NOT squeeze the desktop five-line chart directly onto mobile.
+
+Use a mobile-focused chart.
+
+Default:
+show Overall Performance only.
+
+Above/below chart provide a selector:
+
+Overall
+Games
+Trading
+Competitions
+1v1
+
+Only ONE or TWO series should appear simultaneously on mobile.
+
+This prevents visual clutter.
+
+Example:
+
+[ Overall ▼ ]
+
+or:
+
+[ Overall ] [ Games ] [ Trading ] →
+
+Touching a mode updates the graph.
+
+==================================================
+12. TREND CHART RANGE CONTROL
+==================================================
+
+Use:
+
+7D
+30D
+90D
+ALL
+
+Horizontal segmented control.
+
+Default:
+30D
+
+The selected range should be obvious.
+
+This date range should update the entire mobile Performance page where appropriate.
+
+Do NOT create separate unrelated period states for every section.
+
+==================================================
+13. MOBILE PERFORMANCE CHART RULES
+==================================================
+
+Recommended chart height:
+230–270px.
+
+Use:
+
+fewer x-axis labels
+fewer y-axis labels
+strong readable line
+large touch target
+large tooltip
+subtle glow
+clean grid
+
+Tooltip:
+
+Date
+Selected performance metric
+Change from previous point
+
+If multiple series selected:
+show all active metrics.
+
+Do not depend on mouse hover.
+
+Tap interaction must work.
+
+==================================================
+14. PERFORMANCE MODE SELECTOR
+==================================================
+
+Below Performance Trend, add a compact mode selector.
+
+Example:
+
+PERFORMANCE BREAKDOWN
+
+[ Trading ]
+[ 1v1 ]
+[ Competitions ]
+
+Optional:
+Games if detailed game analytics are also available separately.
+
+This lets the user move between deeper analytics without putting everything on screen simultaneously.
+
+Use pill / tab buttons with icons.
+
+==================================================
+15. TRADING PERFORMANCE
+==================================================
+
+Create a mobile-specific Trading Performance section.
+
+Title:
+
+TRADING PERFORMANCE
+
+Subtitle:
+
+Your trading results for the selected period.
+
+Do NOT display eight tiny desktop circles in one row.
+
+Use a 2-column grid.
+
+Cards:
+
+Win Rate
+Net ROI
+Trade ROI
+Profit Factor
+Avg Win
+Avg Loss
+Best Trade
+Worst Trade
+
+Each compact card includes:
+
+small icon/gauge
+label
+value
+change if relevant
+
+Recommended height:
+85–105px.
+
+==================================================
+16. TRADING PERFORMANCE PRIORITY
+==================================================
+
+The most important metrics should appear first:
+
+1. Win Rate
+2. Net ROI
+3. Profit Factor
+4. Avg Win / Avg Loss
+
+Secondary:
+
+Trade ROI
+Best Trade
+Worst Trade
+
+Do not give all metrics equal visual importance.
+
+==================================================
+17. TRADING COLORS
+==================================================
+
+Positive:
+green / cyan
+
+Negative:
+red / pink
+
+Neutral:
+blue / muted gray
+
+Best trade:
+gold
+
+Worst trade:
+orange/red
+
+Keep colors consistent throughout the application.
+
+==================================================
+18. 1V1 CHALLENGE PERFORMANCE
+==================================================
+
+Create a full-width mobile card.
+
+Header:
+
+[ crossed swords icon ]
+
+1v1 Challenge Performance
+
+Subtitle:
+Your head-to-head performance.
+
+Top summary metrics:
+
+1v1 Wins
+Total Challenges
+Win Rate
+Best 1v1 Score
+
+Use either:
+
+2x2 grid
+
+or:
+
+horizontal stat carousel.
+
+Below:
+
+Win Rate
+Average Profit
+Average Score
+
+Use large horizontal progress bars.
+
+Do not squeeze the desktop card.
+
+==================================================
+19. 1V1 CARD EXAMPLE
+==================================================
+
+1V1 CHALLENGES
+
+Wins
+8
+↑ 33%
+
+Challenges
+12
+↑ 20%
+
+Win Rate
+67%
+
+Best Score
+4,320
+
+--------------------------------
+
+Win Rate
+███████████░░ 67%
+
+Average Profit
+██████░░░░░░ 12.4%
+
+Average Score
+████████░░░░ 2,180
+
+==================================================
+20. COMPETITION PERFORMANCE
+==================================================
+
+Create a separate mobile Competition Performance card.
+
+The layout should MATCH the 1v1 card.
+
+Metrics:
+
+Competitions Won
+Total Participations
+Placement Rate
+Best Competition Score
+
+Bars:
+
+Win Rate
+Top 3 Rate
+Average Score
+
+Accent:
+gold / purple / blue.
+
+Do NOT create a completely different component.
+
+Reuse one shared:
+
+MobilePerformanceSummaryCard
+
+with different data and accent settings.
+
+==================================================
+21. MARKET HOLIDAYS / EVENTS
+==================================================
+
+Market Holidays is secondary information.
+
+Keep it near the bottom.
+
+Title:
+
+MARKET HOLIDAYS
+
+Right:
+View Calendar
+
+Show only the next 3 holidays by default.
+
+Each row:
+
+date tile
+holiday name
+market
+time until event
+chevron
+
+Example:
+
+MAY 27
+Memorial Day
+US Markets
+In 26 days >
+
+Use the pink/magenta Calendar icon family.
+
+Allow:
+View All
+
+Do not show a long desktop list.
+
+==================================================
+22. GLOBAL FILTERS
+==================================================
+
+Mobile global filters must control:
+
+Performance Highlights
+Game Performance
+Performance Trend
+Trading Performance
+1v1
+Competition Performance
+
+Controls:
+
+Date Range
+Game / All Games
+
+On mobile, open filters through:
+
+bottom sheet
+popover
+or compact modal
+
+Do not permanently occupy large screen space with filter boxes.
+
+==================================================
+23. FILTER BUTTON
+==================================================
+
+Mobile header can use:
+
+[ calendar icon ] 30D
+
+and
+
+[ filter icon ] All Games
+
+or a single:
+
+[ Filters ]
+
+button.
+
+When opened, show:
+
+Date Range
+Game
+Competition Type if necessary
+Trading / Games mode if required
+
+Use large touch controls.
+
+==================================================
+24. SECTION CARDS
+==================================================
+
+Recommended style:
+
+border-radius:
+16–20px
+
+padding:
+14–18px
+
+background:
+
+linear-gradient(
+  135deg,
+  rgba(5, 17, 41, .97),
+  rgba(3, 8, 22, .98)
+)
+
+border:
+1px solid rgba(0, 205, 255, .25)
+
+Do NOT place intense neon glow around every card.
+
+Glow belongs mainly on:
+
+active game
+selected filter
+important performance
+highlighted metric
+navigation control
+
+==================================================
+25. MOBILE CHARTVOLT ICON SYSTEM
+==================================================
+
+Use the provided ChartVolt icon family.
+
+Examples:
+
+analytics bars
+trophy
+target
+clock
+calendar
+crossed swords
+performance arrow
+lightning
+star
+
+Use transparent PNGs.
+
+Do not replace the main visuals with generic Lucide icons.
+
+Lucide may only be used for small utility controls.
+
+Recommended sizes:
+
+Page icon:
+34–42px
+
+Section icons:
+24–30px
+
+Metric icons:
+28–38px
+
+Tiny utility icons:
+16–20px
+
+==================================================
+26. MOBILE TYPOGRAPHY
+==================================================
+
+Page title:
+22–26px
+
+Main performance value:
+32–40px
+
+Section title:
+16–18px
+
+Metric value:
+20–24px
+
+Card label:
+11–13px
+
+Body:
+13–15px
+
+Secondary text:
+11–12px
+
+Do NOT shrink text simply to fit more information.
+
+==================================================
+27. MOBILE SPACING
+==================================================
+
+Horizontal page padding:
+14–16px
+
+Major section gap:
+18–24px
+
+Card gap:
+10–14px
+
+Internal padding:
+14–18px
+
+Use enough breathing room.
+
+The desktop page is intentionally dense.
+
+The mobile page should feel cleaner.
+
+==================================================
+28. MOBILE BOTTOM NAVIGATION
+==================================================
+
+Use ChartVolt bottom navigation.
+
+Suggested:
+
+Dashboard
+Games
+Compete
+Performance
+Profile
+
+Performance is active.
+
+Active icon:
+cyan / blue glow.
+
+Bottom content padding:
+
+calc(80px + env(safe-area-inset-bottom))
+
+Content must never hide behind navigation.
+
+==================================================
+29. SAFE AREAS
+==================================================
+
+Support modern iPhones.
+
+Use:
+
+padding-top:
+env(safe-area-inset-top)
+
+padding-inline:
+max(16px, env(safe-area-inset-left))
+
+padding-bottom:
+calc(80px + env(safe-area-inset-bottom))
+
+==================================================
+30. COMPONENT STRUCTURE
+==================================================
+
+Create dedicated mobile performance components.
+
+Recommended:
+
+components/
+performance/
+
+desktop/
+DesktopPerformanceAnalytics.tsx
+
+mobile/
+MobilePerformanceAnalytics.tsx
+MobilePerformanceHeader.tsx
+MobileOverallPerformanceCard.tsx
+MobilePerformanceHighlights.tsx
+MobileGamePerformanceCarousel.tsx
+MobileGamePerformanceCard.tsx
+MobilePerformanceTrend.tsx
+MobilePerformanceModeTabs.tsx
+MobileTradingPerformance.tsx
+MobileChallengePerformance.tsx
+MobileCompetitionPerformance.tsx
+MobileMarketHolidays.tsx
+
+Shared:
+
+hooks/
+usePerformanceAnalytics.ts
+
+Do NOT duplicate API calls.
+
+==================================================
+31. SHARED DATA
+==================================================
+
+Desktop and mobile must use the same source data.
+
+Example:
+
+const performance = usePerformanceAnalytics();
+
+DesktopPerformanceAnalytics
+MobilePerformanceAnalytics
+
+consume the SAME backend state.
+
+Do NOT create:
+
+useDesktopPerformance()
+useMobilePerformance()
+
+if they fetch the same information.
+
+==================================================
+32. REAL DATA ONLY
+==================================================
+
+Do NOT hardcode values from the design.
+
+Use real ChartVolt data for:
+
+overall performance
+win rate
+ROI
+play time
+active days
+best score
+competition wins
+1v1 wins
+consistency
+game statistics
+game score
+game rounds
+game durations
+trading metrics
+competition metrics
+challenge metrics
+trend history
+
+The supplied image is VISUAL GUIDANCE only.
+
+==================================================
+33. MANY-GAME BEHAVIOR
+==================================================
+
+Game Performance must be data-driven.
+
+Example:
+
+const gamePerformance = [
+ {
+   id,
+   name,
+   icon,
+   accent,
+   tagline,
+   rounds,
+   score,
+   avgDuration,
+   competitions,
+   trend
+ }
+];
+
+Never hardcode:
+
+<VoltStack />
+<VoltVelocity />
+<CircuitSprint />
+
+Future games must automatically work.
+
+==================================================
+34. PERFORMANCE TREND DATA
+==================================================
+
+Create a normalized timeline containing:
+
+date
+overallScore
+gamePerformance
+tradingPerformance
+competitionPerformance
+challengePerformance
+
+Do not combine metrics incorrectly.
+
+If scales are different, provide:
+
+normalized Overall Score
+
+plus individual metric views through the selector.
+
+Do not plot incompatible raw values on one axis if that makes the chart misleading.
+
+==================================================
+35. MOBILE GRAPH INTERACTION
+==================================================
+
+Charts must support:
+
+tap
+drag
+touch tooltip
+large hit area
+responsive resize
+
+Do not require hover.
+
+Do not allow graph overflow.
+
+Do not create tiny legends.
+
+==================================================
+36. INSIGHT CARDS
+==================================================
+
+Optional:
+
+Add a small:
+
+PERFORMANCE INSIGHTS
+
+section if real derived insights are available.
+
+Examples:
+
+"Your Volt Stack score improved 12% this month."
+
+"You win 67% of your 1v1 challenges."
+
+"Your trading ROI improved compared with the previous period."
+
+"Competition performance is strongest in Circuit Sprint."
+
+Only generate these from real data.
+
+Do NOT invent insights.
+
+Use swipeable insight cards.
+
+==================================================
+37. MOBILE EMPTY STATES
+==================================================
+
+Handle:
+
+No games played
+No trading activity
+No competitions
+No 1v1 challenges
+No trend data
+No market holidays
+
+Do not show broken charts.
+
+Examples:
+
+No game activity yet.
+Play your first game to start building your performance history.
+
+No trading activity for this period.
+
+No 1v1 challenges yet.
+
+==================================================
+38. LOADING STATES
+==================================================
+
+Use individual skeletons for:
+
+overall summary
+highlight cards
+game card
+chart
+trading metrics
+challenge card
+competition card
+
+Do not cover the whole page with one large spinner.
+
+Skeleton dimensions must match final components.
+
+==================================================
+39. ERROR STATES
+==================================================
+
+If one analytics request fails:
+
+do not break the whole Performance page.
+
+Example:
+
+We couldn't load your trading performance.
+
+[ Retry ]
+
+Other sections must remain usable.
+
+==================================================
+40. ACCESSIBILITY
+==================================================
+
+Use:
+
+proper button semantics
+aria-labels
+keyboard support where relevant
+readable contrast
+text + icons for positive/negative changes
+
+Carousel:
+
+aria-label="Previous game"
+aria-label="Next game"
+
+Do not communicate state only through color.
+
+==================================================
+41. NUMBER FORMATTING
+==================================================
+
+Use consistent formatting.
+
+Examples:
+
+4320
+→ 4,320
+
+0.124
+→ 12.4%
+
+-0.654
+→ -65.4%
+
+2180
+→ 2,180
+
+Durations:
+5m 18s
+
+Use Volts formatting wherever the metric represents Volts.
+
+==================================================
+42. POSITIVE / NEGATIVE INDICATORS
+==================================================
+
+Positive:
+
+↑ +12%
+
+green / cyan
+
+Negative:
+
+↓ -5.2%
+
+red / pink
+
+Neutral:
+
+— 0%
+
+muted gray
+
+Do not use positive green arrows for negative movement.
+
+==================================================
+43. ANIMATIONS
+==================================================
+
+Use restrained animations.
+
+Examples:
+
+Game swipe transition
+Selected metric glow
+Chart line reveal
+Stat number transition
+Card press state
+
+Avoid continuous background animation.
+
+Performance analytics must remain readable.
+
+==================================================
+44. TOUCH INTERACTIONS
+==================================================
+
+Minimum interactive target:
+44px
+
+Prefer:
+48–56px
+
+This applies to:
+
+carousel arrows
+filters
+tabs
+range selector
+View Details
+View Calendar
+bottom nav
+
+==================================================
+45. PERFORMANCE / OPTIMIZATION
+==================================================
+
+Do not load desktop-only graphics unnecessarily on mobile.
+
+Optimize icon assets.
+
+Reuse the existing chart library.
+
+Memoize transformed analytics data.
+
+Avoid rendering every game card simultaneously if there are many games.
+
+Use carousel virtualization if needed.
+
+==================================================
+46. REQUIRED MOBILE VISUAL FLOW
+==================================================
+
+The user should visually experience:
+
+PERFORMANCE
+↓
+OVERALL PERFORMANCE
+↓
+PERFORMANCE HIGHLIGHTS
+→ swipe metrics
+↓
+GAME PERFORMANCE
+→ swipe games
+↓
+PERFORMANCE TREND
+↓
+PERFORMANCE BREAKDOWN
+↓
+TRADING PERFORMANCE
+↓
+1V1 CHALLENGES
+↓
+COMPETITION PERFORMANCE
+↓
+MARKET HOLIDAYS
+↓
+BOTTOM NAV
+
+This is the required mobile hierarchy.
+
+==================================================
+47. MOST IMPORTANT UX RULE
+==================================================
+
+Do NOT treat the mobile page like a compressed analytics spreadsheet.
+
+The hierarchy should be:
+
+1. How am I doing overall?
+2. What changed?
+3. How are my games performing?
+4. Is my overall performance improving?
+5. How am I trading?
+6. How am I doing in 1v1?
+7. How am I doing in competitions?
+8. What upcoming events matter?
+
+A player should understand the page without needing to understand advanced analytics.
+
+==================================================
+48. MOBILE REFERENCE VISUAL
+==================================================
+
+Use the desktop reference only for:
+
+colors
+component identity
+icon style
+data hierarchy
+ChartVolt visual language
+
+Do NOT copy the desktop dimensions.
+
+Mobile components must be redesigned specifically for mobile interaction.
+
+==================================================
+49. DESKTOP MUST REMAIN UNCHANGED
+==================================================
+
+Do not modify DesktopPerformanceAnalytics styling just to support mobile.
+
+Use:
+
+<>
+  <div className="hidden md:block">
+    <DesktopPerformanceAnalytics />
+  </div>
+
+  <div className="md:hidden">
+    <MobilePerformanceAnalytics />
+  </div>
+</>
+
+==================================================
+50. TEST THESE MOBILE WIDTHS
+==================================================
+
+Test:
+
+360x800
+375x812
+390x844
+393x852
+412x915
+430x932
+
+Verify:
+
+- no horizontal page overflow
+- game carousel works
+- cards do not clip
+- chart remains readable
+- legends do not overflow
+- text remains readable
+- touch targets are large enough
+- bottom navigation does not cover content
+- filter bottom sheet works
+- game cards swipe correctly
+- metric cards snap correctly
+
+==================================================
+51. FINAL ACCEPTANCE CRITERIA
+==================================================
+
+DO NOT mark the task complete until:
+
+- Desktop Performance Analytics remains unchanged.
+- Mobile has a completely dedicated layout.
+- Overall performance is immediately visible.
+- Highlights are mobile swipe cards.
+- Games are a carousel and not endlessly stacked.
+- Adding more games does not increase page height significantly.
+- Overall Performance Trend includes trading, games, competitions and 1v1.
+- Performance graph is touch-friendly.
+- Trading metrics are mobile-friendly.
+- 1v1 and Competition cards share the same design system.
+- Market Holidays is compact.
+- Existing ChartVolt neon icons are used.
+- Real backend data is used.
+- No desktop values are hardcoded.
+- No tiny desktop labels remain.
+- No horizontal overflow exists.
+- Loading states work.
+- Error states work.
+- Empty states work.
+- Safe areas work.
+- Bottom navigation works.
+- The finished page looks like a premium ChartVolt mobile app.

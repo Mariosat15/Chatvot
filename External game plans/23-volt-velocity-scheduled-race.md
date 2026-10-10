@@ -1,0 +1,668 @@
+# 23 - Volt Velocity: a scheduled 16-player race
+
+> **Status: PLAN, not built (27 September 2026).** Nothing in this chapter exists in code yet.
+> It was written after reading the whole of `Volt-Velocity-0.21-Complete.zip` (server, client
+> integration surface, examples, tests) and the parts of the platform it touches. Owner approval
+> of section 9's decisions is required before phase VV1 starts.
+
+## 1. What the owner asked for
+
+> "This game is a racing game ... many users can play this game at the same time. 16 players must
+> join and start at a specific time ... users must join, pick a ship and wait for the game to start."
+
+So the player's journey is:
+
+1. **Enter** the competition on ChartVolt (pay the fee) any time before entry closes.
+2. **Open the lobby** shortly before the race - the game loads, connected to a shared room.
+3. **Pick a ship** in the game's own hangar and press **Ready**.
+4. **Wait** - a countdown to the scheduled start is visible to everyone in the room.
+5. **Race** - at the appointed moment the race starts for every connected player at once.
+6. **Result** - finish times come back to ChartVolt and the contest settles as any other.
+
+## 2. What the game package already provides (verified by reading it)
+
+| Piece | What it does | Where |
+|---|---|---|
+| Race server | Node 22 process, authoritative physics at 60 Hz, broadcasts at 10 Hz over **SSE** (not WebSockets). Rooms of **2-16** players, in memory | `server/index.mjs`, `server/race-room.mjs` |
+| Room creation | `POST /v1/races` with the **admin key**: `{ id, trackId (18 tracks since 28 Sep 2026; "auto" draws from the original 15 only), seed (uint32), players: [{id, name}] }`. The roster is **frozen** at creation | `server/index.mjs` |
+| Player tickets | HMAC tickets `{ aud: "volt-velocity", raceId, playerId, exp }` signed with `RACE_TICKET_SECRET`; never placed in URLs | `server/tickets.mjs` |
+| Player endpoints | `join`, `events` (SSE), `input`, `ship`, `ready`, `leave` under `/v1/races/:id/` | `server/index.mjs` |
+| Ship selection + Ready | The game's **hangar UI** already does it once connected: ship buttons lock after Ready, the Play button reads "READY TO RACE" / "READY - WAITING FOR RACERS" | `src/main.js`, `src/multiplayer-client.js` |
+| Start | Automatic when **every** registered player is connected and Ready (5 s countdown), or the admin `POST /v1/races/:id/start` starts the connected+ready subset (min 2) | `race-room.mjs` `ready()` / `start()` |
+| Race rules | 3 laps or 300 s cap; a disconnected player has 30 s to return before DNF; a lobby expires after 30 min | `race-room.mjs` |
+| Result | `GET /v1/races/:id/result` - 202 while running, 200 with an **HMAC-signed receipt** (finish order, times, DNFs) | `server/index.mjs` |
+| Browser API | `ChartvoltVelocity3D.connectCompetition({ url, raceId, ticket })`, events `competition-connected` / `competition-result` (UI only, `requiresBackendSettlement: true`) | `examples/chartvolt-host.ts` |
+| Practice | The game plays solo with no server at all | `Volt-Velocity-3D.html` |
+
+## 3. The five gaps between the package and the owner's requirement
+
+1. **There is no scheduled start.** The server starts either when *all* registered players are
+   ready, or when an admin calls `/start`. "Start at a specific time" does not exist.
+2. **The roster is frozen at creation**, but ChartVolt players enter one by one until entry closes.
+   Something must either wait until entry closes, or the room must accept players while in lobby.
+3. **The platform refuses to launch a round before the play window opens**
+   (`lib/services/games/round-launch.service.ts:186`). A race lobby must be joinable *before* the
+   gun, so a scheduled contest needs a **lobby window**.
+4. **Nothing tells a provider WHEN a scheduled contest starts.** `POST /v1/rounds` carries
+   `contentSeed` (one per contest - good, that identifies the shared room) and `expiresAt`, but no
+   start time.
+5. **Results must enter through the single ingestion door**, per player, signed - the race receipt
+   is one document for 16 players.
+
+## 4. Architecture (recommended)
+
+```
+Browser (player)                      VPS
+  /competitions/[id]/play  ---------> Next.js platform (unchanged play screen, iframe)
+     iframe /play/volt-velocity?t=... -> games-service (provider, :3002)  -- bootstrap page
+     game client SSE /race/v1/races/* -> nginx /race/ -> race server (:3080, 127.0.0.1 only)
+                                          ^ admin API (create room, add player, result)
+                                          | called ONLY by games-service over loopback
+Platform  <-- signed result callback per player -- games-service (sweeper polls race result)
+```
+
+**Why games-service owns the race, not the platform:** the platform already speaks one provider
+protocol to games-service, and "a new title needs no platform code" is a hard property of the
+programme. Volt Velocity becomes a **fourth ChartVolt Games title**. The platform never holds the
+admin key or the ticket secret; the race server never touches money (hard constraint).
+
+### 4.1 Pieces to build
+
+| # | Piece | Side | Notes |
+|---|---|---|---|
+| A | **Race server as a PM2 process** `chartvolt-velocity` | infra | Copy `server/` into `games-service/velocity-server/` (own `package.json`, Node 22). `HOST=127.0.0.1`, `PORT=3080`, `RACE_DATA_DIR`, two separate 32+ char secrets. **As built it has no env file of its own**: it reads `games-service/.env` under the `VELOCITY_*` names and takes its address from `VELOCITY_RACE_URL` (s8.1 amendment) |
+| B | **Server patch 1: open lobby roster** - admin `POST /v1/races/:id/players` adds a player while `status === "lobby"`, max 16 | race server | Closes gap 2 without making entry close early. Small and testable |
+| C | **Server patch 2: `startAt` in the room spec** - `ready()` never auto-starts before `startAt`; at `startAt` the loop starts the connected players (auto-readying anyone connected with their chosen or default ship); fewer than 2 connected -> room `cancelled` | race server | Closes gap 1 inside the authoritative process, so a cron delay can never make the gun late. The admin `/start` stays as a manual override |
+| D | **Title `volt-velocity`** in `games-service/src/games/titles.ts`: `playMode: "scheduled"`, `scoreDirection: lower_is_better`, `scoreType: duration_ms`, `maxDurationSeconds: 305`, `supportsContentSeed: true`, `supportsOneVsOne: true` (s9 decision 4), `supportsPractice: true`, `configSchema` = `trackId` enum (`auto` + 18 tracks since 28 Sep 2026; `auto` resolves within the original 15 via `AUTO_TRACK_POOL`) + `laps` fixed | games-service | Copy in `content.ts` (en + el - both locales are declared, so both are required) |
+| E | **Round create for a race** (`rounds/create.ts` branch): room key = hash(gameCode, contentSeed, config); create the room on first launch (with `startAt`), add the player on every launch; refuse the 17th with a clear error | games-service | Idempotent on `roundId` like every other round |
+| F | **Bootstrap page** `GET /play/volt-velocity?t=token`: loads the game client, resolves the token server-side, fetches `{ serviceUrl: "/race", raceId, ticket }` from `POST /play/api/velocity/session` (token-authenticated, ticket in body, never in a URL), calls `connectCompetition` | games-service | Shows the scheduled start countdown above the hangar |
+| G | **Result sweeper**: poll `GET /v1/races/:id/result` (admin key) after `startAt`; verify the receipt HMAC; per player deliver the **existing** signed result callback: finished -> `completed` + `score = finishTimeMs`; DNF -> `completed` with **no score** (R45/R50: not eligible) | games-service | Delivery, retry and signing are the existing `callback/deliver.ts` |
+| H | **Platform: lobby window for scheduled contests** - the launch service admits a seated player from `startTime - lobbySeconds`; everything else about `scheduled` (single attempt, entry closes at start) unchanged | platform (`round-launch.service.ts`, `play-shape.ts`, mirrored) | Closes gap 3. `lobbySeconds` is set per title by the admin in the Games section (s9 decision 1) and copied onto the contest at write time |
+| I | **Protocol: `scheduledStartAt` on `POST /v1/rounds`** for scheduled titles | platform adapter + `01` + API HTML version bump | Closes gap 4. The only protocol change |
+| J | **Pre-flight: player cap** - refuse `maxParticipants > 16` for this title (title declares `maxPlayers: 16`) | admin pre-flight (mirrored) | Otherwise the 17th payer is refused at the lobby door with their money taken |
+| K | **nginx `/race/` location** - `proxy_buffering off`, `proxy_read_timeout 3600s`, forward `Authorization`, HTTP/2; expose only player endpoints, never `POST /v1/races` | deploy | Same origin as the platform, which `connectCompetition` requires |
+| L | **Static client** under `/play/volt-velocity/assets/` with fingerprinted long cache | games-service | See risk VV-3 (size) |
+
+### 4.2 What the platform does NOT need
+
+No new model, no new ingestion path, no new settlement code, no new play screen. Ranking, ties,
+unscored-player policy, refunds for too few players, prize split and Game Master fees all already
+work for a provider contest with `lower_is_better` scores.
+
+## 5. Timeline of one race
+
+| Time | What happens |
+|---|---|
+| T-days | Operator creates the contest: Volt Velocity, track, **start 18:00**, max 16, min 2. Mode is forced to `scheduled` |
+| until 18:00 | Players enter and pay. Entry closes at the gun (existing rule) |
+| 17:50 | Lobby opens. A seated player presses Play: the platform creates their round (single attempt), games-service creates/extends the room, the iframe loads, the hangar appears with "Race starts in 9:58" |
+| 17:50-18:00 | Pick a ship, press Ready. Leaving and returning resumes the **same** round (existing idempotent resume) |
+| 18:00:00 | Race server starts the race for everyone connected (5 s countdown). No-shows are not in the race. **Superseded by s8.11:** from the start time it waits until two players are Ready, then counts down 10 s; a late player may still join |
+| ~18:05 | Race ends (3 laps or 300 s). Sweeper fetches and verifies the receipt, delivers 16 result callbacks |
+| after end + grace | Contest finalizes as any provider contest: fastest time wins, DNF = no score |
+
+## 6. Failure handling
+
+| Failure | Handling |
+|---|---|
+| Fewer than 2 players connected at the gun | Room cancelled; each launched round reported without a score; the contest's too-few-players / unscored policy refunds (existing) |
+| Seated player never opens the lobby | No round -> no score -> unscored policy (existing) |
+| Player disconnects mid-race | 30 s to reconnect (server rule), else DNF -> no score |
+| **Race server restarts mid-race** | Rooms are in memory and lost. Sweeper sees 404 for a started room -> rounds marked `voided`, operator alerted; contest must be **cancelled with refund** (existing admin control). Risk VV-1 |
+| Receipt signature fails | Never delivered; round becomes `unresolved` -> contest's unresolved policy + alert |
+| 17th launch | Refused with a clear message; prevented upstream by the pre-flight cap (J) |
+
+## 7. Security
+
+- Admin key and ticket secret live only in `games-service/.env`, which both processes read (s8.1 amendment); the platform never sees them.
+- Tickets are issued per round, 1 hour lifetime (covers lobby + race), delivered in a POST body.
+- nginx exposes only the six player endpoints; room creation and results are loopback-only.
+- Allowed origins = the platform origin only (built as `VELOCITY_ALLOWED_ORIGINS`, defaulting to the origin of `GAMES_PUBLIC_URL`).
+- Browser `competition-result` is display only; money moves only from the verified receipt via the single ingestion door.
+
+## 8. Phases
+
+| Phase | Content | Estimate |
+|---|---|---|
+| **VV1** | Race server in repo + PM2 + nginx + the two server patches (B, C) with tests | 2-3 days - **BUILT 27 Sep 2026**, see 8.1 |
+| **VV2** | Title, round-create branch, bootstrap page, session endpoint, static client (D, E, F, L) | 2-3 days - **CODE-COMPLETE 27 Sep 2026**, see 8.2 |
+| **VV3** | Result sweeper + receipt verification + per-player callbacks (G) | 1-2 days - **CODE-COMPLETE 27 Sep 2026**, see 8.3 |
+| **VV4** | Platform lobby window, `scheduledStartAt`, player-cap pre-flight, spec version bump (H, I, J) | 2 days - **CODE-COMPLETE 27 Sep 2026**, see 8.4 |
+| **VV5** | End-to-end rehearsal: 2 then 16 simulated players (headless clients), restart drill, deploy runbook, docs | 2 days |
+
+**Total ~10-13 working days** including the 1v1 decision and the admin lobby control. Behind `externalGamesEnabled` and the title's `chartvoltEnabled`
+switch throughout, so nothing reaches players until the owner enables the title.
+
+### 8.1 VV1 - what was built (27 September 2026)
+
+`velocity-server/` at the repository root: the vendor `server/` (four files), the ten `src/`
+modules it imports, the three vendor multiplayer tests, and `CHARTVOLT-PATCHES.md`, which is the
+authoritative list of every change. **It is not built and not deployed**; nothing calls it yet.
+
+- **Without the two new spec fields the vendor behaviour is unchanged** - a frozen 2-16 roster
+  that starts when everybody is Ready. That is what a 1v1 challenge room uses (s9 decision 4), and
+  the 21 vendor tests pinning it still pass.
+- `openRoster: true` lets a room start empty and grow to 16 through `POST /v1/races/:id/players`
+  (admin key). `addPlayer()` is **idempotent for a known id** so a retried launch never errors,
+  refuses once the room has left the lobby, and refuses the 17th.
+- `scheduledStartAt` disables the all-ready start. The countdown begins 5 seconds early so the
+  race goes **green at** the scheduled moment with every **connected** player, Ready or not
+  (s9 decision 2). A registered player who never connected does not race.
+- **Fewer than two connected at the start cancels the race**, and a cancelled race is archived
+  with a signed, final receipt (`status: "cancelled"`, empty `results`, the `registered` list).
+  Without this the result endpoint answers 202 for ever and nothing can settle the round - the
+  vendor archived `finished` rooms only.
+- A scheduled lobby lives until its start plus 5 minutes (the vendor evicted every lobby at 30
+  minutes), and a start may be booked at most 6 hours ahead, which bounds idle memory.
+- The vendor `GET /` that served the 107 MB client is removed; games-service serves the client
+  (VV2).
+- Deploy pieces: PM2 `chartvolt-velocity` (**fork, one instance** - rooms are in memory, so two
+  processes would each hold half of them), and an nginx location
+  that admits **only the six ticket-authenticated player actions** under `/race/`, with
+  `proxy_buffering off` because `events` is a server-sent-event stream. The admin endpoints are
+  reached by games-service over loopback only.
+- Tests: `npm test` in `velocity-server/`, **35** (21 vendor + 14 new). Three probes - restoring
+  the all-ready start on a scheduled room, archiving `finished` only, and dropping the auto-Ready
+  at the gun - each turned the suite red.
+- **VV-6 is resolved**: the vendor declares no Node engine; `--env-file` needs Node 20.6, which is
+  what `package.json` now states.
+- **Amended 27 September 2026 (owner): there is no `.env` for the race server.** It was first
+  built with its own `velocity-server/env.example` under the vendor's `RACE_*` names; the owner
+  asked for one file, and that is also the safer design, because the two secrets must be equal
+  in both processes and two files are two places for them to disagree - with every result then
+  failing its signature check. PM2 now starts it with `--env-file=../games-service/.env`, and
+  `server/env.mjs` reads `VELOCITY_TICKET_SECRET`, `VELOCITY_ADMIN_KEY`, and optionally
+  `VELOCITY_DATA_DIR` and `VELOCITY_ALLOWED_ORIGINS`. **It must not read `PORT` or `HOST`**:
+  in that file they belong to the games service, so a race server reading them would try to
+  bind the games service's port. Its listen address comes from `VELOCITY_RACE_URL` (default
+  `http://127.0.0.1:3080`), the same line games-service uses to reach it, so the two cannot
+  disagree about that either. **Amended 27 Sep 2026 (two servers):** optional
+  `VELOCITY_RACE_LISTEN` overrides the bind address only; a machine whose `VELOCITY_RACE_URL`
+  names another server runs no race process (`ecosystem.config.js`) and forwards `/race` there
+  (`next.config.ts`). Seated players also pre-download the client from the lobby via
+  `/play/warmup/:gameCode` - see PROGRESS.md's 27 Sep entry (4). Allowed origins default to the origin of `GAMES_PUBLIC_URL`, and
+  with neither set **no** browser origin is admitted rather than all of them. `npm run
+  setup:env` does not yet write the two Velocity secrets; add them by hand, or - since 27 Sep
+  2026 - generate them from the admin panel (see the amendment below). The race-server
+  suite is now **40** (5 new in `tests/chartvolt-env.test.mjs`, one of which passes a
+  conflicting `PORT` and asserts it is ignored), and the games-service race test spawns the
+  server with the shared names and a decoy `PORT`.
+- **Amended 27 September 2026 (owner, option 1 of three): the admin panel can generate the two
+  secrets.** This is a deliberate exception to s7's "the platform never sees them", and it is
+  written down rather than absorbed. Games -> Volt Velocity -> Race server secrets calls
+  `POST /api/games/velocity-secrets` (`guardSection("game-providers")`), which makes two
+  different 32-byte hex values and writes only those two lines into `games-service/.env`
+  (`apps/admin/lib/services/games/velocity-secrets.service.ts`). What keeps it narrow: the values
+  are **never returned, logged or stored in MongoDB** - the screen shows "set" / "not set" and the
+  file path, and the audit line says "values not recorded"; the write **refuses when the file does
+  not exist**, rather than creating a stray `.env` nothing reads (the failure that retired the
+  payment-provider `.env` writer); replacing secrets that are already set - even one - needs the
+  typed word `ROTATE`, because it ends every race in progress; the file is replaced atomically
+  with its permissions kept, and the placeholder lines `env.example` ships are replaced in place.
+  **It only works when the admin app runs on the same server as games-service.** The default path
+  is `../../games-service/.env` from `apps/admin` (the PM2 layout); `GAMES_SERVICE_ENV_FILE`
+  overrides it. Both processes read the secrets at boot, so the screen then says to run
+  `pm2 restart chartvolt-games chartvolt-velocity`. The control names no game - the route reports
+  which title it belongs to - and the fs-using service never reaches the browser (R58); the shared
+  phrase and restart command live in `apps/admin/lib/admin/velocity-secrets-copy.ts`. Tests:
+  `__tests__/admin/velocity-secrets.test.ts` (18).
+
+### 8.2 VV2 - what was built (27 September 2026)
+
+A fourth ChartVolt Games title, `volt-velocity`, in `games-service/src/games/volt-velocity/`
+(`title.ts`, `tracks.ts`, `copy.ts`, `race-server.ts`, `launch.ts`), plus
+`rounds/play-volt-velocity.ts`, `http/volt-velocity-client.ts` and a host page in
+`public/play/volt-velocity/`. **Code-complete, not deployed, and the platform half (VV4) is not
+built**, so no contest can be created on it yet. Everything in this list is `games-service` only
+and shares no code with the platform (`check:isolation`).
+
+- **The title is `playMode: "scheduled"`, `lower_is_better`, `duration_ms`, `maxDurationSeconds:
+  305`, `supportsOneVsOne: true`, desktop only**, config = `trackId` (`auto` or one of the 15
+  tracks, resolved per race from the seed). Copy in `en` and `el`.
+- **Deviation: `supportsPractice: false`**, where 4.1 D said `true`. A practice round would need a
+  race room of its own with nobody else in it, and a one-player scheduled room is cancelled by the
+  server at the gun (VV1). A ranked-only title is honest; `mode: "practice"` is refused with a 400
+  that names the reason.
+  > **Closed 28 September 2026 - the build now matches 4.1 D (`supportsPractice: true`).** The
+  > reason above stopped holding once anytime competitions gained a **solo room** (keyed
+  > `solo:<providerRoundId>`, frozen at one pilot, unscheduled, starts when that pilot is Ready).
+  > Practice is that room with nothing at stake. Three facts drift easily: practice sends **no
+  > content seed**, so the track seeds from the round's own id and each practice run gets a
+  > different track; a practice round carrying `scheduledStartAt` is **refused** (400), because a
+  > scheduled solo room is exactly the VV1 room cancelled at the gun; and separate room ids alone
+  > **cannot** prove the room is solo, since the round-id seed already makes every id unique - the
+  > test in `tools/test-velocity.ts` recomputes the solo identity, and a probe dropping practice
+  > from `solo` turned exactly that test red. The refusal test was **flipped, not deleted**.
+  > Deploy needs `npm run build` + `pm2 restart chartvolt-games` (TypeScript changed), then a
+  > catalogue re-sync so the platform's `provider_game` row picks up `supportsPractice: true`.
+- **An unconfigured deployment publishes the title as `maintenance`**, so the platform's pre-flight
+  refuses contests on it rather than selling seats in a race nobody can host. Configuration is
+  all-or-nothing: `VELOCITY_ADMIN_KEY` and `VELOCITY_TICKET_SECRET` both or neither, and they must
+  differ (the race server refuses to boot when they are equal), or games-service refuses to start.
+- **Seating happens at round creation, before the round is written**: the room id is derived from
+  `(gameCode, contentSeed, track, scheduledStartAt)`, so every entrant of one contest lands in one
+  room, and the racer's id on the race server is the **`providerRoundId`**, never the platform's
+  user id - the receipt is keyed by it and it keeps a user id out of a second process's archive.
+- **Deviation: no new error codes.** 4.1 E sketched `RACE_FULL` / `RACE_CLOSED`; the provider
+  error table is a closed set the platform branches on, so a new code is a protocol change. Full or
+  closed -> 400 `INVALID_REQUEST` (permanent, and a failed creation consumes no attempt); race
+  server unreachable -> 503 `GAME_UNAVAILABLE`, retryable; any other refusal -> 500 `INTERNAL`.
+- **`scheduledStartAt` is accepted on `POST /v1/rounds`** (must be before `expiresAt` and at most
+  six hours ahead). Absent means a challenge room, which starts when both players are Ready. **The
+  requirements document is not yet amended** - that is VV4 piece I, with its version bump.
+- **The session endpoint is `POST /play/api/velocity/session`**, token in the body: it marks the
+  round `in_progress` and returns the room id, a freshly minted ticket (never stored), the client
+  URL and, locally only, the race URL. **No score comes back through it.**
+- **Deviation from 4.1 F/L: the client is a nested same-origin frame, not static assets in the
+  repository.** The vendor client is one ~107 MB self-contained HTML file and is not edited.
+  **Amended 27 Sep 2026 (owner: the manual install was too many steps):** it is now committed
+  gzipped (~76 MB) as `games-service/vendor/volt-velocity-client.html.gz` and unpacked beside
+  itself on first use, keeping the archive's mtime so the fingerprint survives restarts;
+  `VELOCITY_CLIENT_FILE` still overrides it. Each new client build adds ~76 MB to git history.
+  **Amended again 27 Sep 2026 (owner: players re-downloaded 100 MB every visit):** the .gz is no
+  longer served. `tools/games/pack-velocity-client.ts` splits every inlined `data:` asset into
+  `games-service/vendor/volt-velocity/assets/<content-hash>.<ext>`, resizes the six 4096² stone
+  maps to 2048² and the two 8192×4096 skies to 4096×2048 (webp q90), and writes a ~1 MB
+  `client.html` whose literals point at the files, plus `manifest.json`. ~48 MB in 36 files, the
+  largest 5 MB, all `immutable`; the page's fingerprint is now its content hash, not size+mtime.
+  The client itself is still not edited - only its literals are rewritten, which is safe because
+  every one is a whole quoted `data:` URI handed to a URL-taking three.js loader. Verified by
+  loading the packed page in Chromium: every model, texture and HDR requested and 200, menu drawn.
+  Originally the operator pointed `VELOCITY_CLIENT_FILE` at it and games-service streams it at a
+  size-and-mtime fingerprinted URL with an immutable cache. The host page loads it in a frame and
+  drives its public `ChartvoltVelocity3D.connectCompetition` API, so the ticket is handed over as a
+  JavaScript value and never reaches a `src`, a `Referer` or an access log. The host only ever
+  posts `ready` and `finished` to the platform - never a time, position or lap.
+- **Known and accepted: a duplicate concurrent create can leave an orphan seat.** Two requests with
+  the same `roundId` arriving together each seat a player before the unique index refuses one of
+  them. The loser's seat is a registered racer who never connects, and a registered racer who
+  never connects does not race (VV1). Harmless, so it is recorded rather than locked.
+
+### 8.3 VV3 - what was built (27 September 2026)
+
+`games-service/src/callback/race-results.ts`, called at the start of every `sweepOnce`.
+
+- **A race round is closed ONLY by a verified receipt.** The sweeper groups open velocity rounds by
+  room, polls each room at most every 10 s (20 rooms per tick), verifies the HMAC over
+  `signedPayload` and reads only the signed payload. Finished without DNF -> `completed` with
+  `score = timeMs`; DNF, unfinished or absent from the results -> `completed` with **no score**
+  (never zero, which on a lower-is-better title would be the best time on the board). A
+  **cancelled** race -> every round `voided` with the reason, so the attempt is handed back.
+- **A grace window keeps the ordinary expiry from beating the receipt.** `hardDeadline` for a race
+  round is `expiresAt + 10 minutes` (`VELOCITY_RESULT_GRACE_MS`), and the overdue sweep and the
+  finished-clock sweep both skip race rounds until then - otherwise a race ending at the contest
+  window's close is expired a second before its result is read.
+- **A room the race server has lost** (404, e.g. a restart mid-race) is voided once the oldest round
+  in it is at least 60 s old, so a round created a moment ago is not mistaken for a lost one.
+- **Deviation from section 6: a receipt that fails verification closes nothing.** It is logged as an
+  error on every poll and the round is left open; when the grace window ends it is expired without a
+  score. games-service has no `unresolved` status - that is the platform's reconciliation state -
+  and paying on, or voiding on, a receipt we cannot trust are both wrong.
+- **Tests: `npm run test:velocity`**, 7, part of `npm test` (now **344**). It **spawns the real
+  race server** rather than stubbing it, and reads its track list as text rather than importing it,
+  because `check:isolation` forbids that import. It proves the track lists agree, that two entrants
+  share one room the race server knows, that the ticket we sign is accepted by the race server and a
+  tampered one refused, that no ticket appears in any URL, and that a scheduled race nobody joins is
+  cancelled, receipted, verified and delivered to the platform as `voided` with no score. It
+  **skips loudly** when `velocity-server/node_modules` is missing. Two probes - scoring a DNF, and
+  ignoring a cancellation - each turned exactly one test red.
+- **A finished race is not exercised end to end**: it takes five minutes and two steering clients.
+  That is VV5's headless rehearsal; here scoring is covered on hand-built entries.
+- Two **pre-existing** failures were fixed on the way, both flipped rather than deleted: the progress
+  test still expected the pre-v1.20 body without `provisionalScore` / `provisionalDurationMs`, and
+  the board test's fake DOM lacked `insertBefore`, which `board.js` has called since `ade774ef`.
+
+### 8.4 VV4 - what was built (27 September 2026)
+
+The platform half: pieces H, I and J. **Code-complete, not deployed, never run against the real
+race server** (that is VV5). Nothing is player-visible until the owner enables the title.
+
+- **The lobby (H).** `lobbySeconds` is an operator-owned field on `provider_game` (both model
+  copies), set per title in Games -> Providers -> catalogue by `GameLobbyLengthControl.tsx`
+  (default **10 minutes, 1-30**, whole seconds; `parseLobbySecondsInput` refuses anything else and
+  `null` clears it). It is **copied onto `Competition.lobbySeconds` at write time**, like
+  `playMode`, so an operator changing the title later does not move the lobby of a contest people
+  have already paid for. It is barred from the content editor (`NEVER_EDITABLE_CONTENT_FIELDS`)
+  and the play-style route refuses a request carrying it together with another decision, so one
+  audit line covers one decision.
+- **One definition of "has a lobby".** `playModeHasLobby` and `lobbyOpensAt` in `play-shape.ts`
+  (mirrored, byte-identical) are read by the create service, the launch service and the play
+  state. `play-shape.test.ts`'s single-resolver guard forbids a literal `=== "scheduled"` in the
+  services; the first cut had one and the guard caught it.
+- **The launch service admits an `upcoming` contest from the moment the lobby opens onwards**, not
+  only until the gun - the status cron flips `upcoming` to `active` up to a minute late, and a
+  player pressing Play in that minute would otherwise be told the race has not started. An
+  `anytime` contest has no lobby and every other status is refused exactly as before.
+- **Round expiry is measured from `max(now, scheduledStartAt)`.** Measured from creation, a round
+  opened 30 minutes early would expire before the race ended, and games-service refuses a round
+  whose start is not before its expiry.
+- **The protocol (I).** `scheduledStartAt` on `POST /v1/rounds` and `maxPlayers` on the catalogue,
+  in `01` and `ChartVolt-Game-API-Requirements.html`, now at **version 1.21**. Both are optional,
+  so a provider ignoring them is conformant. `scheduledStartAt` is sent on **every** round of a
+  scheduled contest, including one opened after the gun, because it is what puts every entrant in
+  the same room; `contestRoundConfig` sets it only for a contest *stored* as scheduled.
+- **The seat cap (J).** `maxPlayers` is provider-owned (games-service publishes 16 for
+  `volt-velocity` and nothing for the other titles, pinned by a games-service API test). The
+  pre-flight refuses a contest whose `maxParticipants` is absent, zero, or above the cap, and a
+  minimum above it, naming both numbers; a challenge counts as 2. Publishing re-runs it against
+  the stored record. A title with no cap is unchanged.
+- **The player screen.** `PlayState.lobbyOpensAt` drives `RoundPreflight`: before the lobby it says
+  the lobby has not opened; inside it the button reads **Enter the lobby** / **Back to the
+  lobby**. It uses the same rule as the launch service rather than a second one.
+- **Tests:** `__tests__/services/volt-velocity-lobby.test.ts` (19), plus the existing play-shape,
+  provider-round-launch and create suites; two probes (a lobby on `anytime`, a seventeenth seat)
+  each turned exactly their own test red. games-service `npm test` green and `check:isolation`
+  clean. One **pre-existing** guard was repaired on the way: `round-progress.test.ts` measured
+  the progress call against a file-wide `lastIndexOf`, which `completeRound` (Volt Stack,
+  `d664a85e`) had made fail on correct code; it now slices `submitBoard` with both ends asserted.
+
+### 8.5 Smooth driving over the network - what was built (27 September 2026)
+
+**The report:** once connected, the ship felt "very clunky... stuck back and forth". **Nothing
+was computed wrongly and there is no risk number.** The race stayed fair, but what the player saw
+kept being corrected. Three causes, all in the vendor netcode:
+
+- **The server did not simulate the drive the player made.** It applied whatever input had
+  arrived last and treated it as released after 250 ms. It also allowed only one input request on
+  the wire at a time, so a single slow round trip froze every later control.
+- **The client predicted without replaying.** Each snapshot put the ship back where the server
+  had it, about one round trip in the past, and prediction then started again from there. That
+  is the back-and-forth.
+- **Other ships were only eased towards their last known spot**, so they always ran behind.
+
+**What changed** (details and file list in `velocity-server/CHARTVOLT-PATCHES.md`):
+
+- Inputs are **step-numbered frames**, and the server applies exactly one per 1/60 s physics
+  step, reporting `ackStep` and `inputStep`.
+- The client predicts every step. On each snapshot it restores the server's state and replays
+  the frames the server has not applied yet.
+- Any remaining difference is eased out on screen only.
+- Up to four input requests may be in flight at once.
+- Opponents are drawn ahead by their speed × (age of snapshot + half the round trip), capped at
+  0.35 s.
+
+**Fairness is unchanged.** Missiles, mines and collisions are still decided by the server on its
+own positions, and drawing a rival slightly ahead affects the picture and nothing else.
+
+**No protocol change for providers.** This is the race client talking to our own race server,
+so `01` and the requirements HTML are untouched and no version is bumped. Both directions are
+backward compatible: a patched client drives an unpatched server the vendor way, and vice versa.
+The two machines can therefore be updated in either order.
+
+**Tests.** `velocity-server` has 50 tests.
+
+- `chartvolt-input-frames` (7) proves that a client replaying the same frames lands on exactly
+  the server's position.
+- `chartvolt-client-prediction` (1) drives the real patched client against the real server over
+  HTTP and asserts a median gap of under 5 cm. It was probed red at 0.54 m by a client sending
+  only every other step.
+- The vendor client's own 84 tests pass on the rebuilt game, and games-service `npm test` is green.
+
+The client sources live in `velocity-server/client-patches/`. The packed page changed only
+`client.html` (1 MB); every asset kept its hash, so a returning player downloads 1 MB and nothing
+else.
+
+**Not verified live.** The benefit shows only over a real connection with 16 players.
+
+### 8.6 Laps, solo races and the tie-break - what was built (28 September 2026)
+
+The owner's rules, and where each one lives:
+
+| Rule | How it is enforced |
+|---|---|
+| Fastest time wins; equal times go to more points | games-service scores a finisher `timeMs - min(points, 999999) / 1e6` (`tieBrokenScore` in `race-server.ts`), lower is better. The fraction is under one millisecond, so points can never beat a faster time |
+| A player who does not finish gets no score | Unchanged: a DNF finishes the round with no `rawScore`, so `hasResult` excludes them (`05` s9.2) |
+| A competition is 1-10 laps, 100 s per lap | New `laps` setting in the title's `configSchema` (default 3). The race server takes `laps` on create and sets the limit to `laps x 100 s`. `maxDurationSeconds` is now **1005** (10 laps + the 5 s countdown) |
+| A challenge is always 3 laps | New generic `configSchema` keyword **`challengeValue`** (requirements **v1.22**). The platform pins it on every challenge round (`applyChallengeValues` in `config-schema.ts`) and the challenge form shows it as fixed. games-service pins it again (`pinChallengeSettings`), so neither side can be talked out of it |
+| The operator chooses "everyone together" or "each plays alone" | That is the existing play-mode choice (`22` s10): `scheduled` is everyone together; `anytime` is now **each plays alone**. The platform sends the new optional **`contestType`** on create-round (v1.22); an `anytime` competition round (no `scheduledStartAt`) gets its **own solo room** keyed on the provider round id |
+| A challenge always races together | A challenge round keeps the shared room both players join. One carrying `scheduledStartAt` is refused (400); the platform never sends one |
+
+Three facts drift easily:
+
+- **Room identity** now includes `laps:N` only when N is not 3, and `solo:<providerRoundId>` for a
+  solo room. Existing 3-lap rooms keep their old identity. Solo rooms use the **provider** round id,
+  so a retry after a failed write gets a fresh room instead of the frozen one.
+- **An absent `contestType` keeps the old shared behaviour**, so a platform deployed before
+  games-service still works.
+- **Fingerprint:** the resolved config now includes `laps`. A round created before the deploy and
+  retried after it could fail its fingerprint check once. This is negligible, but worth knowing.
+
+**Operator action:** enable **both** play styles on Volt Velocity in the play-style control
+(Games -> Providers -> catalogue), and re-sync the catalogue so the `laps` setting appears.
+
+Tests: race server 57/57; games-service `npm test` green (Volt Velocity 13, four new); platform
+`config-schema-challenge-value.test.ts` (new) and one new resolution test. Three probes went red on
+exactly one test each (solo off, challenge pin off, platform pin off). **Not verified live.**
+
+### 8.7 Start screen, race screen, power-ups and full screen - what was built (28 September 2026)
+
+The owner asked for a start screen that fits without scrolling, a race screen that does not cover
+the road, a full screen button for every game, power-ups that replace each other, clearer power-up
+graphics, turn indicators on the road, better scenery and a lighter game.
+
+| Request | What was built |
+|---|---|
+| **Full screen, for every game** | Platform: a **Full screen** button in a bar above the game frame (`ProviderGameFrame.tsx`, `use-stage-fullscreen.ts`). It enlarges the element *holding* the iframe, so no provider needs code for it. Where the browser has no element Fullscreen API (iPhone Safari) or refuses, the stage is pinned over the window instead, with Escape to leave. It is a bar, not a button over the game, because every game draws its own controls in its corners. Guarded by `__tests__/games/stage-fullscreen.test.ts` (5 tests; removing the iPhone fallback turns exactly 1 red) |
+| **A power-up replaces the one held** | `collect()` in `simulation.js` now sets the new weapon even when one is held. It is the **same rule for every racer and decided by the server**, so it gives nobody an advantage; repair and energy never touch the held weapon. Server and client copies are identical. `velocity-server/tests/chartvolt-pickup-replace.test.mjs` (4 tests) |
+| Clearer capsules and a pickup effect | Brighter capsule graphics, a short screen flash and a burst at the ship on collection (display only) |
+| Start screen | One screen with no scroll: ship picker, the Launch button always visible, obsolete text and empty panels removed |
+| Race screen | HUD panels moved to the edges on PC, tablet and short windows so the road is visible; phones keep the vendor layout, which already fitted. Checked by screenshots and measured panel boxes at five sizes |
+| Road indicators | Amber chevrons painted on the road on the approach to each corner, pointing the way it turns |
+| Scenery | Scene **slightly brighter only** (exposure 1.0 -> 1.16). **The buildings and scenes were not redesigned**; that needs new 3D assets and is still open |
+| Lighter | 2K sky and textures by default, smaller audio. The standalone HTML benefits most; the served copy was already capped by the packer. Served package: page 1.0 MB, 42.2 MB total |
+
+Nothing here changes a score, a time or who wins. **Not verified live**: seen through headless
+screenshots only, not on a real phone or tablet.
+
+**Second pass, same day - the HUD cannot overlap.** The owner reported three faults: on a phone the
+touch controls (steer pad and pedals) were missing, so the game could not be played; the equipment
+panel sat on the hull panel, both in the frame and at 1920x1080; and live position sat on the lap
+panel. The "Race screen" row above is therefore **superseded**. Its fixed pixel offsets per
+breakpoint were the cause, because any panel whose size differed from what a breakpoint assumed
+(a long equipment name, the multiplayer standings list) landed on its neighbour.
+
+| Fault | Cause and fix |
+|---|---|
+| Touch controls missing | The vendor showed them only after the first touch, and our desktop rule hid them until then. A device that also reports a fine pointer (tablets, hybrids) could never reveal them. They are now shown from the start on any touch-capable device |
+| Panels overlapping | `hud-layout.js` measures the panels after every layout change and moves any that touch a neighbour vertically clear of it. The touch pads and top buttons are never moved. On a mouse screen panels also scale with the window (down to 62% in a small frame) |
+| Live position on the lap panel | It sits under the map on PC, below the lap panel on phones and tablets, and beside the lap panel on a sideways phone, where both side columns are full |
+| Logo | The text brand is replaced by the supplied Volt Velocity logo, hidden while racing on small screens |
+
+The screenshot check now covers **eight** sizes (1920x1080 to a 390x640 phone frame) with a
+forced 8-row standings list. It fails on any overlap, any panel off the screen, and touch controls
+missing on a touch size or shown on a mouse size; all eight pass. **Still not verified on a real
+phone or tablet.** No server change, so only games-service needs a pull and restart.
+
+## 9. Owner decisions (answered 27 September 2026)
+
+1. **Lobby length is set by the admin in the Games section**, not fixed in code. It becomes an
+   operator-owned field on the catalogue title (`lobbySeconds`, beside `playModeOverride`, in
+   `NEVER_EDITABLE_CONTENT_FIELDS` and edited through its own control in Game Providers), copied
+   onto the contest **at write time** like every other forced value, so changing it later never
+   moves the lobby of a contest players have already paid into. The per-title field must stay
+   outside the provider sync allow-lists, or the next sync reverts it silently. Bounds 1-30
+   minutes (the server's lobby expiry is 30 minutes); default 10 when unset.
+2. **Connected but not Ready at the gun: they race** with the ship they selected, or the default.
+3. **The vendor server may be patched** - pieces B and C stand as written.
+4. **1v1 challenges are ON.** This fits the server with no extra patch: a challenge has no
+   appointed start (`22` s5), so a challenge room is created **without `startAt`** and uses the
+   server's own rule - the race starts when both players are connected and Ready. The lobby
+   opens when the challenge is accepted and stays open for the challenge's play window; an
+   opponent who never arrives means no round and no score, which the existing challenge
+   settlement already handles. `supportsOneVsOne: true` on the title; the room key comes from the
+   challenge's own `contentSeed`, so two players are never put into a competition's room.
+   Adds about 1 day to VV3/VV5.
+
+### 8.7 A contest too short for the race is refused, and fixed in one click (28 September 2026)
+
+The wizard told an operator a 3-lap race took **1005 s** (the 10-lap ceiling) and that a
+cut-short attempt was fine "if a partial run still scores". A race scores nothing unless it
+finishes, and 3 laps is 305 s. Three changes, none of them Volt-Velocity-specific code on the
+platform:
+
+- **The title says how long a lap is.** `laps` carries `format: "duration-units"`,
+  `secondsPerUnit: 100`, `secondsExtra: 5` (requirements HTML **1.23**, `01` s3.2). The
+  platform reserves `laps x 100 + 5`; a test pins 10 laps to `maxDurationSeconds`.
+- **Scheduled contests shorter than one race are refused**, not warned about, in both
+  pre-flight copies, on create, publish and challenge. A play-any-time contest still only
+  warns, because the player chooses when to start.
+- **One-click fix:** the warning shows a "Make the contest long enough" button that sets the
+  end time to start + one race + 1 minute.
+
+Found on the way: the admin create route dropped the chosen play style, so every contest was
+stored in the title's default shape. Fixed.
+
+### 8.8 After the start there is nothing to join - and the lobby says so (28 September 2026)
+
+> **Superseded the same day by s8.11.** The start gate described here was removed: a late player may now join a running race. Kept as history.
+
+Owner report: pressing Play on a race competition **after** the gun gave "Round cancelled -
+does not count" with a **Play another round** button, and the log said `refused round
+creation: Entry to this race has closed`. The race server was right to refuse. The platform
+then voided the round, handed the attempt back and offered a fresh one that could only meet the
+same refusal - **a loop, with a real provider call on every press.** Nothing was paid wrongly.
+
+One rule, `startHasPassed` in `lib/services/games/play-shape.ts` (mirrored, byte-identical),
+read in three places. None of it names a game; it applies to any `scheduled` competition.
+
+- **The launch service refuses before a round exists** (`start_has_passed`, 409) unless the
+  player already has a live round to resume, so no attempt is spent and no provider is called.
+- **The pre-flight withholds Play** ("Already started") and **the result panel no longer offers
+  another round** once the start has passed.
+- **Challenges are exempt from the gate**: a challenge has no gun, it starts when both players
+  are in. Both formats lose the "this will be a shorter round" warning when everybody plays
+  together, because there is no personal clock for a late start to shorten - that warning fired
+  the instant any together-game began.
+- **The lobby states the rule in words that fit any game**, from `playModePlayerRule`:
+  "Everyone starts together - open the game before the start and wait in the lobby" versus
+  "Play any time - whenever you like before the competition ends". The challenge lobby shows it
+  before acceptance too, read from the title's own shape.
+- **After the finish the player goes back to the lobby**: the host blanks the race, marks the
+  round finished and a together contest has one attempt, so nothing offers a restart.
+
+Unchanged and still an owner decision: a race with **fewer than two connected players** at the
+gun is cancelled by the race server. The attempt is handed back and, with this fix, the screen
+now says there is no new race to join rather than looping.
+
+### 8.9 The end clock, no restart, readable times, and a non-finisher is not a zero (28 September 2026)
+
+Owner report on the race arena: no clock showing when the competition or challenge actually
+ends, a pause menu that let a player go back and start over, a score of `172,666.998`, and a
+prize that did not match the published split. None of the fixes names a game.
+
+- **An "Ends in" countdown** (`components/games/arena/ArenaEndsIn.tsx`) on the arena for every
+  game, read from the contest's stored end on the server clock.
+- **No way back in**: the race host hides the pause menu's return and race-again controls.
+- **Scores are shown by the title's declared `scoreType`**, through one formatter,
+  `lib/utils/format-game-score.ts`: `duration_ms` reads `2:52.667` (`h:mm:ss.mmm` from one
+  hour), `integer` is rounded, anything else has at most two decimals, and an absent score is a
+  dash. The long fraction was the tie-break (`timeMs - points/1e6`, below one millisecond).
+  **Display only** - ranking and settlement still read the stored number. Wired into every
+  provider score surface: arena board, feed, contest panel, challenge standings, both lobbies,
+  both round result panels and the results screen. `PlayState` carries no `scoreType`, so it is
+  passed as a prop and through `ArenaLiveProvider`'s context. Not wired: the dashboard
+  `ContestsSidebar`, which does not have the title's score type.
+- **A player who did not finish no longer records a 0** (**R115**). The adapter normaliser
+  turned "no score" into `rawScore: 0`, so a non-finisher was stored as a real zero, ranked,
+  and became eligible for a share of the prizes. It now reports `scoreReported: false`, the
+  stored score stays unset, and ranking treats it as last. See `17` R115 for what this does and
+  does not explain about the reported payout.
+
+### 8.10 A race cannot go live with its start already behind it (28 September 2026)
+
+> **Amended by s8.11.** The two-minute rule below still stands. Where this section says pressing Play after the start is refused, that is no longer true: it now offers **Join late**.
+
+Owner report: a race competition created and published at once, two players entered, and the
+first press of Play said **Already started**, with "Play closes in 6m". **8.8 was working as
+designed**: after the gun there is nothing to join, and only a player already in the lobby races.
+The fault was earlier. **Create, publish and edit never compared the start with the clock**, so
+a `scheduled` contest could go live with its start in the past or seconds away. The lobby
+(`playWindowStart - lobbySeconds`) had then closed before anybody could reach it, and nobody
+could ever play. No money moved wrongly and there is nothing to backfill. The stuck contest has
+to be **cancelled with a refund** and created again.
+
+One rule, `scheduledStartTooSoon` in `lib/services/games/scheduled-start.ts` (mirrored and
+byte-identical, model-free so the wizard can import it). It refuses a together-start contest
+whose start is less than `MIN_SCHEDULED_START_LEAD_SECONDS` (**2 minutes**) away. It never names
+a game, and a play-any-time contest is never refused. It is called in four places:
+
+- **Create** (both `provider-contest.service.ts` copies), before `Competition.create`. This also
+  covers the Game Master route.
+- **Publish** (both `provider-contest-publish.service.ts` copies), before the claim. It judges the
+  contest's **own** stored shape, not the title's default. Auto-publish goes through here too, so a
+  draft created ahead and published late is caught.
+- **Edit** (admin-only), **only when the start moves**. Renaming a race already under way must
+  not be refused.
+- **The wizard's Schedule step** shows the same sentence before the operator presses Create.
+
+Pinned by `__tests__/services/scheduled-start-lead.test.ts` (13 tests): the behaviour, the mirror,
+and the position of each call before its write.
+
+### 8.11 The race waits for two ready players, counts down from 10, and a late player may join (28 September 2026)
+
+Owner instruction, the same day: a player who has paid opens the game, picks a ship, presses
+Launch and **waits**. The race starts by itself **only when the start time has come AND at least
+two players are ready**, with a **10-second countdown** during which no ship moves. A player who
+is late **can still join and race**, with the time already raced counting against them.
+
+**This reverses two earlier rules, and says so rather than rewriting them.** 8.8's "after the gun
+there is nothing to join" and the entry in the patch table that "connected players race even if
+not Ready" (auto-ready at the gun) are both history now. What was built:
+
+- **Race server** (`velocity-server/server/race-room.mjs`). A scheduled room stays in the lobby
+  past its start until two connected pilots are Ready, then runs `SCHEDULED_COUNTDOWN_MS` (10 s).
+  Only Ready pilots race; a pilot who never connected (a ghost) does not. If two are still not
+  Ready at `latestStartAt` the room is cancelled (`too-few-ready`) and the attempts are handed
+  back. While an open-roster scheduled room is counting down or racing, `lateEntryOpen` admits a
+  new pilot. During the countdown the late pilot takes a grid slot with no penalty. During the race
+  they get a 3 s countdown of their own, and `lateOffsetMs` (race time already run plus those 3 s)
+  is added to their time, so **being late is never an advantage**. The result row carries
+  `lateStartMs`. An unscheduled race keeps the vendor's all-ready 5 s start and refuses late entry.
+  67 tests in `velocity-server/tests/`.
+- **games-service** sends `latestStartAt` = `latestRaceStart(start, expiresAt, laps)`: the latest
+  moment a full race still fits inside the round, capped at 6 hours after the start and never
+  before it. It is sent for scheduled rooms only and is not part of the room identity.
+- **Platform.** The launch service **no longer refuses after the start** (`start_has_passed` is
+  gone). Whether the race can still be joined is the game's answer. A finished or cancelled race
+  refuses the seat, `createRound` deletes the pending round, so **no attempt is spent**, and the
+  player is told "This race can no longer be joined... Your attempt was not used", **not** "try
+  again shortly", which would restart 8.8's loop. A together-start round now **expires at the
+  play window end** (`resolveExpiry`), because nobody can say when a race that waits for players
+  will end. `startHasPassed` survives as the definition screens read: the pre-flight keeps Play
+  enabled after the start (**Join late**) with `LATE_ENTRY_NOTICE`, and the result panel still
+  offers no second round, because a contest has one race. The shared wording in
+  `playModePlayerRule` names no game. Pinned by `__tests__/games/together-start-gate.test.ts`,
+  whose gate tests were flipped rather than deleted.
+
+**Unchanged:** entry (paying) still closes at the start (`entryClosesAtStart`), so a late joiner
+is a player who paid in time and opened the game late. The lobby still opens `lobbySeconds` (60-1800 s,
+default 10 minutes) before the start, so Play is available **before** the start time from then on,
+not from the moment of entry.
+
+### 8.12 The race cannot wait for ever: a waiting limit, then a full refund (28 September 2026)
+
+**Owner report:** the race does not start at its start time if fewer than two players are ready, and it keeps waiting. **Owner decision:** there must be a limit; past it, stop and refund everybody in full. Chosen through two questions: **5 minutes by default, operator-set 1-15 minutes per competition**, and **full refund, no platform fee, immediately, players notified.**
+
+**What was built.**
+
+- `Competition.startWaitSeconds` (both model copies, whole seconds 60-900). Stamped **at create time, for `scheduled` contests only**, from the wizard's new "Waiting limit (minutes)" field on the Schedule step. The edit path deliberately does not send it, so a limit cannot move under people who have paid. Absent or invalid reads as 300 through `resolveStartWaitSeconds` in `lib/services/games/start-wait.ts` (mirrored, byte-identical test).
+- **The platform decides, not the game.** `cancelUnstartedTogetherContests` (`together-start-cancel.service.ts`, mirrored) runs in both apps' scheduled job **before** `checkAndFinalizeCompetitions`. Once `playWindowStart + startWaitSeconds` has passed on an unpaused scheduled provider contest, it reads the contest's own `game_round` rows. `playNeverStarted` is true when no non-voided round carries a finite score, no round is `unresolved`, and fewer than two distinct players hold a `pending` or `launched` round. The contest is then cancelled through `cancelCompetitionAndRefund`, the existing full-refund, no-fee, notify-everyone path. The sweep **never pre-sets the status**, which is R43's rule: a status written first makes the refund's own lock refuse.
+- **The game is told the same limit** as the optional `startWaitSeconds` on create-round (requirements **v1.24**, `01` s4), and `games-service` caps the room's latest start at `start + wait`, so the race server gives up at the moment the platform refunds and voids its rounds. The game's own decision is not what refunds anybody; if the two disagreed, the platform's records win.
+- **The player is told before it happens.** `PlayState.startWaitEndsAt` feeds one sentence in `RoundPreflight`: if fewer than two players are ready by the stated time, the competition is cancelled and everyone gets their full entry fee back.
+
+**Why it runs before settlement.** An unstarted contest whose end time has also passed would otherwise reach finalization first and be settled as "nobody scored" under its unscored-contest policy, which is not a full refund.
+
+**Not built.** Challenges are untouched - they already have their own accept deadline and expiry. Tests: `__tests__/games/start-wait.test.ts` (21) and games-service `test:velocity` (15).
+## 10. Risks
+
+| ID | Risk | Mitigation |
+|---|---|---|
+| VV-1 | In-memory rooms: a restart mid-race loses it | Do not deploy during scheduled races; restart drill in VV5; cancel-with-refund runbook |
+| VV-2 | Capacity: 100 rooms per process, 60 Hz physics | Benchmark 16 players in VV5; one race at a time is far inside the limit |
+| VV-3 | **Client is ~107 MB** (inlined assets) - slow on mobile, and it must load inside the lobby window | Serve the modular build with long cache + compression; lobby opens 10 min early; ask the vendor for a split-asset build |
+| VV-4 | Latency: SSE through Cloudflare/nginx buffering | `proxy_buffering off`; verify Cloudflare does not buffer `text/event-stream` |
+| VV-5 | Protocol change (`scheduledStartAt`) | Additive field, version bump of `ChartVolt-Game-API-Requirements.html` |
+| VV-6 | Node 22 required by the race server | **Resolved in VV1**: no engine declared by the vendor; Node >= 20.6 for `--env-file` |
+
+> **27 Sep 2026 - the race stream froze on the machine that forwards to the race server.** On a server that does not host `chartvolt-velocity`, `/race` goes through the Next.js rewrite, and Next.js gzips every response it sends, including forwarded ones (`router-server.js`). Gzip holds the 10 Hz `events` snapshots back until a chunk fills, so the client saw no updates and showed RECONNECTING. The fix is `Cache-Control: no-cache, no-transform` on the stream in `velocity-server/server/index.mjs`, which the compressor (and Cloudflare) honour. No nginx change is needed. A one-shot `curl` cannot show this, because a single reply is not held back.
+

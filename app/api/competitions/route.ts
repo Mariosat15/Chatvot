@@ -1,52 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/database/mongoose';
-import Competition from '@/database/models/trading/competition.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import { auth } from '@/lib/better-auth/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { auth } from "@/lib/better-auth/auth";
+import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
+import {
+  browseCompetitions,
+  COMPETITIONS_PAGE_SIZE,
+} from "@/lib/competitions/browse-competitions";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
+/**
+ * GET /api/competitions
+ *
+ * Paginated browse (default pageSize 10). Query:
+ *   page, limit, status, game, asset, q, sort, difficulty
+ *
+ * Legacy clients that omit page still get a paged envelope; `competitions` is
+ * aliased to `items` for older callers that only read that key.
+ */
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase();
 
-    // Get session for user-specific data
     let userId: string | null = null;
     try {
       const session = await auth.api.getSession({ headers: request.headers });
       userId = session?.user?.id || null;
     } catch {
-      // Not logged in, continue without user data
+      // anonymous browse
     }
 
-    // Fetch all non-draft competitions
-    const competitions = await Competition.find({ 
-      status: { $ne: 'draft' } 
-    })
-      .sort({ startTime: -1 })
-      .lean();
+    const sp = request.nextUrl.searchParams;
+    const viewer = await resolveContestViewer(userId);
 
-    // Get user's participation status if logged in
-    let userInCompetitionIds: string[] = [];
-    if (userId) {
-      const participations = await CompetitionParticipant.find({
-        userId,
-        status: { $in: ['active', 'completed'] }
-      }).select('competitionId').lean();
-      
-      userInCompetitionIds = participations.map((p: any) => p.competitionId.toString());
-    }
+    const result = await browseCompetitions({
+      page: Number(sp.get("page") || 1),
+      limit: Number(sp.get("limit") || COMPETITIONS_PAGE_SIZE),
+      status: sp.get("status") || "active,upcoming",
+      game: sp.get("game") || sp.get("type") || "all",
+      asset: sp.get("asset") || undefined,
+      q: sp.get("q") || sp.get("search") || undefined,
+      sort: sp.get("sort") || "featured",
+      difficulty: sp.get("difficulty") || undefined,
+      viewer,
+    });
 
     return NextResponse.json({
-      competitions: JSON.parse(JSON.stringify(competitions)),
-      userInCompetitionIds,
+      ...result,
+      // Reason: older pollers read `competitions`; keep both until fully migrated.
+      competitions: result.items,
+      userInCompetitionIds: result.userInCompetitionIds,
     });
   } catch (error) {
-    console.error('Error fetching competitions:', error);
+    console.error("Error fetching competitions:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch competitions' },
-      { status: 500 }
+      { error: "Failed to fetch competitions" },
+      { status: 500 },
     );
   }
 }
-

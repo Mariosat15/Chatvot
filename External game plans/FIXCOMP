@@ -1,0 +1,841 @@
+# BUILT 9 Oct 2026 (eng, nineteenth pass) - gamepad, GM tag, compact clock, ALREADY IN
+
+- Board Size uses the owner's gamepad icon (`COMPETITION_ICON.gamepad`).
+- The funding tag is labelled **GM**, replacing "GM Funded".
+- The Starts In / Ends In clock is slightly smaller and never wraps.
+- Narrow data boxes (under 150px) use 13px values, so Rounds "1 Attempt" fits on one line.
+- Dashboard **Suggested for you**: when the player already holds a non-refunded seat, the card shows the green ALREADY IN corner ribbon and the button reads **Already In**. The flag is computed server-side in `suggestOpenContests`.
+- **Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, eighteenth pass) — card grid survives any number of boxes
+
+- **Supersedes the seventeenth pass's grid-card CTA position.** The box count differs per game, so there is no fixed "button cell". Grid order is now: game metrics → **Host (two cells)** → **Starts in / Ends in (two cells)** with **Funding** beside it → other context → the **CTA on its own full-width row, always centred**. `grid-flow-row-dense` lets one-cell boxes fill any gap.
+- **Private access is a top-left PRIVATE ribbon** (`ribbon-private-r1.png`, owner-supplied, transparent) on both the grid card and the list row; the Access box is gone. The right corner keeps GAME / TRADING / cancelled.
+- Host is two cells in the list view too (unchanged there); the list keeps its own order otherwise.
+- Focused verification: competition tests **23/23**, scoped ESLint clean.
+- **Amended same day for the wide list view:** Starts In is two cells there too and leads the context boxes, with Funding beside it. The list CTA moved off the metric row onto its own centred row. In both views the CTA is one box tall (56px) at the artwork's own 3:1 proportions, never stretched, and the drop-shadow glow is off for the in-grid button because it made the baked-in text look blurred.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, seventeenth pass) — competition ribbons and exact grid-cell CTA placement
+
+- Every open competition now carries the supplied corner identity ribbon: green **TRADING** for Trading and gold **GAME** for every game competition. A cancelled/refunded ribbon takes precedence, so one card never displays two corner ribbons.
+- **Wide list row:** the CTA stretches to the full width and height of the metric box beside it.
+- **Grid card:** Host moved into the former one-cell CTA position. The CTA moved into the former two-column Host position below it and fills that whole red-box footprint. Other context follows after the CTA.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **23/23**.
+- **Amended same day (owner: "the button looked stretched"):** the CTA still occupies the full cell, but its artwork is now `object-contain`, never `object-fill` — stretching distorted the baked-in text and icon. The art is centred at its own proportions inside the box; a test forbids `object-fill`.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, sixteenth pass) — CTA aligned inside the metric grid
+
+**Extended by the seventeenth pass above.** The CTA remains in the metric grid, but its final span and Host position now follow the owner's marked references.
+
+- The Join / View Results button is no longer in a separate column under the card. It is a cell in the same auto-fit metric grid as Prize Pool, Mode and Rounds, so it sits beside those boxes instead of floating below the open slot.
+- Both the wide list row and the grid card use that placement. The list row's third CTA column is removed.
+- ~~Host and the other context boxes still follow after the CTA in the grid card.~~ **Superseded:** Host now comes first in one cell; the CTA takes the two-column row below it.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, fifteenth pass) — every Mode box explains itself
+
+**Extended by the sixteenth pass above.** Mode help remains current; only the CTA placement changed.
+
+- Every **Mode** metric now uses the same hover, keyboard and touch explanation treatment as Host, Funding, Access and the clock.
+- **Anytime** explains that each player can start during the open play window. **Scheduled** explains the shared start and warns that arriving late may leave less playing time.
+- A title-specific or future mode still receives an honest generic explanation. The card does not branch on a game code or invent rules the title did not declare.
+- The visual data-box shell was extracted once and is shared by ordinary and explanatory metrics, so Mode keeps exactly the same size and alignment as the surrounding boxes.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **22/22**; scoped ESLint and IDE diagnostics clean; scoped diff check clean. The repository-wide typecheck retains unrelated failures and reports none in these files.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, fourteenth pass) — host/access placement; lower list CTA; cancelled red
+
+**List CTA placement superseded by the sixteenth pass above** — the dedicated right column is history; host/access order and cancelled red remain current.
+
+- **Grid card:** Funding keeps its existing slot, Access moves into the old Host slot, and Host moves to the lower row and spans two grid columns. A long Game Master name therefore gets twice the width instead of wrapping inside a single metric box.
+- **List row:** Host also spans two boxes, but appears before Access so Access sits immediately to its right as marked in the wide-row reference. The context renderer takes an explicit `grid` / `list` layout; neither card duplicates the boxes.
+- ~~**List CTA:** the button is bottom-aligned in its dedicated right column rather than floating halfway up beside the title.~~ **Superseded** — CTA is now a metric-grid cell.
+- **Cancelled/refunded cards are red:** red border, outer/inset glow, dark-red base and red-tinted artwork scrim. The uploaded cancellation ribbon remains the only cancellation-status marker.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **19/19**; scoped ESLint clean.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, thirteenth pass) — contextual explanations on hover and touch
+
+**Extended by the fourteenth pass above.** Hover/touch behavior and its shared component remain current.
+
+- Host, GM funding, private access, level requirement and the live clock now explain what they mean from the card itself.
+- **Desktop:** hovering the whole data box opens its explanation. **Mobile:** pressing the box opens the same popover and it stays open until the player presses elsewhere. Keyboard users can focus the real button and press Enter; Escape closes it.
+- Mouse hover is gated on `pointerType === "mouse"` so a touch pointer cannot open the popover on pointer-enter and immediately close it again on the click generated by the same tap.
+- The help treatment is one shared `CompetitionInfoDataBlock`; both grid and list cards consume it through `CardContextDataBlocks`. A small info glyph signals that these boxes are interactive without changing their size.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **19/19**; scoped ESLint clean.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, twelfth pass) — quiet header; context and clock moved into the data grid
+
+**Extended by the thirteenth pass above.** The placement and shared data-box anatomy remain current.
+
+- **The clutter marked X is removed from every competition-card header.** The header now carries only the competition status. The repeated game-name badge was removed at the presentation source because the artwork and title already identify the game.
+- **Host, funding, access and level requirement are now data boxes**, using the exact same shared shell, icon scale, height and typography as prize, players and every game-defined metric. They join the dynamic grid only when that fact exists; there is no reserved empty slot.
+- **The ticking Starts in / Ends in clock is now another data box in that grid.** It keeps the hydration-safe placeholder and one-second update, but no longer competes with the status above the title.
+- **The CTA is restrained to 220px** rather than stretching across the content column. The list view keeps the same cap.
+- Cancelled/refunded cards still use only the uploaded corner ribbon, and difficulty remains Trading-only. Circuit Sprint board size, Volt Velocity laps/track, Volt Stack scoring and future game-defined metrics remain data-driven; no title branch was added to either card.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **19/19**; scoped ESLint clean.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, eleventh pass) — personal history; target card anatomy; cancelled ribbon only
+
+**Superseded in layout by the twelfth pass above.** Personal-history scope, the left-side artwork, dynamic metrics and cancelled-ribbon rule remain current; the wrapping badge row and full-width CTA are history only.
+
+- **Completed and cancelled history is now personal.** `browseCompetitions` reads the signed-in player's participant seats before constructing the paginated MongoDB query. Active/upcoming competitions remain discoverable, while `finalizing`, `completed`, `cancelled` and the historical `emergency_ended` state are admitted only when that competition id belongs to the viewer. Anonymous viewers and players with no seats receive no settled history. Counts, pages and prize totals use the same scoped query. Participant ids are converted back to ObjectIds before the featured aggregation match because Mongoose does not cast aggregation pipelines.
+- **The card now follows the supplied target's structure.** The game artwork owns the full left side; the right side holds one wrapping badge row, title, two-line description, a dynamic three-column grid containing every populated game-specific metric, and the supplied CTA PNG across the bottom. The grid becomes two-up at `lg`, so a desktop row matches the two-card target rather than showing one oversized card.
+- **Metric boxes are dynamic rather than hard-coded into two mismatched rows.** Circuit Sprint can add board size/attempts, Volt Velocity laps/track, Volt Stack scoring, and future titles can add further declared metrics without changing the card component. Every populated box in a card shares the same grid and row sizing.
+- **Cancelled competitions use only the newly uploaded `CANCELLED / REFUNDED` corner ribbon as their cancellation marker.** It is restrained to a 96–112px top-right box and is rendered only for a stored cancelled competition (including its refunded presentation); the duplicate cancelled/refunded status badge is withheld. Other status/context/countdown badges remain boxed and wrap when present.
+- Difficulty remains Trading-only and all game fields still come through `gameDefinitions`; the card contains no per-title branch.
+- Focused verification: `competition-presentation.test.ts` + `competition-participation-scope.test.ts` **18/18**; ESLint and IDE diagnostics clean; scoped diff check clean. The repository-wide typecheck retains unrelated failures and reports none in these files.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, tenth pass) — artwork restored; one cancelled state; per-game boxes corrected
+
+**Superseded by the eleventh pass above.** The artwork/per-game-field diagnosis remains correct; the ribbon removal and compact footer anatomy are history only.
+
+- **The blank artwork panel was a component defect, not missing files.** `CardHeroWithStatus` put a relative `CardHero` inside an absolute zero-intrinsic-size wrapper. The shared hero now owns its dimensions directly, fills its panel with the resolved game artwork and uses `artworkObjectPosition`; the dedicated Trading, Circuit Sprint, Volt Stack and Volt Velocity assets were also opened directly and confirmed to load.
+- **There is one cancelled treatment.** The supplied diagonal ribbon and its presentation fields were removed; cancelled/refunded cards retain the existing top-left status badge. This supersedes the sixth pass's ribbon requirement at the owner's instruction.
+- **Difficulty is trading-only on cards.** It was explicitly listed in the Circuit Sprint, Volt Stack, provider and all-games definitions. Those entries were removed rather than hidden in the component.
+- **Known game cards carry their own real fields through `gameDefinitions`, not card branches:**
+  - Circuit Sprint: prize pool, players, duration, board size; entry fee, mode and attempts.
+  - Volt Velocity: prize pool, players, duration, mode; entry fee, laps and track.
+  - Volt Stack: prize pool, players, duration, scoring rule; entry fee, mode and attempts.
+  - Trading retains assets, leverage and difficulty.
+- Grid cards now stretch to their row, both metric rows use equal-height tracks, and the same shared artwork/status treatment is used by list view.
+- Focused verification: ESLint clean; `competition-presentation.test.ts` **13/13**. The repository-wide typecheck still has its existing unrelated failures and reports none in the changed competition files.
+
+**Never verified by eye.** The page redirects this browser session to sign-in; the individual game artwork files were verified visually.
+
+# BUILT 9 Oct 2026 (eng, ninth pass) — KPI tiles restyled; card made compact to the owner reference
+
+- **KPI tiles (LIVE NOW / STARTING SOON / PRIZE POOL)** in `ArenaKpiCards.tsx` now use the reference look: a tinted gradient tile in each tile's own colour, a strong coloured border with an outer and inner glow, a glowing ring around the icon, a coloured label with a text glow, the white value with its caption beside it, faint artwork on the right and a ringed arrow. **The wording is unchanged.**
+- **The card is compact and structured** to the reference. It supersedes the seventh pass's centred CTA in its own row, which the owner rejected as "too much space, very big button, no structure".
+  - The status pill sits on the artwork's top-left corner.
+  - A boxed game pill (icon plus name) sits at the top-right of the title.
+  - The title is clamped to two lines, with the full title available as a tooltip. The description is clamped to two lines.
+  - The four primary boxes sit under the description.
+  - The footer row holds the game-specific boxes, with **the CTA PNG as the fourth column**, so the button is box-sized.
+  - Padding and gaps are tighter, and the box minimum height drops from 68 to 56px.
+- The list row uses the same status-on-artwork and game pill, with tighter spacing and a narrower CTA column.
+- **GM Funded is still shown on both views**, as the gold first tag and as the FREE / GM pays entry box. The full-width "Free to enter…" banner was removed for space. Its sentence is now the tag's tooltip, and `GmFundedNote` was deleted rather than left unused.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, eighth pass) — list view on par with the grid card; GM Funded on both
+
+- **The list row now shows everything the card shows**: the whole game artwork over a blurred backdrop, the full title with the large status badge, the tags, a **ticking countdown**, the description, all seven boxes (primary plus game-specific), the glowing accent border, and the CTA in its own column (centred below on narrow rows). Previously it dropped the tags, the description, the countdown and up to two boxes, and cropped the artwork.
+- **The two views cannot drift apart again.** The backdrop, ribbon, hero, tag row and GM Funded note live in `components/competitions/arena/CompetitionCardParts.tsx`, and both views use them.
+- **GM Funded is read from the stored `fundingMode === "gm_funded"`** (`isSponsoredContest`), never guessed. The old heuristic was "private plus a free entry". It missed sponsored contests that store the per-seat fee the GM pays, and it could also label a contest that was free for another reason. On both views a funded contest gets:
+  - a gold "GM Funded" tag first in the row, with the Volts icon;
+  - the line "Free to enter - {GM} pays every seat…" (the existing `sponsoredContestCopy`);
+  - an Entry Fee box reading **FREE / GM pays** instead of the fee the GM is charged.
+- Private now also covers `visibility === "gm_private"`, and the GM creator tag also covers `gameMasterId`.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, seventh pass) — taller card, everything moved down, button centred
+
+Supersedes the fifth pass's footer, which put the CTA in the fourth column beside the boxes. That is correct as history only.
+
+- The card is taller: more padding (16 → 20px), bigger gaps, and a taller hero (minimum 230px).
+- The **full title** shows; the two-line clamp that cut off "Circuit Sprint: Legendary Connect-A-..." is gone, and the card grows instead. The description now shows up to 3 lines.
+- The three game-specific boxes span the full card width on their own row.
+- The CTA has **its own row, centred in the card**, and its maximum width is now 300px (was 260px).
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, sixth pass) — owner's replacement button PNGs, "Add Volts"
+
+- The owner supplied new images for Join Competition, Reserve Spot, Join GM to Enter and View Results, plus a new Cancelled/Refunded ribbon. They are saved as `*-r2.png` under `public/assets/neon/competitions/cta/` and wired in `COMPETITION_CTA_ASSET`. The old files are left in place. The new names matter because overwriting the old filenames would keep serving the old images to returning visitors from their browser cache (R54). "Already in" got no new image and is unchanged.
+- The new ribbon is square (1024×1024; the old one was 1024×682), so its box on the card is now a 118px square pinned top-right.
+- The arena header's Top Up card now reads **"Add Volts →"** instead of "Add Credits →".
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, fifth pass) — status top-right, live countdown, full-width footer, whole artwork, glow
+
+Supersedes the fourth pass's hero and footer layout (correct as history only).
+
+- **Status badge replaces the game-name pill on the right**, using the new `size="lg"` variant of `CompetitionStatusBadge`: 36px tall, 22px icon, 11–12px text. The game's identity is still on the card, through the game tag, which now carries the game icon.
+- **Live countdown beside the tags**: the new `CompetitionCountdown.tsx` ("use client") ticks every second toward `presentation.countdown`. That field is built in `build-competition-presentation.ts`: an upcoming competition counts to its start, a live one to its end. The clock renders nothing once its target has passed. The first render shows `--:--:--`, so the server and browser agree (no hydration mismatch). `countdownLabel` is kept because the list row reads it.
+- **Footer spans the whole card**: three game-specific boxes plus the CTA, with the CTA vertically centred. The card has more padding and a larger title. Previously the footer shared the 72% content column, which is what squeezed the values.
+- **Artwork is shown whole** (`object-contain`, centred), so a title baked into a game's banner (e.g. trading) is no longer cropped. The blurred copy behind it is unchanged. This is game-agnostic.
+- **Glow**: the card border is the game accent at about 85% with an outer and inset glow (dimmer once settled). Info boxes have accent-tinted borders and an inner glow; the prize box glows gold.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, fourth pass) — readable text, centred hero, info boxes to images 3/4
+
+- **Text was unreadable** because the crisp artwork filled the whole card and the game's logo showed through the title and description. The backdrop is now the **same artwork blurred, faded and blended** (`blur-2xl`, 60% opacity, darkened to ~92% behind the content column); description/tags/labels brightened.
+- **Game not centred**: the crisp art was positioned against the whole card, so its centre sat behind the content. It now lives in **its own left hero box** (`object-cover`, the game's `objectPosition`, centre for every catalogue banner), with a soft inner-edge mask. Game-agnostic: both layers read `gameArtwork`, nothing per game.
+- **Info boxes**: icons drawn bare and large (34px, glow in the box tint) instead of in a 38px tile — the tile is what left ~45px for text and split "Skilled"/"Attempt" mid-word. Labels stay on one line; values wrap only between words (`word-break: keep-all`). CTA column floor 190px → 170px to widen the footer boxes.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, third pass) — difficulty filter is server-side
+
+The Difficulty dropdown used to hide cards on the **current page only**. Now it filters **every** competition: the list sends `?difficulty=` to `GET /api/competitions`, and `browseCompetitions` turns it into an `_id $in` clause on the normal query. That means pagination, totals, sort and the featured KPIs all count only the matching competitions.
+
+- Difficulty is **derived** from eight fields and is never stored, so the server scans the candidate competitions (same visibility and filters, projected to `DIFFICULTY_SOURCE_FIELDS`), works out each one's difficulty in JS, and keeps the matching ids. A warning is logged if more than 5,000 are scanned.
+- There is **one definition** of difficulty: `difficultyForCompetition` in `lib/competitions/competition-difficulty-input.ts`. Both the label on each card and the server filter call it, so a card can never be labelled with a difficulty its filter disagrees with. It imports no database model, so client components can use it (R58).
+- An unknown `difficulty` value is ignored (checked against a `Set`), not treated as "match nothing".
+- Platform leverage comes from `getTradingRiskSettings()`, falling back to 100, the same value the client uses.
+- Join GM still only opens the lobby. That is correct and was deliberately not changed.
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng, second pass) — card anatomy rebuilt to the strict brief
+
+Supersedes the "card correction pass" block below (correct as history only — its `mix-blend-screen` ribbon is gone).
+
+- Layout: `grid-cols-[28%_72%]`, switching from the card's **own** width (container query `@[600px]`), not from the viewport; below that the art stacks on top at 150px
+- Fade: the brief's two gradients exactly at wide widths; a top-to-bottom fade when stacked
+- Badges 28px (`h-7`), 10–11px; game badge carries the game's own icon (`CompetitionPresentation.gameIcon`) and per-game accent
+- Primary row `repeat(4,minmax(0,1fr))` gap 8; boxes min-height 72px, `38px 1fr`, values wrap (`break-words`, no `truncate`, no "…")
+- Secondary row `repeat(3,minmax(0,1fr)) minmax(190px,1.3fr)` with the CTA bottom-right from `@[720px]`; below that the CTA sits full-width under the boxes so they are never squeezed
+- CTA and ribbon are the supplied PNGs with no blend mode (both are transparent); ribbon at `right:-5px; top:-2px`, z-20, sized to its measured artwork
+- Completed cards: artwork kept, desaturated, softer glow, View Results CTA. Private GM: "PRIVATE • GM ONLY" badge + Join GM CTA
+- Empty metrics ("", "-", "—") are dropped rather than rendered as empty boxes
+- **Deviation:** the arena grid is two cards per row only at `2xl` (was `md`), because a card under ~600px cannot hold the 28/72 layout
+- Skeletons rebuilt to the same anatomy
+
+**Never verified by eye.**
+
+# BUILT 9 Oct 2026 (eng) — Competition Arena cards → Image 1 target
+
+**Target:** Image 1 (horizontal mini-dashboards with full faded game bg, boxed metrics, owner CTA PNGs). Image 2 was the incorrect prior build.
+
+**Shipped (card correction pass):**
+- Full game artwork as faded card background + crisp left hero (`play-*` / catalogue `bannerUrl`)
+- Primary + secondary metrics all in boxes (ENTRY FEE / MODE / DIFFICULTY never plain text chips)
+- Owner CTA assets under `public/assets/neon/competitions/cta/` — Join, Reserve Spot, Join GM, View Results, Already In
+- Cancelled ribbon uses `ribbon-cancelled.png` (mix-blend-screen), not a CSS sash
+- Browse attaches ProviderGame `bannerUrl` so cards match Games catalogue when set
+- Server pagination 10/page unchanged
+
+**Never verified by eye.** ~~Difficulty remains a soft client filter on the current page.~~ This was true when written. It stopped being true after the third pass above: difficulty is now filtered on the server.
+
+---
+
+Yes. Image 1 is structurally far away from Image 2. Cursor has copied some concepts, but not the visual system, hierarchy, spacing, card anatomy, image treatment, or state logic. Give Cursor the following instructions as a strict rebuild specification, not as optional design suggestions.
+Cursor instruction — rebuild Competition Arena to match target
+IMPORTANT: Do not continue polishing the current implementation. Rebuild the competition listing/card area to match the supplied TARGET image. The current implementation is structurally wrong.
+The TARGET is Image 2. Image 1 is only the current incorrect implementation.
+1. Fix the overall visual hierarchy
+The current page looks like normal web cards placed over a background. The target needs to feel like a ChartVolt competition control center / arena.
+Use this hierarchy:
+1. Arena hero/header
+2. 3 large KPI cards
+3. Search + filters toolbar
+4. Competition results
+5. Pagination / loading controls
+Use a centered desktop content width around 1500–1600px, consistent spacing, and a clear rhythm between sections.
+Do not let cards, filters and text float independently.
+2. Header / Arena Summary
+Current header is too plain and compressed.
+Match the target:
+Left
+- Large trophy/icon approximately 64–72px.
+- COMPETITION ARENA large and strong.
+- “ARENA” may use cyan accent.
+- Subtitle underneath.
+Right
+Use three separate premium mini-cards:
+- Server Time
+- Your Balance
+- Add Credits
+Their icons must be much larger than now.
+Approximate sizing:
+header-icon: 60-72px
+mini-card-icon: 34-42px
+main-title: 28-34px
+primary-value: 21-25px
+secondary-label: 11-13px
+
+The problem with the current design is that everything is tiny. Do not solve this by simply increasing all fonts globally. Increase hierarchy: important numbers/icons large, supporting labels smaller.
+3. KPI cards need to look like actual feature panels
+The target has:
+LIVE NOW
+- green/cyan theme
+STARTING SOON
+- amber/gold theme
+PRIZE POOL
+- purple/magenta theme
+Each should contain:
+- large themed icon
+- section label
+- very large number/value
+- supporting description
+- subtle illustrated background
+- glow border
+- right navigation arrow
+Do not use the tiny icons currently in Image 1.
+Recommended icon sizes:
+.kpiIcon {
+  width: 58px;
+  height: 58px;
+}
+
+.kpiValue {
+  font-size: 32px;
+  font-weight: 800;
+}
+
+4. Search/filter row
+Keep all discovery controls together inside one toolbar.
+Target structure:
+[ Search............................ ]
+[Status ▼] [Type ▼] [Assets ▼] [Difficulty ▼] [Sort ▼]
+[Clear]
+[Grid] [List]
+
+Search gets the most width.
+Controls must have:
+- 42–46px desktop height
+- dark glass background
+- blue/cyan border
+- visible icons
+- 12–14px text minimum
+- 10–12px horizontal gap
+Current implementation is too small and visually flat.
+5. COMPETITION CARDS — THIS IS THE MAIN PROBLEM
+The current cards do not match the target.
+They currently look like:
+status
+huge rectangular image
+title
+tags
+description
+random statistic boxes
+button
+
+This is too generic and vertically inefficient.
+The target cards need to feel like mini game dashboards.
+Correct card anatomy
+Each card should use:
+┌──────────────────────────────────────┐
+│ STATUS                 GAME BADGE    │
+│                                      │
+│ ARTWORK / GAME HERO      CONTENT     │
+│                         TITLE        │
+│                         tags         │
+│                         description  │
+│                                      │
+│                         DATA BLOCKS  │
+│                                      │
+│ ENTRY / MODE / ETC        CTA        │
+└──────────────────────────────────────┘
+
+The artwork and information must feel integrated.
+6. Fix game image handling completely
+This is particularly wrong in Image 1.
+You already have the correct game artwork used on:
+- Games page
+- Dashboard
+- Game Performance
+- Suggested competitions
+Reuse those same assets.
+Do not randomly crop them into generic large rectangles.
+The card image should automatically use the correct game artwork based on gameId / gameSlug.
+Example:
+const gameArtwork = {
+  trading: "/games/trading/card.webp",
+  "volt-stack": "/games/volt-stack/card.webp",
+  "circuit-sprint": "/games/circuit-sprint/card.webp",
+  "volt-velocity": "/games/volt-velocity/card.webp",
+};
+
+Use the existing actual paths where available.
+Image treatment
+Images should use:
+object-fit: cover;
+object-position: center;
+
+But there must also be per-game focal positioning if necessary:
+const gameArtworkPosition = {
+  trading: "center 45%",
+  "volt-stack": "center",
+  "circuit-sprint": "center",
+  "volt-velocity": "center 55%",
+};
+
+Add fade integration
+Do not end the artwork with a hard rectangular edge.
+Apply a dark fade into the card:
+background:
+ linear-gradient(
+   90deg,
+   rgba(3,10,29,0.03) 0%,
+   rgba(3,10,29,0.15) 58%,
+   rgba(3,10,29,0.96) 100%
+ );
+
+For another layout variation, fade downward:
+linear-gradient(
+ to bottom,
+ transparent 35%,
+ rgba(3,10,29,.65) 72%,
+ rgba(3,10,29,1) 100%
+)
+
+The logo/title contained in the source artwork must remain visible. Do not crop off Volt Stack, Circuit Sprint, Volt Velocity or Trading logos.
+7. Cards need game-specific accent colours
+Do not make every card visually identical.
+Use game accent metadata:
+const GAME_THEME = {
+  trading: {
+    accent: "#00f0ff",
+    secondary: "#00ffad"
+  },
+
+  "volt-stack": {
+    accent: "#e42cff",
+    secondary: "#793cff"
+  },
+
+  "circuit-sprint": {
+    accent: "#ffb000",
+    secondary: "#ff5c22"
+  },
+
+  "volt-velocity": {
+    accent: "#1dcfff",
+    secondary: "#3677ff"
+  }
+};
+
+Apply this to:
+- card border
+- small icon highlights
+- section badges
+- CTA glow where appropriate
+- hover
+- spark lines / decorations
+Do not flood the entire card with that color.
+8. Make icons larger and aligned with the numbers
+This is one of the clearest problems in Image 1.
+Currently the statistic icons are tiny and visually disconnected from the values.
+Each data tile should work like:
+ [ICON]   PRIZE POOL
+          20,000 VOLTS
+          ≈ $20,000
+
+or
+[ICON] PLAYERS
+       24 / 100
+
+Use approximately:
+.dataIcon {
+  width: 30px;
+  height: 30px;
+}
+
+.dataLabel {
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+
+.dataValue {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+Larger primary prize boxes can use icons around 38–42px.
+Align icon and text vertically using flex/grid.
+9. Stop hardcoding trading fields
+Competition cards must be game agnostic.
+The current design should not assume every competition has:
+- leverage
+- assets
+- capital
+- trading difficulty
+Generate the data tiles according to the competition creator's actual settings.
+For example:
+Trading
+Prize Pool
+Players
+Duration
+Assets
+Entry Fee
+Capital
+Leverage
+Trading Mode
+
+Volt Stack
+Prize Pool
+Players
+Duration
+Board Size
+Entry Fee
+Rounds
+Game Mode
+Difficulty
+
+Circuit Sprint
+Prize Pool
+Players
+Duration
+Board Size
+Entry Fee
+Rounds
+Puzzle Mode
+Difficulty
+
+Volt Velocity
+Prize Pool
+Players
+Duration
+Track
+Entry Fee
+Laps
+Race Mode
+Difficulty
+
+Build a reusable adapter:
+getCompetitionDisplayFields(competition)
+
+It should return only meaningful fields.
+Never display empty or irrelevant fields.
+10. Competition state must control the entire card
+Create a proper state machine.
+type CompetitionState =
+  | "live"
+  | "starting-soon"
+  | "open"
+  | "private-gm"
+  | "joined"
+  | "full"
+  | "completed"
+  | "cancelled"
+  | "refunded"
+  | "disabled";
+
+The state affects:
+- badge
+- card accent
+- CTA
+- CTA icon
+- secondary text
+- accessibility
+- whether CTA is clickable
+11. USE THE ACTUAL CTA ASSETS I PROVIDED
+Cursor is currently recreating plain CSS buttons.
+Stop doing this.
+I already supplied visual assets for:
+- Join Competition
+- Reserve Spot
+- Join GM to Enter
+- View Results
+- Already In
+- Cancelled ribbon
+Use those actual assets.
+Do not approximate them with generic gradients.
+The button should preserve the artwork while still acting like a real button:
+<button className="competitionCta">
+  <img src={ctaAsset} alt="" />
+  <span className="sr-only">{ctaLabel}</span>
+</button>
+
+Or place the asset as a background while preserving responsive text/interaction if necessary.
+Use:
+background-size: 100% 100%;
+background-repeat: no-repeat;
+background-position: center;
+
+State mapping
+live/open + eligible
+→ Join Competition
+
+starting soon
+→ Reserve Spot
+
+private GM + user not affiliated
+→ Join GM to Enter
+
+already joined
+→ Already In
+
+completed
+→ View Results
+
+cancelled
+→ disabled/details only + CANCELLED ribbon
+
+full
+→ Competition Full
+
+12. Existing Join GM logic must remain
+Do not create another GM system.
+Reuse ChartVolt's existing logic.
+For a private GM competition:
+if (competition.private && competition.gmId) {
+   if (!user.isAcceptedReferralOf(competition.gmId)) {
+      CTA = "Join GM to Enter";
+   }
+}
+
+After GM joining + terms acceptance:
+Join GM to Enter
+        ↓
+Join Competition
+
+Or Already In if entry already occurred.
+13. Fix card proportions
+Image 1 cards are too tall and feel empty.
+Desktop target should show 2 cards per row with approximately:
+grid-template-columns: repeat(2, minmax(0,1fr));
+gap: 14px;
+
+Approx card height:
+310–380px, depending on actual data.
+Do not force every card to be exactly the same height if dynamic fields differ slightly, but aim for visual alignment.
+The CTA should stay in a consistent footer area.
+Use:
+.card {
+ display:flex;
+ flex-direction:column;
+}
+
+.cardContent {
+ flex:1;
+}
+
+.cardFooter {
+ margin-top:auto;
+}
+
+14. Improve text readability
+Current text is far too small.
+On normal desktop 1440p/1600p:
+Competition title     18–21px
+Description           12–14px
+Primary value         16–19px
+Data label            9–11px
+Badges                10–12px
+CTA text              14–16px
+
+Do not use 7–9px body text.
+Users should not need zoom to understand a card.
+15. Status badges should be stronger
+Examples:
+🟢 LIVE NOW
+🟡 STARTING SOON
+🟣 PRIVATE · GM ONLY
+🔵 COMPLETED
+🔴 CANCELLED
+The status must be immediately visible without reading the body.
+16. Cancelled state
+The current small CANCELLED badge is weak.
+Use the red diagonal CANCELLED ribbon asset I supplied across the upper-right corner.
+A cancelled card should also have:
+- slightly reduced artwork saturation
+- muted CTA
+- optionally reason/refund status
+- no Join CTA
+Example:
+CANCELLED
+Entry refunded
+
+if refund actually occurred.
+17. Completed competition card
+Completed does not mean visually dead.
+Keep game artwork visible.
+Show:
+COMPLETED
+Prize
+Players
+Duration
+Game-specific result information
+
+[ VIEW RESULTS ]
+
+Do not display a bland generic card.
+18. ADD PROPER DATA LOADING — IMPORTANT
+Do not load every competition into the browser.
+With thousands of:
+- completed
+- expired
+- cancelled
+- refunded
+competitions, this will become slow and eventually unusable.
+Use server-side pagination.
+Default:
+pageSize = 10
+
+Only request 10 competitions at a time.
+Example API:
+GET /api/competitions
+?page=1
+&limit=10
+&status=all
+&type=all
+&game=all
+&difficulty=all
+&sort=featured
+
+Backend should return:
+{
+  items: Competition[],
+  page: 1,
+  pageSize: 10,
+  totalItems: 3284,
+  totalPages: 329,
+  hasNextPage: true,
+  hasPreviousPage: false
+}
+
+Never:
+fetchAllCompetitions()
+
+and then filter 3,000 records client-side.
+19. Pagination
+Below the competition cards add:
+Showing 1–10 of 3,284
+
+‹ Previous   1  2  3  4  ... 329   Next ›
+
+Keep 10 cards per page.
+This is important because the user needs predictable browsing instead of endless scrolling.
+When filters change:
+setPage(1)
+
+Then refetch.
+20. Lazy-load images
+All competition artwork must use lazy loading:
+<img
+  src={image}
+  loading="lazy"
+  decoding="async"
+/>
+
+In Next.js:
+<Image
+  src={image}
+  fill
+  sizes="(max-width: 768px) 100vw, 50vw"
+  loading="lazy"
+/>
+
+Only hero/header imagery above the fold should receive priority.
+Competition card images should not use priority.
+21. Add skeleton loading states
+When requesting another page, do not blank out the whole section.
+Render 4–6 skeleton cards matching the card geometry.
+Example:
+┌────────────────────┐
+│ ██████████████████ │
+│ ██████             │
+│ ▓▓▓  ▓▓▓  ▓▓▓     │
+│ ███████████        │
+└────────────────────┘
+
+Use subtle animated shimmer, not a spinner centered on the whole screen.
+22. Prefetch next page
+After page 1 loads, optionally prefetch page 2 in the background.
+For React Query/TanStack Query:
+queryClient.prefetchQuery({
+  queryKey: ["competitions", filters, page + 1],
+  queryFn: ...
+});
+
+This makes next-page navigation nearly instant.
+23. Filtering must happen on server
+These should change API query parameters:
+- Status
+- Game/type
+- Assets
+- Difficulty
+- Sort
+- Search
+Do not load everything first.
+Use search debounce around:
+300–400ms
+
+Example:
+useDebounce(search, 350);
+
+24. Historical competition strategy
+As the platform grows, the current competition page should prioritize relevant competitions.
+Suggested sort:
+1 Live
+2 Starting Soon
+3 Open
+4 Private eligible
+5 Private requiring GM
+6 Completed recent
+7 Cancelled/refunded recent
+8 Historical
+
+Consider status tabs later:
+Discover
+Live
+Upcoming
+Joined
+Completed
+
+This prevents old competitions overwhelming active opportunities.
+25. Database indexes
+Cursor must make sure MongoDB queries are indexable.
+Likely indexes:
+{ status: 1, startTime: 1 }
+
+{ gameId: 1, status: 1, startTime: 1 }
+
+{ status: 1, createdAt: -1 }
+
+{ gmId: 1, visibility: 1, status: 1 }
+
+{ endTime: -1 }
+
+Do not create every imaginable compound index blindly; inspect existing queries and add indexes supporting the actual filter/sort combinations.
+26. ARCHIVE OLD COMPETITIONS LOGICALLY
+Do not mix thousands of historical competitions into the first discovery results.
+Completed/cancelled competitions should remain searchable, but users should reach them through filtering/pagination.
+Possible data logic:
+isHistorical =
+  status === "completed" ||
+  status === "cancelled" ||
+  status === "refunded";
+
+Do not delete them because they are needed for:
+- history
+- results
+- audit
+- player performance
+- GM reporting
+Final visual requirement
+Do not recreate Image 1 with slightly larger fonts.
+The result must structurally resemble Image 2:
+- larger, stronger icons
+- readable typography
+- integrated game artwork
+- game-specific artwork automatically selected
+- artwork fades naturally into card
+- game logos remain visible
+- dynamic data blocks
+- meaningful hierarchy
+- premium neon/glass ChartVolt aesthetic
+- real supplied CTA artwork
+- state-aware actions
+- clear badges
+- consistent two-column card system
+- no tiny UI
+- no hardcoded trading fields
+- no loading every historical competition
+- 10 competitions per page
+- server-side pagination
+- lazy-loaded artwork
+- skeleton loading
+- responsive mobile layout
+Critical acceptance test
+Before considering the page finished, compare it side-by-side with the target. At 100% browser zoom, I should immediately be able to read the title, prize, players, duration, game information and CTA of every competition without zooming. The game artwork must look like the existing ChartVolt Games/Dashboard cards, not generic landscape images. The target should feel like a premium competitive gaming interface, not a standard admin listing.
