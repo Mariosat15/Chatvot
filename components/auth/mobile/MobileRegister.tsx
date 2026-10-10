@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CountrySelectField } from "@/components/forms/CountrySelectField";
 import { PhoneInputField } from "@/components/forms/PhoneInputField";
@@ -16,7 +16,11 @@ import { useSignUpForm } from "@/hooks/useSignUpForm";
 import { usernameValidation } from "@/components/auth/username-validation";
 import type { SignupInterest } from "@/lib/utils/signup-interest";
 
-/** Dedicated mobile registration — one column, two steps. */
+/**
+ * Dedicated mobile registration — one column, one page, same field order as desktop.
+ * Reason: the two-step version hid address, city, ZIP, the player-type choice and the terms
+ * box behind Continue, and the owner read them as missing (10 Oct 2026).
+ */
 export default function MobileRegister() {
   const {
     form,
@@ -32,9 +36,6 @@ export default function MobileRegister() {
     setTermsAccepted,
     termsError,
     setTermsError,
-    step,
-    goToStep1,
-    goToStep2,
     onSubmit,
     referralCode,
   } = useSignUpForm();
@@ -68,13 +69,6 @@ export default function MobileRegister() {
           onSubmit={handleSubmit(onSubmit)}
           className="relative space-y-3.5"
         >
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-cyan-300/80">
-            Step {step} of 2 ·{" "}
-            {step === 1 ? "Account Details" : "Profile & Preferences"}
-          </p>
-
-          {step === 1 ? (
-            <>
               <MobileAuthInput
                 name="fullName"
                 label="Full Name"
@@ -189,19 +183,6 @@ export default function MobileRegister() {
                 }}
               />
 
-              <div className="auth-card space-y-1 [&_.form-label]:text-[11px] [&_.form-input]:h-14 [&_.form-input]:rounded-xl [&_.form-input]:text-[16px] [&_.country-select-trigger]:h-14 [&_.country-select-trigger]:rounded-xl [&_.select-trigger]:h-14">
-                <CountrySelectField
-                  name="country"
-                  label="Country"
-                  control={
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    control as any
-                  }
-                  error={errors.country}
-                  required
-                />
-              </div>
-
               {/* Reason: match code trigger and national input to the same
                   fixed 56px height — min-h alone let the number field grow
                   taller than the dial-code button. */}
@@ -217,19 +198,19 @@ export default function MobileRegister() {
                 />
               </div>
 
-              <Button
-                type="button"
-                onClick={() => void goToStep2()}
-                className="yellow-btn mt-2 h-14 w-full text-[16px] font-bold"
-              >
-                <span className="inline-flex items-center gap-2">
-                  Continue
-                  <ArrowRight className="h-4 w-4" aria-hidden />
-                </span>
-              </Button>
-            </>
-          ) : (
-            <>
+              <div className="auth-card space-y-1 [&_.form-label]:text-[11px] [&_.form-input]:h-14 [&_.form-input]:rounded-xl [&_.form-input]:text-[16px] [&_.country-select-trigger]:h-14 [&_.country-select-trigger]:rounded-xl [&_.select-trigger]:h-14">
+                <CountrySelectField
+                  name="country"
+                  label="Country"
+                  control={
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    control as any
+                  }
+                  error={errors.country}
+                  required
+                />
+              </div>
+
               <MobileAuthInput
                 name="address"
                 label="Address"
@@ -293,30 +274,15 @@ export default function MobileRegister() {
                 onEnabledChange={setCaptchaEnabled}
               />
 
-              <div className="flex flex-col gap-2.5 pt-1">
-                <Button
-                  type="submit"
-                  disabled={isSubmitting || (captchaEnabled && !captchaToken)}
-                  className="yellow-btn h-14 w-full text-[15px] font-bold sm:text-[16px]"
-                >
-                  {isSubmitting
-                    ? "Creating your account..."
-                    : "Create Account & Start Playing"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={goToStep1}
-                  className="h-12 w-full border-cyan-400/30 bg-transparent text-[15px] text-cyan-50 hover:bg-cyan-400/10"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <ArrowLeft className="h-4 w-4" aria-hidden />
-                    Back
-                  </span>
-                </Button>
-              </div>
-            </>
-          )}
+              <Button
+                type="submit"
+                disabled={isSubmitting || (captchaEnabled && !captchaToken)}
+                className="yellow-btn mt-1 h-14 w-full text-[15px] font-bold sm:text-[16px]"
+              >
+                {isSubmitting
+                  ? "Creating your account..."
+                  : "Create Account & Start Playing"}
+              </Button>
 
           <div
             aria-hidden="true"

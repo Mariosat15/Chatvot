@@ -15,17 +15,6 @@ export type ExtendedSignUpFormData = SignUpFormData & {
   website?: string;
 };
 
-const STEP1_FIELDS = [
-  "fullName",
-  "username",
-  "email",
-  "password",
-  "confirmPassword",
-  "country",
-  "phoneCountry",
-  "phoneNational",
-] as const;
-
 export function useSignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,11 +27,10 @@ export function useSignUpForm() {
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsError, setTermsError] = useState<string | undefined>();
-  const [step, setStep] = useState<1 | 2>(1);
   const formStartTime = useRef(Date.now());
 
-  // Reason: GM referral must survive the mobile two-step UI and the
-  // sign-up → sign-in hop. Read from the URL once and keep in memory.
+  // Reason: GM referral must survive the sign-up → sign-in hop.
+  // Read from the URL once and keep in memory.
   const referralCode = searchParams.get("ref") || undefined;
 
   const form = useForm<ExtendedSignUpFormData>({
@@ -73,20 +61,6 @@ export function useSignUpForm() {
     });
     setPasswordStrength(strength);
   }, [password]);
-
-  const goToStep2 = async () => {
-    const ok = await form.trigger([...STEP1_FIELDS]);
-    if (!ok) return false;
-    if (!passwordMeetsRequirements(form.getValues("password"))) {
-      toast.error("Password does not meet security requirements");
-      setShowRequirements(true);
-      return false;
-    }
-    setStep(2);
-    return true;
-  };
-
-  const goToStep1 = () => setStep(1);
 
   const onSubmit = async (data: ExtendedSignUpFormData) => {
     if (!termsAccepted) {
@@ -167,9 +141,6 @@ export function useSignUpForm() {
     setTermsAccepted,
     termsError,
     setTermsError,
-    step,
-    goToStep1,
-    goToStep2,
     onSubmit,
     referralCode,
   };

@@ -398,6 +398,10 @@ and preferably:
 
 TWO STEPS
 
+> **AMENDED 10 Oct 2026 (owner):** mobile registration is now ONE page, not two steps.
+> Step 2 (address, city, ZIP, "What kind of player are you?", terms) was being read as
+> missing. See section 46. Correct as history, stale as a present fact.
+
 ==================================================
 13. MOBILE REGISTRATION WORDING
 ==================================================
@@ -1290,3 +1294,22 @@ real names stay visible to admins and to Game Masters whose package has
 
 Proven by __tests__/services/username-rules.test.ts (19 tests) and
 __tests__/admin/admin-user-label.test.ts (5 tests). Never verified by eye.
+
+## 46. BUILT - Mobile registration is one page (10 Oct 2026)
+
+Report: on mobile the address, city, ZIP, "What kind of player are you?"
+and the agree-to-terms box were missing. They existed, but on step 2,
+behind a Continue button that refuses silently whenever any step-1 field
+fails validation - so the player never saw them.
+
+Fix (owner's instruction, deviating from section 12's "preferably two
+steps"): components/auth/mobile/MobileRegister.tsx renders every field
+on one page, one column, in desktop's order - name, username, email,
+password, confirm, phone, country, address, city, ZIP, player type,
+terms, captcha, Create Account. Submit validates everything at once and
+shows each error under its own field. The step state, goToStep1/2 and
+STEP1_FIELDS were removed from hooks/useSignUpForm.ts (desktop never
+used them). Desktop unchanged.
+
+Proven by __tests__/auth/auth-page-look.test.ts (field order on the
+mobile page, no step condition left). Never verified by eye.

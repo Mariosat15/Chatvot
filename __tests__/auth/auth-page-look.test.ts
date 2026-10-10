@@ -106,13 +106,32 @@ describe("auth page look", () => {
     expect(css).toContain("scrollbar-width: none");
   });
 
-  it("mobile registration is a two-step one-column flow and terms link to real pages", () => {
-    const mobileReg = read("components/auth/mobile/MobileRegister.tsx");
+  // Reason (10 Oct 2026): the two-step version hid address, city, ZIP, the player-type
+  // choice and the terms box behind Continue, and the owner reported them as missing. Every
+  // field now renders on one page, so none of them may sit behind a step condition.
+  it("mobile registration is one page, one column, with every field and terms linking to real pages", () => {
+    const mobileReg = stripComments(read("components/auth/mobile/MobileRegister.tsx"));
     const terms = read("components/auth/AuthTermsAgree.tsx");
     const hook = read("hooks/useSignUpForm.ts");
-    expect(mobileReg).toContain("goToStep2");
-    expect(mobileReg).toContain("Step {step} of 2");
-    expect(mobileReg).toContain("MobileInterestSelector");
+    expect(mobileReg).not.toMatch(/goToStep|step ===|\{step\}/);
+    expect(hook).not.toMatch(/goToStep|setStep/);
+    const order = [
+      'name="fullName"',
+      'name="username"',
+      'name="email"',
+      'name="password"',
+      'name="confirmPassword"',
+      "<PhoneInputField",
+      'name="country"',
+      'name="address"',
+      'name="city"',
+      'name="postalCode"',
+      "<MobileInterestSelector",
+      "<AuthTermsAgree",
+      'type="submit"',
+    ].map((marker) => mobileReg.indexOf(marker));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(mobileReg).not.toMatch(/grid-cols-2/);
     expect(terms).toContain('href="/terms"');
     expect(terms).toContain('href="/privacy"');
