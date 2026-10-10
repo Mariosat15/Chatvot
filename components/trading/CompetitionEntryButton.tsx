@@ -38,6 +38,11 @@ import { formatVolts } from "@/lib/utils/format-volts";
 import { resolveLevelName } from "@/lib/utils/level-title";
 import type { TitleLevel } from "@/lib/constants/levels";
 import { levelEmoji } from "@/components/trading/level-emoji";
+import {
+  DEFAULT_FREE_PRIVATE_ENTRY_RULE,
+  freePrivateEntryRefusal,
+  type FreePrivateEntryRule,
+} from "@/lib/utils/free-private-entry-rule";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
@@ -107,6 +112,17 @@ export default function CompetitionEntryButton({
   // chooses what the panel says and which terms it asks for.
   const isFunded = competition.fundingMode === "gm_funded";
   const canAfford = isFunded || userBalance >= entryFee;
+  // Reason: the seat is free but the admin can still require a minimum wallet balance
+  // ("Who can join a free competition"). Cards deliberately let the player into this lobby
+  // whatever their balance, so this is where they learn the rule - before the terms dialogs,
+  // not from a toast after them. The lobby page attaches the resolved rule; an absent one
+  // falls back to the strict default, matching `payFundedEntry`, which stays the authority.
+  const fundedRule: FreePrivateEntryRule | null = isFunded
+    ? (competition.freePrivateEntryRule ?? DEFAULT_FREE_PRIVATE_ENTRY_RULE)
+    : null;
+  const fundedRefusal = fundedRule
+    ? freePrivateEntryRefusal(fundedRule, userBalance)
+    : null;
   const gameMasterName =
     typeof competition.gameMasterName === "string" && competition.gameMasterName
       ? competition.gameMasterName
@@ -199,6 +215,7 @@ export default function CompetitionEntryButton({
     (isActive || isUpcoming) &&
     !isFull &&
     canAfford &&
+    !fundedRefusal &&
     !isUserIn &&
     meetsLevelReq &&
     !registrationClosed &&
@@ -264,6 +281,11 @@ export default function CompetitionEntryButton({
   const handleEnter = async () => {
     if (!canAfford) {
       toast.error(`Insufficient balance. Need ${volts(entryFee)}`);
+      return;
+    }
+
+    if (fundedRefusal) {
+      toast.error(fundedRefusal);
       return;
     }
 
@@ -608,6 +630,11 @@ export default function CompetitionEntryButton({
                 <DollarSign className="mr-2 h-4 w-4" />
                 Need {volts(Math.abs(entryFee - userBalance))} More
               </>
+            ) : fundedRefusal ? (
+              <>
+                <DollarSign className="mr-2 h-4 w-4" />
+                Minimum Balance Required
+              </>
             ) : (
               <>
                 <Trophy className="mr-2 h-4 w-4" />
@@ -697,6 +724,32 @@ export default function CompetitionEntryButton({
                     className="h-auto p-0 text-xs text-red-400 underline mt-1 cursor-pointer hover:text-red-300 active:scale-95 transition-all"
                   >
                     Go to Wallet
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {fundedRefusal && fundedRule && !registrationClosed && !isOwnContest && (
+            <div className="flex items-start gap-3 rounded-lg border-2 border-red-500/60 bg-red-500/15 p-4">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+              <div>
+                <p className="text-base font-bold text-red-400">
+                  You can&apos;t join yet: a minimum balance of{" "}
+                  {volts(fundedRule.minBalance)} is required
+                </p>
+                <p className="mt-1 text-sm font-semibold text-red-300">
+                  This competition is free and paid by {gameMasterName}, but to join a free
+                  Game Master-funded competition you still need at least{" "}
+                  {volts(fundedRule.minBalance)} in your wallet. Your balance is{" "}
+                  {volts(userBalance)}. Your credits are only checked, never taken.
+                </p>
+                <Link href="/wallet">
+                  <Button
+                    variant="link"
+                    className="mt-1 h-auto p-0 text-sm font-semibold text-red-400 underline cursor-pointer hover:text-red-300 active:scale-95 transition-all"
+                  >
+                    Deposit to join →
                   </Button>
                 </Link>
               </div>

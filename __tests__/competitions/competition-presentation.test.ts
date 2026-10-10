@@ -130,6 +130,30 @@ describe("getCompetitionCTA", () => {
     expect(cta.variant).toBe("already_in");
     expect(cta.label).toMatch(/already in/i);
   });
+
+  it("still sends a player who cannot afford a paid contest to the wallet", () => {
+    const cta = getCompetitionCTA({
+      competition: base({ entryFeeCredits: 50 }),
+      isRegistered: false,
+      userBalance: 0,
+      registrationClosed: false,
+    });
+    expect(cta.href).toBe("/wallet");
+  });
+
+  // Reason: a Game Master pays the seat, so the card must let an empty wallet into the lobby,
+  // where the entry button applies the admin's minimum-balance rule and says why.
+  it("lets an empty wallet into a Game Master-funded lobby instead of Top Up", () => {
+    const cta = getCompetitionCTA({
+      competition: base({ entryFeeCredits: 50, fundingMode: "gm_funded" }),
+      isRegistered: false,
+      userBalance: 0,
+      registrationClosed: false,
+    });
+    expect(cta.variant).toBe("join");
+    expect(cta.href).toBe("/competitions/507f1f77bcf86cd799439011");
+    expect(cta.disabled).toBe(false);
+  });
 });
 
 describe("buildCompetitionPresentation", () => {

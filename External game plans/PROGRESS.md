@@ -978,6 +978,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 9 October 2026 - A free (Game Master-funded) competition: the card lets you in, the lobby explains the minimum
+
+**Status: code-complete. Never verified by eye.** Owner report: a player with too little money could not get into a free competition from the cards, yet the lobby never said the admin's "Who can join a free (Game Master-funded) competition" minimum applied.
+
+- **Cards (desktop grid/list and phone):** `getCompetitionCTA` no longer compares the wallet to the entry fee for a `gm_funded` contest. That fee is what the Game Master pays, so the card was sending players to "Top Up to Join" `/wallet` instead of the lobby. The old `CompetitionCard.tsx` already treated sponsored contests as affordable and nothing imports it any more.
+- **Lobby (trading and game lobbies, all widths):** the page resolves the admin rule through `loadFreePrivateEntryRule()` (`lib/services/contest-entry/free-private-entry.ts`, the same loader the join transaction now uses) and attaches it to funded contests. `CompetitionEntryButton` runs `freePrivateEntryRefusal`. While the balance is below the minimum, the button reads "Minimum Balance Required", is disabled, and a bold red panel states the required minimum, the player's balance, and that the credits are only checked, never taken, with a link to deposit. An absent rule falls back to the strict default. `payFundedEntry` remains the authority.
+- Tests: two CTA cases in `competition-presentation.test.ts`, plus `__tests__/competitions/funded-lobby-min-balance.test.ts` (5). The two `gm-private-contest-view` failures are pre-existing and fail without this change.
+
 ### 9 October 2026 - Competition Arena gets its own phone layout
 
 **Status: code-complete, not committed. Never verified by eye.** Brief and BUILT note: `External game plans/competitionmobile`.

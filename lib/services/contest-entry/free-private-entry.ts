@@ -18,9 +18,28 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import {
   freePrivateEntryRefusal,
   resolveFreePrivateEntryRule,
+  type FreePrivateEntryRule,
 } from "@/lib/utils/free-private-entry-rule";
 
 type ClientSession = mongoose.mongo.ClientSession;
+
+/**
+ * The admin's "who can join a free competition" rule. The lobby reads it to explain a
+ * refusal before the player presses Join; `payFundedEntry` reads it again inside the
+ * transaction and stays the authority.
+ */
+export async function loadFreePrivateEntryRule(
+  session?: ClientSession,
+): Promise<FreePrivateEntryRule> {
+  const query = WhiteLabel.findOne().select({
+    freePrivateEntryPolicy: 1,
+    freePrivateMinEntryBalance: 1,
+  });
+  if (session) query.session(session);
+  return resolveFreePrivateEntryRule(
+    await query.lean<{ freePrivateEntryPolicy?: unknown; freePrivateMinEntryBalance?: unknown }>(),
+  );
+}
 
 export interface FundedContestFacts {
   _id: unknown;
@@ -76,12 +95,7 @@ export async function payFundedEntry(
 
   // Reason: a funded seat costs the player nothing, so without this an empty wallet joins.
   // Checked inside the transaction, before the only write, and never debited.
-  const rule = resolveFreePrivateEntryRule(
-    await WhiteLabel.findOne()
-      .select({ freePrivateEntryPolicy: 1, freePrivateMinEntryBalance: 1 })
-      .session(session)
-      .lean<{ freePrivateEntryPolicy?: unknown; freePrivateMinEntryBalance?: unknown }>(),
-  );
+  const rule = await loadFreePrivateEntryRule(session);
   if (rule.policy !== "open") {
     const wallet = await CreditWallet.findOne({ userId: actor.userId })
       .select({ creditBalance: 1 })

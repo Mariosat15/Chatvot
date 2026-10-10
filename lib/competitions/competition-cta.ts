@@ -6,6 +6,7 @@
  */
 
 import { privateContestCardCopy } from "@/lib/utils/private-contest-card-copy";
+import { isSponsoredContest } from "@/lib/utils/sponsored-contest-copy";
 import type { CompetitionCta, CompetitionListItem } from "./types";
 
 export interface CompetitionCtaInput {
@@ -31,7 +32,10 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
   const current = Number(c.currentParticipants ?? 0);
   const max = Number(c.maxParticipants ?? 0);
   const isFull = max > 0 && current >= max;
-  const canAfford = userBalance >= entryFee;
+  // Reason: a Game Master-funded seat is never paid from the player's wallet, so a card must
+  // not send them to top up the entry fee. The lobby's entry button applies the admin's
+  // minimum-balance rule and explains it; the card only gets them through the door.
+  const canAfford = isSponsoredContest(c.fundingMode) || userBalance >= entryFee;
   const privateAccess = c.privateAccess;
 
   if (status === "cancelled") {

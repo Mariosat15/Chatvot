@@ -38,6 +38,11 @@ import { loadTradingPageContent } from "@/lib/services/games/trading-page-conten
 import { canViewContest } from "@/lib/services/gamemaster/private-contest-access.service";
 import { getPrivateContestGate } from "@/lib/services/gamemaster/private-contest-gate.service";
 import PrivateContestGate from "@/components/gamemaster/PrivateContestGate";
+import {
+  isFundedContest,
+  loadFreePrivateEntryRule,
+} from "@/lib/services/contest-entry/free-private-entry";
+import { resolveFreePrivateEntryRule } from "@/lib/utils/free-private-entry-rule";
 
 interface CompetitionDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -120,6 +125,15 @@ const CompetitionDetailsPage = async ({
           entryFee={competition.entryFee}
           gate={gate}
         />
+      );
+    }
+
+    // Reason: cards let a player into a free (Game Master-funded) lobby whatever their balance,
+    // so the lobby's Join button must apply the admin minimum and say why. Both lobbies hand
+    // `competition` to `CompetitionEntryButton` unchanged, so attaching it here reaches both.
+    if (isFundedContest(competition)) {
+      competition.freePrivateEntryRule = await loadFreePrivateEntryRule().catch(() =>
+        resolveFreePrivateEntryRule(null),
       );
     }
 
