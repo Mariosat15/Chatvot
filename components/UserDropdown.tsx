@@ -8,23 +8,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { LogOut, User, HelpCircle, Wallet, ChevronDown } from "lucide-react";
 import { Suspense } from "react";
 import NavItems from "@/components/NavItems";
-import { signOut } from "@/lib/actions/auth.actions";
+import { signOutAndLeave } from "@/lib/auth/sign-out-and-leave";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
 import AvatarWithFrame from "@/components/ui/AvatarWithFrame";
 import Link from "next/link";
 
 const UserDropdown = ({ user }: { user: User }) => {
-  const router = useRouter();
   const { profileImage, frameUrl, hasCustomImage } = useUserProfileImage();
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push("/sign-in");
+    await signOutAndLeave();
   };
 
   return (

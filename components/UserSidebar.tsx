@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWhiteLabelImages } from "@/hooks/useWhiteLabelImages";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
-import { signOut } from "@/lib/actions/auth.actions";
+import { signOutAndLeave } from "@/lib/auth/sign-out-and-leave";
 import NotificationDropdown from "@/components/notifications/NotificationDropdown";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
@@ -191,7 +191,6 @@ function SectionHeader({
 
 const UserSidebar = ({ user }: UserSidebarProps) => {
   const pathname = usePathname();
-  const router = useRouter();
   const terms = useTerms();
   const mainNavItems = buildMainNavItems(terms);
   const { images } = useWhiteLabelImages();
@@ -315,8 +314,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
 
   const handleSignOut = async () => {
     if (!confirm("Are you sure you want to sign out?")) return;
-    await signOut();
-    router.push("/sign-in");
+    await signOutAndLeave();
   };
 
   const NavLink = ({ item }: { item: NavItem }) => {

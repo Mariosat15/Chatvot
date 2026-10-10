@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,10 +11,9 @@ import {
 } from "@/components/ui/card";
 import { Mail, RefreshCw, LogOut, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import { signOut } from "@/lib/actions/auth.actions";
+import { signOutAndLeave } from "@/lib/auth/sign-out-and-leave";
 
 export default function VerifyEmailRequiredPage() {
-  const router = useRouter();
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
 
@@ -44,13 +42,7 @@ export default function VerifyEmailRequiredPage() {
   };
 
   const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push("/sign-in");
-    } catch (error) {
-      console.error("Error signing out:", error);
-      router.push("/sign-in");
-    }
+    await signOutAndLeave();
   };
 
   return (
