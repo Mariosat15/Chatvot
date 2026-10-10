@@ -68,3 +68,24 @@ export async function setContactUsPackageUnlock(
   );
   return { ok: true, packageName: item.name };
 }
+
+/**
+ * Disables EVERY Contact-us package for one player, so they see Contact us again everywhere.
+ * Used by the "Disable GM package" button and by an admin revoke.
+ * Reason: an unlock is a one-off permission from support. Left in place after a revoke or an
+ * expiry, the player could buy the package again without asking, which is what the owner forbade.
+ */
+export async function disableAllContactUsPackagesForUser(
+  userId: string,
+): Promise<{ disabledCount: number }> {
+  await connectToDatabase();
+  const result = await MarketplaceItem.updateMany(
+    {
+      category: "gamemaster",
+      "gameMasterConfig.contactUsOnly": true,
+      contactUsUnlockedUserIds: userId,
+    },
+    { $pull: { contactUsUnlockedUserIds: userId } },
+  );
+  return { disabledCount: result.modifiedCount };
+}

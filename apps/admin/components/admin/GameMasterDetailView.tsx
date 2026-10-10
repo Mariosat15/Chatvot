@@ -25,6 +25,7 @@ import type { AdminAwaitingClaimRow } from "@/lib/admin/admin-terms-reminder-vie
 import { isGameMasterActiveCompetition } from "@/lib/services/gamemaster/active-competitions";
 import ContestOpenButton from "./gamemaster/ContestOpenButton";
 import EnableGmPackageButton from "./gamemaster/EnableGmPackageButton";
+import DisableGmPackageButton from "./gamemaster/DisableGmPackageButton";
 
 // ─── Interfaces ───────────────────────────────────────────────────────
 interface GMSubscription {
@@ -356,6 +357,7 @@ export default function GameMasterDetailView({
             Extend 30 Days
           </button>
           <EnableGmPackageButton subscriptionId={gm.id} />
+          <DisableGmPackageButton subscriptionId={gm.id} />
           <button
             onClick={() => onAction(gm.id, "revoke")}
             disabled={actionLoading}

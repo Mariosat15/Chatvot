@@ -287,6 +287,15 @@ export default function TradingArsenalSection() {
           duration: 6000,
         });
         await fetchGmSubscription();
+      } else if (data.errorCode === "GM_CONTACT_US" && data.contactUsHref) {
+        // Reason: the package went back to Contact us when it expired; support must enable it.
+        toast.error(data.error, {
+          action: {
+            label: "Contact us",
+            onClick: () => window.location.assign(data.contactUsHref),
+          },
+          duration: 10000,
+        });
       } else if (
         data.details?.required &&
         data.details?.available !== undefined

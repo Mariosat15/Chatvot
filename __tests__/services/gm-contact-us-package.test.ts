@@ -89,7 +89,7 @@ describe("contact-us wiring", () => {
     const handlers = src.match(/export async function (GET|POST|PUT|PATCH|DELETE)\b/g) ?? [];
     const guards = src.match(/guardSection\("gamemaster-management"\)/g) ?? [];
     const refusals = src.match(/if \(!guard\.ok\) return guard\.response/g) ?? [];
-    expect(handlers.length).toBe(2);
+    expect(handlers.length).toBe(3);
     expect(guards.length).toBe(handlers.length);
     expect(refusals.length).toBe(handlers.length);
     expect(src).toContain("setContactUsPackageUnlock(");
@@ -115,7 +115,7 @@ describe("contact-us wiring", () => {
     const handlers = src.match(/export async function (GET|POST|PUT|PATCH|DELETE)\b/g) ?? [];
     const guards = src.match(/guardSection\("users"\)/g) ?? [];
     const refusals = src.match(/if \(!guard\.ok\) return guard\.response/g) ?? [];
-    expect(handlers.length).toBe(2);
+    expect(handlers.length).toBe(3);
     expect(guards.length).toBe(handlers.length);
     expect(refusals.length).toBe(handlers.length);
   });
@@ -135,5 +135,82 @@ describe("contact-us wiring", () => {
     const src = stripComments(read("app/(root)/marketplace/page-content.tsx"));
     expect(src.match(/item\.gameMasterContactUs \?/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
     expect(src).toContain("router.push(contactUsChatHref(item.name))");
+  });
+});
+
+// Reason: an unlock is one permission from support. A revoke or an expiry must take it away, or
+// the player keeps the Buy button for ever and never has to contact us again.
+describe("revoke and expiry end the contact-us permission", () => {
+  it("both 'disable all' helpers pull the player from every contact-us package", () => {
+    for (const path of [
+      "apps/admin/lib/services/gamemaster/package-unlocks.service.ts",
+      "lib/services/gamemaster/contact-us-unlocks.ts",
+    ]) {
+      const src = stripComments(read(path));
+      expect(src).toContain('"gameMasterConfig.contactUsOnly": true');
+      expect(src).toMatch(/\$pull:\s*\{\s*contactUsUnlockedUserIds/);
+      expect(src).toContain("updateMany(");
+    }
+  });
+
+  it("an admin revoke disables every enabled package", () => {
+    const src = stripComments(read("apps/admin/app/api/gamemasters/[id]/route.ts"));
+    const revoke = src.slice(src.indexOf("export async function DELETE"));
+    expect(revoke.length).toBeGreaterThan(100);
+    expect(revoke).toContain("disableAllContactUsPackagesForUser(String(existing.userId))");
+  });
+
+  it("every worker expiry path clears the expired players' unlocks", () => {
+    const src = stripComments(read("worker/jobs/gamemaster-renewal.job.ts"));
+    const expiries = src.match(/status: "expired"/g) ?? [];
+    const clears = src.match(/await clearContactUsUnlocks\(/g) ?? [];
+    expect(expiries.length).toBe(3);
+    expect(clears.length).toBe(expiries.length);
+    expect(src).toContain("await clearContactUsUnlocks(expiringUserIds)");
+  });
+
+  it("renew refuses a locked contact-us package and clears only on the first sighting", () => {
+    const src = stripComments(read("app/api/gamemaster/renew/route.ts"));
+    expect(src).toContain('const firstSightingOfExpiry = subscription.status === "active"');
+    expect(src).toMatch(/if \(firstSightingOfExpiry\) \{\s*await clearContactUsUnlocks\(userId\)/);
+    expect(src).toContain("firstSightingOfExpiry || mustContactUsToBuy(currentPackage, userId)");
+    expect(src).toContain('.select("+contactUsUnlockedUserIds")');
+    expect(src).toContain("errorCode: GM_CONTACT_US_ERROR_CODE");
+    // The refusal must happen before any wallet read.
+    expect(src.indexOf("errorCode: GM_CONTACT_US_ERROR_CODE")).toBeLessThan(
+      src.indexOf("CreditWallet.findOne("),
+    );
+  });
+
+  it("deleting a not-yet-swept subscription clears the unlocks too", () => {
+    const src = stripComments(read("app/api/gamemaster/delete/route.ts"));
+    expect(src).toMatch(
+      /if \(subscription\.status === "active"\) \{\s*await clearContactUsUnlocks\(userId\)/,
+    );
+  });
+
+  it("both unlock routes offer 'disable all' through the shared service", () => {
+    for (const path of [
+      "apps/admin/app/api/gamemasters/[id]/package-unlocks/route.ts",
+      "apps/admin/app/api/users/[userId]/package-unlocks/route.ts",
+    ]) {
+      const src = stripComments(read(path));
+      expect(src).toContain("export async function DELETE");
+      expect(src).toContain("disableAllContactUsPackagesForUser(");
+    }
+  });
+
+  it("the Disable GM package button sits beside Enable on both admin screens", () => {
+    for (const path of [
+      "apps/admin/components/admin/GameMasterDetailView.tsx",
+      "apps/admin/components/admin/UserFullDetailPanel.tsx",
+    ]) {
+      const src = stripComments(read(path));
+      expect(src).toMatch(/<EnableGmPackageButton [^>]*\/>\s*<DisableGmPackageButton /);
+    }
+    const button = stripComments(
+      read("apps/admin/components/admin/gamemaster/DisableGmPackageButton.tsx"),
+    );
+    expect(button).toContain('method: "DELETE"');
   });
 });

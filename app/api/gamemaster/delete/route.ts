@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
+import { clearContactUsUnlocks } from "@/lib/services/gamemaster/contact-us-unlocks";
 
 /**
  * DELETE /api/gamemaster/delete
@@ -69,6 +70,11 @@ export async function DELETE() {
 
     // Mark subscription as cancelled (soft delete)
     // This preserves the referral code history and prevents reuse
+    // Reason: still "active" past its end date means the daily worker has not expired it yet,
+    // so end the player's Contact-us package permissions here, as the expiry would have.
+    if (subscription.status === "active") {
+      await clearContactUsUnlocks(userId);
+    }
     subscription.status = "cancelled";
     subscription.cancelledAt = new Date();
     subscription.cancellationReason = "User requested deletion";

@@ -440,6 +440,17 @@ export default function MarketplaceContent() {
         toast.success(data.message);
         setGmActionModal({ show: false, type: null, details: null });
         fetchItems(); // Refresh items
+      } else if (data.errorCode === "GM_CONTACT_US" && data.contactUsHref) {
+        // Reason: the package went back to Contact us when it expired; support must enable it.
+        setGmActionModal({ show: false, type: null, details: null });
+        toast.error(data.error, {
+          action: {
+            label: "Contact us",
+            onClick: () => window.location.assign(data.contactUsHref),
+          },
+          duration: 10000,
+        });
+        fetchItems();
       } else {
         toast.error(data.error || "Failed to renew subscription");
       }

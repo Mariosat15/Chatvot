@@ -15,6 +15,7 @@ import {
   remainingActiveCompetitionSlots,
 } from "@/lib/services/gamemaster/active-competitions";
 import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-model";
+import { disableAllContactUsPackagesForUser } from "@/lib/services/gamemaster/package-unlocks.service";
 import {
   readAdminAwaitingClaims,
   readAdminTermsStates,
@@ -505,6 +506,9 @@ export async function DELETE(
           itemId: { $in: gmItemIds },
         });
       }
+      // Reason: a revoked Game Master must ask support again before buying a Contact-us
+      // package, so every package an admin had enabled for them is switched off here.
+      await disableAllContactUsPackagesForUser(String(existing.userId));
     }
 
     return NextResponse.json({

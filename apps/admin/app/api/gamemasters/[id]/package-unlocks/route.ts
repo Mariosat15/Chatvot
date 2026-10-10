@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import {
+  disableAllContactUsPackagesForUser,
   listContactUsPackagesForUser,
   setContactUsPackageUnlock,
 } from "@/lib/services/gamemaster/package-unlocks.service";
@@ -118,6 +119,36 @@ export async function PUT(
     return NextResponse.json({ success: true, unlocked: enabled });
   } catch (error) {
     console.error("❌ Error updating GM package unlock:", error);
+    return NextResponse.json({ success: false, error: GENERIC_ERROR }, { status: 500 });
+  }
+}
+
+/** DELETE - disable every Contact-us package for this Game Master ("Disable GM package"). */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const guard = await guardSection("gamemaster-management");
+    if (!guard.ok) return guard.response;
+
+    await connectToDatabase();
+    const { id } = await params;
+    const gm = await loadGameMasterUserId(id);
+    if (!gm.ok) return gm.response;
+
+    const { disabledCount } = await disableAllContactUsPackagesForUser(gm.userId);
+
+    await auditLogService.logSettingsUpdated(
+      guard.admin,
+      `All GM packages disabled for Game Master ${gm.name ?? gm.userId} (${disabledCount} were enabled)`,
+      { disabledCount: 0 },
+      { disabledCount, gameMasterUserId: gm.userId },
+    );
+
+    return NextResponse.json({ success: true, disabledCount });
+  } catch (error) {
+    console.error("❌ Error disabling GM packages:", error);
     return NextResponse.json({ success: false, error: GENERIC_ERROR }, { status: 500 });
   }
 }

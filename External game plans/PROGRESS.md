@@ -978,6 +978,42 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 10 October 2026 - A revoked or expired Game Master must contact support again for a Contact-us package
+
+**Owner report:** once support had enabled a "Contact us" Game Master package for a player, the
+player could keep buying it for ever. A revoke or an expiry never took the permission away, and
+the expired card's Renew skipped the Contact-us check altogether.
+
+**Cause:** `MarketplaceItem.contactUsUnlockedUserIds` was add-only. Nothing that ended a
+subscription removed the player from it, and `POST /api/gamemaster/renew` never called
+`mustContactUsToBuy`. **Nothing was computed wrongly and nothing was backfilled.** The defect was
+a permission that outlived the subscription it was granted for.
+
+**Fix:**
+
+- **Admin revoke** (`apps/admin/app/api/gamemasters/[id]/route.ts` DELETE) now calls
+  `disableAllContactUsPackagesForUser` (new, `apps/admin/lib/services/gamemaster/package-unlocks.service.ts`).
+- **Worker expiry:** all three expiry paths in `worker/jobs/gamemaster-renewal.job.ts` (auto-renew
+  off, insufficient balance, and the past-end-date sweep) call `clearContactUsUnlocks` (new,
+  `lib/services/gamemaster/contact-us-unlocks.ts`, raw driver like the worker).
+- **The gap before the daily worker runs:** renew and delete clear the unlocks on the *first
+  sighting* of an expiry, while the stored status is still `active`. Once the status is
+  `expired`, any unlock present is a fresh re-enable from support and is honoured. Renew now
+  refuses a locked Contact-us package with `GM_CONTACT_US` before any wallet read. On the first
+  sighting it marks the subscription `expired`, outside the aborted transaction.
+- **Player screens:** the Arsenal and the marketplace Renew show the refusal with a "Contact us"
+  action linking to the support chat.
+- **Admin:** a red **Disable GM package** button sits beside Enable on the Game Master detail
+  view and the user panel. It calls the new `DELETE` on both package-unlocks routes, which are
+  section-guarded exactly like their GET and POST.
+
+**Trade-off, recorded:** the lazy first sighting in renew marks a Contact-us subscription expired,
+which pre-empts the worker's auto-renew for that one player. This is deliberate: an auto-renew of
+a locked Contact-us package is the thing being refused.
+
+**Tests:** `__tests__/services/gm-contact-us-package.test.ts`, now 20 tests (handler counts 2 to
+3, plus seven structural guards on every writer). **Never verified by eye.**
+
 ### 10 October 2026 - An admin revoke now ends a Game Master subscription immediately
 
 **Owner report:** after an admin revoked a Game Master subscription, both apps still showed the package as active, the player's Arsenal offered Renew, and the player could not buy a package again. **Cause, in four places:**

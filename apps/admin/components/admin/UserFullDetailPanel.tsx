@@ -84,6 +84,7 @@ import { CustomerAuditTrail } from "./CustomerAuditTrail";
 import { TransferCustomerDialog } from "./TransferCustomerDialog";
 import UserPasswordResetCard from "./users/UserPasswordResetCard";
 import EnableGmPackageButton from "./gamemaster/EnableGmPackageButton";
+import DisableGmPackageButton from "./gamemaster/DisableGmPackageButton";
 import TransactionDetailDialog, {
   type TxDetail,
 } from "./transactions/TransactionDetailDialog";
@@ -2292,7 +2293,10 @@ export default function UserFullDetailPanel({
                                   Enable a &quot;Contact us&quot; package so this player can buy it
                                 </p>
                               </div>
-                              <EnableGmPackageButton userId={user.id} />
+                              <div className="flex flex-wrap justify-end gap-2">
+                                <EnableGmPackageButton userId={user.id} />
+                                <DisableGmPackageButton userId={user.id} />
+                              </div>
                             </div>
                           </div>
                         </CardContent>

@@ -4,6 +4,7 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { getUserById } from "@/lib/utils/user-lookup";
 import {
+  disableAllContactUsPackagesForUser,
   listContactUsPackagesForUser,
   setContactUsPackageUnlock,
 } from "@/lib/services/gamemaster/package-unlocks.service";
@@ -89,6 +90,37 @@ export async function PUT(
     return NextResponse.json({ success: true, unlocked: enabled });
   } catch (error) {
     console.error("❌ Error updating user GM package unlock:", error);
+    return NextResponse.json({ success: false, error: GENERIC_ERROR }, { status: 500 });
+  }
+}
+
+/** DELETE - disable every Contact-us package for this player ("Disable GM package"). */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> },
+) {
+  try {
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
+
+    const { userId } = await params;
+    const user = await loadUser(userId);
+    if (!user) {
+      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
+    }
+
+    const { disabledCount } = await disableAllContactUsPackagesForUser(user.id);
+
+    await auditLogService.logSettingsUpdated(
+      guard.admin,
+      `All GM packages disabled for user ${user.username || user.name || user.id} (${disabledCount} were enabled)`,
+      { disabledCount: 0 },
+      { disabledCount, userId: user.id },
+    );
+
+    return NextResponse.json({ success: true, disabledCount });
+  } catch (error) {
+    console.error("❌ Error disabling user GM packages:", error);
     return NextResponse.json({ success: false, error: GENERIC_ERROR }, { status: 500 });
   }
 }

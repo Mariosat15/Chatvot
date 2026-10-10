@@ -8,6 +8,14 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
 import { isRevokedSubscription } from "@/lib/services/gamemaster/revoked-subscription";
+import { clearContactUsUnlocks } from "@/lib/services/gamemaster/contact-us-unlocks";
+import {
+  GM_CONTACT_US_ERROR_CODE,
+  GM_CONTACT_US_MESSAGE,
+  contactUsChatHref,
+  isContactUsPackage,
+  mustContactUsToBuy,
+} from "@/lib/services/gamemaster/contact-us-package";
 import {
   buildSubscriptionLimits,
   type GameMasterSubscriptionLimits,
@@ -96,10 +104,46 @@ export async function POST() {
     let packageConfig: GameMasterSubscriptionLimits =
       buildSubscriptionLimits(existingLimits);
 
+    // Reason: an expiry ends every Contact-us permission support gave this player. The daily
+    // worker normally does that; still "active" past its end date means it has not run yet, so do
+    // it here. Only on that first sighting - once the row says "expired", an unlock present now is
+    // one an admin gave AFTER the expiry and must be honoured.
+    const firstSightingOfExpiry = subscription.status === "active";
+    if (firstSightingOfExpiry) {
+      await clearContactUsUnlocks(userId);
+    }
+
     if (subscription.packageId) {
       const currentPackage = await MarketplaceItem.findById(
         subscription.packageId,
-      ).session(mongoSession);
+      )
+        .select("+contactUsUnlockedUserIds")
+        .session(mongoSession);
+
+      if (
+        currentPackage &&
+        isContactUsPackage(currentPackage) &&
+        (firstSightingOfExpiry || mustContactUsToBuy(currentPackage, userId))
+      ) {
+        if (firstSightingOfExpiry) {
+          // Record the expiry (outside the transaction, so it survives the abort) so the next
+          // attempt does not clear an unlock support gives later.
+          await GameMasterSubscription.updateOne(
+            { _id: subscription._id, status: "active" },
+            { $set: { status: "expired" } },
+          );
+        }
+        await mongoSession.abortTransaction();
+        return NextResponse.json(
+          {
+            success: false,
+            error: GM_CONTACT_US_MESSAGE,
+            errorCode: GM_CONTACT_US_ERROR_CODE,
+            contactUsHref: contactUsChatHref(currentPackage.name),
+          },
+          { status: 403 },
+        );
+      }
       if (currentPackage && currentPackage.gameMasterConfig) {
         renewalPrice = currentPackage.price;
         durationDays =

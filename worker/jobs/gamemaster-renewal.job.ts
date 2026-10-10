@@ -9,6 +9,7 @@
 
 import mongoose from "mongoose";
 import { connectToDatabase } from "../../database/mongoose";
+import { clearContactUsUnlocks } from "../../lib/services/gamemaster/contact-us-unlocks";
 
 interface RenewalResult {
   processedCount: number;
@@ -185,6 +186,8 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
               },
             },
           );
+          // Reason: an expired Game Master must ask support again for a Contact-us package.
+          await clearContactUsUnlocks(String(subscription.userId));
           result.expiredCount++;
           continue;
         }
@@ -227,6 +230,7 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
           // Send notification to user about expired subscription
           // TODO: Implement notification
 
+          await clearContactUsUnlocks(String(subscription.userId));
           result.expiredCount++;
           continue;
         }
@@ -310,20 +314,23 @@ export async function runGameMasterRenewalJob(): Promise<RenewalResult> {
     // TASK 3: Expire subscriptions that have passed their end date (missed renewal)
     console.log("\n⏰ [GM RENEWAL] Checking for expired subscriptions...");
 
+    // Reason: read the owners first, so their Contact-us package permissions can be ended too.
+    const pastEndDate = { status: "active", endDate: { $lt: now } };
+    const expiringUserIds = await db
+      .collection("gamemastersubscriptions")
+      .find(pastEndDate, { projection: { userId: 1 } })
+      .map((row) => String(row.userId))
+      .toArray();
+
     const expireResult = await db
       .collection("gamemastersubscriptions")
-      .updateMany(
-        {
-          status: "active",
-          endDate: { $lt: now },
+      .updateMany(pastEndDate, {
+        $set: {
+          status: "expired",
+          updatedAt: now,
         },
-        {
-          $set: {
-            status: "expired",
-            updatedAt: now,
-          },
-        },
-      );
+      });
+    await clearContactUsUnlocks(expiringUserIds);
 
     if (expireResult.modifiedCount > 0) {
       console.log(
