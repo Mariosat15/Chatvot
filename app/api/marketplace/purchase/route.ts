@@ -10,6 +10,11 @@ import { headers } from "next/headers";
 import mongoose from "mongoose";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 import {
+  freshSubscriptionFields,
+  isRevokedSubscription,
+  removeGameMasterPurchases,
+} from "@/lib/services/gamemaster/revoked-subscription";
+import {
   GM_CONTACT_US_ERROR_CODE,
   GM_CONTACT_US_MESSAGE,
   mustContactUsToBuy,
@@ -77,6 +82,19 @@ export async function POST(request: NextRequest) {
         },
         { status: 403 },
       );
+    }
+
+    // Reason: an admin revoke ends the subscription, but a revoke written before the revoke
+    // route cleared purchases leaves the old package row behind, and it would refuse the
+    // player re-buying that same package below.
+    if (item.category === "gamemaster") {
+      const gmSub = await GameMasterSubscription.findOne({ userId })
+        .select("status")
+        .session(mongoSession)
+        .lean<{ status?: string } | null>();
+      if (isRevokedSubscription(gmSub)) {
+        await removeGameMasterPurchases(userId, mongoSession);
+      }
     }
 
     // Check if already purchased
@@ -352,6 +370,25 @@ export async function POST(request: NextRequest) {
         );
         console.log(
           `✅ [GM UPGRADE] Days remaining after upgrade: ${Math.ceil((new Date(existingSubscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))}`,
+        );
+      } else if (existingSubscription) {
+        // NEW after an admin revoke. Reason: `userId` is unique, so `create` would fail with
+        // E11000 and the player could never buy again. The revoked row is reset into a fresh
+        // subscription on the chosen package - no days carried over, overrides cleared.
+        existingSubscription.set(
+          freshSubscriptionFields({
+            packageId: item._id.toString(),
+            packageName: item.name,
+            renewalPrice: item.price,
+            limits: buildSubscriptionLimits(config),
+            startDate: now,
+            endDate,
+          }),
+        );
+        await existingSubscription.save({ session: mongoSession });
+        gameMasterSubscription = existingSubscription;
+        console.log(
+          `✅ [GM] Revoked subscription restarted for user ${userId} on ${item.name}`,
         );
       } else {
         // NEW: Create new subscription (first time or after deletion)

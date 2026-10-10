@@ -78,8 +78,8 @@ export async function GET(request: NextRequest) {
         { name: { $regex: escapedSearch, $options: "i" } },
         { shortDescription: { $regex: escapedSearch, $options: "i" } },
         // Reason: escapedSearch has every regex metacharacter escaped above.
-      // eslint-disable-next-line security/detect-non-literal-regexp
-      { tags: { $in: [new RegExp(escapedSearch, "i")] } },
+        // eslint-disable-next-line security/detect-non-literal-regexp
+        { tags: { $in: [new RegExp(escapedSearch, "i")] } },
       ];
     }
 
@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
       renewalPrice?: number;
       packageName?: string;
     } | null = null;
+    let gmRevoked = false;
     if (userId) {
       const [purchases, gmSub] = await Promise.all([
         UserPurchase.find({ userId }).select("itemId").limit(500).lean(),
@@ -135,19 +136,23 @@ export async function GET(request: NextRequest) {
           } | null>(),
       ]);
       userPurchases = purchases.map((p) => p.itemId.toString());
-      gmSubscription = gmSub
-        ? {
-            packageId: gmSub.packageId
-              ? typeof gmSub.packageId === "string"
-                ? gmSub.packageId
-                : gmSub.packageId.toString()
-              : undefined,
-            status: gmSub.status,
-            endDate: gmSub.endDate,
-            renewalPrice: gmSub.renewalPrice,
-            packageName: gmSub.packageName,
-          }
-        : null;
+      // Reason: a revoked subscription is no subscription - its package must read as
+      // buyable, not "Owned"/"active", and must never offer Renew.
+      gmRevoked = gmSub?.status === "cancelled";
+      gmSubscription =
+        gmSub && !gmRevoked
+          ? {
+              packageId: gmSub.packageId
+                ? typeof gmSub.packageId === "string"
+                  ? gmSub.packageId
+                  : gmSub.packageId.toString()
+                : undefined,
+              status: gmSub.status,
+              endDate: gmSub.endDate,
+              renewalPrice: gmSub.renewalPrice,
+              packageName: gmSub.packageName,
+            }
+          : null;
     }
 
     // Pre-compute expiry once; identical for every GM item in this list.
@@ -160,7 +165,9 @@ export async function GET(request: NextRequest) {
 
     const itemsWithOwnership = items.map((item) => {
       const itemId = item._id.toString();
-      const owned = userPurchases.includes(itemId);
+      const owned =
+        userPurchases.includes(itemId) &&
+        !(gmRevoked && item.category === "gamemaster");
       // Reason: the unlock list is other players' ids. It is read only to answer this
       // player's question and never sent back.
       const { contactUsUnlockedUserIds: _unlocked, ...publicItem } = item;

@@ -7,6 +7,7 @@ import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subs
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
+import { isRevokedSubscription } from "@/lib/services/gamemaster/revoked-subscription";
 import {
   buildSubscriptionLimits,
   type GameMasterSubscriptionLimits,
@@ -43,6 +44,21 @@ export async function POST() {
       return NextResponse.json(
         { success: false, error: "No Game Master subscription found" },
         { status: 404 },
+      );
+    }
+
+    // Reason: a revoked subscription is not the player's to renew - renewing would undo the
+    // admin's decision. They buy a new package instead, which resets this row.
+    if (isRevokedSubscription(subscription)) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "This Game Master subscription was revoked and cannot be renewed. Buy a new package from the marketplace.",
+          errorCode: "GM_REVOKED_BUY_NEW",
+        },
+        { status: 400 },
       );
     }
 

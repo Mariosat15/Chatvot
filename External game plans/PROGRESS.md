@@ -978,6 +978,30 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 10 October 2026 - An admin revoke now ends a Game Master subscription immediately
+
+**Owner report:** after an admin revoked a Game Master subscription, both apps still showed the package as active, the player's Arsenal offered Renew, and the player could not buy a package again. **Cause, in four places:**
+- The revoke route (`apps/admin/app/api/gamemasters/[id]/route.ts` DELETE) set `status: "cancelled"` but left `endDate` in the future, so every "`endDate > now`" check still read it as running.
+- The player's Game Master purchase row stayed in place, so the purchase route refused with "You already own this item".
+- The marketplace route treated a cancelled subscription with a future end date as active.
+- The purchase and activate routes would have hit the unique `userId` index by calling `create` against the revoked row.
+
+**Fix:**
+- The revoke now also sets `endDate`/`nextRenewalDate` to now, `autoRenew: false`, and clears pause and scheduled deletion. It also deletes the user's Game Master `userpurchases`.
+- The new main-app helper `lib/services/gamemaster/revoked-subscription.ts` holds `isRevokedSubscription`, `removeGameMasterPurchases` and `freshSubscriptionFields`.
+- Purchase and activate reset the revoked row in place as a brand-new subscription of whichever package was bought. Every package rule applies as on a first purchase: limits come from the package, and overrides, pause and old days are cleared, with no carry-over. Lifetime totals and the referral code are kept.
+- `POST /api/gamemaster/renew` refuses a revoked subscription (`GM_REVOKED_BUY_NEW`).
+- The marketplace lists treat a revoked subscription as none.
+- The status route reports 0 days left unless the subscription is active.
+- The Arsenal card shows REVOKED, 0 days and a "Buy a new package" link, with **no Renew**.
+
+**Older revokes** (made before this change) still carry a future `endDate`, but every reader now keys on the status, and they heal on the next purchase. Nothing was backfilled.
+
+**Not fixed, noted:**
+- The worker's scheduled-deletion job deletes `userpurchases` by `"item.category"`, a field purchases do not store. It probably removes nothing.
+
+**Never verified by eye.**
+
 ### 10 October 2026 - Competitions, challenges and messages update without a refresh
 
 **Status: code-complete. Never verified by eye.** Owner request: "the user gets everything live, no need to refresh". **How it works:** one generic socket event, `{type: "live", data: {topic, id}}`, says *what* changed and never the data. The screen re-reads through the loader it already uses, so nothing can disagree with the first render. **Server side:** `lib/services/live-event-hooks.ts` (mirrored, byte-identical test) attaches Mongoose hooks to both copies of `Competition` and `Challenge`, so every writer in either app announces without anybody counting writers. Updates that changed nothing stay silent (`modifiedCount`/`deletedCount` gate), bursts are merged over 250 ms, a directed challenge reaches only its two players and an open one reaches everyone, and the hooks are off under vitest. **Raw-driver writers bypass hooks** and publish themselves: the Game Master free private create (both apps), the early-end all-disqualified completions, and the challenge-expiry worker. Messages are announced by the socket server itself to conversation participants on send and read, which covers every sender. **Client side:** `ChallengePopup` keeps the one socket per tab and relays events. `hooks/useLiveTopic.ts` debounces 600 ms, re-reads only while the tab is visible, catches up when it becomes visible again, and keeps a slow fallback poll in case the socket is down. It is used by the competitions list (whose 20 s poll is gone), the challenges page and the unread-messages count. **Known and deliberately unchanged:** the socket server's `/internal/*` endpoints have no authentication (this predates the work), and a hook can announce a moment before its transaction commits, which the 250 ms merge plus the 600 ms client debounce cover. **Deploy:** rebuild and `pm2 restart` the websocket server as well as the app, admin and worker. 24 tests in `__tests__/live/live-events.test.ts`; `node tools/probe-live-events.mjs` runs 8 probes, all red. Run the harness unpiped: a pipeline that stops early kills it before it restores the file.

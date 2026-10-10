@@ -7,6 +7,10 @@ import { UserPurchase } from "@/database/models/marketplace/user-purchase.model"
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 import { buildReferralLink } from "@/lib/services/gamemaster/referral-link";
+import {
+  freshSubscriptionFields,
+  isRevokedSubscription,
+} from "@/lib/services/gamemaster/revoked-subscription";
 
 /**
  * POST /api/gamemaster/activate
@@ -55,17 +59,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user already has an active subscription
+    // Reason: `userId` is unique, so any existing row - not only an active one - would make
+    // the create below fail. Only a revoked row may be restarted here.
     const existingSubscription = await GameMasterSubscription.findOne({
       userId,
-      status: "active",
     });
 
-    if (existingSubscription) {
+    if (existingSubscription && !isRevokedSubscription(existingSubscription)) {
       return NextResponse.json(
         {
           success: false,
-          error: "You already have an active Game Master subscription",
+          error:
+            existingSubscription.status === "active"
+              ? "You already have an active Game Master subscription"
+              : "You already have a Game Master subscription. Renew or delete it from your arsenal first.",
         },
         { status: 400 },
       );
@@ -79,50 +86,66 @@ export async function POST(request: NextRequest) {
       subscriptionDurationDays: 30,
     };
 
-    // Generate unique referral code
-    let referralCode: string;
-    let isUnique = false;
-    while (!isUnique) {
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-      referralCode = "GM";
-      for (let i = 0; i < 6; i++) {
-        referralCode += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      const existing = await GameMasterSubscription.findOne({ referralCode });
-      if (!existing) isUnique = true;
-    }
-
     // Calculate dates
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + gmConfig.subscriptionDurationDays);
 
-    // Create subscription
-    const subscription = await GameMasterSubscription.create({
-      userId,
-      userEmail: session.user.email,
-      userName: session.user.name || "Game Master",
-      packageId: item._id.toString(),
-      packageName: item.name,
-      status: "active",
-      activatedAt: startDate,
-      startDate,
-      endDate,
-      nextRenewalDate: endDate,
-      autoRenew: true,
-      renewalPrice: item.price,
-      referralCode: referralCode!,
-      referralLink: buildReferralLink(referralCode!),
-      limits: buildSubscriptionLimits(gmConfig),
-      currentPeriodCompetitionsCreated: 0,
-      lastCompetitionResetDate: startDate,
-      totalCompetitionsCreated: 0,
-      totalEarnings: 0,
-      pendingEarnings: 0,
-      totalReferredUsers: 0,
-      activeReferredUsers: 0,
-      renewalHistory: [],
-    });
+    let subscription;
+    if (existingSubscription) {
+      existingSubscription.set(
+        freshSubscriptionFields({
+          packageId: item._id.toString(),
+          packageName: item.name,
+          renewalPrice: item.price,
+          limits: buildSubscriptionLimits(gmConfig),
+          startDate,
+          endDate,
+        }),
+      );
+      subscription = await existingSubscription.save();
+    } else {
+      // Generate unique referral code
+      let referralCode: string;
+      let isUnique = false;
+      while (!isUnique) {
+        const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        referralCode = "GM";
+        for (let i = 0; i < 6; i++) {
+          referralCode += chars.charAt(
+            Math.floor(Math.random() * chars.length),
+          );
+        }
+        const existing = await GameMasterSubscription.findOne({ referralCode });
+        if (!existing) isUnique = true;
+      }
+
+      subscription = await GameMasterSubscription.create({
+        userId,
+        userEmail: session.user.email,
+        userName: session.user.name || "Game Master",
+        packageId: item._id.toString(),
+        packageName: item.name,
+        status: "active",
+        activatedAt: startDate,
+        startDate,
+        endDate,
+        nextRenewalDate: endDate,
+        autoRenew: true,
+        renewalPrice: item.price,
+        referralCode: referralCode!,
+        referralLink: buildReferralLink(referralCode!),
+        limits: buildSubscriptionLimits(gmConfig),
+        currentPeriodCompetitionsCreated: 0,
+        lastCompetitionResetDate: startDate,
+        totalCompetitionsCreated: 0,
+        totalEarnings: 0,
+        pendingEarnings: 0,
+        totalReferredUsers: 0,
+        activeReferredUsers: 0,
+        renewalHistory: [],
+      });
+    }
 
     // Mark purchase as enabled (activated)
     await UserPurchase.findByIdAndUpdate(purchaseId, {

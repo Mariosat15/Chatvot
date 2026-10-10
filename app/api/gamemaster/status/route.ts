@@ -46,10 +46,17 @@ export async function GET() {
 
     const now = new Date();
     const endDate = new Date(subscription.endDate);
-    const daysRemaining = Math.max(
-      0,
-      Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
-    );
+    // Reason: a revoked subscription can still carry its old future endDate (revokes before
+    // the revoke route ended it immediately), so days left only count while active.
+    const daysRemaining =
+      subscription.status === "active"
+        ? Math.max(
+            0,
+            Math.ceil(
+              (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+            ),
+          )
+        : 0;
 
     const db = mongoose.connection.db;
     const packageConfig = db

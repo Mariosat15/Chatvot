@@ -450,24 +450,61 @@ export async function DELETE(
       );
     }
 
-    // Soft delete - set status to cancelled
-    const result = await db.collection("gamemastersubscriptions").updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          status: "cancelled",
-          cancelledAt: new Date(),
-          cancellationReason: "Revoked by admin",
-          updatedAt: new Date(),
-        },
-      },
-    );
-
-    if (result.matchedCount === 0) {
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Game master not found" },
         { status: 404 },
       );
+    }
+
+    const subscriptions = db.collection("gamemastersubscriptions");
+    const existing = await subscriptions.findOne(
+      { _id: new ObjectId(id) },
+      { projection: { userId: 1 } },
+    );
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Game master not found" },
+        { status: 404 },
+      );
+    }
+
+    // Reason: a revoke ends the subscription NOW. Setting only the status left the old
+    // future endDate in place, so screens that test "endDate > now" kept calling it
+    // active, and autoRenew/pause/deletion flags lingered into the next purchase.
+    const now = new Date();
+    await subscriptions.updateOne(
+      { _id: existing._id },
+      {
+        $set: {
+          status: "cancelled",
+          cancelledAt: now,
+          cancellationReason: "Revoked by admin",
+          endDate: now,
+          nextRenewalDate: now,
+          autoRenew: false,
+          isPaused: false,
+          scheduledForDeletion: false,
+          updatedAt: now,
+        },
+      },
+    );
+
+    // Reason: the player's purchase route refuses "You already own this item", so the
+    // leftover purchase row would stop them buying the same package again. The
+    // subscription is what grants Game Master rights; the purchase row grants nothing.
+    if (existing.userId) {
+      const gmItemIds = await db
+        .collection("marketplaceitems")
+        .find({ category: "gamemaster" }, { projection: { _id: 1 } })
+        .map((item) => item._id)
+        .toArray();
+      if (gmItemIds.length > 0) {
+        await db.collection("userpurchases").deleteMany({
+          userId: String(existing.userId),
+          itemId: { $in: gmItemIds },
+        });
+      }
     }
 
     return NextResponse.json({

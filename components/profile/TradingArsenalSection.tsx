@@ -280,17 +280,17 @@ export default function TradingArsenalSection() {
       const data = await response.json();
       if (data.success) {
         notifyGmSubscriptionChanged();
-        toast.success(
-          data.message || "Subscription renewed",
-          {
-            description: data.subscription?.endDate
-              ? `Active until ${new Date(data.subscription.endDate).toLocaleDateString()}`
-              : undefined,
-            duration: 6000,
-          },
-        );
+        toast.success(data.message || "Subscription renewed", {
+          description: data.subscription?.endDate
+            ? `Active until ${new Date(data.subscription.endDate).toLocaleDateString()}`
+            : undefined,
+          duration: 6000,
+        });
         await fetchGmSubscription();
-      } else if (data.details?.required && data.details?.available !== undefined) {
+      } else if (
+        data.details?.required &&
+        data.details?.available !== undefined
+      ) {
         toast.error("Insufficient credits", {
           description: `Need ⚡ ${data.details.required}, you have ⚡ ${data.details.available}.`,
         });
@@ -832,7 +832,7 @@ export default function TradingArsenalSection() {
                             )
                             // Line breaks
                             .replace(/\n\n/g, "<br/><br/>")
-                            .replace(/\n/g, "<br/>")
+                            .replace(/\n/g, "<br/>"),
                         ),
                       }}
                     />
@@ -1058,13 +1058,18 @@ function GameMasterSubscriptionCard({
   schedulingCancel: boolean;
   renewing: boolean;
 }) {
-  const daysRemaining = Math.max(
-    0,
-    Math.ceil(
-      (new Date(subscription.endDate).getTime() - Date.now()) /
-        (1000 * 60 * 60 * 24),
-    ),
-  );
+  // Reason: a revoked subscription is over and is not the player's to renew - it shows
+  // no days left and points at the marketplace instead of offering Renew.
+  const isRevoked = subscription.status === "cancelled";
+  const daysRemaining = isRevoked
+    ? 0
+    : Math.max(
+        0,
+        Math.ceil(
+          (new Date(subscription.endDate).getTime() - Date.now()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      );
   const isExpired = subscription.status !== "active" || daysRemaining === 0;
   const isPaused = subscription.isPaused;
   const isScheduledForDeletion = subscription.scheduledForDeletion;
@@ -1109,7 +1114,12 @@ function GameMasterSubscriptionCard({
             <div>
               <h4 className="font-semibold text-white flex items-center gap-2">
                 {subscription.packageName}
-                {isPaused && (
+                {isRevoked && (
+                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">
+                    REVOKED
+                  </span>
+                )}
+                {isPaused && !isRevoked && (
                   <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">
                     PAUSED
                   </span>
@@ -1221,8 +1231,25 @@ function GameMasterSubscriptionCard({
           </div>
         )}
 
-        {/* Renew block — only when expired */}
-        {isExpired && (
+        {/* Revoked — no renew; buy any package anew */}
+        {isRevoked && (
+          <div className="pt-3 border-t border-gray-800 space-y-2">
+            <Link
+              href="/marketplace"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black transition-colors"
+            >
+              <Crown className="h-4 w-4" />
+              Buy a new package
+            </Link>
+            <p className="text-xs text-red-400/80 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Subscription revoked by an administrator — it has ended.
+            </p>
+          </div>
+        )}
+
+        {/* Renew block — only when expired (never for a revoked subscription) */}
+        {isExpired && !isRevoked && (
           <div className="pt-3 border-t border-gray-800 space-y-2">
             <button
               onClick={onRenew}
@@ -1235,7 +1262,8 @@ function GameMasterSubscriptionCard({
                 <>
                   <RefreshCw className="h-4 w-4" />
                   Renew now
-                  {subscription.renewalPrice && subscription.renewalPrice > 0 ? (
+                  {subscription.renewalPrice &&
+                  subscription.renewalPrice > 0 ? (
                     <span className="ml-1 font-bold">
                       (⚡ {subscription.renewalPrice})
                     </span>
