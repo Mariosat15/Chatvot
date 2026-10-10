@@ -1,4 +1,8 @@
 import { Schema, model, models, Document } from "mongoose";
+import {
+  attachLiveEventHooks,
+  challengeAudience,
+} from "../../../lib/services/live-event-hooks";
 
 // 1v1 Challenge Structure
 export interface IChallenge extends Document {
@@ -531,6 +535,9 @@ ChallengeSchema.index({ openToAnyone: 1, status: 1, createdAt: -1 });
 // Game-scoped queries: challenge lists filtered by game, and the finalization sweeps
 ChallengeSchema.index({ gameType: 1, status: 1 });
 ChallengeSchema.index({ gameKey: 1, status: 1 });
+
+// The players' challenge screens re-read when one changes.
+attachLiveEventHooks(ChallengeSchema, "challenges", challengeAudience);
 
 const Challenge =
   models?.Challenge || model<IChallenge>("Challenge", ChallengeSchema);

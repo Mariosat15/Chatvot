@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import useLiveTopic from "@/hooks/useLiveTopic";
 
 // Reason (7 Oct 2026): sidebar mounts this for every signed-in user. 10s was
 // ~6k Mongo reads/min at 1k online; 30s plus visibility/BroadcastChannel is enough.
@@ -60,6 +61,10 @@ export function useUnreadMessages() {
       try { channelRef.current?.close(); } catch {}
     };
   }, [refresh]);
+
+  // Live: a new message or a read receipt updates the badge at once; the 30s
+  // poll above stays as the safety net, so this adds no timer of its own.
+  useLiveTopic("messages", refresh, { fallbackMs: 0 });
 
   return { unreadCount, refresh };
 }

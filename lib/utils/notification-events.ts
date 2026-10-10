@@ -19,6 +19,22 @@ export function broadcastNotificationPush(detail: unknown): void {
 }
 
 /**
+ * "Something changed, re-read it" - relayed from the same socket for the same
+ * reason as the notification push above. Detail is `{ topic, id? }`.
+ */
+export const LIVE_EVENT = "chartvolt:live";
+
+export interface LiveEventDetail {
+  topic: string;
+  id?: string;
+}
+
+export function broadcastLiveEvent(detail: LiveEventDetail): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(LIVE_EVENT, { detail }));
+}
+
+/**
  * Every templateId a "please answer the Game Master terms" reminder has been sent under
  * (`External game plans/24` s5.6). One list for the modal (which reopens on a push carrying
  * one), the bell (whose click opens the modal instead of navigating) and the server (which

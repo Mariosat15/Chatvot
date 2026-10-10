@@ -10,6 +10,7 @@
 
 import mongoose from "mongoose";
 import { connectToDatabase } from "../config/database";
+import { announceLiveChange } from "../../lib/services/live-event-hooks";
 
 export interface EarlyEndCheckResult {
   competitionsEnded: number;
@@ -208,6 +209,8 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
               },
             },
           );
+          // Reason: the raw driver bypasses the model's live-event hooks.
+          announceLiveChange("competitions", competition._id.toString());
           result.competitionsEnded++;
         } else {
           // Some or all players liquidated - finalize normally to rank by equity
@@ -612,6 +615,7 @@ export async function runEarlyEndCheckForTest(
               },
             },
           );
+          announceLiveChange("competitions", competition._id.toString());
           result.competitionsEnded++;
         } else {
           // Finalize normally

@@ -13,6 +13,7 @@ type Document = mongoose.mongo.Document;
 import type { FundingMode } from "./free-private-competition";
 import { reserveFreePrivateFunds, type ReserveResult } from "./free-private-reserve";
 import { notifyGmContestCreated } from "./gm-contest-notifications";
+import { announceLiveChange } from "../live-event-hooks";
 
 export type GmInsertResult =
   | { ok: true; reserve?: number }
@@ -44,6 +45,8 @@ export async function insertGameMasterCompetition(
     // Reason: void, not awaited - the contest is written, and a slow notification must not
     // delay or fail the response the Game Master is waiting for.
     void notifyGmContestCreated(doc);
+    // Reason: the raw driver bypasses the model's live-event hooks.
+    announceLiveChange("competitions", String(competition._id));
     return { ok: true };
   }
 
@@ -69,6 +72,7 @@ export async function insertGameMasterCompetition(
     });
     // After the commit only, so an aborted reserve never announces a contest that is gone.
     void notifyGmContestCreated(doc, { reserve });
+    announceLiveChange("competitions", String(competition._id));
     return { ok: true, reserve };
   } catch (error) {
     if (error instanceof ReserveRefused) {

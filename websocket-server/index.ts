@@ -7,7 +7,7 @@
  * Start with: pm2 start ecosystem.config.js --only chartvolt-websocket
  */
 
-import { createServer } from "http";
+import { createServer, type IncomingMessage } from "http";
 import path from "path";
 import { WebSocket, WebSocketServer } from "ws";
 import { verify } from "jsonwebtoken";
@@ -105,8 +105,10 @@ async function loadWsPoolSettings(
     await client.connect();
     const doc = await client
       .db()
-      .collection("mdbclustersettings")
-      .findOne({ _id: "global-mdb-cluster-settings" as any });
+      .collection<{ _id: string; wsMaxPoolSize?: number; wsMinPoolSize?: number }>(
+        "mdbclustersettings",
+      )
+      .findOne({ _id: "global-mdb-cluster-settings" });
     await client.close();
 
     if (doc) {
@@ -253,7 +255,7 @@ const server = createServer(async (req, res) => {
                   message: data.message,
                 },
               });
-              // Message broadcast sent
+              void announceToConversationParticipants(data.conversationId);
             }
             break;
 
@@ -273,6 +275,7 @@ const server = createServer(async (req, res) => {
                 },
                 data.participantId,
               );
+              void announceToConversationParticipants(data.conversationId);
             }
             break;
 
@@ -449,9 +452,6 @@ const server = createServer(async (req, res) => {
               // OPTIMIZATION 2: Pre-stringify for unsubscribed clients (stringify once, use many)
               let cachedFullDataStr: string | null = null;
 
-              let clientCount = 0;
-              let filteredCount = 0;
-
               connections.forEach((conn) => {
                 if (conn.ws.readyState !== WebSocket.OPEN) return;
 
@@ -502,7 +502,6 @@ const server = createServer(async (req, res) => {
                       },
                     };
                     conn.ws.send(JSON.stringify(eventData));
-                    filteredCount++;
                   } else {
                     // No subscriptions - use cached stringified data
                     if (!cachedFullDataStr) {
@@ -527,7 +526,6 @@ const server = createServer(async (req, res) => {
                     }
                     conn.ws.send(cachedFullDataStr);
                   }
-                  clientCount++;
                 } catch {
                   // Ignore send errors
                 }
@@ -596,6 +594,39 @@ const server = createServer(async (req, res) => {
               console.log(
                 `🔔 Notification pushed to ${data.userId} (${data.notification.templateId || data.notification.type || "custom"})`,
               );
+            }
+            break;
+
+          case "live-event":
+            // "Something changed, re-read it" - carries a topic and an optional id,
+            // never the data itself, so the screen re-reads through the same loader
+            // that drew it. Reason: one case for every topic, so a new live surface
+            // needs no change to this separately deployed server.
+            if (typeof data.topic === "string" && data.topic) {
+              const liveEvent = {
+                type: "live",
+                data: {
+                  topic: data.topic,
+                  id: typeof data.id === "string" ? data.id : undefined,
+                  at: Date.now(),
+                },
+              };
+              if (Array.isArray(data.userIds)) {
+                for (const id of new Set<string>(data.userIds)) {
+                  if (typeof id === "string" && id) {
+                    broadcastToParticipant(id, liveEvent);
+                  }
+                }
+              } else {
+                connections.forEach((conn) => {
+                  if (
+                    conn.participantType === "user" &&
+                    conn.ws.readyState === WebSocket.OPEN
+                  ) {
+                    send(conn.ws, liveEvent);
+                  }
+                });
+              }
             }
             break;
 
@@ -669,7 +700,7 @@ wss.on("connection", (ws, req) => {
   handleConnection(ws, req);
 });
 
-function handleConnection(ws: WebSocket, req: any) {
+function handleConnection(ws: WebSocket, req: IncomingMessage) {
   const url = new URL(req.url || "", `http://${req.headers.host}`);
   const token = url.searchParams.get("token");
   const type = (url.searchParams.get("type") as "user" | "employee") || "user";
@@ -783,6 +814,9 @@ function handleConnection(ws: WebSocket, req: any) {
   // Connection tracked silently (visible via /stats endpoint)
 }
 
+// Reason: `message` is parsed client JSON whose shape depends on `type`; each
+// case below checks the fields it reads before using them.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function handleMessage(connectionId: string, message: any) {
   const connection = connections.get(connectionId);
   if (!connection) return;
@@ -935,7 +969,7 @@ function handleDisconnect(connectionId: string) {
 // Helper Functions
 // ==========================================
 
-function send(ws: WebSocket, event: any) {
+function send(ws: WebSocket, event: unknown) {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(event));
   }
@@ -960,7 +994,7 @@ function removeSubscriber(conversationId: string, connectionId: string) {
 
 function broadcastToConversation(
   conversationId: string,
-  event: any,
+  event: unknown,
   excludeParticipantId?: string,
 ) {
   const subscribers = conversationSubscribers.get(conversationId);
@@ -979,7 +1013,42 @@ function broadcastToConversation(
   }
 }
 
-function broadcastToParticipant(participantId: string, event: any) {
+/**
+ * Tell every participant of a conversation - not only those with it open -
+ * that their messages changed, so unread badges update without a refresh.
+ *
+ * Reason: `broadcastToConversation` reaches only connections subscribed to the
+ * conversation, i.e. people looking at it. Doing the lookup here, once, covers
+ * every sender in both apps instead of asking each route to remember. Best
+ * effort: a failed lookup only means the badge waits for its own poll.
+ */
+async function announceToConversationParticipants(conversationId: string) {
+  try {
+    if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) return;
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) return;
+    const conversation = await mongoose.connection.db
+      .collection("conversations")
+      .findOne(
+        { _id: new mongoose.Types.ObjectId(conversationId) },
+        { projection: { "participants.id": 1 } },
+      );
+    const participants: Array<{ id?: unknown }> =
+      conversation?.participants ?? [];
+    const liveEvent = {
+      type: "live",
+      data: { topic: "messages", id: conversationId, at: Date.now() },
+    };
+    for (const participant of participants) {
+      if (typeof participant.id === "string" && participant.id) {
+        broadcastToParticipant(participant.id, liveEvent);
+      }
+    }
+  } catch (error) {
+    console.warn("⚠️ Could not announce message to participants:", error);
+  }
+}
+
+function broadcastToParticipant(participantId: string, event: unknown) {
   const connectionIds = participantConnections.get(participantId);
   if (!connectionIds) return;
 
@@ -1082,7 +1151,7 @@ setInterval(() => {
 
 // These functions can be called from other services via HTTP or internal messaging
 
-export function notifyNewMessage(conversationId: string, message: any) {
+export function notifyNewMessage(conversationId: string, message: unknown) {
   broadcastToConversation(conversationId, {
     type: "message",
     data: { conversationId, message },
@@ -1138,7 +1207,7 @@ export function notifyTransfer(
 export function notifyFriendRequest(
   toUserId: string,
   eventType: string,
-  request: any,
+  request: unknown,
 ) {
   broadcastToParticipant(toUserId, {
     type: "friend_request",

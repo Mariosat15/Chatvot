@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import useLiveTopic from "@/hooks/useLiveTopic";
 import type { DifficultyLevel } from "@/lib/utils/competition-difficulty";
 import type { TitleLevel } from "@/lib/constants/levels";
 import type { CompetitionListItem } from "@/lib/competitions/types";
@@ -345,22 +346,19 @@ export default function CompetitionsPageContent({
     difficultyFilter,
   ]);
 
-  // Soft poll current page
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let cancelled = false;
-    const poll = async () => {
-      if (cancelled || document.visibilityState === "hidden") return;
-      await fetchPage(page, { showSkeleton: false });
-      if (cancelled) return;
-      timer = setTimeout(poll, 20_000);
-    };
-    timer = setTimeout(poll, 20_000);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
+  // Live: re-read the current page when a competition is created, published,
+  // starts, ends, is cancelled or gains a player. Reason: the old soft poll
+  // returned without rescheduling once the tab was hidden, so the list froze
+  // for good after the player switched tabs. The hook re-reads on return to
+  // the tab and keeps a slow safety-net poll.
+  const refreshLive = useCallback(() => {
+    prefetchCache.current.clear();
+    void fetchPage(page, { showSkeleton: false });
   }, [fetchPage, page]);
+  useLiveTopic("competitions", refreshLive, {
+    fallbackMs: 30_000,
+    enabled: isHydrated,
+  });
 
   const resetToPage1 = useCallback(() => {
     setPage(1);

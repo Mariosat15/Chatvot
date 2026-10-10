@@ -1,4 +1,5 @@
 import { Schema, model, models, Document } from "mongoose";
+import { attachLiveEventHooks } from "../../../lib/services/live-event-hooks";
 
 // Competition Structure
 export interface ICompetition extends Document {
@@ -860,6 +861,9 @@ CompetitionSchema.virtual("isRegistrationOpen").get(function () {
     this.currentParticipants < this.maxParticipants
   );
 });
+
+// Every open competitions list, lobby and dashboard re-reads when one changes.
+attachLiveEventHooks(CompetitionSchema, "competitions");
 
 const Competition =
   models?.Competition || model<ICompetition>("Competition", CompetitionSchema);

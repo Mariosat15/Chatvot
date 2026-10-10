@@ -15,6 +15,7 @@
 import { connectToDatabase } from "../config/database";
 import mongoose from "mongoose";
 import type { ExpiredChallengeSummary } from "../../lib/services/challenges/expiry-notifications";
+import { announceLiveChange, challengeAudience } from "../../lib/services/live-event-hooks";
 
 export interface ChallengeFinalizeResult {
   checkedChallenges: number;
@@ -117,6 +118,8 @@ export async function runChallengeFinalizeCheck(): Promise<ChallengeFinalizeResu
               },
             },
           );
+          // Reason: the raw driver bypasses the model's live-event hooks.
+          announceLiveChange("challenges", challenge._id.toString(), challengeAudience(challenge));
 
           // Reason: NO refund needed here. Credits are only deducted when
           // the challenged user ACCEPTS (in /api/challenges/[id]/accept).

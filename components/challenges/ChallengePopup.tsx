@@ -18,7 +18,10 @@ import NotificationPopupCard, {
   popupHref,
   type PushedNotification,
 } from "@/components/notifications/NotificationPopupCard";
-import { broadcastNotificationPush } from "@/lib/utils/notification-events";
+import {
+  broadcastLiveEvent,
+  broadcastNotificationPush,
+} from "@/lib/utils/notification-events";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +145,16 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
         setEvents((prev) => {
           if (prev.some((existing) => existing._id === n._id)) return prev;
           return [n, ...prev];
+        });
+        return;
+      }
+
+      if (message.type === "live") {
+        const live = message.data as { topic?: unknown; id?: unknown };
+        if (typeof live?.topic !== "string") return;
+        broadcastLiveEvent({
+          topic: live.topic,
+          id: typeof live.id === "string" ? live.id : undefined,
         });
         return;
       }

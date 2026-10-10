@@ -19,6 +19,7 @@ import {
 import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
 import ChallengeCard from "@/components/trading/ChallengeCard";
 import ChallengeCreateDialog from "@/components/challenges/ChallengeCreateDialog";
+import useLiveTopic from "@/hooks/useLiveTopic";
 
 interface Challenge {
   _id: string;
@@ -99,14 +100,12 @@ export default function ChallengesPageContent({
 
   useEffect(() => {
     fetchChallenges();
-    // Refresh every 30s — skip when tab is hidden to avoid wasted requests
-    const interval = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        fetchChallenges(false);
-      }
-    }, 30000);
-    return () => clearInterval(interval);
   }, [fetchChallenges]);
+
+  // Live: re-read when any challenge this player can see is created, taken,
+  // declined, started, finished or expires; 30s safety-net poll stays.
+  const refreshLive = useCallback(() => fetchChallenges(false), [fetchChallenges]);
+  useLiveTopic("challenges", refreshLive, { fallbackMs: 30_000 });
 
   const handleAccept = async (challengeId: string) => {
     setResponding(challengeId);

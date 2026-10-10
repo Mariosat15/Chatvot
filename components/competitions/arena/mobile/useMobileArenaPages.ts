@@ -84,7 +84,7 @@ export function useMobileArenaPages<T extends CompetitionListItem>({
   }, [hasMore, lastPage, queryForPage]);
 
   const items = useMemo(() => {
-    // Reason: the 20s poll can shift rows between pages; never show one twice.
+    // Reason: a live re-read can shift rows between pages; never show one twice.
     const seen = new Set<string>();
     const out: T[] = [];
     for (const item of [...baseItems, ...extraItems]) {
