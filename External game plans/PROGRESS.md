@@ -978,6 +978,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 10 Oct 2026 - A GAME MASTER WHOSE PACK EXPIRED WHILE SUSPENDED CAN BE RELEASED
+
+**The dead end.** A suspension does not pause a pack's clock, and the renewal worker only expires `active` rows, so a pack whose end date passed during a suspension stayed `suspended` for ever. The admin's Reactivate refused it ("Cannot reactivate expired subscription"), and the player's renew/delete/activate routes refuse a suspended pack (eda81d2c), so nobody could get that Game Master out.
+
+**The fix** (`apps/admin/app/api/gamemasters/[id]/route.ts`). Reactivate now accepts only a suspended pack. If its end date has passed, it lifts the suspension into **`expired`**, which is the state the worker would have written, and clears the Contact-us unlocks the same way the worker's expiry does. The owner's rule that buying again after an expiry means contacting the admin still holds. The write is filtered on `status: "suspended"`. An admin who wants to give the lost time back uses **Extend 30 days first, then Reactivate**. The admin alert now shows the server's message, so the operator is told which of the two things happened.
+
+**Not retroactive in the data**: any pack already stuck stays stuck until an admin presses Reactivate on it. Pinned by 4 tests in `__tests__/services/gm-suspended-blocks.test.ts`. A probe writing `active` instead of `expired` turned it red. **Never verified by eye.**
+
 ### 10 Oct 2026 - MOBILE REGISTRATION IS ONE PAGE: ADDRESS, CITY, ZIP, PLAYER TYPE AND TERMS ARE VISIBLE
 
 Owner report: the mobile sign-up was missing address, city, ZIP, "What kind of player are you?"

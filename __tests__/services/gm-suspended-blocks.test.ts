@@ -84,6 +84,40 @@ describe("delete refuses a suspended Game Master", () => {
   });
 });
 
+// Reason: a suspension does not pause the pack's clock, so a pack can run out while suspended.
+// Reactivate used to refuse it outright, and the player's routes refuse a suspended pack, so
+// nobody could release that Game Master. Reactivate now lands it on "expired".
+describe("admin reactivate releases a pack that expired while suspended", () => {
+  const code = readCode("apps/admin/app/api/gamemasters/[id]/route.ts");
+  const start = firstIndex(code, 'case "reactivate":');
+  const branch = code.slice(start, firstIndex(code, 'case "update_limits":'));
+
+  it("never refuses because the end date has passed", () => {
+    expect(branch).not.toMatch(/Cannot reactivate expired/);
+  });
+
+  it("refuses anything that is not suspended", () => {
+    expect(branch).toMatch(/subscription\.status !== "suspended"/);
+  });
+
+  it("an expired-while-suspended pack becomes expired, never active", () => {
+    const expiredCheck = firstIndex(branch, "new Date(subscription.endDate) < now");
+    const expiredWrite = branch.indexOf('status: "expired"', expiredCheck);
+    const activeWrite = branch.indexOf('status: "active"', expiredCheck);
+    expect(expiredWrite).toBeGreaterThan(expiredCheck);
+    expect(expiredWrite).toBeLessThan(activeWrite);
+    expect(branch.slice(expiredCheck, activeWrite)).toMatch(/return NextResponse\.json/);
+  });
+
+  it("ends the player's Contact-us permissions as the worker's expiry does", () => {
+    const expiredCheck = firstIndex(branch, "new Date(subscription.endDate) < now");
+    const activeWrite = firstIndex(branch, 'status: "active"');
+    expect(branch.slice(expiredCheck, activeWrite)).toContain(
+      "await disableAllContactUsPackagesForUser(",
+    );
+  });
+});
+
 describe("activate names the suspension", () => {
   const code = readCode("app/api/gamemaster/activate/route.ts");
 

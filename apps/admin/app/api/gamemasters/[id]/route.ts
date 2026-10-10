@@ -345,11 +345,36 @@ export async function PATCH(
         break;
 
       case "reactivate":
-        if (new Date(subscription.endDate) < now) {
+        if (subscription.status !== "suspended") {
           return NextResponse.json(
-            { error: "Cannot reactivate expired subscription" },
+            { error: "Only a suspended Game Master can be reactivated" },
             { status: 400 },
           );
+        }
+        if (new Date(subscription.endDate) < now) {
+          // Reason: a suspension does not pause the pack's clock, and the renewal worker only
+          // expires `active` rows - so a pack that ran out while suspended used to be stuck: this
+          // route refused it, and the player's renew/delete/activate refuse a suspended pack. Lift
+          // the suspension into the state the worker would have written, and end the player's
+          // Contact-us permissions as the worker does, so buying again goes through support.
+          // To give the time back instead, Extend first and then Reactivate.
+          await db.collection("gamemastersubscriptions").updateOne(
+            { _id: new ObjectId(id), status: "suspended" },
+            {
+              $set: {
+                status: "expired",
+                suspendedAt: null,
+                suspendedReason: null,
+                updatedAt: now,
+              },
+            },
+          );
+          await disableAllContactUsPackagesForUser(String(subscription.userId));
+          return NextResponse.json({
+            success: true,
+            message:
+              "Suspension lifted. The pack's end date passed while suspended, so it is now expired. Use Extend before Reactivate if you want to give the time back.",
+          });
         }
         updateData = {
           ...updateData,

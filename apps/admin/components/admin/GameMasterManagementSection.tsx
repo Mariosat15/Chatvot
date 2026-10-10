@@ -201,7 +201,7 @@ export default function GameMasterManagementSection({
 
       // Only show alert for non-toggle actions
       if (action !== "toggleCompetitionCreation") {
-        alert(`${action} successful`);
+        alert(data.message || `${action} successful`);
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : "Action failed");
