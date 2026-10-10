@@ -53,6 +53,12 @@ type PhoneInputFieldProps = {
   /** When the residence country changes and the dial country is still empty, follow it. */
   syncFromCountryField?: string;
   required?: boolean;
+  /**
+   * `inline` (default): code and number share one row under one label.
+   * `split`: code and number each take a half-width column with their own label, for
+   * forms laid out as a two-column grid.
+   */
+  layout?: "inline" | "split";
 };
 
 function flagEmoji(countryCode: string): string {
@@ -75,7 +81,9 @@ export function PhoneInputField({
   nationalError,
   syncFromCountryField = "country",
   required = true,
+  layout = "inline",
 }: PhoneInputFieldProps) {
+  const split = layout === "split";
   const [open, setOpen] = useState(false);
   const phoneCountry = watch("phoneCountry") || "";
   const residenceCountry = syncFromCountryField
@@ -118,12 +126,9 @@ export function PhoneInputField({
   const selected = options.find((o) => o.value === phoneCountry);
   const dialPrefix = selected?.dial || dialCodeFor(phoneCountry) || "";
 
-  return (
-    <div className="space-y-2">
-      <Label className="form-label">
-        Phone number{required ? "" : " (optional)"}
-      </Label>
-      <div className="flex gap-2">
+  const optionalSuffix = required ? "" : " (optional)";
+
+  const codeField = (
         <Controller
           name="phoneCountry"
           control={control}
@@ -134,7 +139,7 @@ export function PhoneInputField({
             // Reason: `.country-select-trigger` lives in `@layer utilities` after Tailwind's
             // generated classes and carries `w-full`, so a width on the button itself loses
             // and the code takes the whole row. The wrapper owns the width instead.
-            <div className="w-[7.5rem] shrink-0">
+            <div className={split ? "w-full" : "w-[7.5rem] shrink-0"}>
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -206,7 +211,9 @@ export function PhoneInputField({
             </div>
           )}
         />
+  );
 
+  const numberField = (
         <div className="relative flex-1 min-w-0">
           <Input
             type="tel"
@@ -229,7 +236,32 @@ export function PhoneInputField({
             })}
           />
         </div>
-      </div>
+  );
+
+  return (
+    <div className="space-y-2">
+      {split ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label className="form-label">Code{optionalSuffix}</Label>
+            {codeField}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phoneNational" className="form-label">
+              Phone number{optionalSuffix}
+            </Label>
+            {numberField}
+          </div>
+        </div>
+      ) : (
+        <>
+          <Label className="form-label">Phone number{optionalSuffix}</Label>
+          <div className="flex gap-2">
+            {codeField}
+            {numberField}
+          </div>
+        </>
+      )}
       {(countryError || nationalError) && (
         <p className="text-sm text-red-500">
           {nationalError?.message || countryError?.message}

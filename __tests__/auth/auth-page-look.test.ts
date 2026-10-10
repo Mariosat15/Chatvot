@@ -120,6 +120,31 @@ describe("auth page look", () => {
     expect(hook).toContain("termsAccepted");
   });
 
+  it("desktop registration follows the owner's field arrangement", () => {
+    const src = stripComments(read("components/auth/desktop/DesktopRegister.tsx"));
+    const order = [
+      'name="fullName"',
+      'name="username"',
+      'name="email"',
+      'name="password"',
+      'name="confirmPassword"',
+      "<PhoneInputField",
+      'name="country"',
+      'name="address"',
+      'name="city"',
+      'name="postalCode"',
+    ].map((marker) => src.indexOf(marker));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // Full name, username, email and the phone row each span both columns.
+    for (const marker of ['name="fullName"', 'name="username"', 'name="email"', "<PhoneInputField"]) {
+      const before = src.slice(0, src.indexOf(marker));
+      expect(before.slice(before.lastIndexOf("<div")).startsWith('<div className="sm:col-span-2">')).toBe(true);
+    }
+    // Code and Phone number take one half-width column each.
+    expect(src).toContain('layout="split"');
+  });
+
   it("sign-in and sign-up pages do not render Google/Apple social buttons", () => {
     const signIn = stripComments(read("app/(auth)/sign-in/page.tsx"));
     const signUp = stripComments(read("app/(auth)/sign-up/page.tsx"));

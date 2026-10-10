@@ -83,18 +83,20 @@ export default function DesktopRegister() {
             </p>
           </div>
 
-          <InputField
-            name="email"
-            label="Email"
-            placeholder="contact@example.com"
-            register={register}
-            error={errors.email}
-            validation={{
-              required: "Email is required",
-              pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-              message: "Valid email address is required",
-            }}
-          />
+          <div className="sm:col-span-2">
+            <InputField
+              name="email"
+              label="Email"
+              placeholder="contact@example.com"
+              register={register}
+              error={errors.email}
+              validation={{
+                required: "Email is required",
+                pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: "Valid email address is required",
+              }}
+            />
+          </div>
 
           <div className="space-y-2">
             <InputField
@@ -155,15 +157,18 @@ export default function DesktopRegister() {
             }}
           />
 
-          <PhoneInputField
-            control={control}
-            register={register}
-            setValue={setValue}
-            watch={watch}
-            countryError={errors.phoneCountry}
-            nationalError={errors.phoneNational}
-            required
-          />
+          <div className="sm:col-span-2">
+            <PhoneInputField
+              control={control}
+              register={register}
+              setValue={setValue}
+              watch={watch}
+              countryError={errors.phoneCountry}
+              nationalError={errors.phoneNational}
+              required
+              layout="split"
+            />
+          </div>
 
           <CountrySelectField
             name="country"
