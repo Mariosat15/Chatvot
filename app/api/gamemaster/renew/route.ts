@@ -10,6 +10,11 @@ import mongoose from "mongoose";
 import { isRevokedSubscription } from "@/lib/services/gamemaster/revoked-subscription";
 import { clearContactUsUnlocks } from "@/lib/services/gamemaster/contact-us-unlocks";
 import {
+  GM_SUSPENDED_ERROR_CODE,
+  GM_SUSPENDED_MESSAGE,
+  isSuspendedSubscription,
+} from "@/lib/services/gamemaster/suspended-subscription";
+import {
   GM_CONTACT_US_ERROR_CODE,
   GM_CONTACT_US_MESSAGE,
   contactUsChatHref,
@@ -67,6 +72,20 @@ export async function POST() {
           errorCode: "GM_REVOKED_BUY_NEW",
         },
         { status: 400 },
+      );
+    }
+
+    // Reason: a suspended subscription past its end date passes the expiry check below, and
+    // renewing writes status "active" - which would lift the admin's suspension.
+    if (isSuspendedSubscription(subscription)) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json(
+        {
+          success: false,
+          error: GM_SUSPENDED_MESSAGE,
+          errorCode: GM_SUSPENDED_ERROR_CODE,
+        },
+        { status: 403 },
       );
     }
 

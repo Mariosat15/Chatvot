@@ -978,6 +978,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 10 Oct 2026 - A SUSPENDED GAME MASTER CAN NO LONGER BUY, RENEW, DELETE OR ACTIVATE A PACKAGE
+
+Owner report: an admin suspended a Game Master, who then bought a cheaper package and was active again. **Cause:** `suspended` is neither active nor expired, so every rule that sorted subscriptions into those two (active may only upgrade, expired must renew or delete) let it fall through, and the purchase's subscription update wrote `status: "active"` - **the purchase lifted the admin's suspension.** Two sibling holes of the same shape: **renew** (a suspended subscription past its end date counted as expired and renewing wrote `active`) and **delete** (it marked the row `cancelled`, which counts as revoked, after which a fresh package could be bought). Fixed with one model-free rule, `lib/services/gamemaster/suspended-subscription.ts` (`isSuspendedSubscription`, `GM_SUSPENDED_ERROR_CODE`, the message), refusing with 403 in the marketplace purchase route for any Game Master item **before the contact-us gate and any wallet read** (plus a re-check on the document about to be overwritten, inside the transaction), in renew before the expiry check, in delete before the cancel, and in activate with the suspension named rather than "renew or delete it first". Pause, scheduled cancel, the auto-renew switch and the renewal worker already require `active` - checked, unchanged. Clients already show `data.error` on every refusal. Only the admin's unsuspend changes a suspended subscription. **Not retroactive**: a player who already escaped a suspension this way stays active until the admin suspends them again. `__tests__/services/gm-suspended-blocks.test.ts` (8 tests), probe on the purchase guard red with exactly one failure. **Never verified by eye.**
+
 ### 10 October 2026 - A revoked or expired Game Master must contact support again for a Contact-us package
 
 **Owner report:** once support had enabled a "Contact us" Game Master package for a player, the

@@ -19,6 +19,11 @@ import {
   GM_CONTACT_US_MESSAGE,
   mustContactUsToBuy,
 } from "@/lib/services/gamemaster/contact-us-package";
+import {
+  GM_SUSPENDED_ERROR_CODE,
+  GM_SUSPENDED_MESSAGE,
+  isSuspendedSubscription,
+} from "@/lib/services/gamemaster/suspended-subscription";
 
 /**
  * POST /api/marketplace/purchase
@@ -69,6 +74,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reason: a suspended Game Master is neither active nor expired, so the upgrade and renew
+    // rules further down let them through, and the subscription update then set the status
+    // back to "active" - buying a cheaper package lifted the admin's suspension. Refused first,
+    // before any wallet read, so it cannot leave a debit behind.
+    let gmSub: { status?: string } | null = null;
+    if (item.category === "gamemaster") {
+      gmSub = await GameMasterSubscription.findOne({ userId })
+        .select("status")
+        .session(mongoSession)
+        .lean<{ status?: string } | null>();
+      if (isSuspendedSubscription(gmSub)) {
+        await mongoSession.abortTransaction();
+        return NextResponse.json(
+          {
+            success: false,
+            error: GM_SUSPENDED_MESSAGE,
+            errorCode: GM_SUSPENDED_ERROR_CODE,
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     // Reason: the marketplace swaps Buy for "Contact us" on these packages, but the button is
     // only a hint - this is the gate. Checked before any wallet read, so a refusal cannot
     // leave a debit behind.
@@ -88,10 +116,6 @@ export async function POST(request: NextRequest) {
     // route cleared purchases leaves the old package row behind, and it would refuse the
     // player re-buying that same package below.
     if (item.category === "gamemaster") {
-      const gmSub = await GameMasterSubscription.findOne({ userId })
-        .select("status")
-        .session(mongoSession)
-        .lean<{ status?: string } | null>();
       if (isRevokedSubscription(gmSub)) {
         await removeGameMasterPurchases(userId, mongoSession);
       }
@@ -197,6 +221,20 @@ export async function POST(request: NextRequest) {
       const existingSubscription = await GameMasterSubscription.findOne({
         userId,
       }).session(mongoSession);
+
+      // Reason: re-checked on the document this purchase will overwrite, so a suspension
+      // written after the check at the top still stops the "active" write below.
+      if (isSuspendedSubscription(existingSubscription)) {
+        await mongoSession.abortTransaction();
+        return NextResponse.json(
+          {
+            success: false,
+            error: GM_SUSPENDED_MESSAGE,
+            errorCode: GM_SUSPENDED_ERROR_CODE,
+          },
+          { status: 403 },
+        );
+      }
 
       if (existingSubscription) {
         const isActive =

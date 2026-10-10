@@ -4,6 +4,11 @@ import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subs
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { clearContactUsUnlocks } from "@/lib/services/gamemaster/contact-us-unlocks";
+import {
+  GM_SUSPENDED_ERROR_CODE,
+  GM_SUSPENDED_MESSAGE,
+  isSuspendedSubscription,
+} from "@/lib/services/gamemaster/suspended-subscription";
 
 /**
  * DELETE /api/gamemaster/delete
@@ -31,6 +36,19 @@ export async function DELETE() {
       return NextResponse.json(
         { success: false, error: "No Game Master subscription found" },
         { status: 404 },
+      );
+    }
+
+    // Reason: deleting marks the row cancelled, and a cancelled row may buy a fresh package -
+    // so deleting a suspended subscription was a way round the admin's suspension.
+    if (isSuspendedSubscription(subscription)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: GM_SUSPENDED_MESSAGE,
+          errorCode: GM_SUSPENDED_ERROR_CODE,
+        },
+        { status: 403 },
       );
     }
 

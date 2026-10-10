@@ -11,6 +11,11 @@ import {
   freshSubscriptionFields,
   isRevokedSubscription,
 } from "@/lib/services/gamemaster/revoked-subscription";
+import {
+  GM_SUSPENDED_ERROR_CODE,
+  GM_SUSPENDED_MESSAGE,
+  isSuspendedSubscription,
+} from "@/lib/services/gamemaster/suspended-subscription";
 
 /**
  * POST /api/gamemaster/activate
@@ -64,6 +69,17 @@ export async function POST(request: NextRequest) {
     const existingSubscription = await GameMasterSubscription.findOne({
       userId,
     });
+
+    if (isSuspendedSubscription(existingSubscription)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: GM_SUSPENDED_MESSAGE,
+          errorCode: GM_SUSPENDED_ERROR_CODE,
+        },
+        { status: 403 },
+      );
+    }
 
     if (existingSubscription && !isRevokedSubscription(existingSubscription)) {
       return NextResponse.json(
