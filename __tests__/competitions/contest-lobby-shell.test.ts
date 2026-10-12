@@ -92,7 +92,7 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("game main is Overview → How it works → Leaderboard", () => {
-    expect(gameLobby).toContain('<ContestOverviewPanel');
+    expect(gameLobby).toContain("<ContestOverviewPanel");
     expect(gameLobby).toContain('kind="game"');
     expect(gameLobby).toContain("<ContestHowItWorks");
     expect(gameLobby).toContain("<LobbyLiveLeaderboard");
@@ -110,9 +110,16 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     const tabsIdx = tradingPage.indexOf("<TradingDetailTabs");
     expect(tabsIdx).toBeGreaterThan(-1);
     expect(boardIdx).toBeGreaterThan(tabsIdx);
-    expect(tradingTabs).toContain('kind="trading"');
-    expect(tradingTabs).toContain("<ContestHowItWorks");
-    expect(tradingTabs).toContain("embedded");
+  });
+
+  it("merges the trading Overview into one card instead of tiles plus a timeline", () => {
+    // Reason: until 12 Oct 2026 the Overview rendered feature tiles beside an embedded
+    // `<ContestHowItWorks kind="trading">` timeline, and both said the same things. The owner
+    // asked for one card ("make this section all as one"), so the timeline must not come back.
+    // Flipped rather than deleted so the earlier layout stays on record.
+    expect(tradingTabs).not.toContain("<ContestHowItWorks");
+    expect(tradingTabs).not.toContain("overview.features");
+    expect(tradingTabs).toContain("overview.items.map(");
   });
 
   it("drags the tab bar instead of showing a scrollbar", () => {
@@ -124,8 +131,10 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("writes the Overview from the contest's own facts", () => {
-    expect(tradingTabs).toContain("steps={overview.steps}");
-    expect(tradingPage).toContain("buildTradingOverviewCopy({ competition, creditSymbol })");
+    expect(tradingTabs).toContain("overview.items.map(");
+    expect(tradingPage).toContain(
+      "buildTradingOverviewCopy({ competition, creditSymbol })",
+    );
   });
 
   it("headlines the dashboard with the figure the contest ranks on", () => {

@@ -993,6 +993,12 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 12 Oct 2026 - TRADING LEADERBOARD PAGED BY FIVE, OVERVIEW MERGED INTO ONE CARD
+
+**Why.** Owner: show the first 5 leaderboard rows with pages for the next 5, no scrollbar (drag instead), and merge the Overview's tiles and "Battle plan" because they were busy and repeated each other.
+
+**What shipped.** `CompetitionLeaderboard` shows 5 rows per page with a new `LeaderboardPager.tsx` underneath ("Showing x-y of n traders", previous/next arrows, windowed page numbers). The page number is clamped when a live refresh shrinks the board. The table drags sideways through `useDragScroll` with the scrollbar hidden. `buildTradingOverviewCopy` now returns one `items` list (Jump in / Trade / ranking rule / Take the pot), each folding in the facts its old tile repeated: fee and seats left, assets and capital and leverage and minimum trades, ranking rule and win-rate or liquidation limits, pot and paid places. `TradingDetailTabs` renders it as one "About this competition" card with four numbered items. The tile grid and the embedded `ContestHowItWorks` timeline are gone from trading; a `contest-lobby-shell` test was flipped to forbid them coming back. Game lobby and arena are unchanged. 201 lobby tests green; eslint and tsc clean on changed files. `game-leaderboard.test.ts` has one failure in the untouched global `LeaderboardClient.tsx`; it is unrelated to this work and recorded, not fixed. **Never verified by eye.**
+
 ### 12 Oct 2026 - TRADING PAGE ICONS, RULE CARDS, TAB ARROWS AND OVERVIEW
 
 **Why.** Owner: use the Menuitems icons everywhere, make the rule tabs look like the reference cards, add left/right arrows to the tab bar, drop Prizes from the tabs, and rebuild the Overview to the reference.

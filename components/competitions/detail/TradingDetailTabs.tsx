@@ -6,7 +6,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NeonPanel } from "@/components/neon/Cards";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
-import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
 import { contestAboutFallback } from "@/components/competitions/lobby/contest-lobby-copy";
 import type { TradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
 
@@ -19,8 +18,9 @@ import type { TradingOverviewCopy } from "@/components/competitions/lobby/tradin
  * fallback and "omit when empty" condition stays in that one builder.
  *
  * THE OVERVIEW IS THIS CONTEST'S FACTS, not generic copy: `overview` comes from
- * `buildTradingOverviewCopy`, which writes the feature tiles and the four steps from the ranking
- * method, the assets, the capital, the leverage, the minimum trades and the prize pot.
+ * `buildTradingOverviewCopy`, which writes four numbered items from the ranking method, the
+ * assets, the capital, the leverage, the minimum trades, the seats and the prize pot. It is ONE
+ * card (owner, 12 Oct 2026): the old About tiles and Battle plan timeline repeated each other.
  *
  * ARROWS either side of the strip step to the previous and next tab (owner, 12 Oct 2026), and
  * Prizes is no longer a tab - the sidebar's prize distribution already says all of it.
@@ -42,7 +42,8 @@ function useDragScroll() {
   const drag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "mouse" || event.button !== 0 || !ref.current) return;
+    if (event.pointerType !== "mouse" || event.button !== 0 || !ref.current)
+      return;
     drag.current = {
       down: true,
       moved: false,
@@ -100,14 +101,13 @@ function useDragScroll() {
 }
 
 /**
- * The Overview's four feature tiles each glow in their own colour (owner reference,
- * 12 Oct 2026). Whole class strings, cycled by position, so Tailwind sees every one.
+ * One accent per numbered item, cycled by position. Whole class strings so Tailwind sees each.
  */
-const FEATURE_GLOWS = [
-  "border-emerald-400/45 shadow-[0_0_22px_rgba(52,211,153,0.18)]",
-  "border-sky-400/45 shadow-[0_0_22px_rgba(56,189,248,0.18)]",
-  "border-violet-400/45 shadow-[0_0_22px_rgba(167,139,250,0.18)]",
-  "border-amber-400/45 shadow-[0_0_22px_rgba(251,191,36,0.18)]",
+const ITEM_TONES = [
+  "border-cyan-400/60 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.35)]",
+  "border-sky-400/60 text-sky-200 shadow-[0_0_12px_rgba(56,189,248,0.35)]",
+  "border-violet-400/60 text-violet-200 shadow-[0_0_12px_rgba(167,139,250,0.35)]",
+  "border-amber-400/60 text-amber-200 shadow-[0_0_12px_rgba(251,191,36,0.35)]",
 ] as const;
 
 export function TradingDetailTabs({
@@ -139,7 +139,11 @@ export function TradingDetailTabs({
     setTab(next);
     dragScroll.ref.current
       ?.querySelector<HTMLElement>(`[data-tab-id="${next}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
   };
 
   return (
@@ -193,56 +197,49 @@ export function TradingDetailTabs({
           /* The rule cards carry their own icon and heading, so the panel adds none. */
           active.content
         ) : (
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <section className="rounded-2xl border border-sky-400/30 bg-[#060A18]/85 p-5 shadow-[0_0_26px_rgba(56,189,248,0.12)]">
-              <h3 className="flex items-center gap-3 text-xl font-bold text-gray-100">
-                {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
-                <img
-                  src={NEON_ICON("lightbulb")}
-                  alt=""
-                  draggable={false}
-                  className="h-10 w-10 shrink-0 object-contain"
-                />
-                <span>
-                  About this <span className="text-cyan-300">competition</span>
-                </span>
-              </h3>
-              <p className="mt-3 text-base leading-relaxed text-gray-300">
-                {about}
-              </p>
-              <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {overview.features.map((feature, index) => (
-                  <li
-                    key={feature.iconSrc}
-                    className={`flex flex-col items-center rounded-xl border bg-[#0A1024]/80 px-3 py-5 text-center ${FEATURE_GLOWS[index % FEATURE_GLOWS.length]}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
-                    <img
-                      src={feature.iconSrc}
-                      alt=""
-                      className="h-14 w-14 object-contain"
-                      draggable={false}
-                    />
-                    <p className="mt-3 text-base font-bold text-white">
-                      {feature.title}
-                    </p>
-                    <p className="mt-1 text-xs leading-snug text-gray-400">
-                      {feature.detail}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section className="rounded-2xl border border-violet-400/30 bg-[#060A18]/85 p-5 shadow-[0_0_26px_rgba(167,139,250,0.12)]">
-              <ContestHowItWorks
-                kind="trading"
-                embedded
-                layout="timeline"
-                iconSrc={NEON_ICON("rocket")}
-                steps={overview.steps}
+          <section className="rounded-2xl border border-sky-400/30 bg-[#060A18]/85 p-6 shadow-[0_0_26px_rgba(56,189,248,0.12)]">
+            <h3 className="flex items-center gap-3 text-xl font-bold text-gray-100">
+              {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
+              <img
+                src={NEON_ICON("lightbulb")}
+                alt=""
+                draggable={false}
+                className="h-10 w-10 shrink-0 object-contain"
               />
-            </section>
-          </div>
+              <span>
+                About this <span className="text-cyan-300">competition</span>
+              </span>
+            </h3>
+            <p className="mt-3 max-w-3xl text-base leading-relaxed text-gray-300">
+              {about}
+            </p>
+            <ol className="mt-6 grid grid-cols-1 gap-x-6 gap-y-5 border-t border-white/10 pt-6 sm:grid-cols-2 xl:grid-cols-4">
+              {overview.items.map((item, index) => (
+                <li key={item.iconSrc} className="flex gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
+                  <img
+                    src={item.iconSrc}
+                    alt=""
+                    draggable={false}
+                    className="h-12 w-12 shrink-0 object-contain"
+                  />
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-base font-bold text-white">
+                      <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-[#060A18] text-xs ${ITEM_TONES[index % ITEM_TONES.length]}`}
+                      >
+                        {index + 1}
+                      </span>
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-gray-400">
+                      {item.detail}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
         )}
       </div>
     </NeonPanel>
