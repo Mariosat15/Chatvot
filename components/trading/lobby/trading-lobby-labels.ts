@@ -20,18 +20,12 @@ export const RANKING_LABELS = new Map<string, string>([
 ]);
 
 export const RANKING_EXPLANATIONS = new Map<string, string>([
-  [
-    "pnl",
-    "Winner is determined by total profit & loss (realized + unrealized).",
-  ],
-  [
-    "roi",
-    "Winner is determined by the highest return on investment percentage.",
-  ],
-  ["total_capital", "Winner has the highest account balance at the end."],
-  ["win_rate", "Winner has the highest percentage of winning trades."],
-  ["total_wins", "Winner has the most profitable trades closed."],
-  ["profit_factor", "Winner has the best ratio of winning to losing trades."],
+  ["pnl", "Make the most profit - open trades count too!"],
+  ["roi", "Grow your money by the biggest % and you win."],
+  ["total_capital", "Have the most money when the clock stops and you win."],
+  ["win_rate", "Win the biggest share of your trades and you win."],
+  ["total_wins", "Close the most winning trades and you win."],
+  ["profit_factor", "Win big, lose small - the best win-to-loss ratio wins."],
 ]);
 
 export const ASSET_LABELS = new Map<string, string>([

@@ -80,19 +80,16 @@ function ScheduleLine({
 }
 
 const DIFFICULTY_DESCRIPTIONS = new Map<DifficultyLevel, string>([
-  ["Novice", "Perfect for new traders learning the basics."],
-  ["Apprentice", "Building your trading skills with room to grow."],
-  ["Skilled", "Moderate challenge with balanced risk."],
-  ["Expert", "Higher stakes for experienced traders."],
-  ["Elite", "Challenging competition for skilled traders."],
-  ["Master", "Professional level competition."],
-  [
-    "Grand Master",
-    "Very challenging. Expert risk management required.",
-  ],
-  ["Champion", "Elite competition with high pressure."],
-  ["Legend", "Extreme difficulty for the best traders only."],
-  ["Trading God", "Ultimate challenge. Only legends survive."],
+  ["Novice", "Great first game - learn as you go!"],
+  ["Apprentice", "Easy going, with room to grow."],
+  ["Skilled", "A fair fight - not too easy, not too hard."],
+  ["Expert", "Tougher rivals. Bring your A-game!"],
+  ["Elite", "Hard. Only sharp traders will shine."],
+  ["Master", "Very hard. The pros come here."],
+  ["Grand Master", "Brutal! Guard your money every move."],
+  ["Champion", "Huge pressure, huge glory."],
+  ["Legend", "Only the very best survive this one."],
+  ["Trading God", "The final boss. Good luck!"],
 ]);
 
 export interface TradingLobbySidebarProps {
@@ -160,7 +157,7 @@ export default function TradingLobbySidebar({
       {isUpcoming && (
         <LiveCountdown
           targetDate={new Date(competition.startTime)}
-          label="Competition starts in"
+          label="Starts in"
           type="start"
           status="upcoming"
           size="showcase"
@@ -169,7 +166,7 @@ export default function TradingLobbySidebar({
       {isActive && (
         <LiveCountdown
           targetDate={new Date(competition.endTime)}
-          label="Time remaining"
+          label="Time left"
           type="end"
           status="active"
           size="showcase"
@@ -222,7 +219,7 @@ export default function TradingLobbySidebar({
         </div>
         <NeonNote>
           {DIFFICULTY_DESCRIPTIONS.get(difficultyData.level) ??
-            "Moderate challenge with balanced risk."}
+            "A fair fight - not too easy, not too hard."}
         </NeonNote>
       </NeonPanel>
 
@@ -258,7 +255,7 @@ export default function TradingLobbySidebar({
       <NeonPanel
         iconSrc={NEON_ICON("trophy-green")}
         accent="prize"
-        title="Prize distribution"
+        title="Who wins what"
         size="lg"
         action={
           competition.platformFeePercentage > 0 ? (

@@ -21,15 +21,39 @@ import {
  * same dictionary the Scoring tab reads, so the two can never name different rules.
  *
  * TILES SAY WHAT, STEPS SAY HOW (owner reference, 12 Oct 2026, superseding the same day's
- * one-list merge): `features` are four short facts - market, seats, ranking rule, pot - and
+ * one-list merge): `features` are four short facts - market, seats, ranking rule, pot - each with
+ * up to two small rows (`facts`, reference image of the same day), and
  * `steps` are the four moves of play in order. Each is written once from the stored fields.
  */
+
+/**
+ * Which small glyph a fact row wears. A string key rather than a component, because this copy
+ * is built on the server and drawn by a client component (R39); the renderer maps it.
+ */
+export type TradingOverviewFactIcon =
+  | "cash"
+  | "leverage"
+  | "player"
+  | "seats"
+  | "chart"
+  | "trophy"
+  | "crowd"
+  | "clock";
+
+/** One small row under a tile: `lead` and `tail` are plain, `strong` is the bold part. */
+export interface TradingOverviewFact {
+  icon: TradingOverviewFactIcon;
+  lead?: string;
+  strong: string;
+  tail?: string;
+}
 
 export interface TradingOverviewFeature {
   /** `NEON_ICON` path - a string so it can cross the server/client boundary. */
   iconSrc: string;
   title: string;
-  detail: string;
+  /** At most two short rows; a fact the contest does not carry is left out. */
+  facts: TradingOverviewFact[];
 }
 
 export interface TradingOverviewStep {
@@ -44,34 +68,22 @@ export interface TradingOverviewCopy {
 
 /** Why each ranking method puts one trader above another, in the lobby's playful voice. */
 const CLIMB_DETAIL = new Map<string, string>([
-  ["pnl", "Your total profit & loss decides the order - every tick counts."],
-  [
-    "roi",
-    "Your return % decides the order - a sharp small account can beat a big one.",
-  ],
-  [
-    "total_capital",
-    "Your account balance decides the order - grow it bigger than anyone.",
-  ],
-  ["win_rate", "Your win rate decides the order - pick your shots carefully."],
-  [
-    "total_wins",
-    "Your number of winning trades decides the order - rack them up.",
-  ],
-  [
-    "profit_factor",
-    "Your profit factor decides the order - let winners run, cut losers fast.",
-  ],
+  ["pnl", "Make the most profit to climb. Every tick counts!"],
+  ["roi", "Grow your money by the biggest % to climb. Small and sharp can win!"],
+  ["total_capital", "End with the biggest balance to climb. Grow it, grow it!"],
+  ["win_rate", "Win more of your trades to climb. Pick your shots!"],
+  ["total_wins", "Rack up the most winning trades to climb."],
+  ["profit_factor", "Let winners run and cut losers fast to climb."],
 ]);
 
 /** The short line under the ranking tile: what finishing first takes, per ranking method. */
 const FINISH_DETAIL = new Map<string, string>([
-  ["pnl", "Finish with the strongest profit to top the board."],
-  ["roi", "Finish with the best return % to top the board."],
-  ["total_capital", "Finish with the biggest balance to top the board."],
-  ["win_rate", "Finish with the best win rate to top the board."],
-  ["total_wins", "Finish with the most winning trades to top the board."],
-  ["profit_factor", "Finish with the best profit factor to top the board."],
+  ["pnl", "biggest profit"],
+  ["roi", "best return %"],
+  ["total_capital", "biggest balance"],
+  ["win_rate", "best win rate"],
+  ["total_wins", "most winning trades"],
+  ["profit_factor", "best profit factor"],
 ]);
 
 const DEFAULT_RANKING = "pnl";
@@ -138,61 +150,91 @@ export function buildTradingOverviewCopy({
   const seats = positiveNumber(competition?.maxParticipants);
   const joined = Math.max(0, Number(competition?.currentParticipants) || 0);
 
-  const capitalLine = capitalText
-    ? `Start with ${capitalText} of simulated cash${leverage ? ` and trade with leverage up to 1:${leverage}` : ""}.`
-    : "Real prices, simulated cash - no real money at risk.";
   const qualifyLine = minTrades
-    ? ` Complete at least ${minTrades} trade${minTrades === 1 ? "" : "s"} to qualify.`
+    ? ` Make at least ${minTrades} trade${minTrades === 1 ? "" : "s"} to count.`
     : "";
   const spotsLeft = seats ? Math.max(0, seats - joined) : null;
-  const payoutLine =
-    paid === 1
-      ? "The winner takes it all"
-      : paid > 1
-        ? `The top ${paid} split it`
-        : "It goes to the winners";
+
+  const marketFacts: TradingOverviewFact[] = [
+    capitalText
+      ? { icon: "cash", strong: capitalText, tail: "practice cash" }
+      : { icon: "cash", strong: "No real money", tail: "at risk" },
+  ];
+  if (leverage) {
+    marketFacts.push({ icon: "leverage", lead: "Leverage up to", strong: `1:${leverage}` });
+  }
+
+  const seatFacts: TradingOverviewFact[] = [
+    joined > 0
+      ? {
+          icon: "player",
+          strong: `${joined.toLocaleString()} trader${joined === 1 ? "" : "s"}`,
+          tail: "already in",
+        }
+      : { icon: "player", strong: "Be the first", tail: "to jump in" },
+  ];
+  if (spotsLeft !== null) {
+    seatFacts.push({
+      icon: "seats",
+      strong: `${spotsLeft.toLocaleString()} seat${spotsLeft === 1 ? "" : "s"}`,
+      tail: "left",
+    });
+  }
+
+  const potFacts: TradingOverviewFact[] = potText
+    ? [
+        paid === 1
+          ? { icon: "crowd", strong: "Winner", tail: "takes it all" }
+          : paid > 1
+            ? { icon: "crowd", strong: `Top ${paid} share`, tail: "the prize" }
+            : { icon: "crowd", strong: "Winners share", tail: "the prize" },
+        { icon: "clock", lead: "Paid when", strong: "the bell rings" },
+      ]
+    : [{ icon: "trophy", lead: "Play for", strong: "XP & badges" }];
 
   const features: TradingOverviewFeature[] = [
     {
       iconSrc: NEON_ICON("candles"),
       title: assets.length ? joinLabels(assets) : "Live markets",
-      detail: capitalLine,
+      facts: marketFacts,
     },
     {
       iconSrc: NEON_ICON("users-group"),
       title: seats ? `${seats.toLocaleString()} seats` : "Open field",
-      detail:
-        joined > 0
-          ? `${joined.toLocaleString()} trader${joined === 1 ? "" : "s"} already joined${spotsLeft !== null ? ` - ${spotsLeft.toLocaleString()} seats left` : ""}.`
-          : "Nobody is in yet - grab the first seat.",
+      facts: seatFacts,
     },
     {
       iconSrc: NEON_ICON("target-purple"),
       title: `${RANKING_LABELS.get(rankingMethod)} wins`,
-      detail: FINISH_DETAIL.get(rankingMethod) ?? "Finish on top of the board.",
+      facts: [
+        {
+          icon: "chart",
+          lead: "Finish with the",
+          strong: FINISH_DETAIL.get(rankingMethod) ?? "best score",
+        },
+        { icon: "trophy", lead: "Climb to", strong: "the top" },
+      ],
     },
     {
       iconSrc: NEON_ICON("trophy-green"),
       title: potText ? `${potText} pot` : "Glory & XP",
-      detail: potText
-        ? `${payoutLine} when the bell rings.`
-        : "No prize pot - play for rank, badges and bragging rights.",
+      facts: potFacts,
     },
   ];
 
   const climbExtras = [
     minWinRate ? `Keep your win rate above ${minWinRate}%.` : null,
-    rules.disqualifyOnLiquidation ? "Get liquidated and you're out." : null,
+    rules.disqualifyOnLiquidation ? "Blow your account and you're out!" : null,
   ].filter(Boolean);
 
   const steps: TradingOverviewStep[] = [
     {
       title: "Jump in",
-      detail: `${fee ? `Pay ${formatVolts(fee, { symbol: creditSymbol })} to grab a seat.` : "Grab a free seat."}${capitalText ? ` You start with ${capitalText} of simulated cash.` : ""}`,
+      detail: `${fee ? `Pay ${formatVolts(fee, { symbol: creditSymbol })} to grab a seat.` : "Grab a free seat."}${capitalText ? ` You get ${capitalText} of practice cash to play with.` : ""}`,
     },
     {
       title: "Trade live",
-      detail: `${assets.length ? `Trade ${joinLabels(assets)}` : "Trade the live markets"}${leverage ? ` with leverage up to 1:${leverage}` : ""} while the clock runs.${qualifyLine}`,
+      detail: `${assets.length ? `Trade ${joinLabels(assets)}` : "Trade the live markets"}${leverage ? ` with up to 1:${leverage} leverage` : ""} before the clock runs out.${qualifyLine}`,
     },
     {
       title: "Climb the ranks",
@@ -202,11 +244,11 @@ export function buildTradingOverviewCopy({
       title: "Take the pot",
       detail: potText
         ? paid === 1
-          ? `The winner takes all ${potText} when the bell rings.`
+          ? `Finish first and grab all ${potText}!`
           : paid > 1
-            ? `The top ${paid} split ${potText} when the bell rings.`
-            : `${potText} goes to the winners when the bell rings.`
-        : "Finish high for XP, badges and a spot in the hall of fame.",
+            ? `Finish in the top ${paid} and share ${potText}!`
+            : `The winners share ${potText}!`
+        : "Finish high for XP, badges and bragging rights!",
     },
   ];
 

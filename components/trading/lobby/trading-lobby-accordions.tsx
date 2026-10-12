@@ -66,12 +66,12 @@ const TIE_BREAKER_LABELS = new Map<string, string>([
 ]);
 
 const TIE_BREAKER_EXPLANATIONS = new Map<string, string>([
-  ["trades_count", "The trader with more completed trades wins."],
-  ["win_rate", "The trader with a higher win rate wins."],
-  ["total_capital", "The trader with more capital wins."],
-  ["roi", "The trader with a higher return on investment wins."],
-  ["join_time", "The trader who joined first wins."],
-  ["split_prize", "The prize is split equally between tied traders."],
+  ["trades_count", "whoever made more trades wins."],
+  ["win_rate", "whoever won more of their trades wins."],
+  ["total_capital", "whoever has more money wins."],
+  ["roi", "whoever grew their money by a bigger % wins."],
+  ["join_time", "whoever joined first wins."],
+  ["split_prize", "you share the prize equally."],
 ]);
 
 const COMPETITION_TYPE_LABELS = new Map<string, string>([
@@ -137,7 +137,7 @@ export function buildTradingLobbySections({
           iconSrc={NEON_ICON("candles")}
           accent="sky"
           title="Eligible Assets"
-          subtitle="The markets you can trade in this competition."
+          subtitle="What you can trade and what you start with."
           badge={
             assets.length > 0 && (
               <div className="flex flex-wrap justify-end gap-1.5">
@@ -152,7 +152,7 @@ export function buildTradingLobbySections({
         >
           <RuleRow
             icon={Wallet}
-            label="Starting capital"
+            label="Practice cash"
             tone="cyan"
             value={`$${(
               competition.startingCapital ||
@@ -210,7 +210,7 @@ export function buildTradingLobbySections({
           iconSrc={NEON_ICON("swords")}
           accent="violet"
           title="Trading Rules"
-          subtitle="How this competition is played."
+          subtitle="How the game works."
         >
           <RuleRow
             icon={Clock}
@@ -222,8 +222,8 @@ export function buildTradingLobbySections({
             }
           />
           <RuleInfo>
-            Trades are placed in the competition workspace and only count while
-            the competition is running.
+            Trade from the competition screen. Only trades made while the
+            clock is running count!
           </RuleInfo>
         </RuleCard>
 
@@ -232,7 +232,7 @@ export function buildTradingLobbySections({
             iconSrc={NEON_ICON("target-purple")}
             accent="sky"
             title="Scoring"
-            subtitle="How the winner is decided."
+            subtitle="How you win."
           >
             <RuleRow
               icon={Trophy}
@@ -242,14 +242,14 @@ export function buildTradingLobbySections({
             />
             <RuleInfo>
               {RANKING_EXPLANATIONS.get(rules.rankingMethod) ??
-                "Winner is determined by total profit & loss."}
+                "Make the most profit to win."}
             </RuleInfo>
 
             {rules.tieBreaker1 && (
               <>
                 <RuleRow
                   icon={Scale}
-                  label="First tie breaker"
+                  label="If there is a tie"
                   tone="purple"
                   value={
                     TIE_BREAKER_LABELS.get(rules.tieBreaker1) ??
@@ -257,9 +257,9 @@ export function buildTradingLobbySections({
                   }
                 />
                 <RuleInfo>
-                  If two traders tie,{" "}
+                  Tied?{" "}
                   {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ??
-                    "this is used to break the tie."}
+                    "this decides it."}
                 </RuleInfo>
               </>
             )}
@@ -268,7 +268,7 @@ export function buildTradingLobbySections({
               <>
                 <RuleRow
                   icon={Scale}
-                  label="Second tie breaker"
+                  label="Still tied?"
                   tone="purple"
                   value={
                     TIE_BREAKER_LABELS.get(rules.tieBreaker2) ??
@@ -276,9 +276,9 @@ export function buildTradingLobbySections({
                   }
                 />
                 <RuleInfo>
-                  If they are still tied,{" "}
+                  Still level?{" "}
                   {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ??
-                    "this is used as a secondary tie breaker."}
+                    "this decides it."}
                 </RuleInfo>
               </>
             )}
@@ -290,19 +290,18 @@ export function buildTradingLobbySections({
             iconSrc={NEON_ICON("fire")}
             accent="rose"
             title="Disqualification"
-            subtitle="What knocks you out of the competition."
+            subtitle="Ways to get knocked out. Avoid them!"
           >
             {rules.minimumTrades > 0 && (
               <>
                 <RuleRow
                   icon={ListChecks}
-                  label="Minimum trades required"
+                  label="Trades you must make"
                   tone="yellow"
                   value={rules.minimumTrades}
                 />
                 <RuleInfo>
-                  Complete {rules.minimumTrades} or more trades, or you are
-                  disqualified.
+                  Make at least {rules.minimumTrades} trades or you are out.
                 </RuleInfo>
               </>
             )}
@@ -310,10 +309,10 @@ export function buildTradingLobbySections({
               <>
                 <RuleWarning
                   label="Liquidation"
-                  value="Immediate disqualification"
+                  value="You are out right away"
                 />
                 <RuleInfo>
-                  If your account is liquidated you are out of the competition.
+                  Lose all your money and the game is over for you.
                 </RuleInfo>
               </>
             )}
@@ -326,8 +325,8 @@ export function buildTradingLobbySections({
                   value={`${rules.minimumWinRate}%`}
                 />
                 <RuleInfo>
-                  A win rate below {rules.minimumWinRate}% is a
-                  disqualification.
+                  Win fewer than {rules.minimumWinRate}% of your trades and you
+                  are out.
                 </RuleInfo>
               </>
             )}
@@ -349,7 +348,7 @@ export function buildTradingLobbySections({
           iconSrc={NEON_ICON("shield")}
           accent="pink"
           title="Risk Management"
-          subtitle="The limits that keep your account alive."
+          subtitle="Safety limits that keep you in the game."
         >
           <RuleRow
             icon={ShieldCheck}
@@ -359,13 +358,13 @@ export function buildTradingLobbySections({
           />
           <RuleRow
             icon={TrendingDown}
-            label="Max drawdown"
+            label="Most you can lose overall"
             tone={riskOn ? "red" : "plain"}
             value={`${competition.riskLimits?.maxDrawdownPercent || 50}%`}
           />
           <RuleRow
             icon={CalendarX}
-            label="Daily loss limit"
+            label="Most you can lose in a day"
             tone={riskOn ? "red" : "plain"}
             value={`${competition.riskLimits?.dailyLossLimitPercent || 20}%`}
           />

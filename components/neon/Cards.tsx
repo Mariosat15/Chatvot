@@ -282,24 +282,26 @@ export function StatCard({
   if (size === "showcase") {
     const glow = SHOWCASE_GLOW.get(accent) ?? SHOWCASE_GLOW_FALLBACK;
     return (
-      <div className={`rounded-2xl border bg-[#070C1A]/90 p-4 sm:p-5 ${glow.rim}`}>
-        <div className="flex items-center gap-4">
+      // Reason: sized to the dashboard KPI row (owner, 12 Oct 2026) - 56px icon, 12px label,
+      // 22-24px figure - so the two screens read as one product.
+      <div className={`rounded-[13px] border bg-[#070C1A]/90 px-3.5 py-3.5 sm:px-4 ${glow.rim}`}>
+        <div className="flex items-center gap-3">
           {imageSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imageSrc}
               alt=""
-              className={`h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20 ${glow.icon}`}
+              className={`h-14 w-14 shrink-0 object-contain ${glow.icon}`}
             />
           ) : (
             <IconTile icon={icon} accent={accent} size="lg" />
           )}
           <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-400">
+            <p className="truncate text-[12px] font-medium leading-tight text-gray-300">
               {label}
             </p>
             <div
-              className={`mt-1 truncate text-2xl font-black sm:text-3xl ${
+              className={`mt-0.5 truncate text-[22px] font-bold leading-none tracking-tight sm:text-[24px] ${
                 valueAccent ? accentClasses(valueAccent).text : "text-white"
               }`}
             >

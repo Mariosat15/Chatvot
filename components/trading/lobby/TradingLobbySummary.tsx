@@ -74,8 +74,8 @@ export function TradingLobbySummary({
               >
                 Minimum {competition.minParticipants}
                 {competition.currentParticipants < competition.minParticipants
-                  ? " - needs more traders"
-                  : " - reached"}
+                  ? " to start - bring friends!"
+                  : " to start - good to go!"}
               </p>
             ) : null}
           </>
@@ -90,7 +90,7 @@ export function TradingLobbySummary({
           isCancelled || isCompleted
             ? "Status"
             : isActive
-              ? "Time remaining"
+              ? "Time left"
               : "Starts in"
         }
         value={
