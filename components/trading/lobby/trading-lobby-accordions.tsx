@@ -59,7 +59,7 @@ import {
 const TIE_BREAKER_LABELS = new Map<string, string>([
   ["trades_count", "Most Trades"],
   ["win_rate", "Higher Win Rate"],
-  ["total_capital", "Higher Capital"],
+  ["total_capital", "More Simulated funds"],
   ["roi", "Higher ROI"],
   ["join_time", "First to Join"],
   ["split_prize", "Split Prize"],
@@ -68,8 +68,8 @@ const TIE_BREAKER_LABELS = new Map<string, string>([
 const TIE_BREAKER_EXPLANATIONS = new Map<string, string>([
   ["trades_count", "whoever made more trades wins."],
   ["win_rate", "whoever won more of their trades wins."],
-  ["total_capital", "whoever has more money wins."],
-  ["roi", "whoever grew their money by a bigger % wins."],
+  ["total_capital", "whoever has more Simulated funds wins."],
+  ["roi", "whoever grew their stack by a bigger % wins."],
   ["join_time", "whoever joined first wins."],
   ["split_prize", "you share the prize equally."],
 ]);
@@ -152,13 +152,14 @@ export function buildTradingLobbySections({
         >
           <RuleRow
             icon={Wallet}
-            label="Practice cash"
+            label="Simulated funds"
             tone="cyan"
             value={`$${(
               competition.startingCapital ||
               competition.startingTradingPoints ||
               0
             ).toLocaleString()}`}
+            tip="Your starting stack for this match - fake money, not real cash. Blow it and you are out of ammo."
           />
           <RuleRow
             icon={Gauge}
@@ -169,16 +170,19 @@ export function buildTradingLobbySections({
                 ? `1:${competition.leverage.min} to 1:${competition.leverage.max}`
                 : `1:${storedLeverageCeiling(competition.leverage) ?? riskSettings.maxLeverage}`
             }
+            tip="How hard each trade hits. Higher leverage = bigger swings - bigger wins and bigger wipeouts."
           />
           <RuleRow
             icon={Layers}
             label="Max open positions"
             value={competition.maxOpenPositions || 10}
+            tip="How many trades you can have live at once. Hit the cap and you must close one before opening another."
           />
           <RuleRow
             icon={Percent}
             label="Max position size"
             value={`${competition.maxPositionSize || 100}%`}
+            tip="The biggest chunk of your stack you can put on a single trade. Keeps one bet from eating the whole run."
           />
         </RuleCard>
       </div>
@@ -186,16 +190,14 @@ export function buildTradingLobbySections({
   });
 
   /*
-   * ---------- Trading rules, scoring and disqualification, as ONE tab ----------
+   * ---------- Trading rules + scoring (two cards) ----------
    *
-   * Three sections until 12 Oct 2026, when the owner asked for them combined; since the
-   * owner's second reference the same day each is its own card inside the one tab. Every row,
-   * note, fallback and condition below is the old sections' own. The two minimum rows the old
-   * "Trading Rules" carried live only in the disqualification card, which shows them under
-   * exactly the same condition, so neither threshold is stated twice.
+   * Disqualification used to be its own card under Scoring until 12 Oct 2026; the owner moved
+   * those knock-out rows into Trading Rules so the left card fills the empty space under Format
+   * and the tab is a clean two-up. Every row, tip and condition is the old cards' own.
    */
-  const hasDisqualification =
-    rules &&
+  const showKnockOut =
+    !!rules &&
     (rules.minimumTrades > 0 ||
       rules.disqualifyOnLiquidation ||
       rules.minimumWinRate);
@@ -205,7 +207,7 @@ export function buildTradingLobbySections({
     icon: tabIcon("swords"),
     title: "Trading Rules",
     content: (
-      <div className="grid items-start gap-4 xl:grid-cols-2 xl:[&>*:last-child:nth-child(odd)]:col-span-2">
+      <div className="grid items-start gap-4 xl:grid-cols-2">
         <RuleCard
           iconSrc={NEON_ICON("swords")}
           accent="violet"
@@ -220,8 +222,33 @@ export function buildTradingLobbySections({
               COMPETITION_TYPE_LABELS.get(competition.competitionType) ??
               "Time-based"
             }
-            tip="Trade from the competition screen. Only trades made while the clock is running count!"
+            tip="Play from this contest screen. Only moves you make while the clock is running count toward the board."
           />
+          {showKnockOut && rules.minimumTrades > 0 && (
+            <RuleRow
+              icon={ListChecks}
+              label="Trades you must make"
+              tone="yellow"
+              value={rules.minimumTrades}
+              tip={`Minimum moves to stay in the match. Make fewer than ${rules.minimumTrades} and you are benched.`}
+            />
+          )}
+          {showKnockOut && rules.disqualifyOnLiquidation && (
+            <RuleWarning
+              label="Liquidation"
+              value="You are out right away"
+              tip="Blow your Simulated funds to zero and it is game over - you are knocked out on the spot."
+            />
+          )}
+          {showKnockOut && rules.minimumWinRate > 0 && (
+            <RuleRow
+              icon={Percent}
+              label="Minimum win rate"
+              tone="orange"
+              value={`${rules.minimumWinRate}%`}
+              tip={`Win-rate floor. Drop under ${rules.minimumWinRate}% and you are out of the contest.`}
+            />
+          )}
         </RuleCard>
 
         {rules && (
@@ -238,7 +265,7 @@ export function buildTradingLobbySections({
               value={RANKING_LABELS.get(rules.rankingMethod) ?? "Highest P&L"}
               tip={
                 RANKING_EXPLANATIONS.get(rules.rankingMethod) ??
-                "Make the most profit to win."
+                "Rack up the best score and you take the win."
               }
             />
 
@@ -250,7 +277,7 @@ export function buildTradingLobbySections({
                 value={
                   TIE_BREAKER_LABELS.get(rules.tieBreaker1) ?? rules.tieBreaker1
                 }
-                tip={`Tied? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ?? "this decides it."}`}
+                tip={`Tied on the board? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ?? "this decides it."}`}
               />
             )}
 
@@ -262,42 +289,7 @@ export function buildTradingLobbySections({
                 value={
                   TIE_BREAKER_LABELS.get(rules.tieBreaker2) ?? rules.tieBreaker2
                 }
-                tip={`Still level? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ?? "this decides it."}`}
-              />
-            )}
-          </RuleCard>
-        )}
-
-        {hasDisqualification && (
-          <RuleCard
-            iconSrc={NEON_ICON("fire")}
-            accent="rose"
-            title="Disqualification"
-            subtitle="Ways to get knocked out. Avoid them!"
-          >
-            {rules.minimumTrades > 0 && (
-              <RuleRow
-                icon={ListChecks}
-                label="Trades you must make"
-                tone="yellow"
-                value={rules.minimumTrades}
-                tip={`Make at least ${rules.minimumTrades} trades or you are out.`}
-              />
-            )}
-            {rules.disqualifyOnLiquidation && (
-              <RuleWarning
-                label="Liquidation"
-                value="You are out right away"
-                tip="Lose all your money and the game is over for you."
-              />
-            )}
-            {rules.minimumWinRate > 0 && (
-              <RuleRow
-                icon={Percent}
-                label="Minimum win rate"
-                tone="orange"
-                value={`${rules.minimumWinRate}%`}
-                tip={`Win fewer than ${rules.minimumWinRate}% of your trades and you are out.`}
+                tip={`Still level after the first tie-break? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ?? "this decides it."}`}
               />
             )}
           </RuleCard>

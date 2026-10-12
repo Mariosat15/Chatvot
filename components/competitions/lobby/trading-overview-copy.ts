@@ -156,7 +156,7 @@ export function buildTradingOverviewCopy({
 
   const marketFacts: TradingOverviewFact[] = [
     capitalText
-      ? { icon: "cash", strong: capitalText, tail: "practice cash" }
+      ? { icon: "cash", strong: capitalText, tail: "Simulated funds" }
       : { icon: "cash", strong: "No real money", tail: "at risk" },
   ];
   if (leverage) {
@@ -195,7 +195,7 @@ export function buildTradingOverviewCopy({
   const steps: TradingOverviewStep[] = [
     {
       title: "Jump in",
-      detail: `${fee ? `Pay ${formatVolts(fee, { symbol: creditSymbol })} to grab a seat.` : "Grab a free seat."}${capitalText ? ` You get ${capitalText} of practice cash to play with.` : ""}`,
+      detail: `${fee ? `Pay ${formatVolts(fee, { symbol: creditSymbol })} to grab a seat.` : "Grab a free seat."}${capitalText ? ` You get ${capitalText} of Simulated funds to play with.` : ""}`,
     },
     {
       title: "Trade live",

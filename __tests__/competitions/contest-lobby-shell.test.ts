@@ -132,15 +132,18 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("fills the tab panel instead of pushing rule cards to the left", () => {
-    // Reason: a `max-w-3xl` wrapper left a third of the panel empty on wide screens, and a
-    // lone third card in a two-column grid sat alone on the left (owner, 12 Oct 2026).
+    // Reason: a `max-w-3xl` wrapper left a third of the panel empty on wide screens (owner,
+    // 12 Oct 2026). The odd-child span-2 was for a third Disqualification card; that card
+    // moved into Trading Rules the same day, so the grid is a clean two-up and the span is gone.
     const accordions = readCode(
       "components/trading/lobby/trading-lobby-accordions.tsx",
     );
     expect(accordions).not.toContain("max-w-3xl");
-    expect(accordions).toContain(
+    expect(accordions).not.toContain(
       "xl:[&>*:last-child:nth-child(odd)]:col-span-2",
     );
+    expect(accordions).toContain('xl:grid-cols-2">');
+    expect(accordions).not.toContain('title="Disqualification"');
   });
 
   it("drags the tab bar instead of showing a scrollbar", () => {
