@@ -214,6 +214,9 @@ export const COMPETITION_ICON = {
   players: `${ICON_BASE}/icon-players.png`,
   volts: `${ICON_BASE}/icon-volts.png`,
   wallet: `${ICON_BASE}/icon-wallet.png`,
+  // Reason: ASSETS and ENTRY FEE used to share volts; candles = market, entryFee = ticket cost.
+  candles: `${ICON_BASE}/icon-candles.png`,
+  entryFee: `${ICON_BASE}/icon-entry-fee.png`,
   topup: `${ICON_BASE}/icon-topup.png`,
   bolt: `${ICON_BASE}/icon-bolt.png`,
   trophyGold: `${ICON_BASE}/icon-trophy-gold.png`,
