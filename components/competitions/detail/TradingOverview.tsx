@@ -95,8 +95,6 @@ function CardHeading({
   );
 }
 
-const BATTLE_PLAN_ART = "/assets/competitions/battle-plan-trading.webp";
-
 export function TradingOverview({
   about,
   overview,
@@ -105,7 +103,9 @@ export function TradingOverview({
   overview: TradingOverviewCopy;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+    // Reason: items-start (owner, 12 Oct 2026) - stretching both cards to one height left an
+    // empty block under the About tiles once the Battle plan artwork was removed.
+    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
       <section className={CARD}>
         <CardHeading
           icon={<Info className="h-7 w-7 shrink-0 text-cyan-300" />}
@@ -149,7 +149,7 @@ export function TradingOverview({
         </ul>
       </section>
 
-      <section className={`${CARD} flex flex-col`}>
+      <section className={CARD}>
         <CardHeading
           icon={<Flag className="h-7 w-7 shrink-0 text-cyan-300" />}
           lead="Battle"
@@ -180,22 +180,6 @@ export function TradingOverview({
             </li>
           ))}
         </ol>
-        {/*
-          Reason: the plan is shorter than the About card beside it, which left an empty block
-          at the foot of this card (owner, 12 Oct 2026). The artwork takes that space; mt-auto
-          pins it to the bottom and the 4:3 box matches the file so nothing is cropped.
-        */}
-        <div className="mt-auto pt-6">
-          <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border border-sky-400/20">
-            {/* eslint-disable-next-line @next/next/no-img-element -- fixed local artwork */}
-            <img
-              src={BATTLE_PLAN_ART}
-              alt=""
-              draggable={false}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        </div>
       </section>
     </div>
   );

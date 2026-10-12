@@ -1,4 +1,5 @@
-import { AlertTriangle, Info, type LucideIcon } from "lucide-react";
+import { AlertTriangle, type LucideIcon } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 /**
  * The trading detail tabs' rule cards (owner reference, 12 Oct 2026): a lit card with a large
@@ -8,17 +9,13 @@ import { AlertTriangle, Info, type LucideIcon } from "lucide-react";
  * Server-only presentation. Every value is computed by `buildTradingLobbySections` and handed
  * in; nothing here decides a rule. The tone and frame dictionaries are Maps of whole class
  * strings so Tailwind sees every class literally and a stored value can never reach a lookup.
+ *
+ * Explanations ride on `tip` via the shared `InfoTooltip` (? icon) rather than a second row -
+ * owner, 12 Oct 2026: the blue info boxes under each row were taking too much space.
  */
 
 export type RuleTone =
-  | "cyan"
-  | "yellow"
-  | "purple"
-  | "pink"
-  | "red"
-  | "orange"
-  | "green"
-  | "plain";
+  "cyan" | "yellow" | "purple" | "pink" | "red" | "orange" | "green" | "plain";
 
 const VALUE_TONE = new Map<RuleTone, string>([
   ["cyan", "text-cyan-300"],
@@ -95,18 +92,24 @@ export function RuleRow({
   label,
   value,
   tone = "plain",
+  tip,
 }: {
   icon: LucideIcon;
   label: string;
   value: React.ReactNode;
   tone?: RuleTone;
+  /** Shown on the shared ? icon (hover / tap). Omit when there is nothing to explain. */
+  tip?: string;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0B1124]/80 px-3.5 py-3">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-gray-300">
         <Icon className="h-4 w-4" />
       </span>
-      <span className="text-sm font-medium text-gray-200">{label}</span>
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium text-gray-200">
+        {label}
+        {tip ? <InfoTooltip text={tip} iconSize={12} /> : null}
+      </span>
       <span
         className={`ml-auto text-right text-sm font-bold ${VALUE_TONE.get(tone) ?? "text-gray-100"}`}
       >
@@ -120,28 +123,24 @@ export function RuleRow({
 export function RuleWarning({
   label,
   value,
+  tip,
 }: {
   label: string;
   value: React.ReactNode;
+  tip?: string;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-rose-500/30 bg-rose-500/[0.08] px-3.5 py-3">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-300">
         <AlertTriangle className="h-4 w-4" />
       </span>
-      <span className="text-sm font-medium text-gray-200">{label}</span>
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium text-gray-200">
+        {label}
+        {tip ? <InfoTooltip text={tip} iconSize={12} /> : null}
+      </span>
       <span className="ml-auto text-right text-sm font-bold text-rose-400">
         {value}
       </span>
-    </div>
-  );
-}
-
-export function RuleInfo({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-3 rounded-xl border border-sky-400/15 bg-sky-500/[0.05] px-3.5 py-3 text-sm leading-relaxed text-gray-300">
-      <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
-      <p>{children}</p>
     </div>
   );
 }
@@ -163,7 +162,9 @@ export function MarginLadder({
       <ul className="space-y-2">
         {levels.map((level) => (
           <li key={level.label} className="flex items-center gap-2.5 text-sm">
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${level.dot}`} />
+            <span
+              className={`h-2.5 w-2.5 shrink-0 rounded-full ${level.dot}`}
+            />
             <span className="text-gray-200">{level.label}</span>
             <span className={`ml-auto font-bold ${level.text}`}>
               {level.value}

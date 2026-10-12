@@ -18,7 +18,6 @@ import {
   MarginLadder,
   RuleBadge,
   RuleCard,
-  RuleInfo,
   RuleRow,
   RuleWarning,
 } from "./TradingRuleCard";
@@ -221,11 +220,8 @@ export function buildTradingLobbySections({
               COMPETITION_TYPE_LABELS.get(competition.competitionType) ??
               "Time-based"
             }
+            tip="Trade from the competition screen. Only trades made while the clock is running count!"
           />
-          <RuleInfo>
-            Trade from the competition screen. Only trades made while the clock
-            is running count!
-          </RuleInfo>
         </RuleCard>
 
         {rules && (
@@ -240,48 +236,34 @@ export function buildTradingLobbySections({
               label="Ranked by"
               tone="yellow"
               value={RANKING_LABELS.get(rules.rankingMethod) ?? "Highest P&L"}
+              tip={
+                RANKING_EXPLANATIONS.get(rules.rankingMethod) ??
+                "Make the most profit to win."
+              }
             />
-            <RuleInfo>
-              {RANKING_EXPLANATIONS.get(rules.rankingMethod) ??
-                "Make the most profit to win."}
-            </RuleInfo>
 
             {rules.tieBreaker1 && (
-              <>
-                <RuleRow
-                  icon={Scale}
-                  label="If there is a tie"
-                  tone="purple"
-                  value={
-                    TIE_BREAKER_LABELS.get(rules.tieBreaker1) ??
-                    rules.tieBreaker1
-                  }
-                />
-                <RuleInfo>
-                  Tied?{" "}
-                  {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ??
-                    "this decides it."}
-                </RuleInfo>
-              </>
+              <RuleRow
+                icon={Scale}
+                label="If there is a tie"
+                tone="purple"
+                value={
+                  TIE_BREAKER_LABELS.get(rules.tieBreaker1) ?? rules.tieBreaker1
+                }
+                tip={`Tied? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ?? "this decides it."}`}
+              />
             )}
 
             {rules.tieBreaker2 && (
-              <>
-                <RuleRow
-                  icon={Scale}
-                  label="Still tied?"
-                  tone="purple"
-                  value={
-                    TIE_BREAKER_LABELS.get(rules.tieBreaker2) ??
-                    rules.tieBreaker2
-                  }
-                />
-                <RuleInfo>
-                  Still level?{" "}
-                  {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ??
-                    "this decides it."}
-                </RuleInfo>
-              </>
+              <RuleRow
+                icon={Scale}
+                label="Still tied?"
+                tone="purple"
+                value={
+                  TIE_BREAKER_LABELS.get(rules.tieBreaker2) ?? rules.tieBreaker2
+                }
+                tip={`Still level? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ?? "this decides it."}`}
+              />
             )}
           </RuleCard>
         )}
@@ -294,42 +276,29 @@ export function buildTradingLobbySections({
             subtitle="Ways to get knocked out. Avoid them!"
           >
             {rules.minimumTrades > 0 && (
-              <>
-                <RuleRow
-                  icon={ListChecks}
-                  label="Trades you must make"
-                  tone="yellow"
-                  value={rules.minimumTrades}
-                />
-                <RuleInfo>
-                  Make at least {rules.minimumTrades} trades or you are out.
-                </RuleInfo>
-              </>
+              <RuleRow
+                icon={ListChecks}
+                label="Trades you must make"
+                tone="yellow"
+                value={rules.minimumTrades}
+                tip={`Make at least ${rules.minimumTrades} trades or you are out.`}
+              />
             )}
             {rules.disqualifyOnLiquidation && (
-              <>
-                <RuleWarning
-                  label="Liquidation"
-                  value="You are out right away"
-                />
-                <RuleInfo>
-                  Lose all your money and the game is over for you.
-                </RuleInfo>
-              </>
+              <RuleWarning
+                label="Liquidation"
+                value="You are out right away"
+                tip="Lose all your money and the game is over for you."
+              />
             )}
             {rules.minimumWinRate > 0 && (
-              <>
-                <RuleRow
-                  icon={Percent}
-                  label="Minimum win rate"
-                  tone="orange"
-                  value={`${rules.minimumWinRate}%`}
-                />
-                <RuleInfo>
-                  Win fewer than {rules.minimumWinRate}% of your trades and you
-                  are out.
-                </RuleInfo>
-              </>
+              <RuleRow
+                icon={Percent}
+                label="Minimum win rate"
+                tone="orange"
+                value={`${rules.minimumWinRate}%`}
+                tip={`Win fewer than ${rules.minimumWinRate}% of your trades and you are out.`}
+              />
             )}
           </RuleCard>
         )}
