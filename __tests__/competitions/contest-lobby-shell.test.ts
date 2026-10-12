@@ -98,16 +98,39 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(gameLobby).toContain("<GameEventDetails");
   });
 
-  it("trading main is Leaderboard first, then detail tabs with How it works", () => {
+  it("trading main is detail tabs first, then the Leaderboard", () => {
+    // Reason: this was "Leaderboard first, then tabs" until 12 Oct 2026, when the owner asked
+    // for the tabs to move to the top of the main column ("move the section on the top").
+    // Flipped rather than deleted so the earlier order stays on record.
     expect(tradingPage).toContain("<TradingDetailTabs");
     expect(tradingPage).toContain("<CompetitionLeaderboard");
     const boardIdx = tradingPage.indexOf("<CompetitionLeaderboard");
     const tabsIdx = tradingPage.indexOf("<TradingDetailTabs");
-    expect(boardIdx).toBeGreaterThan(-1);
-    expect(tabsIdx).toBeGreaterThan(boardIdx);
+    expect(tabsIdx).toBeGreaterThan(-1);
+    expect(boardIdx).toBeGreaterThan(tabsIdx);
     expect(tradingTabs).toContain('kind="trading"');
     expect(tradingTabs).toContain("<ContestHowItWorks");
     expect(tradingTabs).toContain("embedded");
+  });
+
+  it("drags the tab bar instead of showing a scrollbar", () => {
+    expect(tradingTabs).toContain("[scrollbar-width:none]");
+    expect(tradingTabs).toContain("[&::-webkit-scrollbar]:hidden");
+    expect(tradingTabs).toContain("onPointerMove");
+    // A drag must not also click the tab it ended on.
+    expect(tradingTabs).toContain("onClickCapture");
+  });
+
+  it("writes the Overview from the contest's own facts", () => {
+    expect(tradingTabs).toContain("steps={overview.steps}");
+    expect(tradingPage).toContain("buildTradingOverviewCopy({ competition, creditSymbol })");
+  });
+
+  it("headlines the dashboard with the figure the contest ranks on", () => {
+    const dashboard = readCode("components/trading/CompetitionDashboard.tsx");
+    expect(dashboard).toContain("rankedFigure(rankingMethod, stats)");
+    expect(tradingPage).toContain("rankingMethod={competition.rankingMethod}");
+    expect(tradingPage).toContain('id="competition-leaderboard"');
   });
 
   it("dresses KPI tiles with Menuitems Volt icons", () => {

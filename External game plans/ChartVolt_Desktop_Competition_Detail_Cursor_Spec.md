@@ -1,6 +1,14 @@
 # ChartVolt Competition Detail Pages — Desktop Cursor Build Specification
 
 > **BUILT 12 Oct 2026 (eng), amended the same day.** Shared shell `components/competitions/detail/CompetitionDetailShell.tsx` (hero → summary KPIs → 2fr/0.9fr main + sidebar, on the competitions hub's `COMPETITIONS_ARENA_BG` backdrop). Trading: the reference sections (Eligible Assets, Trading Rules, Scoring, Risk Management, Disqualification, Prizes) are the **top tab bar** under the leaderboard (`TradingDetailTabs`), with Overview = About + feature tiles beside a How It Works timeline; the sidebar keeps only the decisions (entry, countdown, schedule, difficulty, prizes). Game lobby on the same shell with its own blocks. **Never verified by eye.**
+>
+> **Amended again 12 Oct 2026:**
+> - The trading tab bar now sits **above** the leaderboard. You drag it sideways; it shows no scrollbar.
+> - The Overview is written from the contest's own data (`buildTradingOverviewCopy`), so how you climb follows `rankingMethod`.
+> - "Your Competition Dashboard" follows the Menuitems "Round Complete" panel: a trophy header, a hero card with the ranked figure and `#rank / total`, five coloured tiles, Run summary and Score breakdown rows, and back + gold actions (`components/trading/competition-dashboard/`).
+> - Career stats and the All-Time tab moved behind the Full Performance link, and the equity chart became the hero's sparkline.
+>
+> **Never verified by eye.**
 
 ## Scope
 

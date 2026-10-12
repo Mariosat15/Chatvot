@@ -4,6 +4,7 @@ import { NeonPanel } from "@/components/neon/Cards";
 import {
   contestHowItWorks,
   contestHowTitle,
+  type ContestHowItStep,
   type ContestLobbyKind,
 } from "@/components/competitions/lobby/contest-lobby-copy";
 
@@ -20,8 +21,7 @@ const STEP_ICONS = new Map<string, LucideIcon>([
   ["Take the pot", Trophy],
 ]);
 
-function StepList({ kind }: { kind: ContestLobbyKind }) {
-  const steps = contestHowItWorks(kind);
+function StepList({ steps }: { steps: ContestHowItStep[] }) {
   return (
     <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {steps.map((step, index) => {
@@ -51,8 +51,7 @@ function StepList({ kind }: { kind: ContestLobbyKind }) {
 }
 
 /** Numbered steps joined by a rail — the trading Overview tab's right column. */
-function StepTimeline({ kind }: { kind: ContestLobbyKind }) {
-  const steps = contestHowItWorks(kind);
+function StepTimeline({ steps }: { steps: ContestHowItStep[] }) {
   return (
     <ol className="relative space-y-5 before:absolute before:bottom-5 before:left-5 before:top-5 before:w-px before:bg-gradient-to-b before:from-sky-400/60 before:via-violet-400/50 before:to-amber-400/60">
       {steps.map((step, index) => (
@@ -76,13 +75,20 @@ export function ContestHowItWorks({
   kind,
   embedded = false,
   layout = "grid",
+  steps,
 }: {
   kind: ContestLobbyKind;
+  /**
+   * Steps written from this competition's own facts (`buildTradingOverviewCopy`). Absent means
+   * the kind's generic copy - only the game lobby still relies on that.
+   */
+  steps?: ContestHowItStep[];
   /** Skip the outer panel when nested inside another card (e.g. trading Overview tab). */
   embedded?: boolean;
   /** `timeline` stacks the steps vertically; only used embedded beside another column. */
   layout?: "grid" | "timeline";
 }) {
+  const shown = steps?.length ? steps : contestHowItWorks(kind);
   if (embedded) {
     return (
       <div>
@@ -91,9 +97,9 @@ export function ContestHowItWorks({
           {contestHowTitle(kind)}
         </h3>
         {layout === "timeline" ? (
-          <StepTimeline kind={kind} />
+          <StepTimeline steps={shown} />
         ) : (
-          <StepList kind={kind} />
+          <StepList steps={shown} />
         )}
       </div>
     );
@@ -106,7 +112,7 @@ export function ContestHowItWorks({
       title={contestHowTitle(kind)}
       size="lg"
     >
-      <StepList kind={kind} />
+      <StepList steps={shown} />
     </NeonPanel>
   );
 }

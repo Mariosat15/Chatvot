@@ -20,6 +20,7 @@ import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
 import { TradingLobbySummary } from "@/components/trading/lobby/TradingLobbySummary";
 import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
 import { buildTradingLobbySections } from "@/components/trading/lobby/trading-lobby-accordions";
+import { buildTradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
 import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
 import { TradingDetailTabs } from "@/components/competitions/detail/TradingDetailTabs";
 import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
@@ -444,6 +445,22 @@ const CompetitionDetailsPage = async ({
           }
           main={
             <>
+              {/*
+                Tabs first, directly under the summary cards (owner, 12 Oct 2026: "move the
+                section on the top"). The Overview copy is written from this contest's facts.
+              */}
+              <TradingDetailTabs
+                description={competition.description}
+                sections={buildTradingLobbySections({
+                  competition,
+                  riskSettings,
+                  creditSymbol,
+                })}
+                overview={buildTradingOverviewCopy({ competition, creditSymbol })}
+              />
+
+              {/* The dashboard's "View Leaderboard" button scrolls here. */}
+              <div id="competition-leaderboard" className="scroll-mt-24">
               <NeonPanel
                 icon={Trophy}
                 accent="prize"
@@ -473,6 +490,7 @@ const CompetitionDetailsPage = async ({
                   competitionStatus={competition.status}
                 />
               </NeonPanel>
+              </div>
 
               {isUserIn && userParticipant && (
                 <CompetitionDashboard
@@ -515,17 +533,12 @@ const CompetitionDetailsPage = async ({
                       : undefined
                   }
                   totalParticipants={competition.currentParticipants}
+                  competitionName={competition.name}
+                  rankingMethod={competition.rankingMethod}
+                  entryFee={competition.entryFee ?? competition.entryFeeCredits}
+                  creditSymbol={creditSymbol}
                 />
               )}
-
-              <TradingDetailTabs
-                description={competition.description}
-                sections={buildTradingLobbySections({
-                  competition,
-                  riskSettings,
-                  creditSymbol,
-                })}
-              />
             </>
           }
           sidebar={

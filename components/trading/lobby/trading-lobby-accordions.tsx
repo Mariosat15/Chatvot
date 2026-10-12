@@ -9,6 +9,11 @@ import {
 import { IconTile, NeonNote, NeonRow } from "@/components/neon/Cards";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
 import { formatVolts } from "@/lib/utils/format-volts";
+import {
+  ASSET_LABELS,
+  RANKING_EXPLANATIONS,
+  RANKING_LABELS,
+} from "./trading-lobby-labels";
 
 /**
  * The six collapsible reference sections in the trading lobby's sidebar, from the bottom row of
@@ -36,30 +41,6 @@ import { formatVolts } from "@/lib/utils/format-volts";
  * inline objects were reachable in exactly that way.
  */
 
-const RANKING_LABELS = new Map<string, string>([
-  ["pnl", "Highest P&L"],
-  ["roi", "Highest ROI %"],
-  ["total_capital", "Highest Capital"],
-  ["win_rate", "Highest Win Rate"],
-  ["total_wins", "Most Winning Trades"],
-  ["profit_factor", "Best Profit Factor"],
-]);
-
-const RANKING_EXPLANATIONS = new Map<string, string>([
-  [
-    "pnl",
-    "Winner is determined by total profit & loss (realized + unrealized).",
-  ],
-  [
-    "roi",
-    "Winner is determined by the highest return on investment percentage.",
-  ],
-  ["total_capital", "Winner has the highest account balance at the end."],
-  ["win_rate", "Winner has the highest percentage of winning trades."],
-  ["total_wins", "Winner has the most profitable trades closed."],
-  ["profit_factor", "Winner has the best ratio of winning to losing trades."],
-]);
-
 const TIE_BREAKER_LABELS = new Map<string, string>([
   ["trades_count", "Most Trades"],
   ["win_rate", "Higher Win Rate"],
@@ -76,12 +57,6 @@ const TIE_BREAKER_EXPLANATIONS = new Map<string, string>([
   ["roi", "The trader with a higher return on investment wins."],
   ["join_time", "The trader who joined first wins."],
   ["split_prize", "The prize is split equally between tied traders."],
-]);
-
-const ASSET_LABELS = new Map<string, string>([
-  ["forex", "Forex"],
-  ["crypto", "Crypto"],
-  ["stocks", "Stocks"],
 ]);
 
 const COMPETITION_TYPE_LABELS = new Map<string, string>([
