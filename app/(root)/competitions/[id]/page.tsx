@@ -17,7 +17,7 @@ import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMoni
 import LiveContestRefresher from "@/components/competitions/LiveContestRefresher";
 import UTCClock from "@/components/trading/UTCClock";
 import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
-import TradingLobbySummary from "@/components/trading/lobby/TradingLobbySummary";
+import { TradingLobbySummary } from "@/components/trading/lobby/TradingLobbySummary";
 import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
 import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
 import { TradingDetailTabs } from "@/components/competitions/detail/TradingDetailTabs";
