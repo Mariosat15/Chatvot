@@ -132,7 +132,7 @@ export function buildTradingLobbySections({
     icon: tabIcon("candles"),
     title: "Eligible Assets",
     content: (
-      <div className="max-w-3xl">
+      <div className="w-full">
         <RuleCard
           iconSrc={NEON_ICON("candles")}
           accent="sky"
@@ -205,7 +205,7 @@ export function buildTradingLobbySections({
     icon: tabIcon("swords"),
     title: "Trading Rules",
     content: (
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid items-start gap-4 xl:grid-cols-2 xl:[&>*:last-child:nth-child(odd)]:col-span-2">
         <RuleCard
           iconSrc={NEON_ICON("swords")}
           accent="violet"
@@ -344,7 +344,7 @@ export function buildTradingLobbySections({
     icon: tabIcon("shield"),
     title: "Risk Management",
     content: (
-      <div className="max-w-3xl">
+      <div className="w-full">
         <RuleCard
           iconSrc={NEON_ICON("shield")}
           accent="pink"

@@ -49,6 +49,9 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   const tradingTabs = readCode(
     "components/competitions/detail/TradingDetailTabs.tsx",
   );
+  const tradingOverview = readCode(
+    "components/competitions/detail/TradingOverview.tsx",
+  );
 
   it("defines one max-width shell with a 2fr / 0.9fr main+sidebar grid", () => {
     expect(shell).toContain("max-w-[1600px]");
@@ -118,8 +121,26 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     // asked for one card ("make this section all as one"), so the timeline must not come back.
     // Flipped rather than deleted so the earlier layout stays on record.
     expect(tradingTabs).not.toContain("<ContestHowItWorks");
-    expect(tradingTabs).not.toContain("overview.features");
-    expect(tradingTabs).toContain("overview.items.map(");
+    // Amended the same day: the owner's next reference brought back tiles beside a "Battle
+    // plan", drawn by `TradingOverview` from one builder - still not the shared timeline.
+    expect(tradingTabs).toContain(
+      "<TradingOverview about={about} overview={overview} />",
+    );
+    expect(tradingOverview).not.toContain("<ContestHowItWorks");
+    expect(tradingOverview).toContain("overview.features.map(");
+    expect(tradingOverview).toContain("overview.steps.map(");
+  });
+
+  it("fills the tab panel instead of pushing rule cards to the left", () => {
+    // Reason: a `max-w-3xl` wrapper left a third of the panel empty on wide screens, and a
+    // lone third card in a two-column grid sat alone on the left (owner, 12 Oct 2026).
+    const accordions = readCode(
+      "components/trading/lobby/trading-lobby-accordions.tsx",
+    );
+    expect(accordions).not.toContain("max-w-3xl");
+    expect(accordions).toContain(
+      "xl:[&>*:last-child:nth-child(odd)]:col-span-2",
+    );
   });
 
   it("drags the tab bar instead of showing a scrollbar", () => {
@@ -131,7 +152,7 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("writes the Overview from the contest's own facts", () => {
-    expect(tradingTabs).toContain("overview.items.map(");
+    expect(tradingOverview).toContain("overview.steps.map(");
     expect(tradingPage).toContain(
       "buildTradingOverviewCopy({ competition, creditSymbol })",
     );

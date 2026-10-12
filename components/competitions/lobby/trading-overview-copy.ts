@@ -20,21 +20,26 @@ import {
  * nothing here may be a component (R39). Ranking labels come from `trading-lobby-labels.ts`, the
  * same dictionary the Scoring tab reads, so the two can never name different rules.
  *
- * ONE LIST, NOT TILES PLUS STEPS (owner, 12 Oct 2026: "make this section all as one ... they
- * are very busy and hard to read so merge the info"). Four feature tiles and four timeline steps
- * said the same things twice - the market and capital, the ranking, the pot - so each item is
- * now one step in play order carrying the facts its tile used to repeat.
+ * TILES SAY WHAT, STEPS SAY HOW (owner reference, 12 Oct 2026, superseding the same day's
+ * one-list merge): `features` are four short facts - market, seats, ranking rule, pot - and
+ * `steps` are the four moves of play in order. Each is written once from the stored fields.
  */
 
-export interface TradingOverviewItem {
+export interface TradingOverviewFeature {
   /** `NEON_ICON` path - a string so it can cross the server/client boundary. */
   iconSrc: string;
   title: string;
   detail: string;
 }
 
+export interface TradingOverviewStep {
+  title: string;
+  detail: string;
+}
+
 export interface TradingOverviewCopy {
-  items: TradingOverviewItem[];
+  features: TradingOverviewFeature[];
+  steps: TradingOverviewStep[];
 }
 
 /** Why each ranking method puts one trader above another, in the lobby's playful voice. */
@@ -57,6 +62,16 @@ const CLIMB_DETAIL = new Map<string, string>([
     "profit_factor",
     "Your profit factor decides the order - let winners run, cut losers fast.",
   ],
+]);
+
+/** The short line under the ranking tile: what finishing first takes, per ranking method. */
+const FINISH_DETAIL = new Map<string, string>([
+  ["pnl", "Finish with the strongest profit to top the board."],
+  ["roi", "Finish with the best return % to top the board."],
+  ["total_capital", "Finish with the biggest balance to top the board."],
+  ["win_rate", "Finish with the best win rate to top the board."],
+  ["total_wins", "Finish with the most winning trades to top the board."],
+  ["profit_factor", "Finish with the best profit factor to top the board."],
 ]);
 
 const DEFAULT_RANKING = "pnl";
@@ -124,50 +139,76 @@ export function buildTradingOverviewCopy({
   const joined = Math.max(0, Number(competition?.currentParticipants) || 0);
 
   const capitalLine = capitalText
-    ? `Start with ${capitalText} of simulated cash${leverage ? ` and up to 1:${leverage} leverage` : ""}.`
+    ? `Start with ${capitalText} of simulated cash${leverage ? ` and trade with leverage up to 1:${leverage}` : ""}.`
     : "Real prices, simulated cash - no real money at risk.";
   const qualifyLine = minTrades
-    ? ` Close at least ${minTrades} trade${minTrades === 1 ? "" : "s"} to qualify.`
+    ? ` Complete at least ${minTrades} trade${minTrades === 1 ? "" : "s"} to qualify.`
     : "";
-  const seatsLine = seats
-    ? ` ${Math.max(0, seats - joined).toLocaleString()} of ${seats.toLocaleString()} spots left.`
-    : joined > 0
-      ? ` ${joined.toLocaleString()} trader${joined === 1 ? "" : "s"} already in.`
-      : "";
+  const spotsLeft = seats ? Math.max(0, seats - joined) : null;
+  const payoutLine =
+    paid === 1
+      ? "The winner takes it all"
+      : paid > 1
+        ? `The top ${paid} split it`
+        : "It goes to the winners";
+
+  const features: TradingOverviewFeature[] = [
+    {
+      iconSrc: NEON_ICON("candles"),
+      title: assets.length ? joinLabels(assets) : "Live markets",
+      detail: capitalLine,
+    },
+    {
+      iconSrc: NEON_ICON("users-group"),
+      title: seats ? `${seats.toLocaleString()} seats` : "Open field",
+      detail:
+        joined > 0
+          ? `${joined.toLocaleString()} trader${joined === 1 ? "" : "s"} already joined${spotsLeft !== null ? ` - ${spotsLeft.toLocaleString()} seats left` : ""}.`
+          : "Nobody is in yet - grab the first seat.",
+    },
+    {
+      iconSrc: NEON_ICON("target-purple"),
+      title: `${RANKING_LABELS.get(rankingMethod)} wins`,
+      detail: FINISH_DETAIL.get(rankingMethod) ?? "Finish on top of the board.",
+    },
+    {
+      iconSrc: NEON_ICON("trophy-green"),
+      title: potText ? `${potText} pot` : "Glory & XP",
+      detail: potText
+        ? `${payoutLine} when the bell rings.`
+        : "No prize pot - play for rank, badges and bragging rights.",
+    },
+  ];
 
   const climbExtras = [
     minWinRate ? `Keep your win rate above ${minWinRate}%.` : null,
     rules.disqualifyOnLiquidation ? "Get liquidated and you're out." : null,
   ].filter(Boolean);
 
-  const items: TradingOverviewItem[] = [
+  const steps: TradingOverviewStep[] = [
     {
-      iconSrc: NEON_ICON("users-group"),
       title: "Jump in",
-      detail: `${fee ? `Pay ${formatVolts(fee, { symbol: creditSymbol })} to grab a seat.` : "Grab a free seat."}${seatsLine}`,
+      detail: `${fee ? `Pay ${formatVolts(fee, { symbol: creditSymbol })} to grab a seat.` : "Grab a free seat."}${capitalText ? ` You start with ${capitalText} of simulated cash.` : ""}`,
     },
     {
-      iconSrc: NEON_ICON("candles"),
-      title: assets.length ? `Trade ${joinLabels(assets)}` : "Trade live",
-      detail: `${capitalLine}${qualifyLine}`,
+      title: "Trade live",
+      detail: `${assets.length ? `Trade ${joinLabels(assets)}` : "Trade the live markets"}${leverage ? ` with leverage up to 1:${leverage}` : ""} while the clock runs.${qualifyLine}`,
     },
     {
-      iconSrc: NEON_ICON("target-purple"),
-      title: `${RANKING_LABELS.get(rankingMethod)} wins`,
+      title: "Climb the ranks",
       detail: [CLIMB_DETAIL.get(rankingMethod), ...climbExtras].join(" "),
     },
     {
-      iconSrc: NEON_ICON("trophy-green"),
-      title: potText ? `Take the ${potText} pot` : "Play for glory",
+      title: "Take the pot",
       detail: potText
         ? paid === 1
-          ? "The winner takes it all when the bell rings."
+          ? `The winner takes all ${potText} when the bell rings.`
           : paid > 1
-            ? `The top ${paid} share it when the bell rings.`
-            : "It goes to the winners when the bell rings."
-        : "No prize pot - finish high for XP, badges and bragging rights.",
+            ? `The top ${paid} split ${potText} when the bell rings.`
+            : `${potText} goes to the winners when the bell rings.`
+        : "Finish high for XP, badges and a spot in the hall of fame.",
     },
   ];
 
-  return { items };
+  return { features, steps };
 }
