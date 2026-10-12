@@ -28,6 +28,8 @@ export function TradingLobbySummary({
   isCompleted: boolean;
   isCancelled: boolean;
 }) {
+  const pool = competition.prizePool || competition.prizePoolCredits || 0;
+  const maxPool = maxPrizePool(competition, pool);
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
       <StatCard
@@ -36,11 +38,25 @@ export function TradingLobbySummary({
         imageSrc={COMPETITION_ICON.volts}
         accent="prize"
         label="Prize pool"
-        value={formatVolts(
-          competition.prizePool || competition.prizePoolCredits || 0,
-          { symbol: creditSymbol },
-        )}
-        note={<SummaryHint>What the top places share at the end</SummaryHint>}
+        value={formatVolts(maxPool, { symbol: creditSymbol })}
+        note={
+          <>
+            <LobbyFillBar
+              current={pool}
+              max={maxPool}
+              tone="amber"
+              caption={
+                <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-amber-300/80">
+                  {formatVolts(pool, { symbol: creditSymbol })} collected so far
+                </p>
+              }
+            />
+            <SummaryHint>
+              The most the top places can share - grows with every trader who
+              joins
+            </SummaryHint>
+          </>
+        }
       />
       <StatCard
         size="showcase"
@@ -129,4 +145,19 @@ function SummaryHint({ children }: { children: ReactNode }) {
       {children}
     </p>
   );
+}
+
+/**
+ * The pool a full contest would hold. Every entrant adds their fee (`contest-entry.service.ts`
+ * increments `prizePool` by `entryFee` per join), so the ceiling is today's pool plus one fee per
+ * empty seat - which also keeps any operator seed. Falls back to today's pool when there is no
+ * seat limit or no fee, because then nothing can grow it.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function maxPrizePool(competition: any, pool: number): number {
+  const fee = Number(competition.entryFee || competition.entryFeeCredits || 0);
+  const max = Number(competition.maxParticipants ?? 0);
+  const joined = Number(competition.currentParticipants ?? 0);
+  if (!(fee > 0) || !(max > 0)) return pool;
+  return pool + fee * Math.max(0, max - joined);
 }

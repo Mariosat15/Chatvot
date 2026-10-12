@@ -993,6 +993,8 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+- **12 Oct 2026 - Trading lobby: the Prize pool card shows the most the pool can reach, and the Battle plan card gets its artwork.** The Prize pool tile now reads the pool a full contest would hold (today's pool plus one entry fee per empty seat, matching `contest-entry.service.ts`, which adds `entryFee` to `prizePool` on every join), with an amber bar like the Traders card filling as the pool grows and a "collected so far" line under it. There is no seat limit or no fee? Then it shows today's pool, since nothing can grow it. `LobbyFillBar` gained optional `caption` and `tone` props; the Traders bar is unchanged. The empty space at the foot of the Battle plan card now holds `public/assets/competitions/battle-plan-trading.webp`, pinned to the bottom with `mt-auto` in a 4:3 box that matches the file, so nothing is cropped. Trading lobby only; the game lobby and the arena are untouched. No money logic changed. **Never verified by eye.**
+
 ### 12 Oct 2026 - Trading lobby: paged prize list, leverage that reaches the contest, Game Master equity check
 
 - **Prize list pages seven at a time** (`components/competitions/PrizePager.tsx`, client): the trading sidebar's "Who wins what" card no longer grows a scroll bar; it pages by arrows, dots or a sideways drag/swipe. `PrizeTable` stays a server component and hands over already-rendered rows (R39), so every payout expression in `prize-projection.ts` is untouched.
