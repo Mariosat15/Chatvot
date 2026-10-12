@@ -92,10 +92,11 @@ describe("the user id comes from the session, never from the request", () => {
   it("both handlers read the id off the session", () => {
     const code = readCode(ROUNDS_ROUTE);
 
-    // Two handlers, two reads. Counting is the point: a file whose GET is scoped and whose POST
-    // is not passes any assertion that merely looks for the pattern once.
+    // Two handlers plus the launch displayName lookup. Counting is the point: a file whose GET
+    // is scoped and whose POST is not passes any assertion that merely looks for the pattern
+    // once. Was 2 until displayName also read the session (still never the request body).
     const sessionReads = code.match(/session\.user\.id/g) ?? [];
-    expect(sessionReads.length).toBe(2);
+    expect(sessionReads.length).toBe(3);
   });
 
   it("neither handler takes a user id from the query string or the body", () => {
@@ -1572,29 +1573,31 @@ describe("the game lobby shows a joined player the clock", () => {
 
     /*
       THE PLAYER WITH THE MOST REASON TO WATCH THE CLOCK WAS SHOWN NO CLOCK. The hero's fourth
-      tile counts down only for someone who has NOT entered - once they do, it is replaced by
-      their score. So the countdown vanished at exactly the moment it started to matter.
+      tile used to count down only for someone who has NOT entered - once they do, it is
+      replaced by their score. So the countdown vanished at exactly the moment it started to
+      matter.
 
-      Asserting the COUNT rather than the presence, because the hero's has been there all along
-      and a bare `<InlineCountdown` match is green on the bug.
+      Asserting the COUNT rather than the presence, because a bare `<InlineCountdown` match is
+      green on a file that imports the component and never mounts it.
 
-      IT WAS THREE FROM 7 SEPTEMBER 2026 AND IS TWO FROM 11 SEPTEMBER: the hero tile, and the
-      last moment a new attempt may start. The one that went was the window's close, and it went
-      because the owner asked for one clock instead of two - correctly, since `12` s2.3 derives
-      the play window from the contest clock, so `playWindowEnd` IS `endTime` and that row was
-      counting down to the same instant as the four-cell panel directly above it.
-
-      **The remaining two count down to two different moments**, which is the whole test: the
-      contest's end, and the last moment a new attempt may open under `reserve_full_round`. If
-      this number falls, one of those two has been removed; if it rises, either a third clock has
-      appeared or the merged one has crept back.
+      IT WAS THREE FROM 7 SEPTEMBER 2026, TWO FROM 11 SEPTEMBER, AND ONE FROM 12 OCTOBER 2026:
+      the hero's inline tile left when the shared lobby polish made the fourth KPI **Mode**
+      (Competition) to match the owner game-lobby reference, and the contest end already lives
+      in `CountdownPanel`'s four cells in the sidebar. The one that remains is the last moment
+      a new attempt may start under `reserve_full_round` - a different instant from the cells
+      above it. If this number rises, either a third clock has crept back or the Mode tile was
+      swapped for a second InlineCountdown; if it falls to zero, the attempt cut-off is gone.
     */
     const countdowns = code.match(/<InlineCountdown/g) ?? [];
-    expect(countdowns.length).toBe(2);
+    expect(countdowns.length).toBe(1);
 
-    // Reused, not re-implemented. A third place that formats "2d 4h" is a third place for the
+    // Reused, not re-implemented. A second place that formats "2d 4h" is a second place for the
     // wording to drift, which is the shape behind several defects here.
     expect(code).toMatch(/from "@\/components\/trading\/InlineCountdown"/);
+    // Contest end clock is ContestCountdown (server clock + four cells), not a second
+    // InlineCountdown in the hero. Mode is the fourth KPI for a player who is not seated.
+    expect(code).toMatch(/ContestCountdown/);
+    expect(code).toMatch(/contestModeLabel\("game"\)/);
   });
 
   it("no longer tells players the play window can be narrower than the contest", () => {

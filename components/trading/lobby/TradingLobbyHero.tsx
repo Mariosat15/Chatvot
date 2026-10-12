@@ -4,6 +4,9 @@ import { resolveTradingBanner } from "@/components/neon/banners";
 import { StatCard } from "@/components/neon/Cards";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
+import { contestPlayersLabel } from "@/components/competitions/lobby/contest-lobby-copy";
 
 /**
  * The trading lobby's header, on the shared neon kit.
@@ -75,6 +78,7 @@ export default function TradingLobbyHero({
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
         <StatCard
           icon={Trophy}
+          imageSrc={COMPETITION_ICON.volts}
           accent="prize"
           label="Prize pool"
           value={formatVolts(
@@ -84,6 +88,7 @@ export default function TradingLobbyHero({
         />
         <StatCard
           icon={Link2}
+          imageSrc={COMPETITION_ICON.wallet}
           accent="entry"
           label="Entry fee"
           value={formatVolts(
@@ -93,28 +98,36 @@ export default function TradingLobbyHero({
         />
         <StatCard
           icon={Users}
+          imageSrc={COMPETITION_ICON.players}
           accent="players"
-          label="Participants"
+          label={contestPlayersLabel("trading")}
           value={`${competition.currentParticipants} / ${competition.maxParticipants}`}
           note={
-            isUpcoming && competition.minParticipants > 0 ? (
-              <p
-                className={`mt-2 text-xs ${
-                  competition.currentParticipants < competition.minParticipants
-                    ? "text-orange-400"
-                    : "text-emerald-400"
-                }`}
-              >
-                Minimum {competition.minParticipants}
-                {competition.currentParticipants < competition.minParticipants
-                  ? " - needs more traders"
-                  : " - reached"}
-              </p>
-            ) : undefined
+            <>
+              <LobbyFillBar
+                current={competition.currentParticipants ?? 0}
+                max={competition.maxParticipants ?? 0}
+              />
+              {isUpcoming && competition.minParticipants > 0 ? (
+                <p
+                  className={`mt-2 text-xs ${
+                    competition.currentParticipants < competition.minParticipants
+                      ? "text-orange-400"
+                      : "text-emerald-400"
+                  }`}
+                >
+                  Minimum {competition.minParticipants}
+                  {competition.currentParticipants < competition.minParticipants
+                    ? " - needs more traders"
+                    : " - reached"}
+                </p>
+              ) : null}
+            </>
           }
         />
         <StatCard
           icon={Clock}
+          imageSrc={COMPETITION_ICON.clock}
           accent={isCancelled ? "ended" : isActive ? "entry" : "waiting"}
           label={
             isCancelled || isCompleted

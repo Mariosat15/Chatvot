@@ -4,10 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Trophy,
-  Loader2,
   CheckCircle,
   AlertCircle,
-  DollarSign,
   History,
   Ban,
   Skull,
@@ -43,6 +41,11 @@ import {
   freePrivateEntryRefusal,
   type FreePrivateEntryRule,
 } from "@/lib/utils/free-private-entry-rule";
+import { LobbyJoinArtworkButton } from "@/components/competitions/lobby/LobbyJoinArtworkButton";
+import {
+  contestNotInDetail,
+  contestNotInTitle,
+} from "@/components/competitions/lobby/contest-lobby-copy";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
@@ -500,9 +503,15 @@ export default function CompetitionEntryButton({
             gameMasterName={competition.gameMasterName}
           />
           <div>
-            <h3 className="text-lg font-semibold text-gray-100 mb-2">
-              Entry Requirements
+            <h3 className="text-lg font-semibold text-gray-100 mb-1">
+              {contestNotInTitle(isProviderGame ? "game" : "trading")}
             </h3>
+            <p className="mb-3 text-xs text-gray-400">
+              {contestNotInDetail(isProviderGame ? "game" : "trading")}
+            </p>
+            <h4 className="text-sm font-semibold text-gray-300 mb-2">
+              Entry check
+            </h4>
             <div className="space-y-2">
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Entry Fee</span>
@@ -594,54 +603,46 @@ export default function CompetitionEntryButton({
             </div>
           )}
 
-          {/* Entry Button */}
-          <Button
-            onClick={handleEnter}
-            disabled={!canEnter || entering}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold 
-              disabled:opacity-50 disabled:cursor-not-allowed
-              cursor-pointer active:scale-95 transition-all duration-150
-              shadow-lg hover:shadow-yellow-500/25"
-          >
-            {entering ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Entering...
-              </>
-            ) : registrationClosed ? (
-              <>
-                <Lock className="mr-2 h-4 w-4" />
-                Registration Closed
-              </>
-            ) : isOwnContest ? (
-              <>
-                <Ban className="mr-2 h-4 w-4" />
-                Your Own Competition
-              </>
-            ) : !meetsLevelReq ? (
-              <>
-                <Lock className="mr-2 h-4 w-4" />
-                Level Restricted
-              </>
-            ) : isFull ? (
-              "Competition Full"
-            ) : !canAfford ? (
-              <>
-                <DollarSign className="mr-2 h-4 w-4" />
-                Need {volts(Math.abs(entryFee - userBalance))} More
-              </>
-            ) : fundedRefusal ? (
-              <>
-                <DollarSign className="mr-2 h-4 w-4" />
-                Minimum Balance Required
-              </>
-            ) : (
-              <>
-                <Trophy className="mr-2 h-4 w-4" />
-                Enter Competition
-              </>
-            )}
-          </Button>
+          {/*
+            Menuitems join / reserve artwork — same family as the competitions
+            browser CTA. Refusal states keep a greyed Join so the control never
+            vanishes; the reason below still names why.
+          */}
+          {canEnter || entering ? (
+            <LobbyJoinArtworkButton
+              variant={isUpcoming ? "reserve" : "join"}
+              label={
+                entering
+                  ? "Joining…"
+                  : isUpcoming
+                    ? "Reserve Spot"
+                    : "Join Competition"
+              }
+              onClick={handleEnter}
+              disabled={!canEnter}
+              busy={entering}
+            />
+          ) : (
+            <LobbyJoinArtworkButton
+              variant="join"
+              label={
+                registrationClosed
+                  ? "Registration Closed"
+                  : isOwnContest
+                    ? "Your Own Competition"
+                    : !meetsLevelReq
+                      ? "Level Restricted"
+                      : isFull
+                        ? "Competition Full"
+                        : !canAfford
+                          ? `Need ${volts(Math.abs(entryFee - userBalance))} More`
+                          : fundedRefusal
+                            ? "Minimum Balance Required"
+                            : "Join Competition"
+              }
+              disabled
+            />
+          )}
 
           {/* Registration Closed Warning */}
           {registrationClosed && !isUserIn && (

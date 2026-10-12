@@ -38,6 +38,14 @@ import {
 } from "@/components/neon/Cards";
 import { NEON_LABEL, NEON_PANEL } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
+import { ContestOverviewPanel } from "@/components/competitions/lobby/ContestOverviewPanel";
+import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
+import {
+  contestModeLabel,
+  contestPlayersLabel,
+} from "@/components/competitions/lobby/contest-lobby-copy";
 import { getTerms } from "@/lib/services/terminology.service";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import {
@@ -255,11 +263,10 @@ export default async function ProviderContestLobby({
   const isCancelled = status === "cancelled";
 
   /*
-    The fourth figure is a countdown on a running or upcoming contest and a word on a finished
-    one, which is what the trading lobby does. `InlineCountdown` is reused rather than
-    reimplemented: a game lobby that formats "2d 4h" differently from the trading lobby is the
-    same inconsistency as a different card radius, and it would also be a second place for the
-    "Started"/"Ended" wording to drift.
+    THE CONTEST CLOCK TARGET for `ContestCountdown` in the sidebar. The hero's fourth KPI is
+    Mode (Competition) when the player is not seated, and Your score once they are - matching
+    the owner game-lobby reference. Trading's hero still shows Starts In; game puts the big
+    four-cell clock beside Join so the KPI strip stays non-busy.
   */
   const countdownTarget = isActive ? competition.endTime : competition.startTime;
 
@@ -466,6 +473,7 @@ export default async function ProviderContestLobby({
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
           <StatCard
             icon={Trophy}
+            imageSrc={COMPETITION_ICON.volts}
             accent="prize"
             label={terms.prizePool}
             value={
@@ -477,6 +485,7 @@ export default async function ProviderContestLobby({
           />
           <StatCard
             icon={Link2}
+            imageSrc={COMPETITION_ICON.wallet}
             accent="entry"
             label={terms.entryFee}
             value={
@@ -487,8 +496,9 @@ export default async function ProviderContestLobby({
           />
           <StatCard
             icon={Users}
+            imageSrc={COMPETITION_ICON.players}
             accent="players"
-            label={terms.players}
+            label={contestPlayersLabel("game")}
             value={
               <LobbyLivePlayersValue
                 initialCurrent={competition.currentParticipants ?? 0}
@@ -496,13 +506,19 @@ export default async function ProviderContestLobby({
               />
             }
             note={
-              status === "upcoming" && competition.minParticipants > 0 ? (
-                <LobbyLivePlayersMinNote
-                  minParticipants={competition.minParticipants}
-                  playersLabel={terms.players}
-                  initialCurrent={competition.currentParticipants ?? 0}
+              <>
+                <LobbyFillBar
+                  current={competition.currentParticipants ?? 0}
+                  max={competition.maxParticipants ?? 0}
                 />
-              ) : undefined
+                {status === "upcoming" && competition.minParticipants > 0 ? (
+                  <LobbyLivePlayersMinNote
+                    minParticipants={competition.minParticipants}
+                    playersLabel={terms.players}
+                    initialCurrent={competition.currentParticipants ?? 0}
+                  />
+                ) : null}
+              </>
             }
           />
           {/*
@@ -528,34 +544,25 @@ export default async function ProviderContestLobby({
           {isUserIn ? (
             <StatCard
               icon={Gamepad2}
+              imageSrc={COMPETITION_ICON.gamepad}
               accent="score"
               label="Your score"
               value={<LobbyLiveYourScoreValue initialScore={myInitialScore} />}
             />
           ) : (
             <StatCard
-              icon={Clock}
-              accent={isCancelled ? "ended" : isActive ? "entry" : "waiting"}
+              icon={Gamepad2}
+              imageSrc={COMPETITION_ICON.gamepad}
+              accent={isCancelled ? "ended" : isActive ? "score" : "waiting"}
               label={
-                isCancelled || isCompleted
-                  ? "Status"
-                  : isActive
-                    ? "Time remaining"
-                    : "Starts in"
+                isCancelled || isCompleted ? "Status" : "Mode"
               }
               value={
-                isCancelled ? (
-                  "Cancelled"
-                ) : isCompleted ? (
-                  "Completed"
-                ) : countdownTarget ? (
-                  <InlineCountdown
-                    targetDate={new Date(countdownTarget).toISOString()}
-                    type={isActive ? "end" : "start"}
-                  />
-                ) : (
-                  "-"
-                )
+                isCancelled
+                  ? "Cancelled"
+                  : isCompleted
+                    ? "Completed"
+                    : contestModeLabel("game")
               }
             />
           )}
@@ -565,23 +572,28 @@ export default async function ProviderContestLobby({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="min-w-0 space-y-6 lg:col-span-2">
           {/*
-            ABOVE THE LEADERBOARD, DELIBERATELY. This is the screen a player reads before
-            paying an entry fee, and the rules are what make that decision informed - the
-            standings are not, because they are a fact about other people. It renders nothing
-            at all when the catalogue holds neither field, which is every title synced before
-            R63 and every provider not yet re-synced, so the ordering costs nothing on a
-            contest with no rules text.
-
-            `wide`, because this column is two thirds of the grid: the scoring rule and the
-            controls sit side by side rather than stacking into a tall block that pushes the
-            leaderboard off a laptop screen.
+            Overview → how it works → rules → board. Same order as the owner's
+            game-lobby reference: sell the vibe, explain the loop, then the live table.
+          */}
+          <ContestOverviewPanel
+            kind="game"
+            description={
+              competition.description ||
+              presentation?.description ||
+              presentation?.tagline ||
+              null
+            }
+            imageUrl={
+              presentation?.howToPlayImageUrl || presentation?.bannerUrl
+            }
+            imageAlt={gameName}
+          />
+          <ContestHowItWorks kind="game" />
+          {/*
+            ABOVE THE LEADERBOARD, DELIBERATELY. Rules make the join decision informed.
+            Renders nothing when the catalogue holds neither field.
           */}
           <GameRulesPanel presentation={presentation} layout="wide" />
-
-          {/*
-            Same standings poll as the arena — live ranks via provisionalScore, not a page
-            refresh of settled seat scores. "players", never "traders".
-          */}
           <LobbyLiveLeaderboard
             title={terms.leaderboard}
             scoreLabel={scoreLabel}

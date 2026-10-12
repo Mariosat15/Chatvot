@@ -227,6 +227,7 @@ export function NeonIllustration({
  */
 export function StatCard({
   icon,
+  imageSrc,
   accent,
   label,
   value,
@@ -234,6 +235,11 @@ export function StatCard({
   note,
 }: {
   icon: LucideIcon;
+  /**
+   * Optional Menuitems / neon PNG. When set it replaces the lucide tile so both
+   * lobbies can wear the same owner-supplied icons the competitions arena uses.
+   */
+  imageSrc?: string;
   accent: NeonAccent;
   label: string;
   /*
@@ -251,7 +257,20 @@ export function StatCard({
   return (
     <div className={`${NEON_PANEL} p-3 sm:p-4`}>
       <div className="flex items-center gap-3">
-        <IconTile icon={icon} accent={accent} />
+        {imageSrc ? (
+          <div
+            className={`${NEON_TILE_SHAPE} h-9 w-9 ${accentClasses(accent).tile} overflow-hidden p-1`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageSrc}
+              alt=""
+              className="h-full w-full object-contain"
+            />
+          </div>
+        ) : (
+          <IconTile icon={icon} accent={accent} />
+        )}
         <div className="min-w-0">
           <p className={NEON_LABEL}>{label}</p>
           <div

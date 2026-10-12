@@ -18,6 +18,8 @@ import LiveContestRefresher from "@/components/competitions/LiveContestRefresher
 import UTCClock from "@/components/trading/UTCClock";
 import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
 import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
+import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
+import { ContestOverviewPanel } from "@/components/competitions/lobby/ContestOverviewPanel";
 import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
 import { NeonPill } from "@/components/neon/Buttons";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
@@ -427,6 +429,13 @@ const CompetitionDetailsPage = async ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ========== LEFT COLUMN: MAIN CONTENT ========== */}
           <div className="lg:col-span-2 space-y-6">
+            <ContestOverviewPanel
+              kind="trading"
+              description={competition.description}
+              imageUrl={tradingPage.bannerUrl}
+              imageAlt={competition.name}
+            />
+            <ContestHowItWorks kind="trading" />
             {/* User's Dashboard */}
             {isUserIn && userParticipant && (
               <CompetitionDashboard

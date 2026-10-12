@@ -322,6 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Competition lobby shared shell CODE-COMPLETE 12 Oct (eng)** — game and trading contest detail pages share overview + how-it-works + Menuitems Volt/KPI icons + Menuitems join/reserve art on the entry button; kind is `"game" | "trading"` only (no game-code branch). Game hero 4th KPI is Mode when not seated (clock stays in sidebar `ContestCountdown`); trading hero keeps Starts In. Tests: `contest-lobby-shell.test.ts` + flipped InlineCountdown count in `provider-play-ui.test.ts`. **Never verified by eye.**
 - **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, seventeenth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement, the live clock and every Mode value use shared data boxes with hover/touch help. Anytime and Scheduled receive specific explanations; future title-specific modes receive a generic explanation without a game-code branch. Supplied corner ribbons identify open cards as **TRADING** or **GAME**; cancelled/refunded ribbons take precedence. Wide-row CTAs fill their metric cell. Grid cards put Host in one cell and the CTA in the two-column row below it. Cancelled/refunded cards retain the red frame/scrim. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -977,6 +978,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ## WORK LOG
 
 Newest at the top.
+
+### 12 Oct 2026 - COMPETITION LOBBIES SHARE ONE SHELL (GAME + TRADING)
+
+Owner supplied two reference comps (game lobby live / trading starting soon) and asked for a data-agnostic detail page that adapts by kind, stays readable, reuses the neon kit, uses Menuitems button art, and shows money with the Volt symbol.
+
+**What shipped.** Shared modules under `components/competitions/lobby/`: `contest-lobby-copy.ts` (playful kind-scoped wording, never a game code), `ContestOverviewPanel`, `ContestHowItWorks`, `LobbyFillBar`, `LobbyJoinArtworkButton`. Wired into `ProviderContestLobby`, the trading branch of `app/(root)/competitions/[id]/page.tsx`, and `TradingLobbyHero`. KPI tiles take `StatCard` `imageSrc` from `COMPETITION_ICON` (volts / wallet / players / gamepad or clock). Entry stays a `<button onClick>` (terms + POST) dressed with Menuitems join/reserve art via `LobbyJoinArtworkButton` — not a `CompetitionCTA` Link. Game hero fourth KPI is **Mode** when the player is not seated so the strip matches the game reference; contest end stays in sidebar `ContestCountdown`. Trading hero keeps Starts In.
+
+**Guards.** `__tests__/competitions/contest-lobby-shell.test.ts` pins shared mounts + Volt icons + join artwork. The InlineCountdown count in `provider-play-ui.test.ts` was flipped 2 → 1 with the history kept in the comment (hero tile left; attempt cut-off remains). **Never verified by eye.**
 
 ### 10 Oct 2026 - A GAME MASTER WHOSE PACK EXPIRED WHILE SUSPENDED CAN BE RELEASED
 
