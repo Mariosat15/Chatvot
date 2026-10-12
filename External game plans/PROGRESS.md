@@ -993,6 +993,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 12 Oct 2026 - TRADING OVERVIEW SPLIT INTO ABOUT TILES AND A BATTLE PLAN; RULE CARDS NO LONGER PUSHED LEFT
+
+Owner supplied a target image. The merged single Overview card became two cards: `About this competition` (description plus four centred icon tiles built from the contest's own facts - assets, seats, ranking method, pot via `formatVolts`) and `Battle plan` (four numbered steps on a vertical rail: Jump in, Trade live, Climb the ranks, Take the pot). New `components/competitions/detail/TradingOverview.tsx`; `trading-overview-copy.ts` now returns `{ features, steps }`. Headings and step titles share line boxes with their icons and circles so nothing sits off-centre; text wraps rather than truncates. Eligible Assets and Risk Management dropped their `max-w-3xl` wrapper, and the Trading Rules grid spans a lone odd last card across both columns, which is what left cards pushed to the left. Tests flipped, not deleted, plus one new width guard. No money logic changed, nothing backfilled; game lobby and arena untouched. Commit `1f5b9c76`. **Never verified by eye.**
+
 ### 12 Oct 2026 - TRADING LEADERBOARD PAGED BY FIVE, OVERVIEW MERGED INTO ONE CARD
 
 **Why.** Owner: show the first 5 leaderboard rows with pages for the next 5, no scrollbar (drag instead), and merge the Overview's tiles and "Battle plan" because they were busy and repeated each other.
