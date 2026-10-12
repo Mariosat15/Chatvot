@@ -148,11 +148,18 @@ export function RuleWarning({
 /**
  * The margin ladder: one row per level with a coloured dot, then the segmented bar. The
  * segment widths are the old card's own (20/20/20/40) - the bar is a legend, not a scale.
+ * Optional `tip` uses the same ? icon as `RuleRow` (owner, 12 Oct 2026).
  */
 export function MarginLadder({
   levels,
 }: {
-  levels: { label: string; value: string; dot: string; text: string }[];
+  levels: {
+    label: string;
+    value: string;
+    dot: string;
+    text: string;
+    tip?: string;
+  }[];
 }) {
   return (
     <div className="rounded-xl border border-white/[0.06] bg-[#0B1124]/80 px-3.5 py-3">
@@ -165,7 +172,12 @@ export function MarginLadder({
             <span
               className={`h-2.5 w-2.5 shrink-0 rounded-full ${level.dot}`}
             />
-            <span className="text-gray-200">{level.label}</span>
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-gray-200">
+              {level.label}
+              {level.tip ? (
+                <InfoTooltip text={level.tip} iconSize={12} />
+              ) : null}
+            </span>
             <span className={`ml-auto font-bold ${level.text}`}>
               {level.value}
             </span>

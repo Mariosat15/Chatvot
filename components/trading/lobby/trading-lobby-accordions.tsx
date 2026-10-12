@@ -325,18 +325,21 @@ export function buildTradingLobbySections({
             label="Risk limits"
             tone={riskOn ? "red" : "plain"}
             value={riskOn ? "Active" : "Off"}
+            tip="The safety caps for this contest. On means they can knock you out; Off means they are not watching."
           />
           <RuleRow
             icon={TrendingDown}
             label="Most you can lose overall"
             tone={riskOn ? "red" : "plain"}
             value={`${competition.riskLimits?.maxDrawdownPercent || 50}%`}
+            tip="Your health bar for the whole run. Drop this far from your starting cash and you are out of the contest."
           />
           <RuleRow
             icon={CalendarX}
             label="Most you can lose in a day"
             tone={riskOn ? "red" : "plain"}
             value={`${competition.riskLimits?.dailyLossLimitPercent || 20}%`}
+            tip="How much damage you can take in one day. Hit this and you sit out until tomorrow - your day is done."
           />
           {competition.riskLimits?.equityCheckEnabled && (
             <RuleRow
@@ -344,6 +347,7 @@ export function buildTradingLobbySections({
               label="Equity drawdown"
               tone="purple"
               value={`${competition.riskLimits?.equityDrawdownPercent || 30}%`}
+              tip="How far your current score can fall from its high score. Drop that far from your peak and you are knocked out."
             />
           )}
           <MarginLadder
@@ -353,24 +357,28 @@ export function buildTradingLobbySections({
                 value: `${riskSettings.marginLiquidation}%`,
                 dot: "bg-rose-500",
                 text: "text-rose-400",
+                tip: "Game over. Your HP hit zero - open trades get closed and you are out.",
               },
               {
                 label: "Margin call",
                 value: `${riskSettings.marginCall}%`,
                 dot: "bg-orange-500",
                 text: "text-orange-300",
+                tip: "Low HP warning. Free up cash or close trades soon, or you are heading for game over.",
               },
               {
                 label: "Warning",
                 value: `${riskSettings.marginWarning}%`,
                 dot: "bg-amber-400",
                 text: "text-amber-300",
+                tip: "Yellow zone. Your cushion is getting thin - play carefully.",
               },
               {
                 label: "Safe",
                 value: `${riskSettings.marginSafe}%`,
                 dot: "bg-emerald-500",
                 text: "text-emerald-300",
+                tip: "Green zone. Plenty of cushion - you are in a safe spot.",
               },
             ]}
           />
