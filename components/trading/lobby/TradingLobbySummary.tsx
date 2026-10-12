@@ -61,7 +61,8 @@ export function TradingLobbySummary({
       <StatCard
         size="showcase"
         icon={Link2}
-        imageSrc={COMPETITION_ICON.wallet}
+        // Reason: owner art for the ticket cost (red wallet-up); wallet stays for Simulated funds.
+        imageSrc={COMPETITION_ICON.entryFee}
         accent="entry"
         label="Entry fee"
         value={formatVolts(

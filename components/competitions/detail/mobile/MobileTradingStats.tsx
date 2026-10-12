@@ -1,0 +1,143 @@
+import type { ReactNode } from "react";
+import { Clock, Link2, Trophy, Users } from "lucide-react";
+import { StatCard } from "@/components/neon/Cards";
+import InlineCountdown from "@/components/trading/InlineCountdown";
+import UTCClock from "@/components/trading/UTCClock";
+import { formatVolts } from "@/lib/utils/format-volts";
+import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
+import { contestPlayersLabel } from "@/components/competitions/lobby/contest-lobby-copy";
+
+/**
+ * Phone KPI strip for the trading lobby (2×2, `lg` cards — never desktop `showcase`).
+ *
+ * Reason: showcase tiles on 360–430px squeeze labels and values; this is the dedicated phone
+ * reading of the same four facts as `TradingLobbySummary`.
+ */
+
+export function MobileTradingStats({
+  competition,
+  creditSymbol,
+  isActive,
+  isUpcoming,
+  isCompleted,
+  isCancelled,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  competition: any;
+  creditSymbol?: string;
+  isActive: boolean;
+  isUpcoming: boolean;
+  isCompleted: boolean;
+  isCancelled: boolean;
+}) {
+  const pool = competition.prizePool || competition.prizePoolCredits || 0;
+  const maxPool = maxPrizePool(competition, pool);
+
+  return (
+    <div className="grid grid-cols-2 gap-2.5">
+      <StatCard
+        size="lg"
+        icon={Trophy}
+        imageSrc={COMPETITION_ICON.volts}
+        accent="prize"
+        label="Prize pool"
+        value={formatVolts(maxPool, { symbol: creditSymbol })}
+        note={
+          <>
+            <LobbyFillBar current={pool} max={maxPool} tone="amber" />
+            <Hint>
+              {formatVolts(pool, { symbol: creditSymbol })} collected
+            </Hint>
+          </>
+        }
+      />
+      <StatCard
+        size="lg"
+        icon={Link2}
+        imageSrc={COMPETITION_ICON.entryFee}
+        accent="entry"
+        label="Entry fee"
+        value={formatVolts(
+          competition.entryFee || competition.entryFeeCredits || 0,
+          { symbol: creditSymbol },
+        )}
+        note={<Hint>Paid once for your seat</Hint>}
+      />
+      <StatCard
+        size="lg"
+        icon={Users}
+        imageSrc={COMPETITION_ICON.players}
+        accent="players"
+        label={contestPlayersLabel("trading")}
+        value={`${competition.currentParticipants} / ${competition.maxParticipants}`}
+        note={
+          <>
+            <LobbyFillBar
+              current={competition.currentParticipants ?? 0}
+              max={competition.maxParticipants ?? 0}
+            />
+            {isUpcoming && competition.minParticipants > 0 ? (
+              <p
+                className={`mt-1.5 text-[11px] ${
+                  competition.currentParticipants < competition.minParticipants
+                    ? "text-orange-400"
+                    : "text-emerald-400"
+                }`}
+              >
+                Min {competition.minParticipants} to start
+              </p>
+            ) : null}
+          </>
+        }
+      />
+      <StatCard
+        size="lg"
+        icon={Clock}
+        imageSrc={COMPETITION_ICON.clock}
+        accent={isCancelled ? "ended" : isActive ? "entry" : "waiting"}
+        label={
+          isCancelled || isCompleted
+            ? "Status"
+            : isActive
+              ? "Time left"
+              : "Starts in"
+        }
+        value={
+          isCancelled ? (
+            "Cancelled"
+          ) : isCompleted ? (
+            "Completed"
+          ) : (
+            <InlineCountdown
+              targetDate={
+                isActive ? competition.endTime : competition.startTime
+              }
+              type={isActive ? "end" : "start"}
+            />
+          )
+        }
+        note={
+          <div className="mt-1 border-t border-white/10 pt-2">
+            <UTCClock variant="inline" />
+          </div>
+        }
+      />
+    </div>
+  );
+}
+
+function Hint({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-1.5 text-[11px] leading-snug text-gray-400">{children}</p>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function maxPrizePool(competition: any, pool: number): number {
+  const fee = Number(competition.entryFee || competition.entryFeeCredits || 0);
+  const max = Number(competition.maxParticipants ?? 0);
+  const joined = Number(competition.currentParticipants ?? 0);
+  if (!(fee > 0) || !(max > 0)) return pool;
+  return pool + fee * Math.max(0, max - joined);
+}

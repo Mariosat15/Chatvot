@@ -1,4 +1,5 @@
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
+import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { storedLeverageCeiling } from "@/lib/services/trading/competition-leverage";
 import {
@@ -169,7 +170,8 @@ export function buildTradingOverviewCopy({
 
   const features: TradingOverviewFeature[] = [
     {
-      iconSrc: NEON_ICON("candles"),
+      // Reason: owner candlestick art (`icon-candles.png`); neon `candles.webp` read as bars on phone.
+      iconSrc: COMPETITION_ICON.candles,
       title: assets.length ? joinLabels(assets) : "Live markets",
       facts: marketFacts,
     },

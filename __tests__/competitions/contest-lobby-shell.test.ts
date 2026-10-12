@@ -43,8 +43,17 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   );
   const gameLobby = readCode("components/games/ProviderContestLobby.tsx");
   const tradingPage = readCode("app/(root)/competitions/[id]/page.tsx");
+  const desktopTrading = readCode(
+    "components/competitions/detail/DesktopTradingLobby.tsx",
+  );
+  const mobileTrading = readCode(
+    "components/competitions/detail/mobile/MobileTradingLobby.tsx",
+  );
   const tradingSummary = readCode(
     "components/trading/lobby/TradingLobbySummary.tsx",
+  );
+  const mobileStats = readCode(
+    "components/competitions/detail/mobile/MobileTradingStats.tsx",
   );
   const tradingTabs = readCode(
     "components/competitions/detail/TradingDetailTabs.tsx",
@@ -77,7 +86,24 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
 
   it("mounts both lobbies on CompetitionDetailShell", () => {
     expect(gameLobby).toContain("<CompetitionDetailShell");
-    expect(tradingPage).toContain("<CompetitionDetailShell");
+    // Flipped 12 Oct 2026: trading desktop composition moved into DesktopTradingLobby;
+    // the page mounts that behind `hidden md:block` and a separate phone tree below `md`.
+    expect(desktopTrading).toContain("<CompetitionDetailShell");
+    expect(tradingPage).toContain("<DesktopTradingLobby");
+    expect(tradingPage).toContain("<MobileTradingLobby");
+    expect(tradingPage).toContain('className="md:hidden"');
+    expect(tradingPage).toContain('className="hidden md:block"');
+  });
+
+  it("phone trading lobby is a dedicated tree, not a squeezed desktop shell", () => {
+    expect(mobileTrading).not.toContain("CompetitionDetailShell");
+    expect(mobileTrading).not.toContain("lg:grid-cols-[minmax(0,2fr)");
+    expect(mobileTrading).toContain("max-w-[430px]");
+    expect(mobileTrading).toContain("env(safe-area-inset-bottom)");
+    expect(mobileStats).toContain('size="lg"');
+    expect(mobileStats).not.toContain('size="showcase"');
+    expect(mobileStats).toContain("COMPETITION_ICON.entryFee");
+    expect(mobileStats).toContain("COMPETITION_ICON.volts");
   });
 
   it("puts summary StatCards outside the hero on both kinds", () => {
@@ -107,10 +133,11 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     // Reason: this was "Leaderboard first, then tabs" until 12 Oct 2026, when the owner asked
     // for the tabs to move to the top of the main column ("move the section on the top").
     // Flipped rather than deleted so the earlier order stays on record.
-    expect(tradingPage).toContain("<TradingDetailTabs");
-    expect(tradingPage).toContain("<CompetitionLeaderboard");
-    const boardIdx = tradingPage.indexOf("<CompetitionLeaderboard");
-    const tabsIdx = tradingPage.indexOf("<TradingDetailTabs");
+    // Amended later 12 Oct: desktop composition lives in DesktopTradingLobby.
+    expect(desktopTrading).toContain("<TradingDetailTabs");
+    expect(desktopTrading).toContain("<CompetitionLeaderboard");
+    const boardIdx = desktopTrading.indexOf("<CompetitionLeaderboard");
+    const tabsIdx = desktopTrading.indexOf("<TradingDetailTabs");
     expect(tabsIdx).toBeGreaterThan(-1);
     expect(boardIdx).toBeGreaterThan(tabsIdx);
   });
@@ -156,23 +183,40 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
 
   it("writes the Overview from the contest's own facts", () => {
     expect(tradingOverview).toContain("overview.steps.map(");
-    expect(tradingPage).toContain(
-      "buildTradingOverviewCopy({ competition, creditSymbol })",
-    );
+    // Flipped 12 Oct 2026: built once on the page and handed to both trees as props
+    // (both md trees stay mounted — building inside each would double every rule card).
+    expect(tradingPage.match(/buildTradingOverviewCopy\(/g)?.length).toBe(1);
+    expect(tradingPage).toMatch(/overview=\{lobbyOverview\}/);
+    expect(desktopTrading).toMatch(/overview=\{overview\}/);
+    expect(mobileTrading).toMatch(/overview=\{overview\}/);
+    expect(desktopTrading).not.toContain("buildTradingOverviewCopy(");
+    expect(mobileTrading).not.toContain("buildTradingOverviewCopy(");
   });
 
   it("headlines the dashboard with the figure the contest ranks on", () => {
     const dashboard = readCode("components/trading/CompetitionDashboard.tsx");
     expect(dashboard).toContain("rankedFigure(rankingMethod, stats)");
-    expect(tradingPage).toContain("rankingMethod={competition.rankingMethod}");
-    expect(tradingPage).toContain('id="competition-leaderboard"');
+    expect(desktopTrading).toContain(
+      "rankingMethod={competition.rankingMethod}",
+    );
+    expect(desktopTrading).toContain('id="competition-leaderboard"');
+    expect(mobileTrading).toContain(
+      "rankingMethod={competition.rankingMethod}",
+    );
   });
 
   it("dresses KPI tiles with Menuitems Volt icons", () => {
     expect(gameLobby).toContain("COMPETITION_ICON.volts");
     expect(tradingSummary).toContain("COMPETITION_ICON.volts");
     expect(gameLobby).toContain("COMPETITION_ICON.wallet");
-    expect(tradingSummary).toContain("COMPETITION_ICON.wallet");
+    // Flipped 12 Oct 2026: Entry fee uses owner wallet-up art; Simulated funds keep wallet.
+    expect(tradingSummary).toContain("COMPETITION_ICON.entryFee");
+    expect(tradingSummary).not.toContain("COMPETITION_ICON.wallet");
+    // Overview Forex tile: candlestick art, not the shared volts / bar look.
+    const overviewCopy = readCode(
+      "components/competitions/lobby/trading-overview-copy.ts",
+    );
+    expect(overviewCopy).toContain("COMPETITION_ICON.candles");
   });
 
   it("entry uses Menuitems join artwork, not a yellow CSS pill alone", () => {

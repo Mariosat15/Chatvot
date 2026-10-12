@@ -1189,12 +1189,25 @@ describe("the two lobbies are built from one design kit", () => {
       previous = at;
     }
 
-    // The sections are built ONCE, on the server page, and handed to the tabs as rendered output.
+    /*
+      The sections are built ONCE, on the server page, and handed to BOTH trees as props.
+      Flipped 12 Oct 2026: TradingDetailTabs moved into DesktopTradingLobby (desktop extract
+      for the phone tree). The page still owns the single build; the tabs receive `sections`
+      as a prop rather than calling the builder inline.
+    */
     const page = readCode("app/(root)/competitions/[id]/page.tsx");
     expect(page.match(/buildTradingLobbySections\(/g)?.length).toBe(1);
-    const tabsAt = page.indexOf("<TradingDetailTabs");
+    expect(page).toMatch(/sections=\{lobbySections\}/);
+    expect(page).not.toContain("<TradingDetailTabs");
+
+    const desktop = readCode(
+      "components/competitions/detail/DesktopTradingLobby.tsx",
+    );
+    const tabsAt = desktop.indexOf("<TradingDetailTabs");
     expect(tabsAt).toBeGreaterThan(-1);
-    expect(page.slice(tabsAt, tabsAt + 300)).toMatch(/sections=\{buildTradingLobbySections\(/);
+    expect(desktop.slice(tabsAt, tabsAt + 300)).toMatch(
+      /sections=\{sections\}/,
+    );
 
     // Every section is a tab beside Overview; none is re-collapsed inside the tab panel.
     const tabs = readCode("components/competitions/detail/TradingDetailTabs.tsx");

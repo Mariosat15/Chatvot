@@ -1,5 +1,3 @@
-import { ArrowLeft, BarChart3 } from "lucide-react";
-import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import {
   calculateCompetitionDifficulty,
   DifficultyLevel,
@@ -12,19 +10,12 @@ import {
 } from "@/lib/actions/trading/competition.actions";
 import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
 import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.actions";
-import CompetitionLeaderboard from "@/components/trading/CompetitionLeaderboard";
-import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
 import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
 import LiveContestRefresher from "@/components/competitions/LiveContestRefresher";
-import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
-import { TradingLobbySummary } from "@/components/trading/lobby/TradingLobbySummary";
-import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
+import { DesktopTradingLobby } from "@/components/competitions/detail/DesktopTradingLobby";
+import { MobileTradingLobby } from "@/components/competitions/detail/mobile/MobileTradingLobby";
 import { buildTradingLobbySections } from "@/components/trading/lobby/trading-lobby-accordions";
 import { buildTradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
-import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
-import { TradingDetailTabs } from "@/components/competitions/detail/TradingDetailTabs";
-import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
-import { NeonPill } from "@/components/neon/Buttons";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
 import { getArenaStandings } from "@/lib/services/games/arena-standings.service";
@@ -381,7 +372,20 @@ const CompetitionDetailsPage = async ({
     /*
       Spec order for trading: Leaderboard first → optional live dashboard →
       Overview/Rules/Scoring/Assets tabs. Overview+How-it-works live inside the tabs.
+
+      Sections + overview are built ONCE here and handed to both trees. Both md:hidden and
+      hidden md:block stay mounted, so building inside each tree would double every rule card.
     */
+    const lobbySections = buildTradingLobbySections({
+      competition,
+      riskSettings,
+      creditSymbol,
+    });
+    const lobbyOverview = buildTradingOverviewCopy({
+      competition,
+      creditSymbol,
+    });
+
     return (
       <>
         <CompetitionStatusMonitor
@@ -404,160 +408,69 @@ const CompetitionDetailsPage = async ({
         */}
         <LiveContestRefresher active={competition.status === "active"} />
 
-        <CompetitionDetailShell
-          nav={
-            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <NeonPill
-                  href="/competitions"
-                  icon={ArrowLeft}
-                  label="Back to Competitions"
-                />
-                {isCompleted && isUserIn && (
-                  <NeonPill
-                    href={`/competitions/${id}/results`}
-                    icon={BarChart3}
-                    label="View Results"
-                  />
-                )}
-              </div>
-            </div>
-          }
-          hero={
-            <TradingLobbyHero
-              competition={competition}
-              bannerUrl={tradingPage.bannerUrl}
-              isCancelled={isCancelled}
-            />
-          }
-          summary={
-            <TradingLobbySummary
-              competition={competition}
-              creditSymbol={creditSymbol}
-              isActive={isActive}
-              isUpcoming={isUpcoming}
-              isCompleted={isCompleted}
-              isCancelled={isCancelled}
-            />
-          }
-          main={
-            <>
-              {/*
-                Tabs first, directly under the summary cards (owner, 12 Oct 2026: "move the
-                section on the top"). The Overview copy is written from this contest's facts.
-              */}
-              <TradingDetailTabs
-                description={competition.description}
-                sections={buildTradingLobbySections({
-                  competition,
-                  riskSettings,
-                  creditSymbol,
-                })}
-                overview={buildTradingOverviewCopy({ competition, creditSymbol })}
-              />
-
-              {/* The dashboard's "View Leaderboard" button scrolls here. */}
-              <div id="competition-leaderboard" className="scroll-mt-24">
-              <NeonPanel
-                iconSrc={NEON_ICON("trophy-blue")}
-                accent="prize"
-                title="Leaderboard"
-                size="lg"
-                action={
-                  <div className="flex items-center gap-2">
-                    {/*
-                      "traders" here and "players" on the game lobby. The appearance comes from the
-                      kit; the wording deliberately does not, because the two words describe
-                      genuinely different things and a shared label would be wrong on one screen.
-                    */}
-                    <NeonCountPill>{leaderboard.length} traders</NeonCountPill>
-                    {competition.rules?.minimumTrades > 0 && (
-                      <NeonCountPill tone="warn">
-                        Min {competition.rules.minimumTrades} trades
-                      </NeonCountPill>
-                    )}
-                  </div>
-                }
-              >
-                <CompetitionLeaderboard
-                  leaderboard={leaderboard}
-                  userParticipantId={userParticipant?._id}
-                  prizeDistribution={competition.prizeDistribution}
-                  minimumTrades={competition.rules?.minimumTrades || 0}
-                  competitionStatus={competition.status}
-                />
-              </NeonPanel>
-              </div>
-
-              {isUserIn && userParticipant && (
-                <CompetitionDashboard
-                  competitionId={id}
-                  initialParticipant={{
-                    _id: userParticipant._id.toString(),
-                    currentCapital: userParticipant.currentCapital,
-                    pnl: userParticipant.pnl,
-                    pnlPercentage: userParticipant.pnlPercentage,
-                    totalTrades: userParticipant.totalTrades,
-                    currentRank: userParticipant.currentRank,
-                    winningTrades: userParticipant.winningTrades,
-                    losingTrades: userParticipant.losingTrades,
-                    status: userParticipant.status,
-                  }}
-                  competitionStatus={
-                    isCancelled
-                      ? "cancelled"
-                      : isCompleted
-                        ? "completed"
-                        : isActive
-                          ? "active"
-                          : "upcoming"
-                  }
-                  startTime={new Date(competition.startTime).toISOString()}
-                  endTime={new Date(competition.endTime).toISOString()}
-                  startingCapital={
-                    competition.startingCapital ||
-                    competition.startingTradingPoints ||
-                    10000
-                  }
-                  competitionRules={
-                    competition.rules
-                      ? {
-                          minimumTrades: competition.rules.minimumTrades,
-                          minimumWinRate: competition.rules.minimumWinRate,
-                          disqualifyOnLiquidation:
-                            competition.rules.disqualifyOnLiquidation,
-                        }
-                      : undefined
-                  }
-                  totalParticipants={competition.currentParticipants}
-                  competitionName={competition.name}
-                  rankingMethod={competition.rankingMethod}
-                  entryFee={competition.entryFee ?? competition.entryFeeCredits}
-                  creditSymbol={creditSymbol}
-                />
-              )}
-            </>
-          }
-          sidebar={
-            <TradingLobbySidebar
-              competition={competition}
-              difficultyData={difficultyData}
-              creditSymbol={creditSymbol}
-              walletBalance={walletBalance.balance}
-              isUserIn={isUserIn && !!userParticipant}
-              isFull={isFull}
-              isActive={isActive}
-              isUpcoming={isUpcoming}
-              isCompleted={isCompleted}
-              participantStatus={userParticipant?.status}
-              userLevel={userLevel}
-              registrationClosed={registrationClosed}
-              formatUTCDate={formatUTCDate}
-              levelLadder={ladder}
-              currentUserId={userId}
-            />
-          }
-        />
+        {/*
+          Dedicated phone tree below md — not a stacked copy of the desktop columns
+          (player-mobile-ui). Same loaders, entry rules and graphics; different layout.
+        */}
+        <div className="md:hidden">
+          <MobileTradingLobby
+            competition={competition}
+            leaderboard={leaderboard}
+            creditSymbol={creditSymbol}
+            bannerUrl={tradingPage.bannerUrl}
+            isCancelled={isCancelled}
+            isActive={isActive}
+            isUpcoming={isUpcoming}
+            isCompleted={isCompleted}
+            isUserIn={isUserIn && !!userParticipant}
+            isFull={isFull}
+            registrationClosed={registrationClosed}
+            userParticipant={userParticipant}
+            competitionId={id}
+            walletBalance={walletBalance.balance}
+            userLevel={userLevel}
+            levelLadder={ladder}
+            currentUserId={userId}
+            difficultyData={difficultyData}
+            formatUTCDate={formatUTCDate}
+            sections={lobbySections}
+            overview={lobbyOverview}
+          />
+        </div>
+        <div className="hidden md:block">
+          <DesktopTradingLobby
+            competition={competition}
+            leaderboard={leaderboard}
+            creditSymbol={creditSymbol}
+            bannerUrl={tradingPage.bannerUrl}
+            isCancelled={isCancelled}
+            isActive={isActive}
+            isUpcoming={isUpcoming}
+            isCompleted={isCompleted}
+            isUserIn={isUserIn && !!userParticipant}
+            userParticipant={userParticipant}
+            competitionId={id}
+            sections={lobbySections}
+            overview={lobbyOverview}
+            sidebar={{
+              competition,
+              difficultyData,
+              creditSymbol,
+              walletBalance: walletBalance.balance,
+              isUserIn: isUserIn && !!userParticipant,
+              isFull,
+              isActive,
+              isUpcoming,
+              isCompleted,
+              participantStatus: userParticipant?.status,
+              userLevel,
+              registrationClosed,
+              formatUTCDate,
+              levelLadder: ladder,
+              currentUserId: userId,
+            }}
+          />
+        </div>
       </>
     );
   } catch (error) {
