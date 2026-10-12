@@ -291,3 +291,32 @@ describe("the reporter never invents a figure", () => {
     expect(body.match(/\.sort\(participantSort\)/g)).toHaveLength(3);
   });
 });
+
+// =======================================================================================
+// Audit identity after guardSection (live ReferenceError on production)
+// =======================================================================================
+
+describe("AI agent audit log uses the guard's admin", () => {
+  it("binds admin from guard.admin and never reads a bare admin.adminId", () => {
+    /*
+      Live defect, 12 Oct 2026: every successful chat threw
+      `ReferenceError: admin is not defined` inside the AIAgentAudit.create try/catch.
+      The route had moved onto guardSection("ai-agent") but the audit block still named
+      a free variable `admin` (and a field `admin.adminId` that GuardedAdmin does not have —
+      the id is `admin.id`). The chat still returned because the catch only logged; no
+      audit row was written. Pin both the binding and the field so a revert of either
+      half turns red.
+    */
+    const source = code(ROUTE);
+    const post = source.indexOf("export async function POST");
+    expect(post).toBeGreaterThan(-1);
+    const handler = source.slice(post);
+
+    expect(handler).toMatch(
+      /const guard = await guardSection\("ai-agent"\);[\s\S]{0,120}const admin = guard\.admin;/,
+    );
+    expect(handler).toMatch(/AIAgentAudit\.create\(\{[\s\S]{0,200}adminEmail:\s*admin\.email/);
+    expect(handler).toMatch(/AIAgentAudit\.create\(\{[\s\S]{0,200}adminId:\s*admin\.id/);
+    expect(handler).not.toMatch(/admin\.adminId/);
+  });
+});

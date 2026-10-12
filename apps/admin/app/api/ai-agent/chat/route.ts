@@ -4600,6 +4600,10 @@ export async function POST(request: NextRequest) {
   try {
     const guard = await guardSection("ai-agent");
     if (!guard.ok) return guard.response;
+    // Reason: guardSection returns the caller on `guard.admin`. A bare `admin` was left
+    // after the R101 migration and threw ReferenceError on every successful chat — the
+    // request still answered, but no AIAgentAudit row was ever written.
+    const admin = guard.admin;
 
     const { messages } = await request.json();
 
@@ -4828,7 +4832,7 @@ export async function POST(request: NextRequest) {
     try {
       await AIAgentAudit.create({
         adminEmail: admin.email || "unknown",
-        adminId: admin.adminId,
+        adminId: admin.id,
         query: lastUserMessage.substring(0, 500), // Limit query length
         messageCount: messages.length,
         toolsCalled: auditToolsCalled,
