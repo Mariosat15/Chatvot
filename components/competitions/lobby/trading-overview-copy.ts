@@ -22,7 +22,7 @@ import {
  * same dictionary the Scoring tab reads, so the two can never name different rules.
  *
  * TILES SAY WHAT, STEPS SAY HOW (owner reference, 12 Oct 2026, superseding the same day's
- * one-list merge): `features` are four short facts - market, seats, ranking rule, pot - each with
+ * one-list merge): `features` are two short facts - market and ranking rule (seats and pot were dropped 12 Oct 2026: the summary tiles above already show both) - each with
  * up to two small rows (`facts`, reference image of the same day), and
  * `steps` are the four moves of play in order. Each is written once from the stored fields.
  */
@@ -149,13 +149,10 @@ export function buildTradingOverviewCopy({
     competition?.entryFee ?? competition?.entryFeeCredits,
   );
   const paid = countPaidPositions(competition?.prizeDistribution);
-  const seats = positiveNumber(competition?.maxParticipants);
-  const joined = Math.max(0, Number(competition?.currentParticipants) || 0);
 
   const qualifyLine = minTrades
     ? ` Make at least ${minTrades} trade${minTrades === 1 ? "" : "s"} to count.`
     : "";
-  const spotsLeft = seats ? Math.max(0, seats - joined) : null;
 
   const marketFacts: TradingOverviewFact[] = [
     capitalText
@@ -170,44 +167,11 @@ export function buildTradingOverviewCopy({
     });
   }
 
-  const seatFacts: TradingOverviewFact[] = [
-    joined > 0
-      ? {
-          icon: "player",
-          strong: `${joined.toLocaleString()} trader${joined === 1 ? "" : "s"}`,
-          tail: "already in",
-        }
-      : { icon: "player", strong: "Be the first", tail: "to jump in" },
-  ];
-  if (spotsLeft !== null) {
-    seatFacts.push({
-      icon: "seats",
-      strong: `${spotsLeft.toLocaleString()} seat${spotsLeft === 1 ? "" : "s"}`,
-      tail: "left",
-    });
-  }
-
-  const potFacts: TradingOverviewFact[] = potText
-    ? [
-        paid === 1
-          ? { icon: "crowd", strong: "Winner", tail: "takes it all" }
-          : paid > 1
-            ? { icon: "crowd", strong: `Top ${paid} share`, tail: "the prize" }
-            : { icon: "crowd", strong: "Winners share", tail: "the prize" },
-        { icon: "clock", lead: "Paid when", strong: "the bell rings" },
-      ]
-    : [{ icon: "trophy", lead: "Play for", strong: "XP & badges" }];
-
   const features: TradingOverviewFeature[] = [
     {
       iconSrc: NEON_ICON("candles"),
       title: assets.length ? joinLabels(assets) : "Live markets",
       facts: marketFacts,
-    },
-    {
-      iconSrc: NEON_ICON("users-group"),
-      title: seats ? `${seats.toLocaleString()} seats` : "Open field",
-      facts: seatFacts,
     },
     {
       iconSrc: NEON_ICON("target-purple"),
@@ -220,11 +184,6 @@ export function buildTradingOverviewCopy({
         },
         { icon: "trophy", lead: "Climb to", strong: "the top" },
       ],
-    },
-    {
-      iconSrc: NEON_ICON("trophy-green"),
-      title: potText ? `${potText} pot` : "Glory & XP",
-      facts: potFacts,
     },
   ];
 

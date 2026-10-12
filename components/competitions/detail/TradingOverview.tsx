@@ -18,8 +18,8 @@ import type {
 } from "@/components/competitions/lobby/trading-overview-copy";
 
 /**
- * The trading Overview tab (owner reference, 12 Oct 2026): "About this competition" with four
- * centred fact tiles (each with up to two small icon rows), beside a "Battle plan" numbered timeline.
+ * The trading Overview tab (owner reference, 12 Oct 2026): "About this competition" with two
+ * centred fact tiles (market and how you win - seats and the pot already sit in the summary above) (each with up to two small icon rows), beside a "Battle plan" numbered timeline.
  *
  * Every word comes from `buildTradingOverviewCopy`; this file only draws it. Headings sit on one
  * line with their icon (`items-center`, `leading-none`), each step's title shares the height of
@@ -36,19 +36,9 @@ const TILE_TONES = [
     dot: "border-emerald-400/50 text-emerald-300",
   },
   {
-    frame: "border-sky-400/35 shadow-[0_0_18px_rgba(56,189,248,0.14)]",
-    bar: "bg-sky-400",
-    dot: "border-sky-400/50 text-sky-300",
-  },
-  {
     frame: "border-violet-400/35 shadow-[0_0_18px_rgba(167,139,250,0.14)]",
     bar: "bg-violet-400",
     dot: "border-violet-400/50 text-violet-300",
-  },
-  {
-    frame: "border-green-400/35 shadow-[0_0_18px_rgba(74,222,128,0.14)]",
-    bar: "bg-green-400",
-    dot: "border-green-400/50 text-green-300",
   },
 ] as const;
 

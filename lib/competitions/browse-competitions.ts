@@ -10,9 +10,7 @@ import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { loadTradingPageContent } from "@/lib/services/games/trading-page-content";
-import {
-  annotatePrivateContests,
-} from "@/lib/services/gamemaster/private-contest-listing.service";
+import { annotatePrivateContests } from "@/lib/services/gamemaster/private-contest-listing.service";
 import type { ContestViewer } from "@/lib/services/gamemaster/visible-contests";
 import { withVisibleContests } from "@/lib/services/gamemaster/visible-contests";
 import { resolveGameDefinition } from "./game-definitions";
@@ -57,7 +55,9 @@ async function attachCatalogueArtwork<T extends Record<string, unknown>>(
 
   const byKey = new Map<string, string>();
   if (providerKeys.size > 0) {
-    const titles = await ProviderGame.find({ gameKey: { $in: [...providerKeys] } })
+    const titles = await ProviderGame.find({
+      gameKey: { $in: [...providerKeys] },
+    })
       .select("gameKey bannerUrl thumbnailUrl")
       .lean();
     for (const t of titles) {
@@ -72,15 +72,17 @@ async function attachCatalogueArtwork<T extends Record<string, unknown>>(
       const content = await loadTradingPageContent();
       tradingImage = pickImage(content.bannerUrl, content.thumbnailUrl);
     } catch (error) {
-      console.warn("⚠️ Trading page artwork unavailable for competitions:", error);
+      console.warn(
+        "⚠️ Trading page artwork unavailable for competitions:",
+        error,
+      );
     }
   }
 
   return rows.map((row) => {
     const key = typeof row.gameKey === "string" ? row.gameKey : "";
     const config = row.gameConfig as
-      | { gameCode?: unknown; settings?: unknown }
-      | undefined;
+      { gameCode?: unknown; settings?: unknown } | undefined;
     const gameSettings =
       config?.settings && typeof config.settings === "object"
         ? (config.settings as Record<string, unknown>)
@@ -98,7 +100,11 @@ async function attachCatalogueArtwork<T extends Record<string, unknown>>(
   });
 }
 
-export { COMPETITIONS_PAGE_SIZE, type BrowseCompetitionsResult, type BrowseSort };
+export {
+  COMPETITIONS_PAGE_SIZE,
+  type BrowseCompetitionsResult,
+  type BrowseSort,
+};
 
 export interface BrowseCompetitionsInput {
   page?: number;
@@ -125,7 +131,9 @@ function parseStatuses(raw: string | undefined): string[] {
   return parts.length > 0 ? parts : ["active", "upcoming"];
 }
 
-function gameMatchClause(game: string | undefined): Record<string, unknown> | null {
+function gameMatchClause(
+  game: string | undefined,
+): Record<string, unknown> | null {
   if (!game || game === "all") return null;
   if (game === "trading") {
     // Reason: absent label resolves to trading (invariant 5); never match provider rows.
@@ -167,11 +175,7 @@ function gameMatchClause(game: string | undefined): Record<string, unknown> | nu
   }
   if (game === "voltStack") {
     return {
-      $or: [
-        { gameCode: /stack/i },
-        { gameKey: /stack/i },
-        { name: /stack/i },
-      ],
+      $or: [{ gameCode: /stack/i }, { gameKey: /stack/i }, { name: /stack/i }],
     };
   }
   return null;
@@ -312,7 +316,17 @@ export async function browseCompetitions(
       { $match: mongoQuery },
       {
         $addFields: {
-          _statusRank: statusRankExpr(),
+          // Reason: owner, 12 Oct 2026 - the default list must show the newest competition
+          // first. Ranking live above upcoming buried every just-created contest under older
+          // live ones, so open contests (live or upcoming) share one rank and are ordered by
+          // creation; finished ones still sink below them.
+          _openRank: {
+            $cond: [
+              { $in: ["$status", ["active", "upcoming"]] },
+              1,
+              statusRankExpr(),
+            ],
+          },
           _prize: {
             $ifNull: ["$prizePoolCredits", { $ifNull: ["$prizePool", 0] }],
           },
@@ -321,8 +335,8 @@ export async function browseCompetitions(
       {
         $sort:
           sort === "featured"
-            ? { _statusRank: 1, startTime: -1 }
-            : { createdAt: -1 },
+            ? { _openRank: 1, createdAt: -1, _id: -1 }
+            : { createdAt: -1, _id: -1 },
       },
       {
         $facet: {
@@ -331,14 +345,8 @@ export async function browseCompetitions(
             { $limit: pageSize * 3 }, // over-fetch; outage filter may drop some
           ],
           total: [{ $count: "n" }],
-          live: [
-            { $match: { status: "active" } },
-            { $count: "n" },
-          ],
-          soon: [
-            { $match: { status: "upcoming" } },
-            { $count: "n" },
-          ],
+          live: [{ $match: { status: "active" } }, { $count: "n" }],
+          soon: [{ $match: { status: "upcoming" } }, { $count: "n" }],
           prize: [
             {
               $group: {
@@ -430,7 +438,9 @@ export async function browseCompetitions(
   // Optional post-filter when game was trading-shaped but provider slipped through
   const gameFiltered =
     input.game && input.game !== "all"
-      ? visible.filter((c) => resolveGameDefinition(c as never).id === input.game)
+      ? visible.filter(
+          (c) => resolveGameDefinition(c as never).id === input.game,
+        )
       : visible;
   rows = gameFiltered.slice(0, pageSize);
 
