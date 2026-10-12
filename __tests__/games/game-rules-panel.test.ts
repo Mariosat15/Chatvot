@@ -233,8 +233,18 @@ describe("the rules panel says nothing rather than saying nothing usefully", () 
 });
 
 describe("the rules are on both screens, and defined on neither", () => {
-  it("is rendered by the lobby and by the arena", () => {
-    expect(readCode(LOBBY)).toMatch(/<GameRulesPanel\s+presentation=\{presentation\}/);
+  it("is rendered by the arena; lobby uses Rules & Fair Play (detail shell)", () => {
+    /*
+      12 Oct 2026 — competition-detail Cursor Spec puts Rules & Fair Play in the
+      game SIDEBAR as `CompetitionRulesFairPlay`, not a full-width GameRulesPanel
+      in the main column (that read as stacked admin rows). The arena still mounts
+      GameRulesPanel. Flipped rather than deleted so the old lobby mount claim stays
+      visible as history.
+    */
+    expect(readCode(LOBBY)).not.toMatch(
+      /<GameRulesPanel\s+presentation=\{presentation\}/,
+    );
+    expect(readCode(LOBBY)).toMatch(/<CompetitionRulesFairPlay/);
     expect(readCode(PLAY_PAGE)).toMatch(
       /rules=\{<GameRulesPanel\s+presentation=\{presentation\}/,
     );

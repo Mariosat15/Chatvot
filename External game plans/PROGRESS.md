@@ -322,7 +322,7 @@ project low risk.
 
 ## START HERE NEXT
 
-- **Competition lobby shared shell CODE-COMPLETE 12 Oct (eng)** — game and trading contest detail pages share overview + how-it-works + Menuitems Volt/KPI icons + Menuitems join/reserve art on the entry button; kind is `"game" | "trading"` only (no game-code branch). Game hero 4th KPI is Mode when not seated (clock stays in sidebar `ContestCountdown`); trading hero keeps Starts In. Tests: `contest-lobby-shell.test.ts` + flipped InlineCountdown count in `provider-play-ui.test.ts`. **Never verified by eye.**
+- **Competition detail desktop REBUILT to Cursor Spec 12 Oct (eng)** — `CompetitionDetailShell` (max-w 1600, hero → large summary KPIs → 2fr/0.9fr main+sidebar). Game: Overview → How it works → Leaderboard; sidebar CTA → countdown → prizes → event details → Rules & Fair Play. Trading: Leaderboard first → live dashboard → Overview/Rules/Scoring/Assets tabs; sidebar entry → countdown → schedule → difficulty → prizes. Shared neon kit + Menuitems Volt/join art; kind `"game"|"trading"` only. **Never verified by eye.**
 - **Competitions arena FIXCOMP rebuild CODE-COMPLETE 9 Oct (eng, seventeenth pass)** — settled history is server-scoped to the signed-in player's participant seats; open competitions remain discoverable. Cards keep only status in the header; host/funding/access/requirement, the live clock and every Mode value use shared data boxes with hover/touch help. Anytime and Scheduled receive specific explanations; future title-specific modes receive a generic explanation without a game-code branch. Supplied corner ribbons identify open cards as **TRADING** or **GAME**; cancelled/refunded ribbons take precedence. Wide-row CTAs fill their metric cell. Grid cards put Host in one cell and the CTA in the two-column row below it. Cancelled/refunded cards retain the red frame/scrim. Difficulty remains Trading-only; Circuit board size, Velocity laps/track and Stack scoring remain game-defined. Join GM still lobby-only. **Never verified by eye.**
 - **Competitions arena v1 CODE-COMPLETE 9 Oct (eng)** — first pass (superseded same day by FIXCOMP above). Spec: `design-reference/CHARTVOLT COMPETITIONS PAGE` + Menuitems.
 - **Games catalogue MOBILE polish 8 Oct (eng)** — mobile reuses `GamesHero` (Games Catalog + gamepad) and `GameStatistics` (value beside label, K/M counts); card art `object-contain` in 16/11 like desktop. Spec: `design-reference/game catalog mobile`. Tests: `games-catalogue-mobile.test.ts`. **Never verified by eye.**
@@ -979,7 +979,13 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
-### 12 Oct 2026 - COMPETITION LOBBIES SHARE ONE SHELL (GAME + TRADING)
+### 12 Oct 2026 - COMPETITION DETAIL DESKTOP REBUILT TO CURSOR SPEC
+
+**Why.** Owner rejected the first lobby pass: too many thin rows, weak hierarchy, tiny text, stacked-admin look. Spec: `External game plans/ChartVolt_Desktop_Competition_Detail_Cursor_Spec.md`. Target images (game + trading) share one design system with different data blocks.
+
+**What shipped.** `components/competitions/detail/CompetitionDetailShell.tsx` (nav / hero / summary / main / sidebar / footer). `NeonHero` taller with larger title; `StatCard`/`NeonPanel` `size="lg"`. Game lobby wired through the shell; trading page uses `TradingLobbySummary` (KPIs below hero) + `TradingDetailTabs` under the leaderboard. Game sidebar: `GameEventDetails` + `CompetitionRulesFairPlay` (wide `GameRulesPanel` removed from lobby main — arena still mounts it). Tests updated in `contest-lobby-shell.test.ts`, `provider-play-ui.test.ts`, `game-rules-panel.test.ts`, `contest-countdown.test.ts`, `volts-currency.test.ts`. **Never verified by eye.**
+
+### 12 Oct 2026 - COMPETITION LOBBIES SHARE ONE SHELL (GAME + TRADING) — superseded same day
 
 Owner supplied two reference comps (game lobby live / trading starting soon) and asked for a data-agnostic detail page that adapts by kind, stays readable, reuses the neon kit, uses Menuitems button art, and shows money with the Volt symbol.
 

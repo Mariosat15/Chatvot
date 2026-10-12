@@ -15,11 +15,8 @@ import {
 } from "@/components/competitions/lobby/contest-lobby-copy";
 
 /**
- * Overview + key features — the "what is this" block above the leaderboard.
- *
- * Description is the contest's own text when present; otherwise a playful
- * fallback that never invents rules. Features are kind-scoped only — never a
- * game-code switch. Wording lives in `contest-lobby-copy.ts`.
+ * Large Overview card — description + key features + optional artwork.
+ * Kind-scoped features only; never a game-code switch.
  */
 
 const FEATURE_ICONS = new Map<string, LucideIcon>([
@@ -41,7 +38,6 @@ export function ContestOverviewPanel({
 }: {
   kind: ContestLobbyKind;
   description?: string | null;
-  /** Optional thumbnail — catalogue banner / how-to image when present. */
   imageUrl?: string | null;
   imageAlt?: string | null;
 }) {
@@ -56,28 +52,31 @@ export function ContestOverviewPanel({
       icon={Sparkles}
       accent="players"
       title={contestOverviewTitle(kind)}
+      size="lg"
     >
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_auto] md:items-start">
-        <div className="min-w-0 space-y-4">
-          <p className="text-sm leading-relaxed text-gray-300">{about}</p>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
+        <div className="min-w-0 space-y-5">
+          <p className="text-base leading-relaxed text-gray-200 sm:text-[17px]">
+            {about}
+          </p>
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-sky-300/90">
-              Key vibes
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-sky-300">
+              Key features
             </p>
-            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {features.map((feature) => {
                 const Icon = FEATURE_ICONS.get(feature.title) ?? Sparkles;
                 return (
                   <li
                     key={feature.title}
-                    className="flex items-start gap-2.5 rounded-lg border border-[#1B2540]/70 bg-[#080C18]/40 px-3 py-2"
+                    className="flex items-start gap-3 rounded-xl border border-[#1B2540] bg-[#080C18]/50 px-3.5 py-3"
                   >
-                    <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-300" />
+                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-sky-300" />
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-gray-100">
+                      <p className="text-sm font-semibold text-gray-100">
                         {feature.title}
                       </p>
-                      <p className="text-[11px] leading-snug text-gray-400">
+                      <p className="mt-0.5 text-sm leading-snug text-gray-400">
                         {feature.detail}
                       </p>
                     </div>
@@ -87,7 +86,7 @@ export function ContestOverviewPanel({
             </ul>
           </div>
         </div>
-        <div className="mx-auto w-[112px] shrink-0 md:mx-0">
+        <div className="mx-auto w-full max-w-[200px] shrink-0 lg:mx-0 lg:justify-self-end">
           <NeonIllustration
             src={imageUrl || undefined}
             alt={imageAlt || "Competition"}

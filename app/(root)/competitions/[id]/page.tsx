@@ -17,9 +17,10 @@ import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMoni
 import LiveContestRefresher from "@/components/competitions/LiveContestRefresher";
 import UTCClock from "@/components/trading/UTCClock";
 import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
+import TradingLobbySummary from "@/components/trading/lobby/TradingLobbySummary";
 import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
-import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
-import { ContestOverviewPanel } from "@/components/competitions/lobby/ContestOverviewPanel";
+import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
+import { TradingDetailTabs } from "@/components/competitions/detail/TradingDetailTabs";
 import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
 import { NeonPill } from "@/components/neon/Buttons";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
@@ -375,9 +376,12 @@ const CompetitionDetailsPage = async ({
       `Map`s, because they were indexed by a value derived from a competition document.
     */
 
+    /*
+      Spec order for trading: Leaderboard first → optional live dashboard →
+      Overview/Rules/Scoring/Assets tabs. Overview+How-it-works live inside the tabs.
+    */
     return (
-      <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 overflow-x-hidden">
-        {/* Auto-refresh when competition status changes */}
+      <>
         <CompetitionStatusMonitor
           competitionId={id}
           initialStatus={competition.status}
@@ -398,141 +402,163 @@ const CompetitionDetailsPage = async ({
         */}
         <LiveContestRefresher active={competition.status === "active"} />
 
-        {/* Header with Back Button and UTC Clock */}
-        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <NeonPill href="/competitions" icon={ArrowLeft} label="Back to Competitions" />
-            {isCompleted && isUserIn && (
-              <NeonPill
-                href={`/competitions/${id}/results`}
-                icon={BarChart3}
-                label="View Results"
-              />
-            )}
-          </div>
-          <div className="hidden sm:block">
-            <UTCClock />
-          </div>
-        </div>
-
-        <TradingLobbyHero
-          competition={competition}
-          creditSymbol={creditSymbol}
-          bannerUrl={tradingPage.bannerUrl}
-          isActive={isActive}
-          isUpcoming={isUpcoming}
-          isCompleted={isCompleted}
-          isCancelled={isCancelled}
-        />
-
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* ========== LEFT COLUMN: MAIN CONTENT ========== */}
-          <div className="lg:col-span-2 space-y-6">
-            <ContestOverviewPanel
-              kind="trading"
-              description={competition.description}
-              imageUrl={tradingPage.bannerUrl}
-              imageAlt={competition.name}
+        <CompetitionDetailShell
+          nav={
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <NeonPill
+                  href="/competitions"
+                  icon={ArrowLeft}
+                  label="Back to Competitions"
+                />
+                {isCompleted && isUserIn && (
+                  <NeonPill
+                    href={`/competitions/${id}/results`}
+                    icon={BarChart3}
+                    label="View Results"
+                  />
+                )}
+              </div>
+              <div className="hidden sm:block">
+                <UTCClock />
+              </div>
+            </div>
+          }
+          hero={
+            <TradingLobbyHero
+              competition={competition}
+              bannerUrl={tradingPage.bannerUrl}
+              isCancelled={isCancelled}
             />
-            <ContestHowItWorks kind="trading" />
-            {/* User's Dashboard */}
-            {isUserIn && userParticipant && (
-              <CompetitionDashboard
-                competitionId={id}
-                initialParticipant={{
-                  _id: userParticipant._id.toString(),
-                  currentCapital: userParticipant.currentCapital,
-                  pnl: userParticipant.pnl,
-                  pnlPercentage: userParticipant.pnlPercentage,
-                  totalTrades: userParticipant.totalTrades,
-                  currentRank: userParticipant.currentRank,
-                  winningTrades: userParticipant.winningTrades,
-                  losingTrades: userParticipant.losingTrades,
-                  status: userParticipant.status,
-                }}
-                competitionStatus={
-                  isCancelled
-                    ? "cancelled"
-                    : isCompleted
-                      ? "completed"
-                      : isActive
-                        ? "active"
-                        : "upcoming"
+          }
+          summary={
+            <TradingLobbySummary
+              competition={competition}
+              creditSymbol={creditSymbol}
+              isActive={isActive}
+              isUpcoming={isUpcoming}
+              isCompleted={isCompleted}
+              isCancelled={isCancelled}
+            />
+          }
+          main={
+            <>
+              <NeonPanel
+                icon={Trophy}
+                accent="prize"
+                title="Leaderboard"
+                size="lg"
+                action={
+                  <div className="flex items-center gap-2">
+                    {/*
+                      "traders" here and "players" on the game lobby. The appearance comes from the
+                      kit; the wording deliberately does not, because the two words describe
+                      genuinely different things and a shared label would be wrong on one screen.
+                    */}
+                    <NeonCountPill>{leaderboard.length} traders</NeonCountPill>
+                    {competition.rules?.minimumTrades > 0 && (
+                      <NeonCountPill tone="warn">
+                        Min {competition.rules.minimumTrades} trades
+                      </NeonCountPill>
+                    )}
+                  </div>
                 }
-                startTime={new Date(competition.startTime).toISOString()}
-                endTime={new Date(competition.endTime).toISOString()}
+              >
+                <CompetitionLeaderboard
+                  leaderboard={leaderboard}
+                  userParticipantId={userParticipant?._id}
+                  prizeDistribution={competition.prizeDistribution}
+                  minimumTrades={competition.rules?.minimumTrades || 0}
+                  competitionStatus={competition.status}
+                />
+              </NeonPanel>
+
+              {isUserIn && userParticipant && (
+                <CompetitionDashboard
+                  competitionId={id}
+                  initialParticipant={{
+                    _id: userParticipant._id.toString(),
+                    currentCapital: userParticipant.currentCapital,
+                    pnl: userParticipant.pnl,
+                    pnlPercentage: userParticipant.pnlPercentage,
+                    totalTrades: userParticipant.totalTrades,
+                    currentRank: userParticipant.currentRank,
+                    winningTrades: userParticipant.winningTrades,
+                    losingTrades: userParticipant.losingTrades,
+                    status: userParticipant.status,
+                  }}
+                  competitionStatus={
+                    isCancelled
+                      ? "cancelled"
+                      : isCompleted
+                        ? "completed"
+                        : isActive
+                          ? "active"
+                          : "upcoming"
+                  }
+                  startTime={new Date(competition.startTime).toISOString()}
+                  endTime={new Date(competition.endTime).toISOString()}
+                  startingCapital={
+                    competition.startingCapital ||
+                    competition.startingTradingPoints ||
+                    10000
+                  }
+                  competitionRules={
+                    competition.rules
+                      ? {
+                          minimumTrades: competition.rules.minimumTrades,
+                          minimumWinRate: competition.rules.minimumWinRate,
+                          disqualifyOnLiquidation:
+                            competition.rules.disqualifyOnLiquidation,
+                        }
+                      : undefined
+                  }
+                  totalParticipants={competition.currentParticipants}
+                />
+              )}
+
+              <TradingDetailTabs
+                description={competition.description}
                 startingCapital={
                   competition.startingCapital ||
                   competition.startingTradingPoints ||
-                  10000
+                  null
                 }
-                competitionRules={
-                  competition.rules
-                    ? {
-                        minimumTrades: competition.rules.minimumTrades,
-                        minimumWinRate: competition.rules.minimumWinRate,
-                        disqualifyOnLiquidation:
-                          competition.rules.disqualifyOnLiquidation,
-                      }
-                    : undefined
+                maxLeverage={riskSettings.maxLeverage}
+                minimumTrades={competition.rules?.minimumTrades ?? null}
+                rankingMethod={competition.rankingMethod ?? null}
+                assets={
+                  Array.isArray(competition.allowedAssets)
+                    ? competition.allowedAssets
+                    : Array.isArray(competition.assets)
+                      ? competition.assets
+                      : null
                 }
-                totalParticipants={competition.currentParticipants}
               />
-            )}
-
-            {/* Leaderboard */}
-            <NeonPanel
-              icon={Trophy}
-              accent="prize"
-              title="Leaderboard"
-              action={
-                <div className="flex items-center gap-2">
-                  {/*
-                    "traders" here and "players" on the game lobby. The appearance comes from the
-                    kit; the wording deliberately does not, because the two words describe
-                    genuinely different things and a shared label would be wrong on one screen.
-                  */}
-                  <NeonCountPill>{leaderboard.length} traders</NeonCountPill>
-                  {competition.rules?.minimumTrades > 0 && (
-                    <NeonCountPill tone="warn">
-                      Min {competition.rules.minimumTrades} trades
-                    </NeonCountPill>
-                  )}
-                </div>
-              }
-            >
-              <CompetitionLeaderboard
-                leaderboard={leaderboard}
-                userParticipantId={userParticipant?._id}
-                prizeDistribution={competition.prizeDistribution}
-                minimumTrades={competition.rules?.minimumTrades || 0}
-                competitionStatus={competition.status}
-              />
-            </NeonPanel>
-          </div>
-
-          {/* ========== RIGHT COLUMN: SIDEBAR ========== */}
-          <TradingLobbySidebar
-            competition={competition}
-            riskSettings={riskSettings}
-            difficultyData={difficultyData}
-            creditSymbol={creditSymbol}
-            walletBalance={walletBalance.balance}
-            isUserIn={isUserIn && !!userParticipant}
-            isFull={isFull}
-            isActive={isActive}
-            isUpcoming={isUpcoming}
-            isCompleted={isCompleted}
-            participantStatus={userParticipant?.status}
-            userLevel={userLevel}
-            registrationClosed={registrationClosed}
-            formatUTCDate={formatUTCDate}
-            levelLadder={ladder}
-            currentUserId={userId}
-          />
-        </div>
-      </div>
+            </>
+          }
+          sidebar={
+            <TradingLobbySidebar
+              competition={competition}
+              riskSettings={riskSettings}
+              difficultyData={difficultyData}
+              creditSymbol={creditSymbol}
+              walletBalance={walletBalance.balance}
+              isUserIn={isUserIn && !!userParticipant}
+              isFull={isFull}
+              isActive={isActive}
+              isUpcoming={isUpcoming}
+              isCompleted={isCompleted}
+              participantStatus={userParticipant?.status}
+              userLevel={userLevel}
+              registrationClosed={registrationClosed}
+              formatUTCDate={formatUTCDate}
+              levelLadder={ladder}
+              currentUserId={userId}
+            />
+          }
+        />
+      </>
     );
   } catch (error) {
     /*

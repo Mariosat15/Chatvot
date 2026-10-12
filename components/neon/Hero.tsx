@@ -30,6 +30,7 @@ export function NeonHero({
   title,
   subtitle,
   status,
+  meta,
   children,
 }: {
   banner?: NeonHeroBanner;
@@ -39,14 +40,18 @@ export function NeonHero({
   subtitle?: string | null;
   /** The lifecycle badge, rendered above everything else when there is one. */
   status?: React.ReactNode;
-  /** The stat strip. Passed in rather than built here, because the two lobbies count different
-      things and this component must not learn what a contest is. */
+  /**
+   * Optional right-side hero chrome (event id, mini timer). Competition-detail
+   * summary stats live BELOW the hero in `CompetitionDetailShell`, not here.
+   */
+  meta?: React.ReactNode;
+  /** Optional extra body under the title — keep light; do not use for the metric row. */
   children?: React.ReactNode;
 }) {
   const BadgeIcon = badge?.icon;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-[#1B2540] bg-[#0A0F1F]">
+    <div className="relative min-h-[200px] overflow-hidden rounded-2xl border border-[#1B2540] bg-[#0A0F1F] sm:min-h-[240px] md:min-h-[280px]">
       {banner && (
         <div className="absolute inset-0">
           <Image
@@ -65,32 +70,38 @@ export function NeonHero({
         legible, and without one it IS the hero. The violet-to-transparent wash on the right is
         the sheet's glow treatment.
       */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#05070F] via-[#05070F]/90 to-[#05070F]/40" />
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-violet-600/20" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#05070F] via-[#05070F]/92 to-[#05070F]/45" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-violet-600/25" />
 
-      <div className="relative z-10 p-5 sm:p-7 md:p-8">
-        {status}
+      <div className="relative z-10 flex flex-col justify-end gap-4 p-6 sm:p-8 md:min-h-[280px] md:p-10">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 max-w-3xl">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              {status}
+              {badge && BadgeIcon && (
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 backdrop-blur-sm">
+                  <BadgeIcon className="h-3.5 w-3.5 text-violet-300" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-violet-200">
+                    {badge.label}
+                  </span>
+                </div>
+              )}
+            </div>
 
-        {badge && BadgeIcon && (
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 backdrop-blur-sm">
-            <BadgeIcon className="h-3.5 w-3.5 text-violet-300" />
-            <span className="text-xs font-semibold text-violet-200">
-              {badge.label}
-            </span>
+            <h1 className="text-3xl font-bold leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-4xl md:text-[42px]">
+              {title}
+            </h1>
+
+            {subtitle && (
+              <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-200 drop-shadow-[0_1px_8px_rgba(0,0,0,0.85)] sm:text-[17px]">
+                {subtitle}
+              </p>
+            )}
           </div>
-        )}
+          {meta ? <div className="shrink-0">{meta}</div> : null}
+        </div>
 
-        <h1 className="text-2xl font-bold text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:text-3xl md:text-4xl">
-          {title}
-        </h1>
-
-        {subtitle && (
-          <p className="mt-2 max-w-2xl text-sm text-gray-300 drop-shadow-[0_1px_8px_rgba(0,0,0,0.8)]">
-            {subtitle}
-          </p>
-        )}
-
-        {children && <div className="mt-6">{children}</div>}
+        {children && <div className="mt-2">{children}</div>}
       </div>
     </div>
   );
@@ -108,7 +119,7 @@ export function NeonHero({
 export function NeonStatusBadge({ status }: { status: string }) {
   if (status === "active") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-emerald-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-300 backdrop-blur-sm">
         <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
         Live now
       </span>
@@ -117,7 +128,7 @@ export function NeonStatusBadge({ status }: { status: string }) {
 
   if (status === "cancelled") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
         Cancelled
       </span>
     );
@@ -125,7 +136,7 @@ export function NeonStatusBadge({ status }: { status: string }) {
 
   if (status === "completed") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#2A3766] bg-[#0A0F1F]/80 px-3 py-1 text-xs font-bold uppercase tracking-wide text-gray-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-[#2A3766] bg-[#0A0F1F]/80 px-3 py-1 text-xs font-bold uppercase tracking-wide text-gray-300 backdrop-blur-sm">
         Completed
       </span>
     );
@@ -133,7 +144,7 @@ export function NeonStatusBadge({ status }: { status: string }) {
 
   if (status === "upcoming" || status === "registration") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300 backdrop-blur-sm">
         Starting soon
       </span>
     );
@@ -146,7 +157,7 @@ export function NeonStatusBadge({ status }: { status: string }) {
   */
   if (status === "pending") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-yellow-300 backdrop-blur-sm">
         Awaiting response
       </span>
     );
@@ -154,7 +165,7 @@ export function NeonStatusBadge({ status }: { status: string }) {
 
   if (status === "declined") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
         Declined
       </span>
     );
@@ -162,7 +173,7 @@ export function NeonStatusBadge({ status }: { status: string }) {
 
   if (status === "expired") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-rose-400/40 bg-rose-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-rose-300 backdrop-blur-sm">
         Expired
       </span>
     );
@@ -176,7 +187,7 @@ export function NeonStatusBadge({ status }: { status: string }) {
   */
   if (status === "finalizing") {
     return (
-      <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-sky-300 backdrop-blur-sm">
+      <span className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-sky-300 backdrop-blur-sm">
         <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400" />
         Finalizing
       </span>

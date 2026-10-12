@@ -573,9 +573,15 @@ describe("a provider contest gets its own lobby, not the trading one", () => {
 
     // `13` s4: players hit all three, and the third is the one nobody thinks to show and the one
     // that costs money when it happens.
+    //
+    // 12 Oct 2026 — unresolved policy moved into GameEventDetails as "If a round stalls"
+    // (Cursor Spec sidebar Event details) rather than a standalone thin panel titled
+    // "If a round does not finish". Flipped rather than deleted; UNRESOLVED_POLICY_COPY still
+    // supplies the money-adjacent sentence.
     expect(code).toMatch(/Play window/);
     expect(code).toMatch(/Your attempts/);
-    expect(code).toMatch(/If a round does not finish/);
+    expect(code).toMatch(/If a round stalls/);
+    expect(code).toMatch(/UNRESOLVED_POLICY_COPY/);
   });
 
   it("refuses Play with a reason when the contest cannot launch a round", () => {
@@ -713,6 +719,7 @@ describe("the two lobbies are built from one design kit", () => {
   const KIT_TOKENS = "components/neon/tokens.ts";
   const KIT_CARDS = "components/neon/Cards.tsx";
   const TRADING_HERO = "components/trading/lobby/TradingLobbyHero.tsx";
+  const TRADING_SUMMARY = "components/trading/lobby/TradingLobbySummary.tsx";
   const TRADING_SIDEBAR = "components/trading/lobby/TradingLobbySidebar.tsx";
   const TRADING_BOARD = "components/trading/CompetitionLeaderboard.tsx";
 
@@ -823,13 +830,19 @@ describe("the two lobbies are built from one design kit", () => {
       property is the grid: the sheet puts four figures across, and a fifth would need either a
       five-column grid or a wrap, both of which show up here.
     */
-    for (const consumer of [PROVIDER_LOBBY, TRADING_HERO]) {
+    /*
+      12 Oct 2026 — summary KPIs moved BELOW the hero into CompetitionDetailShell
+      (game lobby) and TradingLobbySummary (trading). The hero no longer owns StatCards;
+      asserting TRADING_HERO would pin the rejected thin-row layout.
+    */
+    for (const consumer of [PROVIDER_LOBBY, TRADING_SUMMARY]) {
       const code = readCode(consumer);
       expect(code).toMatch(/<StatCard/);
       expect(code).toMatch(/grid-cols-2[^"]*(md|lg):grid-cols-4/);
       const grids = code.match(/grid-cols-4/g) ?? [];
       expect(grids.length).toBe(1);
     }
+    expect(readCode(TRADING_HERO)).not.toMatch(/<StatCard/);
   });
 
   it("gives both leaderboards the same row shell and column headings", () => {
@@ -886,7 +899,8 @@ describe("the two lobbies are built from one design kit", () => {
     // inconsistency as a different card radius - and it would be a second place for the
     // "Started"/"Ended" wording to drift.
     expect(code).toMatch(/<UTCClock\s*\/>/);
-    expect(readCode(TRADING_HERO)).toMatch(/<InlineCountdown/);
+    // Trading Starts-In lives on the summary strip under the hero, not inside NeonHero.
+    expect(readCode(TRADING_SUMMARY)).toMatch(/<InlineCountdown/);
     expect(code).toMatch(/<InlineCountdown[\s\S]{0,200}targetDate=/);
     expect(code).not.toMatch(/1000 \* 60 \* 60/);
   });

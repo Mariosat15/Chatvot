@@ -37,30 +37,71 @@ describe("contest lobby copy is kind-scoped, never game-coded", () => {
   });
 });
 
-describe("both lobbies share the overview shell", () => {
+describe("competition detail shell (Cursor Spec hierarchy)", () => {
+  const shell = readCode(
+    "components/competitions/detail/CompetitionDetailShell.tsx",
+  );
   const gameLobby = readCode("components/games/ProviderContestLobby.tsx");
   const tradingPage = readCode("app/(root)/competitions/[id]/page.tsx");
-  const tradingHero = readCode(
-    "components/trading/lobby/TradingLobbyHero.tsx",
+  const tradingSummary = readCode(
+    "components/trading/lobby/TradingLobbySummary.tsx",
+  );
+  const tradingTabs = readCode(
+    "components/competitions/detail/TradingDetailTabs.tsx",
   );
 
-  it("mounts ContestOverviewPanel and ContestHowItWorks on the game lobby", () => {
+  it("defines one max-width shell with a 2fr / 0.9fr main+sidebar grid", () => {
+    expect(shell).toContain("max-w-[1600px]");
+    expect(shell).toMatch(
+      /lg:grid-cols-\[minmax\(0,2fr\)_minmax\(340px,0\.9fr\)\]/,
+    );
+    expect(shell).toContain("summary");
+    expect(shell).toContain("sidebar");
+  });
+
+  it("mounts both lobbies on CompetitionDetailShell", () => {
+    expect(gameLobby).toContain("<CompetitionDetailShell");
+    expect(tradingPage).toContain("<CompetitionDetailShell");
+  });
+
+  it("puts summary StatCards outside the hero on both kinds", () => {
+    expect(gameLobby).toContain('size="lg"');
+    expect(gameLobby).toContain("<StatCard");
+    expect(tradingSummary).toContain('size="lg"');
+    expect(tradingSummary).toContain("<StatCard");
+    // Hero file must not own the KPI strip (that was the thin-row layout).
+    const tradingHero = readCode(
+      "components/trading/lobby/TradingLobbyHero.tsx",
+    );
+    expect(tradingHero).not.toContain("<StatCard");
+  });
+
+  it("game main is Overview → How it works → Leaderboard", () => {
     expect(gameLobby).toContain('<ContestOverviewPanel');
     expect(gameLobby).toContain('kind="game"');
     expect(gameLobby).toContain("<ContestHowItWorks");
+    expect(gameLobby).toContain("<LobbyLiveLeaderboard");
+    expect(gameLobby).toContain("<CompetitionRulesFairPlay");
+    expect(gameLobby).toContain("<GameEventDetails");
   });
 
-  it("mounts ContestOverviewPanel and ContestHowItWorks on the trading lobby", () => {
-    expect(tradingPage).toContain("<ContestOverviewPanel");
-    expect(tradingPage).toContain('kind="trading"');
-    expect(tradingPage).toContain("<ContestHowItWorks");
+  it("trading main is Leaderboard first, then detail tabs with How it works", () => {
+    expect(tradingPage).toContain("<TradingDetailTabs");
+    expect(tradingPage).toContain("<CompetitionLeaderboard");
+    const boardIdx = tradingPage.indexOf("<CompetitionLeaderboard");
+    const tabsIdx = tradingPage.indexOf("<TradingDetailTabs");
+    expect(boardIdx).toBeGreaterThan(-1);
+    expect(tabsIdx).toBeGreaterThan(boardIdx);
+    expect(tradingTabs).toContain('kind="trading"');
+    expect(tradingTabs).toContain("<ContestHowItWorks");
+    expect(tradingTabs).toContain("embedded");
   });
 
-  it("dresses both heroes with Menuitems Volt icons", () => {
+  it("dresses KPI tiles with Menuitems Volt icons", () => {
     expect(gameLobby).toContain("COMPETITION_ICON.volts");
-    expect(tradingHero).toContain("COMPETITION_ICON.volts");
+    expect(tradingSummary).toContain("COMPETITION_ICON.volts");
     expect(gameLobby).toContain("COMPETITION_ICON.wallet");
-    expect(tradingHero).toContain("COMPETITION_ICON.wallet");
+    expect(tradingSummary).toContain("COMPETITION_ICON.wallet");
   });
 
   it("entry uses Menuitems join artwork, not a yellow CSS pill alone", () => {

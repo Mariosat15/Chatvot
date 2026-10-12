@@ -233,6 +233,7 @@ export function StatCard({
   value,
   valueAccent,
   note,
+  size = "default",
 }: {
   icon: LucideIcon;
   /**
@@ -253,13 +254,21 @@ export function StatCard({
   /** Tints the figure itself, for a profit or loss. Left unset the figure is plain white. */
   valueAccent?: NeonAccent;
   note?: React.ReactNode;
+  /**
+   * `lg` is the competition-detail summary row (spec §5/§8): large icon + metric.
+   * Default stays compact for arena and other dense strips.
+   */
+  size?: "default" | "lg";
 }) {
+  const large = size === "lg";
   return (
-    <div className={`${NEON_PANEL} p-3 sm:p-4`}>
-      <div className="flex items-center gap-3">
+    <div className={`${NEON_PANEL} ${large ? "p-4 sm:p-5" : "p-3 sm:p-4"}`}>
+      <div className={`flex items-center ${large ? "gap-4" : "gap-3"}`}>
         {imageSrc ? (
           <div
-            className={`${NEON_TILE_SHAPE} h-9 w-9 ${accentClasses(accent).tile} overflow-hidden p-1`}
+            className={`${NEON_TILE_SHAPE} ${
+              large ? "h-12 w-12 sm:h-14 sm:w-14" : "h-9 w-9"
+            } ${accentClasses(accent).tile} overflow-hidden p-1.5`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -269,12 +278,24 @@ export function StatCard({
             />
           </div>
         ) : (
-          <IconTile icon={icon} accent={accent} />
+          <IconTile icon={icon} accent={accent} size={large ? "md" : "sm"} />
         )}
         <div className="min-w-0">
-          <p className={NEON_LABEL}>{label}</p>
+          <p
+            className={
+              large
+                ? "text-[11px] font-semibold uppercase tracking-wider text-gray-400"
+                : NEON_LABEL
+            }
+          >
+            {label}
+          </p>
           <div
-            className={`truncate text-lg font-bold sm:text-xl ${
+            className={`truncate font-bold ${
+              large
+                ? "mt-0.5 text-2xl sm:text-3xl"
+                : "text-lg sm:text-xl"
+            } ${
               valueAccent ? accentClasses(valueAccent).text : "text-gray-100"
             }`}
           >
@@ -335,6 +356,7 @@ export function NeonPanel({
   action,
   children,
   className = "",
+  size = "default",
 }: {
   icon?: LucideIcon;
   accent?: NeonAccent;
@@ -342,14 +364,33 @@ export function NeonPanel({
   action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** `lg` section titles for competition-detail cards (spec §5). */
+  size?: "default" | "lg";
 }) {
+  const large = size === "lg";
   return (
-    <div className={`${NEON_PANEL} p-4 sm:p-5 ${className}`}>
+    <div
+      className={`${NEON_PANEL} ${large ? "p-5 sm:p-6" : "p-4 sm:p-5"} ${className}`}
+    >
       {title && (
-        <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="mb-4 flex items-center justify-between gap-3 sm:mb-5">
           <div className="flex items-center gap-2.5">
-            {icon && <IconTile icon={icon} accent={accent} size="sm" />}
-            <h2 className="text-sm font-semibold text-gray-100">{title}</h2>
+            {icon && (
+              <IconTile
+                icon={icon}
+                accent={accent}
+                size={large ? "md" : "sm"}
+              />
+            )}
+            <h2
+              className={
+                large
+                  ? "text-lg font-semibold text-gray-100 sm:text-xl"
+                  : "text-sm font-semibold text-gray-100"
+              }
+            >
+              {title}
+            </h2>
           </div>
           {action}
         </div>

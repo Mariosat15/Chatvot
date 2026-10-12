@@ -39,7 +39,7 @@ const LIVE_COUNTDOWN = "components/trading/LiveCountdown.tsx";
 const GAME_COUNTDOWN = "components/games/ContestCountdown.tsx";
 const GAME_LOBBY = "components/games/ProviderContestLobby.tsx";
 const TRADING_SIDEBAR = "components/trading/lobby/TradingLobbySidebar.tsx";
-const TRADING_HERO = "components/trading/lobby/TradingLobbyHero.tsx";
+const TRADING_SUMMARY = "components/trading/lobby/TradingLobbySummary.tsx";
 const CHALLENGE_PAGE = "app/(root)/challenges/[id]/page.tsx";
 
 /**
@@ -85,7 +85,7 @@ describe("the four-cell contest countdown", () => {
       GAME_COUNTDOWN,
       GAME_LOBBY,
       TRADING_SIDEBAR,
-      TRADING_HERO,
+      TRADING_SUMMARY,
       CHALLENGE_PAGE,
     ]) {
       const code = readCode(consumer);

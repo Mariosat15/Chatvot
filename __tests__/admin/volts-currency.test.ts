@@ -322,7 +322,7 @@ const CONTEST_MONEY_SCREENS = [
   "components/trading/ChallengeCard.tsx",
   "components/trading/LastManStandingListener.tsx",
   "components/trading/LastManStandingPopup.tsx",
-  "components/trading/lobby/TradingLobbyHero.tsx",
+  "components/trading/lobby/TradingLobbySummary.tsx",
   "components/trading/lobby/TradingLobbySidebar.tsx",
   "components/trading/lobby/trading-lobby-accordions.tsx",
   "components/games/ProviderContestLobby.tsx",

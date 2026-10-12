@@ -129,8 +129,8 @@ export default function TradingLobbySidebar({
   });
 
   return (
-    <div className="space-y-4">
-      {/* Act. */}
+    <>
+      {/* Act → time → schedule → difficulty → prizes (spec trading sidebar). */}
       {(!isCompleted || isUserIn) && (
         <CompetitionEntryButton
           competition={competition}
@@ -162,9 +162,13 @@ export default function TradingLobbySidebar({
         />
       )}
 
-      {/* When. */}
-      <NeonPanel icon={Target} accent="players" title="Schedule (UTC)">
-        <div className="space-y-2">
+      <NeonPanel
+        icon={Target}
+        accent="players"
+        title="Schedule (UTC)"
+        size="lg"
+      >
+        <div className="space-y-2.5">
           <NeonRow
             label="Start"
             value={formatUTCDate(new Date(competition.startTime))}
@@ -176,24 +180,24 @@ export default function TradingLobbySidebar({
         </div>
       </NeonPanel>
 
-      {/* Decide. */}
       <NeonPanel
         icon={Target}
         accent="score"
         title="Difficulty"
+        size="lg"
         action={
-          <span className={`text-xs font-bold ${difficulty.text}`}>
+          <span className={`text-sm font-bold ${difficulty.text}`}>
             {difficultyData.label}
           </span>
         }
       >
-        <div className="h-2 overflow-hidden rounded-full bg-[#080C18]">
+        <div className="h-2.5 overflow-hidden rounded-full bg-[#080C18]">
           <div
             className={`h-full transition-all ${difficulty.bar}`}
             style={{ width: `${difficultyData.score}%` }}
           />
         </div>
-        <div className="mt-1 flex justify-between text-[11px] text-gray-500">
+        <div className="mt-1.5 flex justify-between text-xs text-gray-500">
           <span>Easier</span>
           <span className={difficulty.text}>{difficultyData.score}/100</span>
           <span>Harder</span>
@@ -205,8 +209,13 @@ export default function TradingLobbySidebar({
       </NeonPanel>
 
       {competition.levelRequirement?.enabled && (
-        <NeonPanel icon={Crown} accent="score" title="Level requirement">
-          <p className="text-sm font-medium text-gray-100">
+        <NeonPanel
+          icon={Crown}
+          accent="score"
+          title="Level requirement"
+          size="lg"
+        >
+          <p className="text-base font-medium text-gray-100">
             {(() => {
               const min = Number(competition.levelRequirement.minLevel);
               const max = competition.levelRequirement.maxLevel
@@ -232,9 +241,10 @@ export default function TradingLobbySidebar({
         icon={Trophy}
         accent="prize"
         title="Prize distribution"
+        size="lg"
         action={
           competition.platformFeePercentage > 0 ? (
-            <span className="text-[11px] text-sky-300">
+            <span className="text-xs text-sky-300">
               Fee {competition.platformFeePercentage}%
             </span>
           ) : undefined
@@ -243,8 +253,7 @@ export default function TradingLobbySidebar({
         <PrizeTable competition={competition} creditSymbol={creditSymbol} />
       </NeonPanel>
 
-      {/* Read. */}
       <NeonAccordion sections={sections} />
-    </div>
+    </>
   );
 }

@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   Clock,
   Gamepad2,
-  Info,
   Link2,
   LifeBuoy,
   RotateCcw,
@@ -14,7 +13,6 @@ import { connectToDatabase } from "@/database/mongoose";
 import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import ContestCountdown from "@/components/games/ContestCountdown";
-import GameRulesPanel from "@/components/games/GameRulesPanel";
 import ProviderClientWarmup from "@/components/games/ProviderClientWarmup";
 import {
   LobbyLiveEntryButton,
@@ -39,6 +37,9 @@ import {
 import { NEON_LABEL, NEON_PANEL } from "@/components/neon/tokens";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
+import { CompetitionRulesFairPlay } from "@/components/competitions/detail/CompetitionRulesFairPlay";
+import { GameEventDetails } from "@/components/competitions/detail/GameEventDetails";
 import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
 import { ContestOverviewPanel } from "@/components/competitions/lobby/ContestOverviewPanel";
 import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
@@ -426,6 +427,30 @@ export default async function ProviderContestLobby({
   const myInitialScore = standings.rows.find((row) => row.userId === userId)
     ?.score;
 
+  /*
+    Spec game main: Overview → How it works → Leaderboard.
+    Spec game sidebar: CTA → Countdown → Prize → Event details → Rules & Fair Play.
+    Summary KPIs sit BELOW the hero, never inside it.
+  */
+  const eventDetailRows: Array<{ label: string; value: string }> = [
+    { label: "Format", value: modeRule.label },
+    {
+      label: "Scoring",
+      value: attemptsCopy ?? (scoreLabel === "Time" ? "Faster finishes rank higher" : "Higher scores rank higher"),
+    },
+    {
+      label: "Play window",
+      value:
+        playWindowStart && playWindowEnd
+          ? `${playWindowStart} → ${playWindowEnd}`
+          : playWindowEnd || playWindowStart || "",
+    },
+    {
+      label: "If a round stalls",
+      value: unresolvedCopy ?? "",
+    },
+  ];
+
   return (
     <ArenaLiveProvider
       competitionId={String(competition._id)}
@@ -441,314 +466,244 @@ export default async function ProviderContestLobby({
       }}
       scoreType={presentation?.scoreType}
     >
-    {isUserIn ? <ProviderClientWarmup gameCode={competition?.gameConfig?.gameCode} /> : null}
-    <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <NeonPill
-          href="/competitions"
-          icon={ArrowLeft}
-          label={`Back to ${terms.contests}`}
-        />
-        <div className="hidden sm:block">
-          <UTCClock />
-        </div>
-      </div>
+      {isUserIn ? (
+        <ProviderClientWarmup gameCode={competition?.gameConfig?.gameCode} />
+      ) : null}
+      <CompetitionDetailShell
+        nav={
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+            <NeonPill
+              href="/competitions"
+              icon={ArrowLeft}
+              label={`Back to ${terms.contests}`}
+            />
+            <div className="hidden sm:block">
+              <UTCClock />
+            </div>
+          </div>
+        }
+        hero={
+          <NeonHero
+            banner={resolveProviderBanner({
+              bannerUrl: presentation?.bannerUrl,
+              gameName: presentation?.gameName ?? gameName,
+              gameCode: competition?.gameConfig?.gameCode,
+            })}
+            badge={{ icon: Gamepad2, label: gameName }}
+            title={competition.name}
+            subtitle={competition.description}
+            status={<NeonStatusBadge status={status} />}
+          />
+        }
+        summary={
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
+            <StatCard
+              size="lg"
+              icon={Trophy}
+              imageSrc={COMPETITION_ICON.volts}
+              accent="prize"
+              label={terms.prizePool}
+              value={
+                <LobbyLivePrizePoolValue
+                  initialPool={competition.prizePool ?? 0}
+                  creditSymbol={creditSymbol}
+                />
+              }
+            />
+            <StatCard
+              size="lg"
+              icon={Link2}
+              imageSrc={COMPETITION_ICON.wallet}
+              accent="entry"
+              label={terms.entryFee}
+              value={
+                competition.entryFee
+                  ? formatVolts(competition.entryFee, { symbol: creditSymbol })
+                  : "Free"
+              }
+            />
+            <StatCard
+              size="lg"
+              icon={Users}
+              imageSrc={COMPETITION_ICON.players}
+              accent="players"
+              label={contestPlayersLabel("game")}
+              value={
+                <LobbyLivePlayersValue
+                  initialCurrent={competition.currentParticipants ?? 0}
+                  initialMax={competition.maxParticipants ?? 0}
+                />
+              }
+              note={
+                <>
+                  <LobbyFillBar
+                    current={competition.currentParticipants ?? 0}
+                    max={competition.maxParticipants ?? 0}
+                  />
+                  {status === "upcoming" && competition.minParticipants > 0 ? (
+                    <LobbyLivePlayersMinNote
+                      minParticipants={competition.minParticipants}
+                      playersLabel={terms.players}
+                      initialCurrent={competition.currentParticipants ?? 0}
+                    />
+                  ) : null}
+                </>
+              }
+            />
+            {/*
+              The score, not PnL. A puzzle has no profit and loss, and `05` section 10 makes this a
+              binding rule rather than a style point. A dash, never a zero, for a player with no
+              scored round (R50). Live standings poll supplies mid-round totals.
+            */}
+            {isUserIn ? (
+              <StatCard
+                size="lg"
+                icon={Gamepad2}
+                imageSrc={COMPETITION_ICON.gamepad}
+                accent="score"
+                label="Your score"
+                value={
+                  <LobbyLiveYourScoreValue initialScore={myInitialScore} />
+                }
+              />
+            ) : (
+              <StatCard
+                size="lg"
+                icon={Gamepad2}
+                imageSrc={COMPETITION_ICON.gamepad}
+                accent={isCancelled ? "ended" : isActive ? "score" : "waiting"}
+                label={isCancelled || isCompleted ? "Status" : "Mode"}
+                value={
+                  isCancelled
+                    ? "Cancelled"
+                    : isCompleted
+                      ? "Completed"
+                      : contestModeLabel("game")
+                }
+              />
+            )}
+          </div>
+        }
+        main={
+          <>
+            <ContestOverviewPanel
+              kind="game"
+              description={
+                competition.description ||
+                presentation?.description ||
+                presentation?.tagline ||
+                null
+              }
+              imageUrl={
+                presentation?.howToPlayImageUrl || presentation?.bannerUrl
+              }
+              imageAlt={gameName}
+            />
+            <ContestHowItWorks kind="game" />
+            <LobbyLiveLeaderboard
+              title={terms.leaderboard}
+              scoreLabel={scoreLabel}
+            />
+          </>
+        }
+        sidebar={
+          <>
+            <LobbyLiveEntryButton
+              competition={competition}
+              userBalance={walletBalance}
+              isUserIn={isUserIn}
+              isFull={isFull}
+              participantStatus={participantStatus}
+              registrationClosed={registrationClosed}
+              levelLadder={levelLadder}
+              currentUserId={userId}
+            />
 
-      <NeonHero
-        /*
-          Catalogue bannerUrl from Games & Trading settings first; neon map only when the
-          operator has not uploaded one. Same helper as play + results so one title cannot
-          wear three different heroes across the journey.
-        */
-        banner={resolveProviderBanner({
-          bannerUrl: presentation?.bannerUrl,
-          gameName: presentation?.gameName ?? gameName,
-          gameCode: competition?.gameConfig?.gameCode,
-        })}
-        badge={{ icon: Gamepad2, label: gameName }}
-        title={competition.name}
-        subtitle={competition.description}
-        status={<NeonStatusBadge status={status} />}
-      >
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
-          <StatCard
-            icon={Trophy}
-            imageSrc={COMPETITION_ICON.volts}
-            accent="prize"
-            label={terms.prizePool}
-            value={
-              <LobbyLivePrizePoolValue
-                initialPool={competition.prizePool ?? 0}
+            {/*
+              ContestCountdown on the SERVER clock — every game gate uses the same time.
+              Schedule folds into details so one clock is not stated twice.
+            */}
+            {showCountdown && (
+              <ContestCountdown
+                target={countdownTarget}
+                serverNow={state?.serverNow}
+                label={
+                  isActive ? "Time remaining" : `${terms.contest} starts in`
+                }
+                variant={isActive ? "end" : "start"}
+                details={scheduleDetails}
+              />
+            )}
+
+            {isUserIn && !canLaunch && (
+              <StatusCard
+                icon={TriangleAlert}
+                accent="waiting"
+                title="This competition cannot start a round yet"
+                detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
+              />
+            )}
+
+            {(competition.prizeDistribution?.length ?? 0) > 0 && (
+              <LobbyLivePrizePanel
+                initialCompetition={competition}
                 creditSymbol={creditSymbol}
               />
-            }
-          />
-          <StatCard
-            icon={Link2}
-            imageSrc={COMPETITION_ICON.wallet}
-            accent="entry"
-            label={terms.entryFee}
-            value={
-              competition.entryFee
-                ? formatVolts(competition.entryFee, { symbol: creditSymbol })
-                : "Free"
-            }
-          />
-          <StatCard
-            icon={Users}
-            imageSrc={COMPETITION_ICON.players}
-            accent="players"
-            label={contestPlayersLabel("game")}
-            value={
-              <LobbyLivePlayersValue
-                initialCurrent={competition.currentParticipants ?? 0}
-                initialMax={competition.maxParticipants ?? 0}
-              />
-            }
-            note={
-              <>
-                <LobbyFillBar
-                  current={competition.currentParticipants ?? 0}
-                  max={competition.maxParticipants ?? 0}
-                />
-                {status === "upcoming" && competition.minParticipants > 0 ? (
-                  <LobbyLivePlayersMinNote
-                    minParticipants={competition.minParticipants}
-                    playersLabel={terms.players}
-                    initialCurrent={competition.currentParticipants ?? 0}
-                  />
-                ) : null}
-              </>
-            }
-          />
-          {/*
-            The score, not PnL. A puzzle has no profit and loss, and `05` section 10 makes this a
-            binding rule rather than a style point: every figure is either generalised across
-            games or explicitly scoped to one. There is no third option, and the failure mode of
-            getting it wrong is not a crash - a trading-only figure keeps computing and keeps
-            rendering.
+            )}
 
-            A dash, never a zero, for a player with no scored round. Same read-side rule as the
-            leaderboard cell and the dashboard card: an absent score and a score of nothing are
-            different facts, and conflating them is what made every provider participant tie.
+            {!showCountdown && scheduleDetails && (
+              <NeonPanel
+                icon={Clock}
+                accent="players"
+                title="Schedule"
+                size="lg"
+              >
+                {scheduleDetails}
+              </NeonPanel>
+            )}
 
-            THAT SENTENCE WAS FALSE FOR A DAY, and the correction is left visible because the
-            next reader needs to know it was once believed. The service defaulted the field to
-            nought before the payload left it, so this tile showed `0` to a player who had not
-            played and the dash was unreachable. Fixed with the seat and the schema in R50 -
-            all three had to change, since any one of them supplying a zero is enough.
-
-            26 SEP 2026 — value comes from the live standings poll (finished + provisional),
-            not only `getPlayState`'s seat score, so a mid-round total matches the board below.
-          */}
-          {isUserIn ? (
-            <StatCard
-              icon={Gamepad2}
-              imageSrc={COMPETITION_ICON.gamepad}
-              accent="score"
-              label="Your score"
-              value={<LobbyLiveYourScoreValue initialScore={myInitialScore} />}
-            />
-          ) : (
-            <StatCard
-              icon={Gamepad2}
-              imageSrc={COMPETITION_ICON.gamepad}
-              accent={isCancelled ? "ended" : isActive ? "score" : "waiting"}
-              label={
-                isCancelled || isCompleted ? "Status" : "Mode"
-              }
-              value={
-                isCancelled
-                  ? "Cancelled"
-                  : isCompleted
-                    ? "Completed"
-                    : contestModeLabel("game")
-              }
-            />
-          )}
-        </div>
-      </NeonHero>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="min-w-0 space-y-6 lg:col-span-2">
-          {/*
-            Overview → how it works → rules → board. Same order as the owner's
-            game-lobby reference: sell the vibe, explain the loop, then the live table.
-          */}
-          <ContestOverviewPanel
-            kind="game"
-            description={
-              competition.description ||
-              presentation?.description ||
-              presentation?.tagline ||
-              null
-            }
-            imageUrl={
-              presentation?.howToPlayImageUrl || presentation?.bannerUrl
-            }
-            imageAlt={gameName}
-          />
-          <ContestHowItWorks kind="game" />
-          {/*
-            ABOVE THE LEADERBOARD, DELIBERATELY. Rules make the join decision informed.
-            Renders nothing when the catalogue holds neither field.
-          */}
-          <GameRulesPanel presentation={presentation} layout="wide" />
-          <LobbyLiveLeaderboard
-            title={terms.leaderboard}
-            scoreLabel={scoreLabel}
-          />
-        </div>
-
-        <div className="space-y-6">
-          <LobbyLiveEntryButton
-            competition={competition}
-            userBalance={walletBalance}
-            isUserIn={isUserIn}
-            isFull={isFull}
-            participantStatus={participantStatus}
-            registrationClosed={registrationClosed}
-            levelLadder={levelLadder}
-            currentUserId={userId}
-          />
-
-          {/*
-            THE CONTEST CLOCK, AT THE SIZE THE OWNER ASKED FOR. Until now this screen's only
-            clocks were three lines of small text, where the trading lobby has a four-cell
-            panel you can read across a room - and it sits in the same place in the same
-            column, directly under the entry control and above the details, because a player
-            comparing the two screens should not have to look in two different places.
-
-            `ContestCountdown` rather than trading's `LiveCountdown`, for two reasons that are
-            both about being wrong quietly. It runs on the SERVER's clock, which is the clock
-            every gate on the game side is judged against. And `LiveCountdown` renders nothing
-            at all unless its `type` matches the contest's `status` - a mismatch produces an
-            empty space and no error, which is exactly how a countdown disappears without
-            anybody noticing. Here the decision to show one is made here, in the open.
-
-            Reason it reuses `countdownTarget` instead of picking a date of its own: that
-            expression is already the answer to "which clock matters now", and it is what the
-            hero tile and the play-window row count down to. A third date resolved separately
-            is a third chance for this screen to contradict itself.
-
-            THE SCHEDULE IS NOW INSIDE IT (owner instruction, 11 September 2026). Two cards, one
-            counting down to the close in large cells and one counting down to the same close in
-            a small row, is a duplicate statement of one clock.
-          */}
-          {showCountdown && (
-            <ContestCountdown
-              target={countdownTarget}
-              serverNow={state?.serverNow}
-              label={
-                isActive
-                  ? "Time remaining"
-                  : `${terms.contest} starts in`
-              }
-              variant={isActive ? "end" : "start"}
-              details={scheduleDetails}
-            />
-          )}
-
-          {/*
-            A control that cannot work must refuse with its reason rather than be quietly
-            disabled - after a provider enabled with no adapter and the Edit button withheld from
-            a provider contest. A greyed-out button teaches the player nothing and sends them to
-            support; this at least tells an operator what is missing.
-          */}
-          {isUserIn && !canLaunch && (
-            <StatusCard
-              icon={TriangleAlert}
-              accent="waiting"
-              title="This competition cannot start a round yet"
-              detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
-            />
-          )}
-
-          {/*
-            THE PRIZE TABLE, which this lobby did not have at all - a player could see the pool
-            and the entry fee and had no way to learn what finishing second was worth.
-
-            It is the SAME component the trading lobby's sidebar renders, moved out of
-            `components/trading/lobby/` rather than reimplemented. Nothing in the calculation is
-            about trading: it reads the pool, the configured shares, the participant count and
-            the platform fee, and a provider contest carries all four in the same fields. A
-            second copy of a payout calculation is the shape behind four defects here.
-
-            Rendered only when shares are configured. A contest with none is a legitimate free
-            or practice contest, and an empty panel headed "Prize distribution" reads as data
-            that failed to load.
-          */}
-          {(competition.prizeDistribution?.length ?? 0) > 0 && (
-            <LobbyLivePrizePanel
-              initialCompetition={competition}
-              creditSymbol={creditSymbol}
-            />
-          )}
-
-          {/*
-            THE SCHEDULE'S FALLBACK HOST. The countdown above owns it while there is a clock to
-            show; a finished or cancelled contest has none, and the window's open and close are
-            still facts on one. Same node, so the two hosts cannot disagree - two copies of these
-            rows would be the "one rule, two copies" shape this codebase keeps paying for.
-          */}
-          {!showCountdown && scheduleDetails && (
-            <NeonPanel icon={Clock} accent="players" title="Schedule">
-              {scheduleDetails}
-            </NeonPanel>
-          )}
-
-          {state && (
-            <NeonPanel icon={RotateCcw} accent="score" title="Your attempts">
-              <NeonRow
-                label="Remaining"
+            {state && (
+              <NeonPanel
+                icon={RotateCcw}
                 accent="score"
-                value={`${state.attemptsRemaining} of ${state.attemptsPermitted}`}
-              />
-              {attemptsCopy && <NeonNote>{attemptsCopy}</NeonNote>}
-              <NeonNote>
-                An attempt is used the moment a round opens, even if you leave
-                before finishing.
-              </NeonNote>
-            </NeonPanel>
-          )}
+                title="Your attempts"
+                size="lg"
+              >
+                <NeonRow
+                  label="Remaining"
+                  accent="score"
+                  value={`${state.attemptsRemaining} of ${state.attemptsPermitted}`}
+                />
+                {attemptsCopy && <NeonNote>{attemptsCopy}</NeonNote>}
+                <NeonNote>
+                  An attempt is used the moment a round opens, even if you leave
+                  before finishing.
+                </NeonNote>
+              </NeonPanel>
+            )}
 
-          {unresolvedCopy && (
-            <NeonPanel
-              icon={Info}
-              accent="waiting"
-              title="If a round does not finish"
-            >
-              <NeonNote>{unresolvedCopy}</NeonNote>
-            </NeonPanel>
-          )}
-        </div>
-      </div>
-
-      {/*
-        The sheet's footer help strip. It points at `/help/competitions`, which really exists and
-        is where the trading lobby's help link already goes.
-
-        THE SENTENCE THAT WAS HERE IS CORRECTED RATHER THAN DELETED, because it was believed for
-        five days and was the reason nobody looked. It said the mock's "View Rules" button had no
-        destination "because a provider title has no rules surface: the catalogue stores a
-        `description` and no rules summary or how-to-play". The second half stopped being true on
-        10 September 2026, when R63 found that `rulesSummary` and `howToPlay` had been demanded of
-        providers, validated on arrival and then discarded by a parse bug - they are stored now,
-        and `GameRulesPanel` above renders them. So the rules have a surface and it is on this
-        page; this strip stays a help link, which is a different thing from the rules of one game.
-      */}
-      <div
-        className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
-      >
-        <div className="flex items-center gap-2.5">
-          <LifeBuoy className="h-4 w-4 text-sky-300" />
-          <p className="text-xs text-gray-400">
-            Need help? Read how competitions work, or contact support.
-          </p>
-        </div>
-        <NeonPill href="/help/competitions" icon={LifeBuoy} label="Help centre" />
-      </div>
-    </div>
+            <GameEventDetails rows={eventDetailRows} />
+            <CompetitionRulesFairPlay />
+          </>
+        }
+        footer={
+          <div
+            className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
+          >
+            <div className="flex items-center gap-2.5">
+              <LifeBuoy className="h-4 w-4 text-sky-300" />
+              <p className="text-sm text-gray-400">
+                Need help? Read how competitions work, or contact support.
+              </p>
+            </div>
+            <NeonPill
+              href="/help/competitions"
+              icon={LifeBuoy}
+              label="Help centre"
+            />
+          </div>
+        }
+      />
     </ArenaLiveProvider>
   );
 }
