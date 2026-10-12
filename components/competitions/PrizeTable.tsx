@@ -1,4 +1,5 @@
-import { Gift } from "lucide-react";
+import { Gift, Info } from "lucide-react";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
 import {
   NEON_FACE_TILE,
@@ -57,9 +58,41 @@ function ordinal(rank: number): string {
   return `${rank}${suffix}`;
 }
 
+/**
+ * The icon at the head of a showcase place card: a trophy for first, a numbered medal below.
+ * Presentation only, like `ordinal`.
+ */
+function PlaceIcon({ rank, filled }: { rank: number; filled: boolean }) {
+  if (rank === 1) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+      <img
+        src={NEON_ICON("trophy-green")}
+        alt=""
+        draggable={false}
+        className={`h-14 w-14 shrink-0 object-contain ${filled ? "" : "opacity-60"}`}
+      />
+    );
+  }
+  const tone =
+    rank === 2
+      ? "border-slate-300/50 bg-slate-400/15 text-slate-200"
+      : rank === 3
+        ? "border-orange-400/50 bg-orange-500/15 text-orange-200"
+        : "border-sky-400/40 bg-sky-500/10 text-sky-200";
+  return (
+    <span
+      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 text-lg font-black ${tone}`}
+    >
+      {rank}
+    </span>
+  );
+}
+
 export default function PrizeTable({
   competition,
   creditSymbol,
+  size = "default",
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
@@ -70,10 +103,87 @@ export default function PrizeTable({
    * *fiat* symbol, so every prize in this table used to read `€33.33`.
    */
   creditSymbol?: string;
+  /**
+   * `lg` is the trading lobby's showcase layout (owner reference, 12 Oct 2026): big place cards
+   * and a glowing banner. Opt-in, so the game lobby and the arena keep the compact table. The
+   * figures are the same `rows` either way - only the markup differs.
+   */
+  size?: "default" | "lg";
 }) {
   const { rows, prizePositions, unclaimedPercentage, allFilled } =
     projectPrizeDistribution(competition);
   const currentParticipants = competition.currentParticipants || 0;
+  const bannerText = allFilled
+    ? `${currentParticipants} of ${prizePositions} paid positions filled`
+    : `${currentParticipants} of ${prizePositions} filled - ${unclaimedPercentage}% still to share`;
+  const caution =
+    "Empty prize spots are shared among the winners. If someone enters but never finishes, their share is split among the people who did.";
+
+  if (size === "lg") {
+    return (
+      <>
+        <div
+          className={`mb-4 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold ${
+            allFilled
+              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200 shadow-[0_0_16px_rgba(52,211,153,0.2)]"
+              : "border-amber-400/50 bg-gradient-to-r from-amber-500/20 to-amber-500/5 text-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.25)]"
+          }`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
+          <img
+            src={NEON_ICON("gift")}
+            alt=""
+            draggable={false}
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <span>{bannerText}</span>
+        </div>
+
+        <div className="space-y-3">
+          {rows.map((row, index) => (
+            <div
+              key={index}
+              className={`flex items-center gap-4 rounded-xl border px-4 py-3.5 ${
+                row.filled
+                  ? "border-cyan-400/50 bg-gradient-to-r from-cyan-500/10 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.22)]"
+                  : NEON_FACE_TILE_MUTED
+              }`}
+            >
+              <PlaceIcon rank={row.rank} filled={row.filled} />
+              <span className="h-10 w-px shrink-0 bg-white/10" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <div
+                  className={`text-base font-bold leading-tight ${row.filled ? "text-gray-100" : "text-gray-400"}`}
+                >
+                  {ordinal(row.rank)} place
+                </div>
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                    {row.configuredPercentage}%
+                  </span>
+                  {row.bonusPercentage > 0 && (
+                    <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300">
+                      +{row.bonusPercentage.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span
+                className={`shrink-0 text-2xl font-black tabular-nums ${row.filled ? "text-amber-300" : "text-gray-500"}`}
+              >
+                {row.filled ? formatVolts(row.netAmount, { symbol: creditSymbol }) : "-"}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className={`mt-4 flex items-start gap-3 px-4 py-3 ${NEON_FACE_TILE}`}>
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+          <p className="text-xs leading-relaxed text-gray-300">{caution}</p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -85,11 +195,7 @@ export default function PrizeTable({
         }`}
       >
         <Gift className="h-3.5 w-3.5 shrink-0" />
-        <span>
-          {allFilled
-            ? `${currentParticipants} of ${prizePositions} paid positions filled`
-            : `${currentParticipants} of ${prizePositions} filled - ${unclaimedPercentage}% still to share`}
-        </span>
+        <span>{bannerText}</span>
       </div>
 
       <div className="space-y-2">
@@ -139,8 +245,7 @@ export default function PrizeTable({
       </div>
 
       <p className="mt-auto pt-3 text-[11px] leading-relaxed text-gray-500">
-        Empty prize spots are shared among the winners. If someone enters but
-        never finishes, their share is split among the people who did.
+        {caution}
       </p>
     </>
   );

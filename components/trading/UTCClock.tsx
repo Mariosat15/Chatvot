@@ -3,7 +3,16 @@
 import { useState, useEffect } from "react";
 import { GameIcon } from "@/components/ui/GameIcon";
 
-export default function UTCClock() {
+/**
+ * `badge` is the boxed clock the lobbies put in their top bar. `inline` is the same icon,
+ * wording and format with no box, for sitting inside another card - the trading lobby's
+ * "Starts in" tile (owner, 12 Oct 2026).
+ */
+export default function UTCClock({
+  variant = "badge",
+}: {
+  variant?: "badge" | "inline";
+} = {}) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -29,7 +38,13 @@ export default function UTCClock() {
   };
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/30 shadow-lg h-[72px]">
+    <div
+      className={
+        variant === "inline"
+          ? "flex items-center gap-3"
+          : "flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/30 shadow-lg h-[72px]"
+      }
+    >
       <GameIcon name="timer" size={24} className="animate-pulse" />
       <div className="flex flex-col">
         <span className="text-[10px] text-blue-400/80 font-semibold uppercase tracking-wider">

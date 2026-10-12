@@ -50,17 +50,30 @@ function StepList({ steps }: { steps: ContestHowItStep[] }) {
   );
 }
 
-/** Numbered steps joined by a rail — the trading Overview tab's right column. */
+/**
+ * The timeline's circle colours, one per step and cycling (owner reference, 12 Oct 2026: each
+ * step glows in its own colour). Whole class strings so Tailwind sees them literally.
+ */
+const TIMELINE_TONES = [
+  "border-cyan-400/70 text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.45)]",
+  "border-violet-400/70 text-violet-200 shadow-[0_0_18px_rgba(167,139,250,0.45)]",
+  "border-pink-400/70 text-pink-200 shadow-[0_0_18px_rgba(244,114,182,0.45)]",
+  "border-amber-400/70 text-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.45)]",
+] as const;
+
+/** Numbered steps joined by a rail ? the trading Overview tab's right column. */
 function StepTimeline({ steps }: { steps: ContestHowItStep[] }) {
   return (
-    <ol className="relative space-y-5 before:absolute before:bottom-5 before:left-5 before:top-5 before:w-px before:bg-gradient-to-b before:from-sky-400/60 before:via-violet-400/50 before:to-amber-400/60">
+    <ol className="relative space-y-6 before:absolute before:bottom-6 before:left-6 before:top-6 before:w-0.5 before:bg-gradient-to-b before:from-cyan-400/70 before:via-violet-400/60 before:to-amber-400/70">
       {steps.map((step, index) => (
         <li key={step.title} className="relative flex gap-4">
-          <span className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-sky-400/60 bg-[#0A1228] text-base font-bold text-sky-200 shadow-[0_0_14px_rgba(56,189,248,0.35)]">
+          <span
+            className={`relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 bg-[#0A1228] text-lg font-black ${TIMELINE_TONES[index % TIMELINE_TONES.length]}`}
+          >
             {index + 1}
           </span>
-          <div className="min-w-0 pt-1">
-            <p className="text-base font-semibold text-gray-100">{step.title}</p>
+          <div className="min-w-0 pt-1.5">
+            <p className="text-base font-bold text-white">{step.title}</p>
             <p className="mt-1 text-sm leading-relaxed text-gray-400">
               {step.detail}
             </p>
@@ -71,11 +84,24 @@ function StepTimeline({ steps }: { steps: ContestHowItStep[] }) {
   );
 }
 
+/** "Battle plan" -> "Battle " + "plan", the last word lit in cyan as in the reference. */
+function AccentTitle({ text }: { text: string }) {
+  const cut = text.lastIndexOf(" ");
+  if (cut < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, cut + 1)}
+      <span className="text-cyan-300">{text.slice(cut + 1)}</span>
+    </>
+  );
+}
+
 export function ContestHowItWorks({
   kind,
   embedded = false,
   layout = "grid",
   steps,
+  iconSrc,
 }: {
   kind: ContestLobbyKind;
   /**
@@ -87,14 +113,26 @@ export function ContestHowItWorks({
   embedded?: boolean;
   /** `timeline` stacks the steps vertically; only used embedded beside another column. */
   layout?: "grid" | "timeline";
+  /** Embedded only: a neon picture beside the heading in place of the flag glyph. */
+  iconSrc?: string;
 }) {
   const shown = steps?.length ? steps : contestHowItWorks(kind);
   if (embedded) {
     return (
       <div>
-        <h3 className="mb-4 flex items-center gap-2.5 text-xl font-bold text-gray-100">
-          <Flag className="h-5 w-5 text-sky-300" />
-          {contestHowTitle(kind)}
+        <h3 className="mb-5 flex items-center gap-3 text-xl font-bold text-gray-100">
+          {iconSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+            <img
+              src={iconSrc}
+              alt=""
+              draggable={false}
+              className="h-10 w-10 shrink-0 object-contain"
+            />
+          ) : (
+            <Flag className="h-5 w-5 text-sky-300" />
+          )}
+          <AccentTitle text={contestHowTitle(kind)} />
         </h3>
         {layout === "timeline" ? (
           <StepTimeline steps={shown} />

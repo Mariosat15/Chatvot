@@ -1,14 +1,26 @@
 import {
-  Ban,
-  Coins,
+  CalendarX,
+  Clock,
   Gauge,
+  Layers,
+  ListChecks,
+  Percent,
   Scale,
-  ShieldAlert,
+  ShieldCheck,
+  TrendingDown,
   Trophy,
+  Wallet,
 } from "lucide-react";
-import { IconTile, NeonNote, NeonRow } from "@/components/neon/Cards";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
-import { formatVolts } from "@/lib/utils/format-volts";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
+import {
+  MarginLadder,
+  RuleBadge,
+  RuleCard,
+  RuleInfo,
+  RuleRow,
+  RuleWarning,
+} from "./TradingRuleCard";
 import {
   ASSET_LABELS,
   RANKING_EXPLANATIONS,
@@ -16,9 +28,12 @@ import {
 } from "./trading-lobby-labels";
 
 /**
- * The six collapsible reference sections in the trading lobby's sidebar, from the bottom row of
- * the owner's style sheet: Eligible Assets, Trading Rules, Scoring, Risk Management,
- * Disqualification, Prizes.
+ * The reference sections in the trading lobby's tab bar: Eligible Assets, Trading Rules and
+ * Risk Management. Scoring and Disqualification were their own sections until 12 Oct 2026 and
+ * now sit inside Trading Rules as cards of their own (owner instruction). Prizes was a fourth
+ * section until the same day and was removed from the tabs at the owner's request: the prize
+ * distribution panel in the sidebar already shows the pool, the paid places, the fee and the
+ * unfilled-share rule, so the tab only repeated it.
  *
  * WHAT COLLAPSING ACTUALLY COSTS, because a restyle should not hide a behaviour change. These
  * six sections were nine always-open cards, so a trader who reads the page today sees every
@@ -65,6 +80,19 @@ const COMPETITION_TYPE_LABELS = new Map<string, string>([
   ["hybrid", "Hybrid"],
 ]);
 
+/** The small Menuitems picture each tab button carries (R39: an element, never a component). */
+function tabIcon(slug: string) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+    <img
+      src={NEON_ICON(slug)}
+      alt=""
+      draggable={false}
+      className="h-5 w-5 shrink-0 object-contain"
+    />
+  );
+}
+
 interface RiskSettings {
   maxLeverage: number;
   marginLiquidation: number;
@@ -84,310 +112,300 @@ interface RiskSettings {
 export function buildTradingLobbySections({
   competition,
   riskSettings,
-  creditSymbol,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   riskSettings: RiskSettings;
-  /** `AppSettings.credits.symbol`. Replaced a `currSymbol` prop handed the fiat symbol. */
+  /**
+   * `AppSettings.credits.symbol`. Read by the Prizes section, which left the tabs on
+   * 12 Oct 2026; still accepted so the page's call is unchanged.
+   */
   creditSymbol?: string;
 }): NeonAccordionSection[] {
   const sections: NeonAccordionSection[] = [];
   const rules = competition.rules;
+  const assets: string[] = competition.assetClasses ?? [];
 
   /* ---------- Eligible assets and the account a trader is given ---------- */
   sections.push({
     id: "eligible-assets",
-    icon: <IconTile icon={Coins} accent="players" size="sm" />,
+    icon: tabIcon("candles"),
     title: "Eligible Assets",
     content: (
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {(competition.assetClasses ?? []).map((asset: string) => (
-            <span
-              key={asset}
-              className="rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300"
-            >
-              {ASSET_LABELS.get(asset) ?? asset}
-            </span>
-          ))}
-        </div>
-        <NeonRow
-          label="Starting capital"
-          accent="entry"
-          value={`$${(
-            competition.startingCapital ||
-            competition.startingTradingPoints ||
-            0
-          ).toLocaleString()}`}
-        />
-        <NeonRow
-          label="Leverage"
-          accent="score"
-          /* Competition-specific leverage, never the platform-wide setting - carried over. */
-          value={
-            competition.leverage?.enabled
-              ? `1:${competition.leverage.min} to 1:${competition.leverage.max}`
-              : `1:${competition.leverage?.max || riskSettings.maxLeverage}`
+      <div className="max-w-3xl">
+        <RuleCard
+          iconSrc={NEON_ICON("candles")}
+          accent="sky"
+          title="Eligible Assets"
+          subtitle="The markets you can trade in this competition."
+          badge={
+            assets.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {assets.map((asset) => (
+                  <RuleBadge key={asset}>
+                    {ASSET_LABELS.get(asset) ?? asset}
+                  </RuleBadge>
+                ))}
+              </div>
+            )
           }
-        />
-        <NeonRow
-          label="Max open positions"
-          accent="rate"
-          value={competition.maxOpenPositions || 10}
-        />
-        <NeonRow
-          label="Max position size"
-          accent="rate"
-          value={`${competition.maxPositionSize || 100}%`}
-        />
+        >
+          <RuleRow
+            icon={Wallet}
+            label="Starting capital"
+            tone="cyan"
+            value={`$${(
+              competition.startingCapital ||
+              competition.startingTradingPoints ||
+              0
+            ).toLocaleString()}`}
+          />
+          <RuleRow
+            icon={Gauge}
+            label="Leverage"
+            /* Competition-specific leverage, never the platform-wide setting - carried over. */
+            value={
+              competition.leverage?.enabled
+                ? `1:${competition.leverage.min} to 1:${competition.leverage.max}`
+                : `1:${competition.leverage?.max || riskSettings.maxLeverage}`
+            }
+          />
+          <RuleRow
+            icon={Layers}
+            label="Max open positions"
+            value={competition.maxOpenPositions || 10}
+          />
+          <RuleRow
+            icon={Percent}
+            label="Max position size"
+            value={`${competition.maxPositionSize || 100}%`}
+          />
+        </RuleCard>
       </div>
     ),
   });
 
-  /* ---------- The format, and the thresholds a trader must clear ---------- */
-  sections.push({
-    id: "trading-rules",
-    icon: <IconTile icon={Scale} accent="value" size="sm" />,
-    title: "Trading Rules",
-    content: (
-      <div className="space-y-2">
-        <NeonRow
-          label="Format"
-          value={
-            COMPETITION_TYPE_LABELS.get(competition.competitionType) ??
-            "Time-based"
-          }
-        />
-        {rules?.minimumTrades > 0 && (
-          <NeonRow
-            label="Minimum trades"
-            accent="waiting"
-            value={rules.minimumTrades}
-          />
-        )}
-        {rules?.minimumWinRate > 0 && (
-          <NeonRow
-            label="Minimum win rate"
-            accent="waiting"
-            value={`${rules.minimumWinRate}%`}
-          />
-        )}
-        <NeonNote>
-          Trades are placed in the competition workspace and only count while
-          the competition is running.
-        </NeonNote>
-      </div>
-    ),
-  });
-
-  /* ---------- How the winner is decided ---------- */
-  if (rules) {
-    sections.push({
-      id: "scoring",
-      icon: <IconTile icon={Gauge} accent="entry" size="sm" />,
-      title: "Scoring",
-      content: (
-        <div className="space-y-2">
-          <NeonRow
-            label="Ranked by"
-            accent="value"
-            value={RANKING_LABELS.get(rules.rankingMethod) ?? "Highest P&L"}
-          />
-          <NeonNote>
-            {RANKING_EXPLANATIONS.get(rules.rankingMethod) ??
-              "Winner is determined by total profit & loss."}
-          </NeonNote>
-
-          {rules.tieBreaker1 && (
-            <>
-              <NeonRow
-                label="First tie breaker"
-                accent="score"
-                value={
-                  TIE_BREAKER_LABELS.get(rules.tieBreaker1) ?? rules.tieBreaker1
-                }
-              />
-              <NeonNote>
-                If two traders tie,{" "}
-                {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ??
-                  "this is used to break the tie."}
-              </NeonNote>
-            </>
-          )}
-
-          {rules.tieBreaker2 && (
-            <>
-              <NeonRow
-                label="Second tie breaker"
-                accent="score"
-                value={
-                  TIE_BREAKER_LABELS.get(rules.tieBreaker2) ?? rules.tieBreaker2
-                }
-              />
-              <NeonNote>
-                If they are still tied,{" "}
-                {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ??
-                  "this is used as a secondary tie breaker."}
-              </NeonNote>
-            </>
-          )}
-        </div>
-      ),
-    });
-  }
-
-  /* ---------- Risk limits and the margin ladder, which were two cards ---------- */
-  sections.push({
-    id: "risk-management",
-    icon: <IconTile icon={ShieldAlert} accent="ended" size="sm" />,
-    title: "Risk Management",
-    content: (
-      <div className="space-y-2">
-        <NeonRow
-          label="Risk limits"
-          accent={competition.riskLimits?.enabled ? "ended" : undefined}
-          value={competition.riskLimits?.enabled ? "Active" : "Off"}
-        />
-        <NeonRow
-          label="Max drawdown"
-          accent={competition.riskLimits?.enabled ? "ended" : undefined}
-          value={`${competition.riskLimits?.maxDrawdownPercent || 50}%`}
-        />
-        <NeonRow
-          label="Daily loss limit"
-          accent={competition.riskLimits?.enabled ? "ended" : undefined}
-          value={`${competition.riskLimits?.dailyLossLimitPercent || 20}%`}
-        />
-        {competition.riskLimits?.equityCheckEnabled && (
-          <NeonRow
-            label="Equity drawdown"
-            accent="score"
-            value={`${competition.riskLimits?.equityDrawdownPercent || 30}%`}
-          />
-        )}
-
-        <p className="pt-2 text-[11px] uppercase tracking-wider text-gray-500">
-          Margin levels
-        </p>
-        <NeonRow
-          label="Liquidation"
-          accent="ended"
-          value={`${riskSettings.marginLiquidation}%`}
-        />
-        <NeonRow
-          label="Margin call"
-          accent="waiting"
-          value={`${riskSettings.marginCall}%`}
-        />
-        <NeonRow
-          label="Warning"
-          accent="prize"
-          value={`${riskSettings.marginWarning}%`}
-        />
-        <NeonRow
-          label="Safe"
-          accent="entry"
-          value={`${riskSettings.marginSafe}%`}
-        />
-
-        {/* The ladder as a bar, which is the one part of the old card that was not a number. */}
-        <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-[#080C18]">
-          <div className="bg-rose-500" style={{ width: "20%" }} />
-          <div className="bg-orange-500" style={{ width: "20%" }} />
-          <div className="bg-amber-400" style={{ width: "20%" }} />
-          <div className="bg-emerald-500" style={{ width: "40%" }} />
-        </div>
-      </div>
-    ),
-  });
-
-  /* ---------- Disqualification, only when something can actually disqualify ---------- */
-  if (
+  /*
+   * ---------- Trading rules, scoring and disqualification, as ONE tab ----------
+   *
+   * Three sections until 12 Oct 2026, when the owner asked for them combined; since the
+   * owner's second reference the same day each is its own card inside the one tab. Every row,
+   * note, fallback and condition below is the old sections' own. The two minimum rows the old
+   * "Trading Rules" carried live only in the disqualification card, which shows them under
+   * exactly the same condition, so neither threshold is stated twice.
+   */
+  const hasDisqualification =
     rules &&
     (rules.minimumTrades > 0 ||
       rules.disqualifyOnLiquidation ||
-      rules.minimumWinRate)
-  ) {
-    sections.push({
-      id: "disqualification",
-      icon: <IconTile icon={Ban} accent="ended" size="sm" />,
-      title: "Disqualification",
-      content: (
-        <div className="space-y-2">
-          {rules.minimumTrades > 0 && (
-            <>
-              <NeonRow
-                label="Minimum trades required"
-                accent="waiting"
-                value={rules.minimumTrades}
-              />
-              <NeonNote>
-                Complete {rules.minimumTrades} or more trades, or you are
-                disqualified.
-              </NeonNote>
-            </>
-          )}
-          {rules.disqualifyOnLiquidation && (
-            <>
-              <NeonRow
-                label="Liquidation"
-                accent="ended"
-                value="Immediate disqualification"
-              />
-              <NeonNote>
-                If your account is liquidated you are out of the competition.
-              </NeonNote>
-            </>
-          )}
-          {rules.minimumWinRate > 0 && (
-            <>
-              <NeonRow
-                label="Minimum win rate"
-                accent="prize"
-                value={`${rules.minimumWinRate}%`}
-              />
-              <NeonNote>
-                A win rate below {rules.minimumWinRate}% is a disqualification.
-              </NeonNote>
-            </>
-          )}
-        </div>
-      ),
-    });
-  }
+      rules.minimumWinRate);
 
-  /* ---------- How prize money is worked out, which used to be a footnote ---------- */
   sections.push({
-    id: "prizes",
-    icon: <IconTile icon={Trophy} accent="prize" size="sm" />,
-    title: "Prizes",
+    id: "trading-rules",
+    icon: tabIcon("swords"),
+    title: "Trading Rules",
     content: (
-      <div className="space-y-2">
-        <NeonRow
-          label="Prize pool"
-          accent="prize"
-          value={formatVolts(
-            competition.prizePool || competition.prizePoolCredits || 0,
-            { symbol: creditSymbol },
-          )}
-        />
-        <NeonRow
-          label="Paid positions"
-          value={competition.prizeDistribution?.length ?? 0}
-        />
-        {competition.platformFeePercentage > 0 && (
-          <NeonRow
-            label="Platform fee"
-            accent="value"
-            value={`${competition.platformFeePercentage}%`}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <RuleCard
+          iconSrc={NEON_ICON("swords")}
+          accent="violet"
+          title="Trading Rules"
+          subtitle="How this competition is played."
+        >
+          <RuleRow
+            icon={Clock}
+            label="Format"
+            tone="cyan"
+            value={
+              COMPETITION_TYPE_LABELS.get(competition.competitionType) ??
+              "Time-based"
+            }
           />
+          <RuleInfo>
+            Trades are placed in the competition workspace and only count while
+            the competition is running.
+          </RuleInfo>
+        </RuleCard>
+
+        {rules && (
+          <RuleCard
+            iconSrc={NEON_ICON("target-purple")}
+            accent="sky"
+            title="Scoring"
+            subtitle="How the winner is decided."
+          >
+            <RuleRow
+              icon={Trophy}
+              label="Ranked by"
+              tone="yellow"
+              value={RANKING_LABELS.get(rules.rankingMethod) ?? "Highest P&L"}
+            />
+            <RuleInfo>
+              {RANKING_EXPLANATIONS.get(rules.rankingMethod) ??
+                "Winner is determined by total profit & loss."}
+            </RuleInfo>
+
+            {rules.tieBreaker1 && (
+              <>
+                <RuleRow
+                  icon={Scale}
+                  label="First tie breaker"
+                  tone="purple"
+                  value={
+                    TIE_BREAKER_LABELS.get(rules.tieBreaker1) ??
+                    rules.tieBreaker1
+                  }
+                />
+                <RuleInfo>
+                  If two traders tie,{" "}
+                  {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ??
+                    "this is used to break the tie."}
+                </RuleInfo>
+              </>
+            )}
+
+            {rules.tieBreaker2 && (
+              <>
+                <RuleRow
+                  icon={Scale}
+                  label="Second tie breaker"
+                  tone="purple"
+                  value={
+                    TIE_BREAKER_LABELS.get(rules.tieBreaker2) ??
+                    rules.tieBreaker2
+                  }
+                />
+                <RuleInfo>
+                  If they are still tied,{" "}
+                  {TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ??
+                    "this is used as a secondary tie breaker."}
+                </RuleInfo>
+              </>
+            )}
+          </RuleCard>
         )}
-        <NeonNote>
-          Prize amounts are shown net of the platform fee. If a paid position is
-          not filled, its share is split equally among the winners who did
-          finish.
-        </NeonNote>
+
+        {hasDisqualification && (
+          <RuleCard
+            iconSrc={NEON_ICON("fire")}
+            accent="rose"
+            title="Disqualification"
+            subtitle="What knocks you out of the competition."
+          >
+            {rules.minimumTrades > 0 && (
+              <>
+                <RuleRow
+                  icon={ListChecks}
+                  label="Minimum trades required"
+                  tone="yellow"
+                  value={rules.minimumTrades}
+                />
+                <RuleInfo>
+                  Complete {rules.minimumTrades} or more trades, or you are
+                  disqualified.
+                </RuleInfo>
+              </>
+            )}
+            {rules.disqualifyOnLiquidation && (
+              <>
+                <RuleWarning
+                  label="Liquidation"
+                  value="Immediate disqualification"
+                />
+                <RuleInfo>
+                  If your account is liquidated you are out of the competition.
+                </RuleInfo>
+              </>
+            )}
+            {rules.minimumWinRate > 0 && (
+              <>
+                <RuleRow
+                  icon={Percent}
+                  label="Minimum win rate"
+                  tone="orange"
+                  value={`${rules.minimumWinRate}%`}
+                />
+                <RuleInfo>
+                  A win rate below {rules.minimumWinRate}% is a
+                  disqualification.
+                </RuleInfo>
+              </>
+            )}
+          </RuleCard>
+        )}
+      </div>
+    ),
+  });
+
+  /* ---------- Risk limits and the margin ladder ---------- */
+  const riskOn = !!competition.riskLimits?.enabled;
+  sections.push({
+    id: "risk-management",
+    icon: tabIcon("shield"),
+    title: "Risk Management",
+    content: (
+      <div className="max-w-3xl">
+        <RuleCard
+          iconSrc={NEON_ICON("shield")}
+          accent="pink"
+          title="Risk Management"
+          subtitle="The limits that keep your account alive."
+        >
+          <RuleRow
+            icon={ShieldCheck}
+            label="Risk limits"
+            tone={riskOn ? "red" : "plain"}
+            value={riskOn ? "Active" : "Off"}
+          />
+          <RuleRow
+            icon={TrendingDown}
+            label="Max drawdown"
+            tone={riskOn ? "red" : "plain"}
+            value={`${competition.riskLimits?.maxDrawdownPercent || 50}%`}
+          />
+          <RuleRow
+            icon={CalendarX}
+            label="Daily loss limit"
+            tone={riskOn ? "red" : "plain"}
+            value={`${competition.riskLimits?.dailyLossLimitPercent || 20}%`}
+          />
+          {competition.riskLimits?.equityCheckEnabled && (
+            <RuleRow
+              icon={TrendingDown}
+              label="Equity drawdown"
+              tone="purple"
+              value={`${competition.riskLimits?.equityDrawdownPercent || 30}%`}
+            />
+          )}
+          <MarginLadder
+            levels={[
+              {
+                label: "Liquidation",
+                value: `${riskSettings.marginLiquidation}%`,
+                dot: "bg-rose-500",
+                text: "text-rose-400",
+              },
+              {
+                label: "Margin call",
+                value: `${riskSettings.marginCall}%`,
+                dot: "bg-orange-500",
+                text: "text-orange-300",
+              },
+              {
+                label: "Warning",
+                value: `${riskSettings.marginWarning}%`,
+                dot: "bg-amber-400",
+                text: "text-amber-300",
+              },
+              {
+                label: "Safe",
+                value: `${riskSettings.marginSafe}%`,
+                dot: "bg-emerald-500",
+                text: "text-emerald-300",
+              },
+            ]}
+          />
+        </RuleCard>
       </div>
     ),
   });

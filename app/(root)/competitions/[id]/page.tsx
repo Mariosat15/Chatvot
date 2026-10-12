@@ -1,4 +1,5 @@
-import { ArrowLeft, BarChart3, Trophy } from "lucide-react";
+import { ArrowLeft, BarChart3 } from "lucide-react";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import {
   calculateCompetitionDifficulty,
   DifficultyLevel,
@@ -15,7 +16,6 @@ import CompetitionLeaderboard from "@/components/trading/CompetitionLeaderboard"
 import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
 import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
 import LiveContestRefresher from "@/components/competitions/LiveContestRefresher";
-import UTCClock from "@/components/trading/UTCClock";
 import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
 import { TradingLobbySummary } from "@/components/trading/lobby/TradingLobbySummary";
 import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
@@ -421,9 +421,6 @@ const CompetitionDetailsPage = async ({
                   />
                 )}
               </div>
-              <div className="hidden sm:block">
-                <UTCClock />
-              </div>
             </div>
           }
           hero={
@@ -462,7 +459,7 @@ const CompetitionDetailsPage = async ({
               {/* The dashboard's "View Leaderboard" button scrolls here. */}
               <div id="competition-leaderboard" className="scroll-mt-24">
               <NeonPanel
-                icon={Trophy}
+                iconSrc={NEON_ICON("trophy-blue")}
                 accent="prize"
                 title="Leaderboard"
                 size="lg"

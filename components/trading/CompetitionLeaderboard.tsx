@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Trophy, Ban, AlertTriangle, Skull, ShieldX } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
-import { neonRowClasses } from "@/components/neon/LeaderboardRow";
+import { NeonRankBadge, neonRowClasses } from "@/components/neon/LeaderboardRow";
 import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import ProfileCard from "@/components/profile/ProfileCard";
 import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
@@ -39,6 +39,10 @@ interface CompetitionLeaderboardProps {
   competitionStatus?: "upcoming" | "active" | "completed" | "cancelled";
 }
 
+/** One column template for the header and every row, so the two cannot drift apart. */
+const GRID =
+  "grid grid-cols-[minmax(0,1fr)_96px_88px_80px_84px_64px_72px] items-center gap-3";
+
 export default function CompetitionLeaderboard({
   leaderboard,
   userParticipantId,
@@ -52,50 +56,6 @@ export default function CompetitionLeaderboard({
   const getPrizePercentage = (rank: number) => {
     const prize = prizeDistribution.find((p) => p.rank === rank);
     return prize ? prize.percentage : 0;
-  };
-
-  const getRankIcon = (
-    rank: number,
-    isDisqualified: boolean,
-    isTied?: boolean,
-  ) => {
-    if (isDisqualified) {
-      return <Ban className="h-5 w-5 text-red-500" />;
-    }
-
-    // Add tie indicator ring for tied positions
-    const tieRingClass = isTied
-      ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-gray-900 rounded-full"
-      : "";
-
-    switch (rank) {
-      case 1:
-        return (
-          <div className={`${tieRingClass} flex items-center justify-center`}>
-            <Trophy className="h-5 w-5 text-yellow-500" />
-          </div>
-        );
-      case 2:
-        return (
-          <div className={`${tieRingClass} flex items-center justify-center`}>
-            <Trophy className="h-5 w-5 text-gray-400" />
-          </div>
-        );
-      case 3:
-        return (
-          <div className={`${tieRingClass} flex items-center justify-center`}>
-            <Trophy className="h-5 w-5 text-orange-600" />
-          </div>
-        );
-      default:
-        return (
-          <span
-            className={`w-5 h-5 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-400 ${tieRingClass}`}
-          >
-            {rank}
-          </span>
-        );
-    }
   };
 
   // Helper to get disqualification icon
@@ -146,7 +106,7 @@ export default function CompetitionLeaderboard({
     return (
       <div className="py-12 text-center">
         <Trophy className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-        <p className="text-gray-400">No participants yet</p>
+        <p className="text-gray-400">No traders yet - be the first on the board!</p>
       </div>
     );
   }
@@ -156,29 +116,27 @@ export default function CompetitionLeaderboard({
     return entry.winningTrades / entry.losingTrades;
   };
 
-  return (
-    <div className="space-y-2 overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-      <div className="min-w-[640px]">
-      {/* Header */}
-      <div
-        className={`grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 md:gap-3 px-3 md:px-4 pb-2 ${NEON_TABLE_HEAD}`}
-      >
-        <div className="flex-shrink-0">#</div>
-        <div className="min-w-0">Trader</div>
-        <div className="text-right flex-shrink-0 min-w-[80px]">Capital</div>
-        <div className="text-right flex-shrink-0 min-w-[70px]">P&L</div>
-        <div className="text-right flex-shrink-0 min-w-[60px]">ROI %</div>
-        <div className="text-right flex-shrink-0 min-w-[60px]">Win Rate</div>
-        <div className="text-right flex-shrink-0 min-w-[45px]">Trades</div>
-        <div className="text-right flex-shrink-0 min-w-[55px]">P.Factor</div>
-      </div>
+  const struck = "text-gray-500 line-through";
 
-      {/* Leaderboard Entries */}
-      <div className="space-y-1">
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[760px] space-y-2.5">
+        {/* Header */}
+        <div className={`${GRID} px-4 pb-1 ${NEON_TABLE_HEAD}`}>
+          <div>Trader</div>
+          <div className="text-right">Capital</div>
+          <div className="text-right">P&L</div>
+          <div className="text-right">ROI %</div>
+          <div className="text-right">Win Rate</div>
+          <div className="text-right">Trades</div>
+          <div className="text-right">P.Factor</div>
+        </div>
+
         {leaderboard.map((entry, index) => {
+          const rank = entry.currentRank || index + 1;
           const isCurrentUser = entry._id === userParticipantId;
-          const isPrizePosition =
-            getPrizePercentage(entry.currentRank || index + 1) > 0;
+          const prizePercentage = getPrizePercentage(rank);
+          const isPrizePosition = prizePercentage > 0;
           const winRate =
             entry.totalTrades > 0
               ? (entry.winningTrades / entry.totalTrades) * 100
@@ -193,13 +151,13 @@ export default function CompetitionLeaderboard({
             <div
               key={entry._id}
               /*
-                The row shell comes from the shared kit, so this board and the game board are
-                the same object with different columns. Disqualification is tested FIRST and
-                keeps its own treatment: it is the one state that must beat both "this is you"
-                and "this is a paid position", because a struck-through row tinted as a winner
-                would read as a prize a disqualified trader is about to be paid.
+                The row shell comes from the shared kit's framed (`flush`) set: a gold frame for
+                the leader, a blue glow for "you". Disqualification is tested FIRST and keeps its
+                own treatment: it must beat both "this is you" and "this is a paid position",
+                because a struck-through row tinted as a winner would read as a prize a
+                disqualified trader is about to be paid.
               */
-              className={`relative grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 p-3 md:gap-3 md:p-4 ${
+              className={`relative px-4 py-3.5 ${
                 isDisqualified
                   ? "rounded-xl border border-rose-500/30 bg-rose-500/5 opacity-70"
                   : neonRowClasses({
@@ -207,228 +165,213 @@ export default function CompetitionLeaderboard({
                         `isPrizePosition`, not the raw rank, decides the podium tint here. A
                         trading contest can pay four places or one, so the kit's top-three
                         default would tint a third place that wins nothing and leave a paid
-                        fourth plain.
+                        fourth plain. The leader keeps rank 1 so it gets the gold frame.
                       */
-                      rank: isPrizePosition ? 1 : 99,
+                      rank: isPrizePosition ? (rank === 1 ? 1 : 2) : 99,
                       isCurrentUser,
+                      variant: "flush",
                     })
               }`}
             >
-              {/* Red strikethrough line for disqualified */}
               {isDisqualified && (
-                <div className="absolute inset-0 flex items-center pointer-events-none z-10">
-                  <div className="w-full h-[2px] bg-red-500/60"></div>
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center">
+                  <div className="h-[2px] w-full bg-red-500/60" />
                 </div>
               )}
 
-              {/* Rank */}
-              <div className="flex items-center flex-shrink-0">
-                {getRankIcon(
-                  entry.currentRank || index + 1,
-                  isDisqualified,
-                  entry.isTied,
-                )}
-              </div>
-
-              {/* Trader */}
-              <div className="flex flex-col justify-center min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                  <button
-                    onClick={() => {
-                      setSelectedUser(entry);
-                      setShowProfileCard(true);
-                    }}
-                    className={`text-sm font-medium truncate hover:underline cursor-pointer transition-colors ${
-                      isDisqualified
-                        ? "text-red-400/70 line-through"
-                        : isCurrentUser
-                          ? "text-blue-400"
-                          : "text-gray-100 hover:text-blue-400"
+              <div className={GRID}>
+                {/* Rank + trader */}
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                      entry.isTied && !isDisqualified
+                        ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-[#080C18]"
+                        : ""
                     }`}
                   >
-                    {entry.username}
-                  </button>
-                  <GameMasterBadge userId={entry.userId} />
-                  {entry.userTitle && !isDisqualified && (
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 inline-flex items-center gap-1 ${entry.userTitleColor || "text-purple-400"} bg-gray-800/80 border border-gray-700`}
-                    >
-                      {entry.userTitleIcon && entry.userTitleIcon in GAME_ICONS ? (
-                        <GameIcon name={entry.userTitleIcon as GameIconName} size={12} />
-                      ) : entry.userTitleIcon ? (
-                        <span>{entry.userTitleIcon}</span>
-                      ) : null}
-                      {entry.userTitle}
-                    </span>
-                  )}
-                  {isCurrentUser && (
-                    <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400 flex-shrink-0">
-                      You
-                    </span>
-                  )}
-                  {entry.isTied && !isDisqualified && (
-                    <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400 flex-shrink-0 font-semibold flex items-center gap-1">
-                      = #{entry.currentRank}
-                      {entry.tiedWith && entry.tiedWith.length > 0 && (
-                        <span className="text-amber-300/70">
-                          ({entry.tiedWith.length + 1} equal)
+                    {isDisqualified ? (
+                      <Ban className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <NeonRankBadge rank={rank} />
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setSelectedUser(entry);
+                          setShowProfileCard(true);
+                        }}
+                        className={`cursor-pointer truncate text-base font-bold transition-colors hover:underline ${
+                          isDisqualified
+                            ? "text-red-400/70 line-through"
+                            : isCurrentUser
+                              ? "text-sky-200"
+                              : "text-gray-100 hover:text-sky-300"
+                        }`}
+                      >
+                        {entry.username}
+                      </button>
+                      <GameMasterBadge userId={entry.userId} />
+                      {entry.userTitle && !isDisqualified && (
+                        <span
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-700 bg-gray-800/80 px-2 py-0.5 text-xs font-semibold ${entry.userTitleColor || "text-purple-400"}`}
+                        >
+                          {entry.userTitleIcon && entry.userTitleIcon in GAME_ICONS ? (
+                            <GameIcon name={entry.userTitleIcon as GameIconName} size={12} />
+                          ) : entry.userTitleIcon ? (
+                            <span>{entry.userTitleIcon}</span>
+                          ) : null}
+                          {entry.userTitle}
                         </span>
                       )}
-                    </span>
-                  )}
-                  {isDisqualified && (
-                    <span className="px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400 font-bold flex items-center gap-1 flex-shrink-0">
-                      {getDisqualificationIcon(disqualificationReason)}
-                      DISQUALIFIED
-                    </span>
-                  )}
-                </div>
-                {/* Disqualification reason */}
-                {isDisqualified && (
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-xs text-red-400 font-medium flex items-center gap-1">
-                      ❌ Reason: {disqualificationReason}
-                    </span>
+                      {isCurrentUser && (
+                        <span className="shrink-0 rounded-md border border-sky-400/50 bg-sky-500/20 px-1.5 py-0.5 text-xs font-semibold text-sky-300">
+                          You
+                        </span>
+                      )}
+                      {entry.isTied && !isDisqualified && (
+                        <span className="flex shrink-0 items-center gap-1 rounded-md border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold text-amber-300">
+                          = #{entry.currentRank}
+                          {entry.tiedWith && entry.tiedWith.length > 0 && (
+                            <span className="text-amber-300/70">
+                              ({entry.tiedWith.length + 1} equal)
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {isDisqualified && (
+                        <span className="flex shrink-0 items-center gap-1 rounded bg-red-500/20 px-2 py-0.5 text-xs font-bold text-red-400">
+                          {getDisqualificationIcon(disqualificationReason)}
+                          DISQUALIFIED
+                        </span>
+                      )}
+                    </div>
+                    {isDisqualified && (
+                      <p className="mt-1 text-xs font-medium text-red-400">
+                        ❌ Reason: {disqualificationReason}
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Capital */}
-              <div className="flex items-center justify-end gap-1 flex-shrink-0 min-w-[80px]">
-                <p
-                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                    isDisqualified
-                      ? "text-gray-500 line-through"
-                      : "text-gray-100"
-                  }`}
-                >
-                  {entry.currentCapital.toLocaleString()}
-                </p>
-                <span className="text-xs text-gray-500 flex-shrink-0">pts</span>
-              </div>
+                {/* Capital */}
+                <div className="flex items-baseline justify-end gap-1 whitespace-nowrap">
+                  <span
+                    className={`text-base font-bold tabular-nums ${isDisqualified ? struck : "text-gray-100"}`}
+                  >
+                    {entry.currentCapital.toLocaleString()}
+                  </span>
+                  <span className="text-xs text-gray-500">pts</span>
+                </div>
 
-              {/* P&L */}
-              <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[70px]">
+                {/* P&L */}
                 <p
-                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                  className={`text-right text-base font-bold tabular-nums whitespace-nowrap ${
                     isDisqualified
-                      ? "text-gray-500 line-through"
+                      ? struck
                       : entry.pnl >= 0
-                        ? "text-green-500"
-                        : "text-red-500"
+                        ? "text-green-400"
+                        : "text-red-400"
                   }`}
                 >
                   {entry.pnl >= 0 ? "+" : ""}
                   {entry.pnl.toFixed(2)}
                 </p>
-              </div>
 
-              {/* ROI % */}
-              <div className="flex items-center justify-end flex-shrink-0 min-w-[60px]">
+                {/* ROI % */}
                 <p
-                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                  className={`text-right text-base font-bold tabular-nums whitespace-nowrap ${
                     isDisqualified
-                      ? "text-gray-500 line-through"
+                      ? struck
                       : entry.pnlPercentage >= 0
-                        ? "text-green-500"
-                        : "text-red-500"
+                        ? "text-green-400"
+                        : "text-red-400"
                   }`}
                 >
                   {entry.pnlPercentage >= 0 ? "+" : ""}
                   {entry.pnlPercentage.toFixed(2)}%
                 </p>
-              </div>
 
-              {/* Win Rate */}
-              <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[60px]">
-                <p
-                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
-                    isDisqualified
-                      ? "text-gray-500 line-through"
-                      : "text-gray-100"
-                  }`}
-                >
-                  {winRate.toFixed(1)}%
-                </p>
-                <p className="text-xs text-gray-500 whitespace-nowrap">
-                  {entry.winningTrades}W/{entry.losingTrades}L
-                </p>
-              </div>
+                {/* Win Rate */}
+                <div className="text-right whitespace-nowrap">
+                  <p
+                    className={`text-base font-bold tabular-nums ${isDisqualified ? struck : "text-gray-100"}`}
+                  >
+                    {winRate.toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {entry.winningTrades}W/{entry.losingTrades}L
+                  </p>
+                </div>
 
-              {/* Trades */}
-              <div className="flex items-center justify-end flex-shrink-0 min-w-[45px]">
+                {/* Trades */}
                 <p
-                  className={`text-sm font-semibold tabular-nums ${
+                  className={`text-right text-base font-bold tabular-nums ${
                     isDisqualified
                       ? competitionStatus === "completed" &&
                         minimumTrades > 0 &&
                         entry.totalTrades < minimumTrades
                         ? "text-red-400"
-                        : "text-gray-500 line-through"
+                        : struck
                       : minimumTrades > 0 &&
                           entry.totalTrades < minimumTrades &&
                           competitionStatus === "active"
-                        ? "text-yellow-400" // Warning color during active competition
+                        ? "text-amber-400" // Warning color during active competition
                         : "text-gray-100"
                   }`}
                 >
                   {entry.totalTrades}
                   {minimumTrades > 0 && (
                     <span
-                      className={`text-xs ml-0.5 ${
+                      className={`ml-0.5 text-sm ${
                         entry.totalTrades >= minimumTrades
                           ? "text-green-400"
                           : competitionStatus === "completed"
                             ? "text-red-400"
-                            : "text-yellow-400"
+                            : "text-amber-400"
                       }`}
                     >
                       /{minimumTrades}
                     </span>
                   )}
                 </p>
-              </div>
 
-              {/* Profit Factor */}
-              <div className="flex items-center justify-end flex-shrink-0 min-w-[55px]">
+                {/* Profit Factor */}
                 <p
-                  className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
+                  className={`text-right text-base font-bold tabular-nums whitespace-nowrap ${
                     isDisqualified
-                      ? "text-gray-500 line-through"
+                      ? struck
                       : profitFactor >= 2
-                        ? "text-green-500"
+                        ? "text-green-400"
                         : profitFactor >= 1
-                          ? "text-yellow-500"
-                          : "text-red-500"
+                          ? "text-amber-400"
+                          : "text-red-400"
                   }`}
                 >
                   {profitFactor === 9999 ? "∞" : profitFactor.toFixed(2)}
                 </p>
               </div>
 
-              {/* Prize Indicator - Full Width (only for qualified) */}
+              {/* Prize line (qualified only) */}
               {isPrizePosition && !isDisqualified && (
-                <div className="col-span-full mt-2 pt-2 border-t border-gray-700/50">
-                  <p className="text-xs text-yellow-500">
-                    🏆 Prize position:{" "}
-                    {getPrizePercentage(entry.currentRank || index + 1)}% of
-                    pool
-                    {entry.isTied &&
-                      entry.tiedWith &&
-                      entry.tiedWith.length > 0 && (
-                        <span className="ml-2 text-amber-400">
-                          (Split with {entry.tiedWith.length} other
-                          {entry.tiedWith.length > 1 ? "s" : ""})
-                        </span>
-                      )}
+                <div className="mt-3 border-t border-amber-400/20 pt-2.5">
+                  <p className="text-sm font-medium text-amber-300">
+                    🏆 Prize position: {prizePercentage}% of pool
+                    {entry.isTied && entry.tiedWith && entry.tiedWith.length > 0 && (
+                      <span className="ml-2 text-amber-200/80">
+                        (Split with {entry.tiedWith.length} other
+                        {entry.tiedWith.length > 1 ? "s" : ""})
+                      </span>
+                    )}
                   </p>
                 </div>
               )}
 
-              {/* No Prize - Disqualified */}
+              {/* No prize - disqualified */}
               {isPrizePosition && isDisqualified && (
-                <div className="col-span-full mt-2 pt-2 border-t border-red-500/30">
-                  <p className="text-xs text-red-400 flex items-center gap-1">
+                <div className="mt-3 border-t border-red-500/30 pt-2.5">
+                  <p className="flex items-center gap-1 text-xs text-red-400">
                     <Ban className="h-3 w-3" />
                     Not eligible for prize - {disqualificationReason}
                   </p>
@@ -437,7 +380,6 @@ export default function CompetitionLeaderboard({
             </div>
           );
         })}
-      </div>
       </div>
 
       {/* Profile Card Popup */}

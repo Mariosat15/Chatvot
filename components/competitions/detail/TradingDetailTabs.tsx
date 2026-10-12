@@ -2,8 +2,9 @@
 
 import { useRef, useState } from "react";
 import type { PointerEvent, WheelEvent } from "react";
-import { Info, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NeonPanel } from "@/components/neon/Cards";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
 import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
 import { contestAboutFallback } from "@/components/competitions/lobby/contest-lobby-copy";
@@ -20,6 +21,9 @@ import type { TradingOverviewCopy } from "@/components/competitions/lobby/tradin
  * THE OVERVIEW IS THIS CONTEST'S FACTS, not generic copy: `overview` comes from
  * `buildTradingOverviewCopy`, which writes the feature tiles and the four steps from the ranking
  * method, the assets, the capital, the leverage, the minimum trades and the prize pot.
+ *
+ * ARROWS either side of the strip step to the previous and next tab (owner, 12 Oct 2026), and
+ * Prizes is no longer a tab - the sidebar's prize distribution already says all of it.
  *
  * NO VISIBLE SCROLLBAR (owner, same day): the strip scrolls by dragging, by the wheel and by
  * touch. The pointer is captured only after the drag threshold - capturing on pointer-down
@@ -95,6 +99,17 @@ function useDragScroll() {
   };
 }
 
+/**
+ * The Overview's four feature tiles each glow in their own colour (owner reference,
+ * 12 Oct 2026). Whole class strings, cycled by position, so Tailwind sees every one.
+ */
+const FEATURE_GLOWS = [
+  "border-emerald-400/45 shadow-[0_0_22px_rgba(52,211,153,0.18)]",
+  "border-sky-400/45 shadow-[0_0_22px_rgba(56,189,248,0.18)]",
+  "border-violet-400/45 shadow-[0_0_22px_rgba(167,139,250,0.18)]",
+  "border-amber-400/45 shadow-[0_0_22px_rgba(251,191,36,0.18)]",
+] as const;
+
 export function TradingDetailTabs({
   description,
   sections,
@@ -112,63 +127,103 @@ export function TradingDetailTabs({
       : contestAboutFallback("trading");
   const active = sections.find((s) => s.id === tab);
 
+  /*
+   * The arrows step through the tabs in strip order and bring the chosen one into view, so a
+   * tab hidden past the edge of a narrow strip is reachable without dragging (owner request).
+   */
+  const order = [OVERVIEW_ID, ...sections.map((s) => s.id)];
+  const at = Math.max(0, order.indexOf(tab));
+  const go = (step: -1 | 1) => {
+    const next = order[at + step];
+    if (!next) return;
+    setTab(next);
+    dragScroll.ref.current
+      ?.querySelector<HTMLElement>(`[data-tab-id="${next}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+  };
+
   return (
     <NeonPanel accent="players" size="lg" className="!p-0 overflow-hidden">
-      <div
-        role="tablist"
-        {...dragScroll}
-        className="flex cursor-grab select-none gap-1.5 overflow-x-auto border-b border-[#1B2540] bg-[#080C18]/70 p-2 [scrollbar-width:none] active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
-      >
-        <TabButton
-          active={tab === OVERVIEW_ID}
-          onClick={() => setTab(OVERVIEW_ID)}
-          icon={<Sparkles className="h-4 w-4 shrink-0 text-sky-300" />}
-          label="Overview"
+      <div className="flex items-center gap-1.5 border-b border-[#1B2540] bg-[#080C18]/70 p-2">
+        <ArrowButton
+          direction="previous"
+          disabled={at === 0}
+          onClick={() => go(-1)}
         />
-        {sections.map((section) => (
+        <div
+          role="tablist"
+          {...dragScroll}
+          className="flex min-w-0 flex-1 cursor-grab select-none gap-1.5 overflow-x-auto [scrollbar-width:none] active:cursor-grabbing [&::-webkit-scrollbar]:hidden"
+        >
           <TabButton
-            key={section.id}
-            active={tab === section.id}
-            onClick={() => setTab(section.id)}
-            icon={section.icon}
-            label={section.title}
+            id={OVERVIEW_ID}
+            active={tab === OVERVIEW_ID}
+            onClick={() => setTab(OVERVIEW_ID)}
+            icon={
+              // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+              <img
+                src={NEON_ICON("lightbulb")}
+                alt=""
+                draggable={false}
+                className="h-5 w-5 shrink-0 object-contain"
+              />
+            }
+            label="Overview"
           />
-        ))}
+          {sections.map((section) => (
+            <TabButton
+              key={section.id}
+              id={section.id}
+              active={tab === section.id}
+              onClick={() => setTab(section.id)}
+              icon={section.icon}
+              label={section.title}
+            />
+          ))}
+        </div>
+        <ArrowButton
+          direction="next"
+          disabled={at === order.length - 1}
+          onClick={() => go(1)}
+        />
       </div>
 
       <div className="p-5 sm:p-6" role="tabpanel">
         {active ? (
-          <div className="max-w-3xl text-base [&_p]:text-[15px]">
-            <h3 className="mb-4 flex items-center gap-2.5 text-xl font-bold text-gray-100">
-              {active.icon}
-              {active.title}
-            </h3>
-            {active.content}
-          </div>
+          /* The rule cards carry their own icon and heading, so the panel adds none. */
+          active.content
         ) : (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-            <div>
-              <h3 className="flex items-center gap-2.5 text-xl font-bold text-gray-100">
-                <Info className="h-5 w-5 text-sky-300" />
-                About this competition
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            <section className="rounded-2xl border border-sky-400/30 bg-[#060A18]/85 p-5 shadow-[0_0_26px_rgba(56,189,248,0.12)]">
+              <h3 className="flex items-center gap-3 text-xl font-bold text-gray-100">
+                {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
+                <img
+                  src={NEON_ICON("lightbulb")}
+                  alt=""
+                  draggable={false}
+                  className="h-10 w-10 shrink-0 object-contain"
+                />
+                <span>
+                  About this <span className="text-cyan-300">competition</span>
+                </span>
               </h3>
               <p className="mt-3 text-base leading-relaxed text-gray-300">
                 {about}
               </p>
               <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {overview.features.map((feature) => (
+                {overview.features.map((feature, index) => (
                   <li
                     key={feature.iconSrc}
-                    className="flex flex-col items-center rounded-xl border border-[#1B2540] bg-[#080C18]/60 px-3 py-4 text-center"
+                    className={`flex flex-col items-center rounded-xl border bg-[#0A1024]/80 px-3 py-5 text-center ${FEATURE_GLOWS[index % FEATURE_GLOWS.length]}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
                     <img
                       src={feature.iconSrc}
                       alt=""
-                      className="h-11 w-11 object-contain"
+                      className="h-14 w-14 object-contain"
                       draggable={false}
                     />
-                    <p className="mt-2 text-sm font-semibold text-gray-100">
+                    <p className="mt-3 text-base font-bold text-white">
                       {feature.title}
                     </p>
                     <p className="mt-1 text-xs leading-snug text-gray-400">
@@ -177,13 +232,16 @@ export function TradingDetailTabs({
                   </li>
                 ))}
               </ul>
-            </div>
-            <ContestHowItWorks
-              kind="trading"
-              embedded
-              layout="timeline"
-              steps={overview.steps}
-            />
+            </section>
+            <section className="rounded-2xl border border-violet-400/30 bg-[#060A18]/85 p-5 shadow-[0_0_26px_rgba(167,139,250,0.12)]">
+              <ContestHowItWorks
+                kind="trading"
+                embedded
+                layout="timeline"
+                iconSrc={NEON_ICON("rocket")}
+                steps={overview.steps}
+              />
+            </section>
           </div>
         )}
       </div>
@@ -191,12 +249,37 @@ export function TradingDetailTabs({
   );
 }
 
+function ArrowButton({
+  direction,
+  disabled,
+  onClick,
+}: {
+  direction: "previous" | "next";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const Icon = direction === "previous" ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      aria-label={direction === "previous" ? "Previous tab" : "Next tab"}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 text-sky-200 transition hover:bg-sky-500/20 hover:shadow-[0_0_14px_rgba(56,189,248,0.35)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-sky-500/10 disabled:hover:shadow-none"
+    >
+      <Icon className="h-5 w-5" />
+    </button>
+  );
+}
+
 function TabButton({
+  id,
   active,
   onClick,
   icon,
   label,
 }: {
+  id: string;
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
@@ -206,6 +289,7 @@ function TabButton({
     <button
       type="button"
       role="tab"
+      data-tab-id={id}
       aria-selected={active}
       onClick={onClick}
       draggable={false}

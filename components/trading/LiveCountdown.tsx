@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import CountdownPanel from "@/components/competitions/CountdownPanel";
+import type { CountdownSize } from "@/components/competitions/CountdownPanel";
 
 /**
  * The trading competition lobby's large countdown.
@@ -25,6 +26,7 @@ interface LiveCountdownProps {
   label: string;
   type: "start" | "end";
   status: "upcoming" | "active" | "completed";
+  size?: CountdownSize;
 }
 
 export default function LiveCountdown({
@@ -32,6 +34,7 @@ export default function LiveCountdown({
   label,
   type,
   status,
+  size,
 }: LiveCountdownProps) {
   const [remainingMs, setRemainingMs] = useState<number | null>(null);
 
@@ -55,14 +58,14 @@ export default function LiveCountdown({
   // For "starts in" countdown
   if (type === "start" && status === "upcoming") {
     return (
-      <CountdownPanel remainingMs={remainingMs} label={label} variant="start" />
+      <CountdownPanel remainingMs={remainingMs} label={label} variant="start" size={size} />
     );
   }
 
   // For "ends in" countdown (active competition)
   if (type === "end" && status === "active") {
     return (
-      <CountdownPanel remainingMs={remainingMs} label={label} variant="end" />
+      <CountdownPanel remainingMs={remainingMs} label={label} variant="end" size={size} />
     );
   }
 

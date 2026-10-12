@@ -80,7 +80,9 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   it("puts summary StatCards outside the hero on both kinds", () => {
     expect(gameLobby).toContain('size="lg"');
     expect(gameLobby).toContain("<StatCard");
-    expect(tradingSummary).toContain('size="lg"');
+    // Flipped 12 Oct 2026, not deleted: the trading KPI row moved from `lg` to the larger
+    // `showcase` cards on the owner's reference; the game lobby keeps `lg`.
+    expect(tradingSummary).toContain('size="showcase"');
     expect(tradingSummary).toContain("<StatCard");
     // Hero file must not own the KPI strip (that was the thin-row layout).
     const tradingHero = readCode(

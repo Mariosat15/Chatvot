@@ -1,4 +1,5 @@
 import { Clock, Timer, CheckCircle, AlertCircle } from "lucide-react";
+import { COMPETITIONS_ARENA_BG } from "@/lib/competitions/game-definitions";
 
 /**
  * THE LARGE FOUR-CELL CONTEST COUNTDOWN - days, hours, minutes, seconds - and the one
@@ -63,15 +64,33 @@ export function splitDuration(ms: number): CountdownParts {
   };
 }
 
+/** `showcase` is the trading lobby's larger clock (owner reference, 12 Oct 2026). */
+export type CountdownSize = "default" | "showcase";
+
 function Cell({
   value,
   caption,
   valueClassName,
+  size = "default",
 }: {
   value: number;
   caption: string;
   valueClassName: string;
+  size?: CountdownSize;
 }) {
+  if (size === "showcase") {
+    return (
+      <div className="text-center rounded-xl border border-white/10 bg-black/45 px-2 py-3 backdrop-blur-sm">
+        <div className={`text-4xl font-black tabular-nums leading-none ${valueClassName}`}>
+          {value.toString().padStart(2, "0")}
+        </div>
+        <div className="mt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400">
+          {caption}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="text-center p-3 bg-gray-900/50 rounded-lg">
       <div className={`text-3xl font-black tabular-nums ${valueClassName}`}>
@@ -99,19 +118,22 @@ function Cell({
 export function CountdownCells({
   parts,
   secondsClassName,
+  size = "default",
 }: {
   parts: CountdownParts;
   secondsClassName: string;
+  size?: CountdownSize;
 }) {
   return (
     <div className="grid grid-cols-4 gap-2">
-      <Cell value={parts.days} caption="Days" valueClassName="text-white" />
-      <Cell value={parts.hours} caption="Hours" valueClassName="text-white" />
-      <Cell value={parts.minutes} caption="Mins" valueClassName="text-white" />
+      <Cell value={parts.days} caption="Days" valueClassName="text-white" size={size} />
+      <Cell value={parts.hours} caption="Hours" valueClassName="text-white" size={size} />
+      <Cell value={parts.minutes} caption="Mins" valueClassName="text-white" size={size} />
       <Cell
         value={parts.seconds}
         caption="Secs"
         valueClassName={secondsClassName}
+        size={size}
       />
     </div>
   );
@@ -138,6 +160,68 @@ function PanelDetails({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * The showcase frame: a dark card over the arena artwork, the trophy sitting top-right behind
+ * the cells. Reason it is a wrapper and not a fifth branch: the schedule slot is counted per
+ * branch by a test, and a frame is appearance, not a state.
+ */
+function ShowcaseFrame({
+  borderClassName,
+  children,
+}: {
+  borderClassName: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border bg-[#060B18] p-5 ${borderClassName}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorative backdrop, sized by CSS */}
+      <img
+        src={COMPETITIONS_ARENA_BG}
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right-top opacity-35"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#060B18] via-[#060B18]/80 to-transparent" />
+      <div className="relative">{children}</div>
+    </div>
+  );
+}
+
+/** The showcase headings' clock, from the owner's Menuitems set rather than a line glyph. */
+function ShowcaseClock() {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+    <img
+      src="/assets/neon/icons/clock.webp"
+      alt=""
+      draggable={false}
+      className="h-10 w-10 object-contain"
+    />
+  );
+}
+
+function ShowcaseHeading({
+  icon,
+  label,
+  className,
+  extra,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  className: string;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-center gap-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center">
+        {icon}
+      </span>
+      <span className={`text-lg font-bold ${className}`}>{label}</span>
+      {extra}
+    </div>
+  );
+}
+
 interface CountdownPanelProps {
   /** Milliseconds until the target. At or below zero the finished panel is shown instead. */
   remainingMs: number;
@@ -152,6 +236,8 @@ interface CountdownPanelProps {
    * it changes state is how a player concludes the page is broken.
    */
   details?: React.ReactNode;
+  /** Defaults to the compact card the game lobby renders. */
+  size?: CountdownSize;
 }
 
 export default function CountdownPanel({
@@ -159,7 +245,9 @@ export default function CountdownPanel({
   label,
   variant,
   details,
+  size = "default",
 }: CountdownPanelProps) {
+  const showcase = size === "showcase";
   const parts = splitDuration(remainingMs);
   const isComplete = parts.total <= 0;
 
@@ -176,16 +264,34 @@ export default function CountdownPanel({
       );
     }
 
+    const startCells = (
+      <CountdownCells
+        parts={parts}
+        secondsClassName={showcase ? "text-amber-300" : "text-yellow-400 animate-pulse"}
+        size={size}
+      />
+    );
+
+    if (showcase) {
+      return (
+        <ShowcaseFrame borderClassName="border-amber-400/40 shadow-[0_0_24px_rgba(251,191,36,0.12)]">
+          <ShowcaseHeading
+            icon={<ShowcaseClock />}
+            label={label}
+            className="text-white"
+          />
+          {startCells}
+        </ShowcaseFrame>
+      );
+    }
+
     return (
       <div className="p-4 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/50 rounded-xl">
         <div className="flex items-center gap-2 mb-3">
           <Timer className="h-5 w-5 text-yellow-400 animate-pulse" />
           <span className="text-sm font-semibold text-yellow-400">{label}</span>
         </div>
-        <CountdownCells
-          parts={parts}
-          secondsClassName="text-yellow-400 animate-pulse"
-        />
+        {startCells}
         {details && <PanelDetails>{details}</PanelDetails>}
       </div>
     );
@@ -204,6 +310,40 @@ export default function CountdownPanel({
   }
 
   const isWarning = parts.total < COUNTDOWN_WARNING_MS;
+  const endingBadge = isWarning && (
+    <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded animate-pulse">
+      ENDING SOON!
+    </span>
+  );
+  const endCells = (
+    <CountdownCells
+      parts={parts}
+      secondsClassName={
+        isWarning ? "text-red-400 animate-pulse" : showcase ? "text-amber-300" : "text-blue-400"
+      }
+      size={size}
+    />
+  );
+
+  if (showcase) {
+    return (
+      <ShowcaseFrame
+        borderClassName={
+          isWarning
+            ? "border-red-500/50 shadow-[0_0_24px_rgba(239,68,68,0.15)]"
+            : "border-sky-400/40 shadow-[0_0_24px_rgba(56,189,248,0.12)]"
+        }
+      >
+        <ShowcaseHeading
+          icon={<ShowcaseClock />}
+          label={label}
+          className="text-white"
+          extra={endingBadge}
+        />
+        {endCells}
+      </ShowcaseFrame>
+    );
+  }
 
   return (
     <div
@@ -222,18 +362,9 @@ export default function CountdownPanel({
         >
           {label}
         </span>
-        {isWarning && (
-          <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded animate-pulse">
-            ENDING SOON!
-          </span>
-        )}
+        {endingBadge}
       </div>
-      <CountdownCells
-        parts={parts}
-        secondsClassName={
-          isWarning ? "text-red-400 animate-pulse" : "text-blue-400"
-        }
-      />
+      {endCells}
       {details && <PanelDetails>{details}</PanelDetails>}
     </div>
   );

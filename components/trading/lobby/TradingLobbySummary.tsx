@@ -1,6 +1,7 @@
 import { Clock, Link2, Trophy, Users } from "lucide-react";
 import { StatCard } from "@/components/neon/Cards";
 import InlineCountdown from "@/components/trading/InlineCountdown";
+import UTCClock from "@/components/trading/UTCClock";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
 import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
@@ -29,7 +30,7 @@ export function TradingLobbySummary({
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
       <StatCard
-        size="lg"
+        size="showcase"
         icon={Trophy}
         imageSrc={COMPETITION_ICON.volts}
         accent="prize"
@@ -40,7 +41,7 @@ export function TradingLobbySummary({
         )}
       />
       <StatCard
-        size="lg"
+        size="showcase"
         icon={Link2}
         imageSrc={COMPETITION_ICON.wallet}
         accent="entry"
@@ -51,7 +52,7 @@ export function TradingLobbySummary({
         )}
       />
       <StatCard
-        size="lg"
+        size="showcase"
         icon={Users}
         imageSrc={COMPETITION_ICON.players}
         accent="players"
@@ -81,7 +82,7 @@ export function TradingLobbySummary({
         }
       />
       <StatCard
-        size="lg"
+        size="showcase"
         icon={Clock}
         imageSrc={COMPETITION_ICON.clock}
         accent={isCancelled ? "ended" : isActive ? "entry" : "waiting"}
@@ -105,6 +106,13 @@ export function TradingLobbySummary({
               type={isActive ? "end" : "start"}
             />
           )
+        }
+        // Reason: the server clock moved here from the top bar (owner, 12 Oct 2026) so the
+        // countdown and the time it counts against sit in one card.
+        note={
+          <div className="mt-1 border-t border-white/10 pt-3">
+            <UTCClock variant="inline" />
+          </div>
         }
       />
     </div>

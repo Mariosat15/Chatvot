@@ -8,6 +8,20 @@
 > - "Your Competition Dashboard" follows the Menuitems "Round Complete" panel: a trophy header, a hero card with the ranked figure and `#rank / total`, five coloured tiles, Run summary and Score breakdown rows, and back + gold actions (`components/trading/competition-dashboard/`).
 > - Career stats and the All-Time tab moved behind the Full Performance link, and the equity chart became the hero's sparkline.
 >
+> **Amended a third time 12 Oct 2026 (trading page, six owner images):**
+> - The server clock left the top bar and sits inside the "Starts in" / "Time remaining" KPI card (`UTCClock variant="inline"`).
+> - Scoring and Disqualification are sub-groups of the **Trading Rules** tab; there are no separate tabs for them any more.
+> - Leaderboard rows: gold frame on #1, blue glow on You, medal plate, chips (GM, title, You, tie), bigger figures and a prize line under each paid row. The # column is gone; the rank sits in the plate.
+> - Prize distribution: `PrizeTable size="lg"` (gift banner, one large card per place, cyan glow when filled, muted when not, info card). The maths is untouched (`lib/utils/prize-projection.ts`).
+> - Sidebar: the countdown uses `CountdownPanel size="showcase"` (arena trophy backdrop, big cells, gold seconds); Schedule rows have coloured dots and dates in pills; Difficulty has a gradient bar with the label in its own colour.
+> - KPI row uses `StatCard size="showcase"` (large glowing image, lit rim). The game lobby keeps `lg`.
+>
+> **Amended a fourth time 12 Oct 2026 (icons, rule cards, arrows, Overview):**
+> - Icons on the trading page now come from the owner's Menuitems set (`public/assets/neon/icons/*.webp` via `NEON_ICON`): the tab icons, the sidebar panels (`NeonPanel iconSrc`, a new opt-in prop), the leaderboard panel, the large prize branch and the showcase countdown headings. Small inline glyphs inside rows stay lucide.
+> - The tab contents are image-2 cards (`components/trading/lobby/TradingRuleCard.tsx`): lit frame, large picture tile, title + subtitle, dark rows with a coloured value, info notes, a red warning row for liquidation and a margin ladder with dots. Trading Rules shows three cards (Trading Rules, Scoring, Disqualification). Every value, fallback and condition is unchanged.
+> - **Prizes is no longer a tab** - the sidebar's prize distribution already shows the pool, the paid places, the fee and the unfilled-share rule. Left and right arrow buttons step through the tabs and scroll the chosen one into view.
+> - The Overview is two lit cards: "About this **competition**" with four glowing picture tiles, and "Battle **plan**" with glowing numbered circles in a colour per step (`ContestHowItWorks` embedded variant only; the game lobby's grid is unchanged).
+>
 > **Never verified by eye.**
 
 ## Scope

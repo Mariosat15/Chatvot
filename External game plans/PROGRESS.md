@@ -993,6 +993,18 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+### 12 Oct 2026 - TRADING PAGE ICONS, RULE CARDS, TAB ARROWS AND OVERVIEW
+
+**Why.** Owner: use the Menuitems icons everywhere, make the rule tabs look like the reference cards, add left/right arrows to the tab bar, drop Prizes from the tabs, and rebuild the Overview to the reference.
+
+**What shipped.** `NeonPanel` gained an opt-in `iconSrc`; the sidebar, leaderboard panel, large `PrizeTable` branch and showcase `CountdownPanel` headings use `NEON_ICON` pictures. New `TradingRuleCard.tsx` (card, rows, info, warning, margin ladder); `buildTradingLobbySections` renders Eligible Assets, Trading Rules (three cards) and Risk Management on it, with every value and condition carried over, and no longer returns a Prizes section (the sidebar's prize panel already says the same). `TradingDetailTabs` has previous/next arrows, a lightbulb Overview tab and a two-card Overview with glowing tiles and a coloured "Battle plan" timeline. Game lobby and arena unchanged. 233 tests green in the four lobby suites; eslint and tsc clean on changed files. **Never verified by eye.**
+
+### 12 Oct 2026 - TRADING COMPETITION PAGE POLISHED TO SIX OWNER IMAGES
+
+**Why.** Owner sent six images: server clock into the countdown KPI, Scoring + Disqualification merged into Trading Rules, and new looks for the leaderboard, the prize distribution, the sidebar (countdown, schedule, difficulty) and the KPI tiles.
+
+**What shipped.** `UTCClock variant="inline"` inside the clock `StatCard` (removed from the nav); `trading-lobby-accordions.tsx` Trading Rules now carries Scoring and Disqualification as `RuleGroup`s; `CompetitionLeaderboard.tsx` rows on `neonRowClasses` (gold #1, blue You) with medal plates and chips; `PrizeTable size="lg"`; `CountdownPanel`/`LiveCountdown` `size="showcase"`; `StatCard size="showcase"`. Every new look is **opt-in**, so the game lobby and the arena are unchanged, and no money logic moved. One test flipped (`contest-lobby-shell.test.ts`, trading summary now `size="showcase"`). 372 related tests green; eslint clean on changed files. **Never verified by eye.**
+
 ### 12 Oct 2026 - COMPETITION DETAIL DESKTOP REBUILT TO CURSOR SPEC
 
 **Why.** Owner rejected the first lobby pass: too many thin rows, weak hierarchy, tiny text, stacked-admin look. Spec: `External game plans/ChartVolt_Desktop_Competition_Detail_Cursor_Spec.md`. Target images (game + trading) share one design system with different data blocks.

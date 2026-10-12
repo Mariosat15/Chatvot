@@ -219,6 +219,23 @@ export function NeonIllustration({
 }
 
 /**
+ * The lit rim the `showcase` stat card wears, per accent. Written out in full because an
+ * interpolated `shadow-[...]` compiles to nothing.
+ */
+const SHOWCASE_GLOW = new Map<NeonAccent, { rim: string; icon: string }>([
+  ["prize", { rim: "border-amber-400/45 shadow-[0_0_22px_rgba(251,191,36,0.18)]", icon: "drop-shadow-[0_0_14px_rgba(251,191,36,0.55)]" }],
+  ["entry", { rim: "border-emerald-400/45 shadow-[0_0_22px_rgba(52,211,153,0.16)]", icon: "drop-shadow-[0_0_14px_rgba(52,211,153,0.55)]" }],
+  ["players", { rim: "border-sky-400/45 shadow-[0_0_22px_rgba(56,189,248,0.18)]", icon: "drop-shadow-[0_0_14px_rgba(56,189,248,0.55)]" }],
+  ["waiting", { rim: "border-yellow-400/45 shadow-[0_0_22px_rgba(250,204,21,0.16)]", icon: "drop-shadow-[0_0_14px_rgba(250,204,21,0.55)]" }],
+  ["ended", { rim: "border-rose-400/45 shadow-[0_0_22px_rgba(251,113,133,0.16)]", icon: "drop-shadow-[0_0_14px_rgba(251,113,133,0.55)]" }],
+]);
+
+const SHOWCASE_GLOW_FALLBACK = {
+  rim: "border-white/15 shadow-[0_0_18px_rgba(148,163,184,0.12)]",
+  icon: "drop-shadow-[0_0_12px_rgba(148,163,184,0.45)]",
+};
+
+/**
  * A figure with its icon tile - the sheet's `STAT CARDS` row. One component covers the game
  * variants (prize pool, entry fee, players, your score) and the trading variants (total value,
  * total P&L, win rate, position), because they differ only in icon, accent and whether the
@@ -256,10 +273,45 @@ export function StatCard({
   note?: React.ReactNode;
   /**
    * `lg` is the competition-detail summary row (spec §5/§8): large icon + metric.
-   * Default stays compact for arena and other dense strips.
+   * Default stays compact for arena and other dense strips. `showcase` is the trading
+   * competition page's KPI row (owner reference, 12 Oct 2026): a large glowing image with no
+   * tile box and a lit rim. Opt-in so the game lobby keeps its `lg` cards.
    */
-  size?: "default" | "lg";
+  size?: "default" | "lg" | "showcase";
 }) {
+  if (size === "showcase") {
+    const glow = SHOWCASE_GLOW.get(accent) ?? SHOWCASE_GLOW_FALLBACK;
+    return (
+      <div className={`rounded-2xl border bg-[#070C1A]/90 p-4 sm:p-5 ${glow.rim}`}>
+        <div className="flex items-center gap-4">
+          {imageSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageSrc}
+              alt=""
+              className={`h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20 ${glow.icon}`}
+            />
+          ) : (
+            <IconTile icon={icon} accent={accent} size="lg" />
+          )}
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-400">
+              {label}
+            </p>
+            <div
+              className={`mt-1 truncate text-2xl font-black sm:text-3xl ${
+                valueAccent ? accentClasses(valueAccent).text : "text-white"
+              }`}
+            >
+              {value}
+            </div>
+          </div>
+        </div>
+        {note}
+      </div>
+    );
+  }
+
   const large = size === "lg";
   return (
     <div className={`${NEON_PANEL} ${large ? "p-4 sm:p-5" : "p-3 sm:p-4"}`}>
@@ -357,6 +409,7 @@ export function NeonPanel({
   children,
   className = "",
   size = "default",
+  iconSrc,
 }: {
   icon?: LucideIcon;
   accent?: NeonAccent;
@@ -366,6 +419,8 @@ export function NeonPanel({
   className?: string;
   /** `lg` section titles for competition-detail cards (spec §5). */
   size?: "default" | "lg";
+  /** A neon picture tile shown instead of `icon` (owner Menuitems set). */
+  iconSrc?: string;
 }) {
   const large = size === "lg";
   return (
@@ -375,7 +430,15 @@ export function NeonPanel({
       {title && (
         <div className="mb-4 flex items-center justify-between gap-3 sm:mb-5">
           <div className="flex items-center gap-2.5">
-            {icon && (
+            {iconSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+              <img
+                src={iconSrc}
+                alt=""
+                draggable={false}
+                className={`${large ? "h-11 w-11" : "h-8 w-8"} shrink-0 object-contain`}
+              />
+            ) : icon && (
               <IconTile
                 icon={icon}
                 accent={accent}
