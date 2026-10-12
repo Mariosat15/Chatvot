@@ -237,7 +237,7 @@ export function buildTradingLobbySections({
             <RuleWarning
               label="Liquidation"
               value="You are out right away"
-              tip="Blow your Simulated funds to zero and it is game over - you are knocked out on the spot."
+              tip="One margin wipe (your open trades get force-closed) and you are knocked out - even if Simulated funds are still left."
             />
           )}
           {showKnockOut && rules.minimumWinRate > 0 && (

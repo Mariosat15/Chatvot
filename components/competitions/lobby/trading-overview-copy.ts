@@ -189,7 +189,9 @@ export function buildTradingOverviewCopy({
 
   const climbExtras = [
     minWinRate ? `Keep your win rate above ${minWinRate}%.` : null,
-    rules.disqualifyOnLiquidation ? "Blow your account and you're out!" : null,
+    rules.disqualifyOnLiquidation
+      ? "Get liquidated once and you're out - even if funds are left!"
+      : null,
   ].filter(Boolean);
 
   const steps: TradingOverviewStep[] = [

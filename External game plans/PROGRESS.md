@@ -993,6 +993,8 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 Newest at the top.
 
+- **12 Oct 2026 - Liquidation tip corrected.** Disqualify-on-liquidation marks a seat `liquidated` when margin level hits the force-close threshold (`position.actions.ts`), not when Simulated funds hit zero - leftover capital is normal. The Trading Rules tip and the Battle plan Climb line both said "blow to zero"; rewritten to "one margin wipe knocks you out even if funds remain". **Never verified by eye.**
+
 - **12 Oct 2026 - Knock-out rules move into Trading Rules; "Simulated funds" + Eligible Assets tips.** Disqualification is no longer its own card: trades-you-must-make, liquidation and minimum win rate sit under Format in Trading Rules (owner red box). Scoring stays beside it as a clean two-up; the odd-child span-2 left with the third card. "Practice cash" / "Higher Capital" / "Highest Capital" read **Simulated funds** (or "More/Most Simulated funds") on Eligible Assets, the Overview About tile, the Battle plan Jump-in line and scoring/tie labels. Eligible Assets rows get gamer-plain `InfoTooltip` tips; Trading Rules / Scoring tips were rewritten in the same voice. No money logic changed. **Never verified by eye.**
 
 - **12 Oct 2026 - Risk Management tips talk like a game.** Every Risk limits row and every Margin levels rung now carries an `InfoTooltip` (`?`) with a short gamer-style explanation (health bar, day lockout, high-score drop, game over / yellow zone / green zone). `MarginLadder` gained an optional `tip` per level. No numbers or money logic changed. **Never verified by eye.**
