@@ -1,5 +1,7 @@
 # ChartVolt Competition Detail Pages — Desktop Cursor Build Specification
 
+> **BUILT 12 Oct 2026 (eng), amended the same day.** Shared shell `components/competitions/detail/CompetitionDetailShell.tsx` (hero → summary KPIs → 2fr/0.9fr main + sidebar, on the competitions hub's `COMPETITIONS_ARENA_BG` backdrop). Trading: the reference sections (Eligible Assets, Trading Rules, Scoring, Risk Management, Disqualification, Prizes) are the **top tab bar** under the leaderboard (`TradingDetailTabs`), with Overview = About + feature tiles beside a How It Works timeline; the sidebar keeps only the decisions (entry, countdown, schedule, difficulty, prizes). Game lobby on the same shell with its own blocks. **Never verified by eye.**
+
 ## Scope
 
 Build and refine **two desktop competition detail experiences** using the same ChartVolt visual system and the same shared data architecture:

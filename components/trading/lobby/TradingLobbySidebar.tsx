@@ -1,11 +1,9 @@
 import { Crown, Target, Trophy } from "lucide-react";
 import type { DifficultyLevel } from "@/lib/utils/competition-difficulty";
 import type { TitleLevel } from "@/lib/constants/levels";
-import { NeonAccordion } from "@/components/neon/Accordion";
 import { NeonNote, NeonPanel, NeonRow } from "@/components/neon/Cards";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
 import LiveCountdown from "@/components/trading/LiveCountdown";
-import { buildTradingLobbySections } from "@/components/trading/lobby/trading-lobby-accordions";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import { resolveLevelName } from "@/lib/utils/level-title";
 
@@ -16,7 +14,9 @@ import { resolveLevelName } from "@/lib/utils/level-title";
  * reorganised: act, then time, then decide, then read. The entry control comes first because it
  * is why a player opened the page; the countdown and schedule follow because they decide whether
  * to act now; the difficulty and the prize table follow because they decide whether to act at
- * all; and everything a trader merely needs to *know* is last and collapsed.
+ * all. Reference material a trader merely needs to *know* (assets, rules, scoring, risk,
+ * disqualification, prize mechanics) is no longer here: since 12 Oct 2026 it is the tab bar
+ * under the leaderboard (`TradingDetailTabs`), on the owner's mark-up.
  *
  * WHAT IS DELIBERATELY NOT COLLAPSED: the entry control, the countdown, the schedule, the level
  * requirement, the difficulty and the prize table. The prize table in particular is the figure
@@ -28,14 +28,6 @@ interface DifficultyData {
   level: DifficultyLevel;
   label: string;
   score: number;
-}
-
-interface RiskSettings {
-  maxLeverage: number;
-  marginLiquidation: number;
-  marginCall: number;
-  marginWarning: number;
-  marginSafe: number;
 }
 
 /**
@@ -78,7 +70,6 @@ const DIFFICULTY_DESCRIPTIONS = new Map<DifficultyLevel, string>([
 export interface TradingLobbySidebarProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
-  riskSettings: RiskSettings;
   difficultyData: DifficultyData;
   /** `AppSettings.credits.symbol`. Replaced a `currSymbol` prop handed the fiat symbol. */
   creditSymbol?: string;
@@ -100,7 +91,6 @@ export interface TradingLobbySidebarProps {
 
 export default function TradingLobbySidebar({
   competition,
-  riskSettings,
   difficultyData,
   creditSymbol,
   walletBalance,
@@ -121,12 +111,6 @@ export default function TradingLobbySidebar({
       text: "text-gray-300",
       bar: "bg-gray-500",
     };
-
-  const sections = buildTradingLobbySections({
-    competition,
-    riskSettings,
-    creditSymbol,
-  });
 
   return (
     <>
@@ -252,8 +236,6 @@ export default function TradingLobbySidebar({
       >
         <PrizeTable competition={competition} creditSymbol={creditSymbol} />
       </NeonPanel>
-
-      <NeonAccordion sections={sections} />
     </>
   );
 }

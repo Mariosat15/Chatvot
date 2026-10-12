@@ -1159,19 +1159,25 @@ describe("the two lobbies are built from one design kit", () => {
     }
   });
 
-  it("keeps the trading sidebar's decisions open and only its reference material collapsed", () => {
+  it("keeps the trading sidebar's decisions open and moves its reference material to the top tabs", () => {
     const sidebar = readCode(TRADING_SIDEBAR);
 
     /*
-      Collapsing the sidebar is the one behaviour change in the restyle, so what stayed open is
+      Collapsing the sidebar was the one behaviour change in the restyle, so what stayed open is
       pinned rather than left to a comment. The entry control, the countdown, the schedule and
       the prize table are what a trader decides on; burying any of them would be the same class
       of error as an aggregate that quietly means trading only - correct-looking, and wrong
       exactly where it matters.
-    */
-    const accordionAt = sidebar.indexOf("<NeonAccordion");
-    expect(accordionAt).toBeGreaterThan(-1);
 
+      FLIPPED 12 Oct 2026, not deleted: the owner marked the collapsed accordion at the foot of
+      the sidebar and asked for "the menus to be on the top" (spec image). The reference sections
+      now render as the tab bar under the leaderboard (`TradingDetailTabs`), so the sidebar holds
+      no accordion at all - and the four decisions above must still be there, in order.
+    */
+    expect(sidebar).not.toContain("<NeonAccordion");
+    expect(sidebar).not.toContain("buildTradingLobbySections(");
+
+    let previous = -1;
     for (const open of [
       "<CompetitionEntryButton",
       "<LiveCountdown",
@@ -1179,10 +1185,21 @@ describe("the two lobbies are built from one design kit", () => {
       "<PrizeTable",
     ]) {
       const at = sidebar.indexOf(open);
-      expect(at).toBeGreaterThan(-1);
-      // Position, not presence: everything above the accordion is open by construction.
-      expect(at).toBeLessThan(accordionAt);
+      expect(at).toBeGreaterThan(previous);
+      previous = at;
     }
+
+    // The sections are built ONCE, on the server page, and handed to the tabs as rendered output.
+    const page = readCode("app/(root)/competitions/[id]/page.tsx");
+    expect(page.match(/buildTradingLobbySections\(/g)?.length).toBe(1);
+    const tabsAt = page.indexOf("<TradingDetailTabs");
+    expect(tabsAt).toBeGreaterThan(-1);
+    expect(page.slice(tabsAt, tabsAt + 300)).toMatch(/sections=\{buildTradingLobbySections\(/);
+
+    // Every section is a tab beside Overview; none is re-collapsed inside the tab panel.
+    const tabs = readCode("components/competitions/detail/TradingDetailTabs.tsx");
+    expect(tabs).toMatch(/sections\.map\(\(section\)\s*=>\s*\(\s*<TabButton/);
+    expect(tabs).not.toContain("<NeonAccordion");
   });
 
   it("shows the prize breakdown on BOTH lobbies, from one component", () => {

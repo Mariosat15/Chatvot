@@ -59,6 +59,19 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(shell).toContain("sidebar");
   });
 
+  it("paints the competitions hub's arena backdrop behind both lobbies", () => {
+    // One constant, shared with `CompetitionsArena`, so the detail page cannot drift to a
+    // second background file. The backdrop wrapper must OPEN before the max-width container,
+    // or the image is clipped to 1600px and the page edges stay bare.
+    expect(shell).toContain(
+      'import { COMPETITIONS_ARENA_BG } from "@/lib/competitions/game-definitions"',
+    );
+    const bgAt = shell.indexOf("url(${COMPETITIONS_ARENA_BG})");
+    const containerAt = shell.indexOf("max-w-[1600px]");
+    expect(bgAt).toBeGreaterThan(-1);
+    expect(bgAt).toBeLessThan(containerAt);
+  });
+
   it("mounts both lobbies on CompetitionDetailShell", () => {
     expect(gameLobby).toContain("<CompetitionDetailShell");
     expect(tradingPage).toContain("<CompetitionDetailShell");

@@ -19,6 +19,7 @@ import UTCClock from "@/components/trading/UTCClock";
 import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
 import { TradingLobbySummary } from "@/components/trading/lobby/TradingLobbySummary";
 import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
+import { buildTradingLobbySections } from "@/components/trading/lobby/trading-lobby-accordions";
 import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
 import { TradingDetailTabs } from "@/components/competitions/detail/TradingDetailTabs";
 import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
@@ -519,28 +520,17 @@ const CompetitionDetailsPage = async ({
 
               <TradingDetailTabs
                 description={competition.description}
-                startingCapital={
-                  competition.startingCapital ||
-                  competition.startingTradingPoints ||
-                  null
-                }
-                maxLeverage={riskSettings.maxLeverage}
-                minimumTrades={competition.rules?.minimumTrades ?? null}
-                rankingMethod={competition.rankingMethod ?? null}
-                assets={
-                  Array.isArray(competition.allowedAssets)
-                    ? competition.allowedAssets
-                    : Array.isArray(competition.assets)
-                      ? competition.assets
-                      : null
-                }
+                sections={buildTradingLobbySections({
+                  competition,
+                  riskSettings,
+                  creditSymbol,
+                })}
               />
             </>
           }
           sidebar={
             <TradingLobbySidebar
               competition={competition}
-              riskSettings={riskSettings}
               difficultyData={difficultyData}
               creditSymbol={creditSymbol}
               walletBalance={walletBalance.balance}
