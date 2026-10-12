@@ -12,6 +12,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 // Reason: CreditWallet and WalletTransaction were imported only by the deleted
 // enterCompetition. Nothing in this app moves competition entry money any more.
 import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
+import { resolveCompetitionLeverage } from "@/lib/services/trading/competition-leverage";
 import mongoose from "mongoose";
 import { isCompetitionIdShaped } from "@/lib/utils/competition-id";
 
@@ -352,12 +353,12 @@ export const createCompetition = async (competitionData: {
       assetClasses: competitionData.assetClasses,
       allowedSymbols: competitionData.allowedSymbols || [],
       blockedSymbols: [],
-      leverage: {
-        enabled: true,
-        min: tradingRiskDefaults.minLeverage,
-        max: tradingRiskDefaults.maxLeverage,
-        default: tradingRiskDefaults.defaultLeverage,
-      },
+      // Reason: this used to store the platform maximum whatever the wizard sent, so a contest
+      // set up at 1:20 advertised and allowed 1:100. See `competition-leverage.ts`.
+      leverage: resolveCompetitionLeverage(
+        competitionData.leverageAllowed,
+        tradingRiskDefaults,
+      ),
       competitionType: "time_based",
       prizePool: 0,
       platformFeePercentage: competitionData.platformFeePercentage,

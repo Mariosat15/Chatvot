@@ -1,5 +1,6 @@
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { storedLeverageCeiling } from "@/lib/services/trading/competition-leverage";
 import {
   ASSET_LABELS,
   RANKING_LABELS,
@@ -69,7 +70,10 @@ export interface TradingOverviewCopy {
 /** Why each ranking method puts one trader above another, in the lobby's playful voice. */
 const CLIMB_DETAIL = new Map<string, string>([
   ["pnl", "Make the most profit to climb. Every tick counts!"],
-  ["roi", "Grow your money by the biggest % to climb. Small and sharp can win!"],
+  [
+    "roi",
+    "Grow your money by the biggest % to climb. Small and sharp can win!",
+  ],
   ["total_capital", "End with the biggest balance to climb. Grow it, grow it!"],
   ["win_rate", "Win more of your trades to climb. Pick your shots!"],
   ["total_wins", "Rack up the most winning trades to climb."],
@@ -105,10 +109,8 @@ function countPaidPositions(distribution: unknown): number {
     .length;
 }
 
-function leverageCeiling(competition: {
-  leverage?: { enabled?: boolean; max?: number } | null;
-}): number | null {
-  return positiveNumber(competition.leverage?.max);
+function leverageCeiling(competition: { leverage?: unknown }): number | null {
+  return storedLeverageCeiling(competition.leverage) ?? null;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- `competition` is the lean document the
@@ -161,7 +163,11 @@ export function buildTradingOverviewCopy({
       : { icon: "cash", strong: "No real money", tail: "at risk" },
   ];
   if (leverage) {
-    marketFacts.push({ icon: "leverage", lead: "Leverage up to", strong: `1:${leverage}` });
+    marketFacts.push({
+      icon: "leverage",
+      lead: "Leverage up to",
+      strong: `1:${leverage}`,
+    });
   }
 
   const seatFacts: TradingOverviewFact[] = [

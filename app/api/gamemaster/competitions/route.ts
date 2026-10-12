@@ -8,6 +8,9 @@ import { getPublicName } from "@/lib/utils/user-lookup";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { contestGameLabel } from "@/lib/games";
+import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
+import { resolveCompetitionLeverage } from "@/lib/services/trading/competition-leverage";
+import { resolveGmEquityDrawdownPercent } from "@/lib/services/gamemaster/gm-equity-check";
 import {
   checkGameMasterCanCreate,
   checkRouteCanCreateGameType,
@@ -89,7 +92,8 @@ export async function GET() {
       ).lean();
       if (currentPackage?.gameMasterConfig) {
         hasPackage = true;
-        packageAllowedVisibility = currentPackage.gameMasterConfig.allowedVisibility;
+        packageAllowedVisibility =
+          currentPackage.gameMasterConfig.allowedVisibility;
         currentLimits = {
           maxCompetitionsPerDay:
             currentPackage.gameMasterConfig.maxCompetitionsPerDay || 1,
@@ -185,7 +189,8 @@ export async function POST(request: NextRequest) {
     // later check - prize pool, package cap, provider pre-flight - sees the competition that
     // will actually be stored. A locked option is overwritten whatever the request said; an
     // open one is validated and refused, never clamped. Same call as the admin-hosted copy.
-    const defaultsGame = requestBody?.gameType === "provider" ? "provider" : "trading";
+    const defaultsGame =
+      requestBody?.gameType === "provider" ? "provider" : "trading";
     const withDefaults = applyGameMasterCompetitionDefaults(
       requestBody,
       await loadGameMasterCompetitionDefaults(),
@@ -358,7 +363,11 @@ export async function POST(request: NextRequest) {
     const capability = checkRouteCanCreateGameType(verdict.gameType);
     if (!capability.ok) {
       return NextResponse.json(
-        { success: false, error: capability.message, reason: capability.reason },
+        {
+          success: false,
+          error: capability.message,
+          reason: capability.reason,
+        },
         { status: 400 },
       );
     }
@@ -381,7 +390,9 @@ export async function POST(request: NextRequest) {
           reason: visibilityVerdict.reason,
           decidedBy: visibilityVerdict.decidedBy,
         },
-        { status: visibilityVerdict.reason === "visibility_unknown" ? 400 : 403 },
+        {
+          status: visibilityVerdict.reason === "visibility_unknown" ? 400 : 403,
+        },
       );
     }
 
@@ -490,7 +501,10 @@ export async function POST(request: NextRequest) {
       START_IN_PAST_TOLERANCE_MS,
     );
     if (scheduleError) {
-      return NextResponse.json({ success: false, error: scheduleError }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: scheduleError },
+        { status: 400 },
+      );
     }
 
     // Check max participants limit
@@ -614,7 +628,13 @@ export async function POST(request: NextRequest) {
           : ["EUR/USD", "GBP/USD", "USD/JPY"],
       assetClasses:
         assetClassesArray.length > 0 ? assetClassesArray : ["forex"],
-      leverage: leverage || 30,
+      // Reason: this wrote a bare number where the schema expects `{ enabled, min, max, default }`,
+      // so every reader of `leverage.max` saw nothing and allowed 1:100. Also capped by the
+      // platform's trading risk settings, which the defaults registry already promised.
+      leverage: resolveCompetitionLeverage(
+        leverage || 30,
+        await TradingRiskSettings.getSingleton(),
+      ),
       platformFeePercentage: platformFee,
       prizeDistribution: prizeDistribution || [
         { rank: 1, percentage: 70 },
@@ -650,15 +670,25 @@ export async function POST(request: NextRequest) {
           }
         : { enabled: false },
       // Risk limits
+      // The equity check is mandatory and capped at 50% whatever the request says - see
+      // `gm-equity-check.ts`. The other limits stay the Game Master's choice.
       riskLimits: riskLimits?.enabled
         ? {
             enabled: true,
             maxDrawdownPercent: riskLimits.maxDrawdownPercent || 50,
             dailyLossLimitPercent: riskLimits.dailyLossLimitPercent || 20,
-            equityCheckEnabled: riskLimits.equityCheckEnabled || false,
-            equityDrawdownPercent: riskLimits.equityDrawdownPercent || 30,
+            equityCheckEnabled: true,
+            equityDrawdownPercent: resolveGmEquityDrawdownPercent(
+              riskLimits.equityDrawdownPercent,
+            ),
           }
-        : { enabled: false },
+        : {
+            enabled: false,
+            equityCheckEnabled: true,
+            equityDrawdownPercent: resolveGmEquityDrawdownPercent(
+              riskLimits?.equityDrawdownPercent,
+            ),
+          },
       // Difficulty setting
       difficulty: difficulty
         ? {

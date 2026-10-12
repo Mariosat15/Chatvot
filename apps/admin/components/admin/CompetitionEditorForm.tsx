@@ -16,10 +16,10 @@ import {
   Calendar,
   Trophy,
   Shield,
-  Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { storedLeverageCeiling } from "@/lib/services/trading/competition-leverage";
 import type { TitleLevel } from "@/lib/constants/levels";
 
 interface CompetitionEditorFormProps {
@@ -42,6 +42,7 @@ export default function CompetitionEditorForm({
   const cs = settings?.currency?.symbol || "€";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pre-existing: the editor holds the raw API document
   const [competition, setCompetition] = useState<any>(null);
 
   // Form state
@@ -101,6 +102,7 @@ export default function CompetitionEditorForm({
 
   useEffect(() => {
     fetchCompetition();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pre-existing: refetch only when the id changes
   }, [competitionId]);
 
   const fetchCompetition = async () => {
@@ -134,7 +136,7 @@ export default function CompetitionEditorForm({
         startTime: startTimeStr,
         endDate: endDateStr,
         endTime: endTimeStr,
-        leverageAllowed: comp.leverageAllowed || 0,
+        leverageAllowed: storedLeverageCeiling(comp.leverage) ?? 0,
         platformFeePercentage: comp.platformFeePercentage || 0,
       });
 
@@ -188,8 +190,13 @@ export default function CompetitionEditorForm({
     field: "rank" | "percentage",
     value: number,
   ) => {
-    const newPrizes = [...prizeDistribution];
-    newPrizes[index][field] = value;
+    const newPrizes = prizeDistribution.map((prize, i) =>
+      i !== index
+        ? prize
+        : field === "rank"
+          ? { ...prize, rank: value }
+          : { ...prize, percentage: value },
+    );
     setPrizeDistribution(newPrizes);
   };
 
@@ -290,7 +297,7 @@ export default function CompetitionEditorForm({
             Competition Not Found
           </h2>
           <p className="text-gray-400 mb-6">
-            The competition you're trying to edit doesn't exist.
+            The competition you&apos;re trying to edit doesn&apos;t exist.
           </p>
           <Button
             onClick={() => router.push("/dashboard?activeTab=competitions")}
@@ -774,11 +781,13 @@ export default function CompetitionEditorForm({
                   className="mt-2 w-full bg-gray-700 border-gray-600 text-gray-100 rounded-lg px-3 py-2"
                 >
                   <option value="">No Maximum</option>
-                  {levelLadder.filter((level) => level.level >= levelRequirement.minLevel).map((level) => (
-                    <option key={level.level} value={level.level}>
-                      Level {level.level}: {level.title}
-                    </option>
-                  ))}
+                  {levelLadder
+                    .filter((level) => level.level >= levelRequirement.minLevel)
+                    .map((level) => (
+                      <option key={level.level} value={level.level}>
+                        Level {level.level}: {level.title}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>

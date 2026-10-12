@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
+import { storedLeverageCeiling } from "@/lib/services/trading/competition-leverage";
 import {
   MarginLadder,
   RuleBadge,
@@ -167,7 +168,7 @@ export function buildTradingLobbySections({
             value={
               competition.leverage?.enabled
                 ? `1:${competition.leverage.min} to 1:${competition.leverage.max}`
-                : `1:${competition.leverage?.max || riskSettings.maxLeverage}`
+                : `1:${storedLeverageCeiling(competition.leverage) ?? riskSettings.maxLeverage}`
             }
           />
           <RuleRow
@@ -222,8 +223,8 @@ export function buildTradingLobbySections({
             }
           />
           <RuleInfo>
-            Trade from the competition screen. Only trades made while the
-            clock is running count!
+            Trade from the competition screen. Only trades made while the clock
+            is running count!
           </RuleInfo>
         </RuleCard>
 

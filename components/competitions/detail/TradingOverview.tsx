@@ -121,7 +121,7 @@ export function TradingOverview({
           accent="competition"
         />
         <p className="mt-4 text-base leading-relaxed text-gray-300">{about}</p>
-        <ul className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <ul className="mt-6 grid grid-cols-2 gap-3">
           {overview.features.map((feature, index) => {
             const tone = TILE_TONES[index % TILE_TONES.length];
             return (

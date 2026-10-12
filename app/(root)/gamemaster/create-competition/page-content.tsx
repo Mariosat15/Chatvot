@@ -42,6 +42,11 @@ import FreePrivateReserveSummary from "@/components/gamemaster/FreePrivateReserv
 import type { FundingMode } from "@/lib/services/gamemaster/free-private-competition";
 import type { CompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
 import TradingAccessFundingStep from "@/components/gamemaster/TradingAccessFundingStep";
+import GmEquityCheckPanel from "@/components/gamemaster/GmEquityCheckPanel";
+import {
+  GM_EQUITY_DRAWDOWN_DEFAULT_PERCENT,
+  resolveGmEquityDrawdownPercent,
+} from "@/lib/services/gamemaster/gm-equity-check";
 import {
   accessFundingStepError,
   effectiveFundingMode,
@@ -194,8 +199,8 @@ export default function GMCreateCompetitionContent({
     maxDrawdownPercent: defaults.valueOf("maxDrawdownPercent", 50),
     dailyLossLimitPercent: defaults.valueOf("dailyLossLimitPercent", 20),
     // Equity-based check (anti-fraud)
-    equityCheckEnabled: false,
-    equityDrawdownPercent: 30,
+    equityCheckEnabled: true,
+    equityDrawdownPercent: GM_EQUITY_DRAWDOWN_DEFAULT_PERCENT,
   }));
 
   const [assetClasses, setAssetClasses] = useState(() => {
@@ -215,34 +220,43 @@ export default function GMCreateCompetitionContent({
     ]),
   );
 
-  const [competitionRules, setCompetitionRules] = useState<CompetitionRules>(() => ({
-    rankingMethod: defaults.valueOf<CompetitionRules["rankingMethod"]>(
-      "rankingMethod",
-      "pnl",
-    ),
-    tieBreaker1: defaults.valueOf<CompetitionRules["tieBreaker1"]>(
-      "tieBreaker1",
-      "trades_count",
-    ),
-    tieBreaker2: undefined,
-    minimumTrades: defaults.valueOf("minimumTrades", 1),
-    minimumWinRate: undefined,
-    tiePrizeDistribution: defaults.valueOf<CompetitionRules["tiePrizeDistribution"]>(
-      "tiePrizeDistribution",
-      "split_equally",
-    ),
-    disqualifyOnLiquidation: defaults.valueOf("disqualifyOnLiquidation", true),
-  }));
+  const [competitionRules, setCompetitionRules] = useState<CompetitionRules>(
+    () => ({
+      rankingMethod: defaults.valueOf<CompetitionRules["rankingMethod"]>(
+        "rankingMethod",
+        "pnl",
+      ),
+      tieBreaker1: defaults.valueOf<CompetitionRules["tieBreaker1"]>(
+        "tieBreaker1",
+        "trades_count",
+      ),
+      tieBreaker2: undefined,
+      minimumTrades: defaults.valueOf("minimumTrades", 1),
+      minimumWinRate: undefined,
+      tiePrizeDistribution: defaults.valueOf<
+        CompetitionRules["tiePrizeDistribution"]
+      >("tiePrizeDistribution", "split_equally"),
+      disqualifyOnLiquidation: defaults.valueOf(
+        "disqualifyOnLiquidation",
+        true,
+      ),
+    }),
+  );
 
-  const [levelRequirement, setLevelRequirement] = useState<LevelRequirement>(() => ({
-    enabled: defaults.valueOf("levelRequirementEnabled", false),
-    minLevel: defaults.valueOf("minLevel", 1),
-    maxLevel: undefined,
-  }));
+  const [levelRequirement, setLevelRequirement] = useState<LevelRequirement>(
+    () => ({
+      enabled: defaults.valueOf("levelRequirementEnabled", false),
+      minLevel: defaults.valueOf("minLevel", 1),
+      maxLevel: undefined,
+    }),
+  );
 
   const [difficultySettings, setDifficultySettings] =
     useState<DifficultySettings>(() => ({
-      mode: defaults.valueOf<DifficultySettings["mode"]>("difficultyMode", "auto"),
+      mode: defaults.valueOf<DifficultySettings["mode"]>(
+        "difficultyMode",
+        "auto",
+      ),
       manualLevel: defaults.valueOf<DifficultySettings["manualLevel"]>(
         "difficultyLevel",
         undefined,
@@ -719,8 +733,10 @@ export default function GMCreateCompetitionContent({
             enabled: formData.riskLimitsEnabled,
             maxDrawdownPercent: formData.maxDrawdownPercent,
             dailyLossLimitPercent: formData.dailyLossLimitPercent,
-            equityCheckEnabled: formData.equityCheckEnabled,
-            equityDrawdownPercent: formData.equityDrawdownPercent,
+            equityCheckEnabled: true,
+            equityDrawdownPercent: resolveGmEquityDrawdownPercent(
+              formData.equityDrawdownPercent,
+            ),
           },
           difficulty: difficultySettings,
         }),
@@ -861,8 +877,7 @@ export default function GMCreateCompetitionContent({
     subscription.limits.maxCompetitionsPerDay -
     subscription.currentPeriodCompetitionsCreated;
   const remainingActive =
-    subscription.limits.maxActiveCompetitions -
-    subscription.activeCompetitions;
+    subscription.limits.maxActiveCompetitions - subscription.activeCompetitions;
   const blockedByActive = remainingActive <= 0;
   const blockedByDaily = remainingToday <= 0 && !blockedByActive;
   const canCreate = remainingToday > 0 && remainingActive > 0;
@@ -1394,136 +1409,136 @@ export default function GMCreateCompetitionContent({
                       </div>
 
                       {!locked("entryFee") && (
-                      <div>
-                        <label
-                          htmlFor="entryFeeCredits"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
-                          <DollarSign className="h-4 w-4 text-green-400" />
-                          Entry Fee ({platformSettings.currencyCode}) *
-                        </label>
-                        <input
-                          id="entryFeeCredits"
-                          name="entryFeeCredits"
-                          type="number"
-                          min="1"
-                          step="0.01"
-                          value={formData.entryFeeCredits}
-                          onChange={handleInputChange}
-                          className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                          required
-                        />
-                        <p className="text-xs text-gray-500 mt-2">
-                          Amount users pay to enter
-                        </p>
-                      </div>
-                      )}
-
-                      {!locked("startingCapital") && (
-                      <div>
-                        <label
-                          htmlFor="startingTradingPoints"
-                          className="text-gray-300 flex items-center gap-2 mb-2"
-                        >
-                          <Target className="h-4 w-4 text-green-400" />
-                          Starting Capital *
-                        </label>
-                        <input
-                          id="startingTradingPoints"
-                          name="startingTradingPoints"
-                          type="number"
-                          min="100"
-                          step="100"
-                          value={formData.startingTradingPoints}
-                          onChange={(e) => {
-                            const value = Math.max(
-                              100,
-                              Number(e.target.value) || 100,
-                            );
-                            setFormData((prev) => ({
-                              ...prev,
-                              startingTradingPoints: value,
-                            }));
-                          }}
-                          className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                          required
-                        />
-                        <p className="text-xs text-gray-500 mt-2">
-                          Minimum 100 virtual capital for trading
-                        </p>
-                      </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-4">
-                        {!locked("minParticipants") && (
                         <div>
                           <label
-                            htmlFor="minParticipants"
+                            htmlFor="entryFeeCredits"
                             className="text-gray-300 flex items-center gap-2 mb-2"
                           >
-                            <Users className="h-4 w-4 text-orange-400" />
-                            Min Participants *
+                            <DollarSign className="h-4 w-4 text-green-400" />
+                            Entry Fee ({platformSettings.currencyCode}) *
                           </label>
                           <input
-                            id="minParticipants"
-                            name="minParticipants"
+                            id="entryFeeCredits"
+                            name="entryFeeCredits"
                             type="number"
-                            min="2"
-                            step="1"
-                            value={formData.minParticipants}
-                            onChange={(e) => {
-                              const value = Math.max(
-                                2,
-                                Number(e.target.value) || 2,
-                              );
-                              setFormData((prev) => ({
-                                ...prev,
-                                minParticipants: value,
-                              }));
-                            }}
-                            className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            min="1"
+                            step="0.01"
+                            value={formData.entryFeeCredits}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                             required
                           />
                           <p className="text-xs text-gray-500 mt-2">
-                            Minimum 2 required
+                            Amount users pay to enter
                           </p>
                         </div>
-                        )}
-                        {!locked("maxParticipants") && (
+                      )}
+
+                      {!locked("startingCapital") && (
                         <div>
                           <label
-                            htmlFor="maxParticipants"
+                            htmlFor="startingTradingPoints"
                             className="text-gray-300 flex items-center gap-2 mb-2"
                           >
-                            <Users className="h-4 w-4 text-green-400" />
-                            Max Participants *
+                            <Target className="h-4 w-4 text-green-400" />
+                            Starting Capital *
                           </label>
                           <input
-                            id="maxParticipants"
-                            name="maxParticipants"
+                            id="startingTradingPoints"
+                            name="startingTradingPoints"
                             type="number"
-                            min="2"
-                            step="1"
-                            max={subscription.limits.maxUsersPerCompetition}
-                            value={formData.maxParticipants}
+                            min="100"
+                            step="100"
+                            value={formData.startingTradingPoints}
                             onChange={(e) => {
-                              const value = Math.min(
-                                Number(e.target.value) || 2,
-                                subscription.limits.maxUsersPerCompetition,
+                              const value = Math.max(
+                                100,
+                                Number(e.target.value) || 100,
                               );
                               setFormData((prev) => ({
                                 ...prev,
-                                maxParticipants: value,
+                                startingTradingPoints: value,
                               }));
                             }}
                             className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                             required
                           />
-                          <p className="text-xs text-yellow-400 mt-2">
-                            Max: {subscription.limits.maxUsersPerCompetition}{" "}
-                            (package limit)
+                          <p className="text-xs text-gray-500 mt-2">
+                            Minimum 100 virtual capital for trading
                           </p>
                         </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {!locked("minParticipants") && (
+                          <div>
+                            <label
+                              htmlFor="minParticipants"
+                              className="text-gray-300 flex items-center gap-2 mb-2"
+                            >
+                              <Users className="h-4 w-4 text-orange-400" />
+                              Min Participants *
+                            </label>
+                            <input
+                              id="minParticipants"
+                              name="minParticipants"
+                              type="number"
+                              min="2"
+                              step="1"
+                              value={formData.minParticipants}
+                              onChange={(e) => {
+                                const value = Math.max(
+                                  2,
+                                  Number(e.target.value) || 2,
+                                );
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  minParticipants: value,
+                                }));
+                              }}
+                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              required
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                              Minimum 2 required
+                            </p>
+                          </div>
+                        )}
+                        {!locked("maxParticipants") && (
+                          <div>
+                            <label
+                              htmlFor="maxParticipants"
+                              className="text-gray-300 flex items-center gap-2 mb-2"
+                            >
+                              <Users className="h-4 w-4 text-green-400" />
+                              Max Participants *
+                            </label>
+                            <input
+                              id="maxParticipants"
+                              name="maxParticipants"
+                              type="number"
+                              min="2"
+                              step="1"
+                              max={subscription.limits.maxUsersPerCompetition}
+                              value={formData.maxParticipants}
+                              onChange={(e) => {
+                                const value = Math.min(
+                                  Number(e.target.value) || 2,
+                                  subscription.limits.maxUsersPerCompetition,
+                                );
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  maxParticipants: value,
+                                }));
+                              }}
+                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                              required
+                            />
+                            <p className="text-xs text-yellow-400 mt-2">
+                              Max: {subscription.limits.maxUsersPerCompetition}{" "}
+                              (package limit)
+                            </p>
+                          </div>
                         )}
                       </div>
                       {maxParticipantsLocked &&
@@ -1579,7 +1594,8 @@ export default function GMCreateCompetitionContent({
                               <span className="text-green-400 font-bold mx-1">
                                 {subscription.limits.referralFeePercentage}%
                               </span>
-                              of their entry fees from the platform&apos;s share.
+                              of their entry fees from the platform&apos;s
+                              share.
                             </p>
                             <div className="mt-3 p-3 bg-gray-800/50 rounded-lg">
                               <div className="text-xs text-gray-500 mb-1">
@@ -1616,7 +1632,8 @@ export default function GMCreateCompetitionContent({
                   entryFee={formData.entryFeeCredits}
                   maxParticipants={Math.min(
                     formData.maxParticipants,
-                    subscription?.limits?.maxUsersPerCompetition ?? formData.maxParticipants,
+                    subscription?.limits?.maxUsersPerCompetition ??
+                      formData.maxParticipants,
                   )}
                   walletBalance={walletBalance}
                   currencySymbol={platformSettings.currencySymbol}
@@ -1629,7 +1646,8 @@ export default function GMCreateCompetitionContent({
                     entryFee={formData.entryFeeCredits}
                     maxParticipants={Math.min(
                       formData.maxParticipants,
-                      subscription?.limits?.maxUsersPerCompetition ?? formData.maxParticipants,
+                      subscription?.limits?.maxUsersPerCompetition ??
+                        formData.maxParticipants,
                     )}
                     walletBalance={walletBalance}
                     currencySymbol={platformSettings.currencySymbol}
@@ -1723,205 +1741,220 @@ export default function GMCreateCompetitionContent({
                   <div className="p-8 space-y-6">
                     {/* Asset Classes */}
                     {!locked("assetClasses") && (
-                    <div>
-                      <label className="text-gray-300 mb-4 flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-orange-400" />
-                        Asset Classes *
-                      </label>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                        {Object.entries(assetClasses).map(
-                          ([asset, checked]) => (
-                            <div
-                              key={asset}
-                              className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                                checked
-                                  ? "bg-orange-500/20 border-orange-500"
-                                  : "bg-gray-800/50 border-gray-600 hover:border-gray-500"
-                              }`}
-                              onClick={() =>
-                                setAssetClasses((prev) => ({
-                                  ...prev,
-                                  [asset]: !checked,
-                                }))
-                              }
-                            >
-                              <div className="flex items-center gap-3">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={() =>
-                                    setAssetClasses((prev) => ({
-                                      ...prev,
-                                      [asset]: !checked,
-                                    }))
-                                  }
-                                  className="w-4 h-4 rounded border-gray-600 text-orange-500 focus:ring-orange-500 bg-gray-800"
-                                />
-                                <span className="text-sm font-semibold text-gray-200 uppercase">
-                                  {asset}
-                                </span>
+                      <div>
+                        <label className="text-gray-300 mb-4 flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-orange-400" />
+                          Asset Classes *
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                          {Object.entries(assetClasses).map(
+                            ([asset, checked]) => (
+                              <div
+                                key={asset}
+                                className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                                  checked
+                                    ? "bg-orange-500/20 border-orange-500"
+                                    : "bg-gray-800/50 border-gray-600 hover:border-gray-500"
+                                }`}
+                                onClick={() =>
+                                  setAssetClasses((prev) => ({
+                                    ...prev,
+                                    [asset]: !checked,
+                                  }))
+                                }
+                              >
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() =>
+                                      setAssetClasses((prev) => ({
+                                        ...prev,
+                                        [asset]: !checked,
+                                      }))
+                                    }
+                                    className="w-4 h-4 rounded border-gray-600 text-orange-500 focus:ring-orange-500 bg-gray-800"
+                                  />
+                                  <span className="text-sm font-semibold text-gray-200 uppercase">
+                                    {asset}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ),
-                        )}
+                            ),
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          Select at least one asset class for trading
+                        </p>
                       </div>
-                      <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        Select at least one asset class for trading
-                      </p>
-                    </div>
                     )}
 
                     {/* Leverage */}
                     {!leverageLocked && (
-                    <div>
-                      <label
-                        htmlFor="leverageAllowed"
-                        className="text-gray-300 flex items-center gap-2 mb-2"
-                      >
-                        <Zap className="h-4 w-4 text-orange-400" />
-                        Maximum Leverage (1:X) *
-                      </label>
-                      {riskSettings && (
-                        <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                          <p className="text-xs text-blue-400">
-                            📊 Platform limit: 1:{riskSettings.minLeverage} to
-                            1:{riskSettings.maxLeverage}
-                          </p>
+                      <div>
+                        <label
+                          htmlFor="leverageAllowed"
+                          className="text-gray-300 flex items-center gap-2 mb-2"
+                        >
+                          <Zap className="h-4 w-4 text-orange-400" />
+                          Maximum Leverage (1:X) *
+                        </label>
+                        {riskSettings && (
+                          <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                            <p className="text-xs text-blue-400">
+                              📊 Platform limit: 1:{riskSettings.minLeverage} to
+                              1:{riskSettings.maxLeverage}
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min={riskSettings?.minLeverage || 1}
+                            max={riskSettings?.maxLeverage || 100}
+                            step="1"
+                            value={formData.leverageAllowed}
+                            onChange={handleInputChange}
+                            name="leverageAllowed"
+                            className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                          />
+                          <div className="w-24 text-right">
+                            <div className="text-2xl font-bold text-orange-400">
+                              1:{formData.leverageAllowed}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      <div className="flex items-center gap-4">
                         <input
-                          type="range"
+                          type="number"
                           min={riskSettings?.minLeverage || 1}
                           max={riskSettings?.maxLeverage || 100}
                           step="1"
                           value={formData.leverageAllowed}
                           onChange={handleInputChange}
                           name="leverageAllowed"
-                          className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                          className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent mt-3"
+                          required
                         />
-                        <div className="w-24 text-right">
-                          <div className="text-2xl font-bold text-orange-400">
-                            1:{formData.leverageAllowed}
-                          </div>
-                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Higher leverage = higher risk and potential reward
+                        </p>
                       </div>
-                      <input
-                        type="number"
-                        min={riskSettings?.minLeverage || 1}
-                        max={riskSettings?.maxLeverage || 100}
-                        step="1"
-                        value={formData.leverageAllowed}
-                        onChange={handleInputChange}
-                        name="leverageAllowed"
-                        className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-12 text-lg rounded-lg px-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent mt-3"
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-2">
-                        Higher leverage = higher risk and potential reward
-                      </p>
-                    </div>
                     )}
 
                     {/* Risk Limits */}
                     {!riskLimitsHidden && (
-                    <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-xl">
-                      <div className="flex items-start gap-3 mb-4">
-                        <Shield className="h-5 w-5 text-red-400 mt-1" />
-                        <div>
-                          <h4 className="text-sm font-semibold text-red-300">
-                            Risk Limits
-                          </h4>
-                          <p className="text-xs text-gray-400 mt-1">
-                            Set maximum drawdown and daily loss limits for this
-                            competition
-                          </p>
-                        </div>
-                      </div>
-
-                      {!locked("riskLimitsEnabled") && (
-                      <div className="flex items-center space-x-3 mb-4">
-                        <input
-                          type="checkbox"
-                          id="riskLimitsEnabled"
-                          checked={formData.riskLimitsEnabled}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              riskLimitsEnabled: e.target.checked,
-                            }))
-                          }
-                          className="w-4 h-4 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
-                        />
-                        <label
-                          htmlFor="riskLimitsEnabled"
-                          className="text-sm font-medium text-gray-200 cursor-pointer"
-                        >
-                          Enable Risk Limits for this Competition
-                        </label>
-                      </div>
-                      )}
-
-                      {formData.riskLimitsEnabled && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                          {!locked("maxDrawdownPercent") && (
+                      <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-xl">
+                        <div className="flex items-start gap-3 mb-4">
+                          <Shield className="h-5 w-5 text-red-400 mt-1" />
                           <div>
-                            <label className="text-gray-300 flex items-center gap-2 mb-2">
-                              <TrendingDown className="h-4 w-4 text-red-400" />
-                              Max Drawdown %
-                            </label>
+                            <h4 className="text-sm font-semibold text-red-300">
+                              Risk Limits
+                            </h4>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Set maximum drawdown and daily loss limits for
+                              this competition
+                            </p>
+                          </div>
+                        </div>
+
+                        {!locked("riskLimitsEnabled") && (
+                          <div className="flex items-center space-x-3 mb-4">
                             <input
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={formData.maxDrawdownPercent}
+                              type="checkbox"
+                              id="riskLimitsEnabled"
+                              checked={formData.riskLimitsEnabled}
                               onChange={(e) =>
                                 setFormData((prev) => ({
                                   ...prev,
-                                  maxDrawdownPercent: Number(e.target.value),
+                                  riskLimitsEnabled: e.target.checked,
                                 }))
                               }
-                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                              className="w-4 h-4 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
                             />
-                            <p className="text-xs text-red-400 mt-1">
-                              🛑 Trading blocked when account drops{" "}
-                              {formData.maxDrawdownPercent}% below starting
-                              capital
-                            </p>
-                          </div>
-                          )}
-
-                          {!locked("dailyLossLimitPercent") && (
-                          <div>
-                            <label className="text-gray-300 flex items-center gap-2 mb-2">
-                              <AlertTriangle className="h-4 w-4 text-orange-400" />
-                              Daily Loss Limit %
+                            <label
+                              htmlFor="riskLimitsEnabled"
+                              className="text-sm font-medium text-gray-200 cursor-pointer"
+                            >
+                              Enable Risk Limits for this Competition
                             </label>
-                            <input
-                              type="number"
-                              min="1"
-                              max="100"
-                              value={formData.dailyLossLimitPercent}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  dailyLossLimitPercent: Number(e.target.value),
-                                }))
-                              }
-                              className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                            />
-                            <p className="text-xs text-orange-400 mt-1">
-                              ⚠️ Trading blocked when daily loss exceeds{" "}
-                              {formData.dailyLossLimitPercent}% of starting
-                              capital
-                            </p>
                           </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                        )}
+
+                        {formData.riskLimitsEnabled && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            {!locked("maxDrawdownPercent") && (
+                              <div>
+                                <label className="text-gray-300 flex items-center gap-2 mb-2">
+                                  <TrendingDown className="h-4 w-4 text-red-400" />
+                                  Max Drawdown %
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  value={formData.maxDrawdownPercent}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      maxDrawdownPercent: Number(
+                                        e.target.value,
+                                      ),
+                                    }))
+                                  }
+                                  className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                />
+                                <p className="text-xs text-red-400 mt-1">
+                                  🛑 Trading blocked when account drops{" "}
+                                  {formData.maxDrawdownPercent}% below starting
+                                  capital
+                                </p>
+                              </div>
+                            )}
+
+                            {!locked("dailyLossLimitPercent") && (
+                              <div>
+                                <label className="text-gray-300 flex items-center gap-2 mb-2">
+                                  <AlertTriangle className="h-4 w-4 text-orange-400" />
+                                  Daily Loss Limit %
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="100"
+                                  value={formData.dailyLossLimitPercent}
+                                  onChange={(e) =>
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      dailyLossLimitPercent: Number(
+                                        e.target.value,
+                                      ),
+                                    }))
+                                  }
+                                  className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 rounded-lg px-4 focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                />
+                                <p className="text-xs text-orange-400 mt-1">
+                                  ⚠️ Trading blocked when daily loss exceeds{" "}
+                                  {formData.dailyLossLimitPercent}% of starting
+                                  capital
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
+
+                    {/* Equity check - mandatory on every Game Master trading contest */}
+                    <GmEquityCheckPanel
+                      percent={formData.equityDrawdownPercent}
+                      onPercentChange={(equityDrawdownPercent) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          equityDrawdownPercent,
+                        }))
+                      }
+                    />
                   </div>
                 </div>
               )}
@@ -1954,106 +1987,106 @@ export default function GMCreateCompetitionContent({
                           .join(" · ")}
                       </p>
                     ) : (
-                    <>
-                    <div className="flex items-center justify-between p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                      <div>
-                        <div className="text-sm text-gray-400">
-                          Total Distribution
-                        </div>
-                        <div
-                          className={`text-3xl font-bold mt-1 ${
-                            getTotalPrizePercentage() === 100
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {getTotalPrizePercentage()}%
-                        </div>
-                        {getTotalPrizePercentage() !== 100 && (
-                          <div className="text-xs text-red-400 mt-1">
-                            Must equal 100%
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={addPrizeRank}
-                        className="px-4 py-2 border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-gray-900 rounded-lg font-semibold flex items-center gap-2 transition-colors"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add Rank
-                      </button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {prizeDistribution.map((prize, index) => (
-                        <div
-                          key={index}
-                          className="group p-6 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-yellow-500/50 transition-all"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="flex-shrink-0 w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center">
-                              <Trophy className="h-6 w-6 text-yellow-500" />
+                      <>
+                        <div className="flex items-center justify-between p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                          <div>
+                            <div className="text-sm text-gray-400">
+                              Total Distribution
                             </div>
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <label className="text-xs text-gray-400 mb-2 block">
-                                  Rank Position
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={prize.rank}
-                                  onChange={(e) =>
-                                    handlePrizeChange(
-                                      index,
-                                      "rank",
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                  className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 text-lg font-bold rounded-lg px-4 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-xs text-gray-400 mb-2 block">
-                                  Prize Percentage
-                                </label>
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                    value={prize.percentage}
-                                    onChange={(e) =>
-                                      handlePrizeChange(
-                                        index,
-                                        "percentage",
-                                        Number(e.target.value),
-                                      )
-                                    }
-                                    className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 text-lg font-bold rounded-lg px-4 pr-8 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                                  />
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
-                                    %
-                                  </span>
-                                </div>
-                              </div>
+                            <div
+                              className={`text-3xl font-bold mt-1 ${
+                                getTotalPrizePercentage() === 100
+                                  ? "text-green-400"
+                                  : "text-red-400"
+                              }`}
+                            >
+                              {getTotalPrizePercentage()}%
                             </div>
-                            {prizeDistribution.length > 2 && (
-                              <button
-                                type="button"
-                                onClick={() => removePrizeRank(index)}
-                                className="flex-shrink-0 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                              >
-                                <Minus className="h-5 w-5" />
-                              </button>
+                            {getTotalPrizePercentage() !== 100 && (
+                              <div className="text-xs text-red-400 mt-1">
+                                Must equal 100%
+                              </div>
                             )}
                           </div>
+                          <button
+                            type="button"
+                            onClick={addPrizeRank}
+                            className="px-4 py-2 border border-yellow-500 text-yellow-500 hover:bg-yellow-500 hover:text-gray-900 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Rank
+                          </button>
                         </div>
-                      ))}
-                    </div>
-                    </>
+
+                        <div className="space-y-4">
+                          {prizeDistribution.map((prize, index) => (
+                            <div
+                              key={index}
+                              className="group p-6 rounded-xl bg-gray-800/50 border border-gray-600 hover:border-yellow-500/50 transition-all"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="flex-shrink-0 w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center">
+                                  <Trophy className="h-6 w-6 text-yellow-500" />
+                                </div>
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="text-xs text-gray-400 mb-2 block">
+                                      Rank Position
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={prize.rank}
+                                      onChange={(e) =>
+                                        handlePrizeChange(
+                                          index,
+                                          "rank",
+                                          Number(e.target.value),
+                                        )
+                                      }
+                                      className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 text-lg font-bold rounded-lg px-4 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs text-gray-400 mb-2 block">
+                                      Prize Percentage
+                                    </label>
+                                    <div className="relative">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        value={prize.percentage}
+                                        onChange={(e) =>
+                                          handlePrizeChange(
+                                            index,
+                                            "percentage",
+                                            Number(e.target.value),
+                                          )
+                                        }
+                                        className="w-full bg-gray-800 border border-gray-600 text-gray-100 h-11 text-lg font-bold rounded-lg px-4 pr-8 focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                                      />
+                                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
+                                        %
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                {prizeDistribution.length > 2 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removePrizeRank(index)}
+                                    className="flex-shrink-0 p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                                  >
+                                    <Minus className="h-5 w-5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -2081,156 +2114,158 @@ export default function GMCreateCompetitionContent({
                   <div className="p-8 space-y-6">
                     {/* Ranking Method */}
                     {!locked("rankingMethod") && (
-                    <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
-                      <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
-                        <Award className="h-5 w-5 text-red-400" />
-                        Ranking Method
-                      </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {[
-                          {
-                            value: "pnl",
-                            label: "P&L",
-                            emoji: "💰",
-                            desc: "Net profit/loss",
-                          },
-                          {
-                            value: "roi",
-                            label: "ROI %",
-                            emoji: "📈",
-                            desc: "Return on investment",
-                          },
-                          {
-                            value: "total_capital",
-                            label: "Total Capital",
-                            emoji: "🏦",
-                            desc: "Final account value",
-                          },
-                          {
-                            value: "win_rate",
-                            label: "Win Rate",
-                            emoji: "🎯",
-                            desc: "Winning trade %",
-                          },
-                          {
-                            value: "total_wins",
-                            label: "Total Wins",
-                            emoji: "🏆",
-                            desc: "Number of winning trades",
-                          },
-                          {
-                            value: "profit_factor",
-                            label: "Profit Factor",
-                            emoji: "⚖️",
-                            desc: "Gross profit / loss",
-                          },
-                        ].map((method) => (
-                          <button
-                            key={method.value}
-                            type="button"
-                            onClick={() =>
-                              setCompetitionRules((prev) => ({
-                                ...prev,
-                                rankingMethod:
-                                  method.value as CompetitionRules["rankingMethod"],
-                              }))
-                            }
-                            className={`p-4 rounded-xl border-2 transition-all text-left ${
-                              competitionRules.rankingMethod === method.value
-                                ? "bg-red-500/20 border-red-500 text-red-300"
-                                : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
-                            }`}
-                          >
-                            <div className="text-xl mb-1">{method.emoji}</div>
-                            <div className="font-semibold text-sm">
-                              {method.label}
-                            </div>
-                            <div className="text-xs opacity-70 mt-1">
-                              {method.desc}
-                            </div>
-                          </button>
-                        ))}
+                      <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
+                        <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                          <Award className="h-5 w-5 text-red-400" />
+                          Ranking Method
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {[
+                            {
+                              value: "pnl",
+                              label: "P&L",
+                              emoji: "💰",
+                              desc: "Net profit/loss",
+                            },
+                            {
+                              value: "roi",
+                              label: "ROI %",
+                              emoji: "📈",
+                              desc: "Return on investment",
+                            },
+                            {
+                              value: "total_capital",
+                              label: "Total Capital",
+                              emoji: "🏦",
+                              desc: "Final account value",
+                            },
+                            {
+                              value: "win_rate",
+                              label: "Win Rate",
+                              emoji: "🎯",
+                              desc: "Winning trade %",
+                            },
+                            {
+                              value: "total_wins",
+                              label: "Total Wins",
+                              emoji: "🏆",
+                              desc: "Number of winning trades",
+                            },
+                            {
+                              value: "profit_factor",
+                              label: "Profit Factor",
+                              emoji: "⚖️",
+                              desc: "Gross profit / loss",
+                            },
+                          ].map((method) => (
+                            <button
+                              key={method.value}
+                              type="button"
+                              onClick={() =>
+                                setCompetitionRules((prev) => ({
+                                  ...prev,
+                                  rankingMethod:
+                                    method.value as CompetitionRules["rankingMethod"],
+                                }))
+                              }
+                              className={`p-4 rounded-xl border-2 transition-all text-left ${
+                                competitionRules.rankingMethod === method.value
+                                  ? "bg-red-500/20 border-red-500 text-red-300"
+                                  : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
+                              }`}
+                            >
+                              <div className="text-xl mb-1">{method.emoji}</div>
+                              <div className="font-semibold text-sm">
+                                {method.label}
+                              </div>
+                              <div className="text-xs opacity-70 mt-1">
+                                {method.desc}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
                     )}
 
                     {/* Tie Breaker */}
                     {!tieRulesHidden && (
-                    <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
-                      <h3 className="text-lg font-semibold text-gray-100 mb-4">
-                        Tie Breaker Rules
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {!locked("tieBreaker1") && (
-                        <div>
-                          <label className="text-gray-300 text-sm mb-2 block">
-                            Primary Tie Breaker
-                          </label>
-                          <select
-                            value={competitionRules.tieBreaker1}
-                            onChange={(e) =>
-                              setCompetitionRules((prev) => ({
-                                ...prev,
-                                tieBreaker1:
-                                  e.target.value as CompetitionRules["tieBreaker1"],
-                              }))
-                            }
-                            className="w-full bg-gray-800 border border-gray-600 text-gray-100 rounded-lg h-11 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                          >
-                            <option value="trades_count">
-                              Number of Trades
-                            </option>
-                            <option value="win_rate">Win Rate</option>
-                            <option value="total_capital">Total Capital</option>
-                            <option value="roi">ROI</option>
-                            <option value="join_time">First to Join</option>
-                            <option value="split_prize">Split Prize</option>
-                          </select>
+                      <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
+                        <h3 className="text-lg font-semibold text-gray-100 mb-4">
+                          Tie Breaker Rules
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {!locked("tieBreaker1") && (
+                            <div>
+                              <label className="text-gray-300 text-sm mb-2 block">
+                                Primary Tie Breaker
+                              </label>
+                              <select
+                                value={competitionRules.tieBreaker1}
+                                onChange={(e) =>
+                                  setCompetitionRules((prev) => ({
+                                    ...prev,
+                                    tieBreaker1: e.target
+                                      .value as CompetitionRules["tieBreaker1"],
+                                  }))
+                                }
+                                className="w-full bg-gray-800 border border-gray-600 text-gray-100 rounded-lg h-11 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                              >
+                                <option value="trades_count">
+                                  Number of Trades
+                                </option>
+                                <option value="win_rate">Win Rate</option>
+                                <option value="total_capital">
+                                  Total Capital
+                                </option>
+                                <option value="roi">ROI</option>
+                                <option value="join_time">First to Join</option>
+                                <option value="split_prize">Split Prize</option>
+                              </select>
+                            </div>
+                          )}
+                          {!locked("minimumTrades") && (
+                            <div>
+                              <label className="text-gray-300 text-sm mb-2 block">
+                                Minimum Trades Required
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={competitionRules.minimumTrades}
+                                onChange={(e) =>
+                                  setCompetitionRules((prev) => ({
+                                    ...prev,
+                                    minimumTrades: Number(e.target.value),
+                                  }))
+                                }
+                                className="w-full bg-gray-800 border border-gray-600 text-gray-100 rounded-lg h-11 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                              />
+                            </div>
+                          )}
                         </div>
-                        )}
-                        {!locked("minimumTrades") && (
-                        <div>
-                          <label className="text-gray-300 text-sm mb-2 block">
-                            Minimum Trades Required
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={competitionRules.minimumTrades}
-                            onChange={(e) =>
-                              setCompetitionRules((prev) => ({
-                                ...prev,
-                                minimumTrades: Number(e.target.value),
-                              }))
-                            }
-                            className="w-full bg-gray-800 border border-gray-600 text-gray-100 rounded-lg h-11 px-4 focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                          />
-                        </div>
+                        {!locked("disqualifyOnLiquidation") && (
+                          <div className="mt-4 flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              id="disqualifyOnLiquidation"
+                              checked={competitionRules.disqualifyOnLiquidation}
+                              onChange={(e) =>
+                                setCompetitionRules((prev) => ({
+                                  ...prev,
+                                  disqualifyOnLiquidation: e.target.checked,
+                                }))
+                              }
+                              className="w-4 h-4 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
+                            />
+                            <label
+                              htmlFor="disqualifyOnLiquidation"
+                              className="text-sm text-gray-200 cursor-pointer"
+                            >
+                              Disqualify participants who get liquidated
+                            </label>
+                          </div>
                         )}
                       </div>
-                      {!locked("disqualifyOnLiquidation") && (
-                      <div className="mt-4 flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          id="disqualifyOnLiquidation"
-                          checked={competitionRules.disqualifyOnLiquidation}
-                          onChange={(e) =>
-                            setCompetitionRules((prev) => ({
-                              ...prev,
-                              disqualifyOnLiquidation: e.target.checked,
-                            }))
-                          }
-                          className="w-4 h-4 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
-                        />
-                        <label
-                          htmlFor="disqualifyOnLiquidation"
-                          className="text-sm text-gray-200 cursor-pointer"
-                        >
-                          Disqualify participants who get liquidated
-                        </label>
-                      </div>
-                      )}
-                    </div>
                     )}
 
                     {/* Difficulty */}
@@ -2241,51 +2276,51 @@ export default function GMCreateCompetitionContent({
                       </h3>
 
                       {!locked("difficultyMode") && (
-                      <div className="grid grid-cols-2 gap-4 mb-4">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDifficultySettings({
-                              mode: "auto",
-                              manualLevel: undefined,
-                            })
-                          }
-                          className={`p-4 rounded-xl border-2 transition-all ${
-                            difficultySettings.mode === "auto"
-                              ? "bg-purple-500/20 border-purple-500 text-purple-300"
-                              : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
-                          }`}
-                        >
-                          <div className="text-2xl mb-2">🤖</div>
-                          <div className="font-semibold">Auto Calculate</div>
-                          <div className="text-xs mt-1 opacity-70">
-                            Based on competition settings
-                          </div>
-                        </button>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDifficultySettings({
+                                mode: "auto",
+                                manualLevel: undefined,
+                              })
+                            }
+                            className={`p-4 rounded-xl border-2 transition-all ${
+                              difficultySettings.mode === "auto"
+                                ? "bg-purple-500/20 border-purple-500 text-purple-300"
+                                : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
+                            }`}
+                          >
+                            <div className="text-2xl mb-2">🤖</div>
+                            <div className="font-semibold">Auto Calculate</div>
+                            <div className="text-xs mt-1 opacity-70">
+                              Based on competition settings
+                            </div>
+                          </button>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDifficultySettings({
-                              mode: "manual",
-                              manualLevel: defaults.valueOf<
-                                DifficultySettings["manualLevel"]
-                              >("difficultyLevel", "intermediate"),
-                            })
-                          }
-                          className={`p-4 rounded-xl border-2 transition-all ${
-                            difficultySettings.mode === "manual"
-                              ? "bg-purple-500/20 border-purple-500 text-purple-300"
-                              : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
-                          }`}
-                        >
-                          <div className="text-2xl mb-2">✋</div>
-                          <div className="font-semibold">Manual Select</div>
-                          <div className="text-xs mt-1 opacity-70">
-                            Choose specific level
-                          </div>
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDifficultySettings({
+                                mode: "manual",
+                                manualLevel: defaults.valueOf<
+                                  DifficultySettings["manualLevel"]
+                                >("difficultyLevel", "intermediate"),
+                              })
+                            }
+                            className={`p-4 rounded-xl border-2 transition-all ${
+                              difficultySettings.mode === "manual"
+                                ? "bg-purple-500/20 border-purple-500 text-purple-300"
+                                : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
+                            }`}
+                          >
+                            <div className="text-2xl mb-2">✋</div>
+                            <div className="font-semibold">Manual Select</div>
+                            <div className="text-xs mt-1 opacity-70">
+                              Choose specific level
+                            </div>
+                          </button>
+                        </div>
                       )}
 
                       {difficultySettings.mode === "auto" && (
@@ -2368,71 +2403,73 @@ export default function GMCreateCompetitionContent({
 
                       {difficultySettings.mode === "manual" &&
                         !locked("difficultyLevel") && (
-                        <div className="grid grid-cols-5 gap-2">
-                          {[
-                            {
-                              value: "beginner",
-                              label: "Beginner",
-                              emoji: "🌱",
-                              color: "green",
-                            },
-                            {
-                              value: "intermediate",
-                              label: "Intermediate",
-                              emoji: "📊",
-                              color: "blue",
-                            },
-                            {
-                              value: "advanced",
-                              label: "Advanced",
-                              emoji: "⚡",
-                              color: "yellow",
-                            },
-                            {
-                              value: "expert",
-                              label: "Expert",
-                              emoji: "🔥",
-                              color: "orange",
-                            },
-                            {
-                              value: "extreme",
-                              label: "Extreme",
-                              emoji: "💀",
-                              color: "red",
-                            },
-                          ].map((level) => (
-                            <button
-                              key={level.value}
-                              type="button"
-                              onClick={() =>
-                                setDifficultySettings({
-                                  mode: "manual",
-                                  manualLevel:
-                                    level.value as DifficultySettings["manualLevel"],
-                                })
-                              }
-                              className={`p-3 rounded-xl border-2 transition-all text-center ${
-                                difficultySettings.manualLevel === level.value
-                                  ? level.color === "green"
-                                    ? "bg-green-500/20 border-green-500 text-green-300"
-                                    : level.color === "blue"
-                                      ? "bg-blue-500/20 border-blue-500 text-blue-300"
-                                      : level.color === "yellow"
-                                        ? "bg-yellow-500/20 border-yellow-500 text-yellow-300"
-                                        : level.color === "orange"
-                                          ? "bg-orange-500/20 border-orange-500 text-orange-300"
-                                          : "bg-red-500/20 border-red-500 text-red-300"
-                                  : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
-                              }`}
-                            >
-                              <div className="text-xl mb-1">{level.emoji}</div>
-                              <div className="text-xs font-medium">
-                                {level.label}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                          <div className="grid grid-cols-5 gap-2">
+                            {[
+                              {
+                                value: "beginner",
+                                label: "Beginner",
+                                emoji: "🌱",
+                                color: "green",
+                              },
+                              {
+                                value: "intermediate",
+                                label: "Intermediate",
+                                emoji: "📊",
+                                color: "blue",
+                              },
+                              {
+                                value: "advanced",
+                                label: "Advanced",
+                                emoji: "⚡",
+                                color: "yellow",
+                              },
+                              {
+                                value: "expert",
+                                label: "Expert",
+                                emoji: "🔥",
+                                color: "orange",
+                              },
+                              {
+                                value: "extreme",
+                                label: "Extreme",
+                                emoji: "💀",
+                                color: "red",
+                              },
+                            ].map((level) => (
+                              <button
+                                key={level.value}
+                                type="button"
+                                onClick={() =>
+                                  setDifficultySettings({
+                                    mode: "manual",
+                                    manualLevel:
+                                      level.value as DifficultySettings["manualLevel"],
+                                  })
+                                }
+                                className={`p-3 rounded-xl border-2 transition-all text-center ${
+                                  difficultySettings.manualLevel === level.value
+                                    ? level.color === "green"
+                                      ? "bg-green-500/20 border-green-500 text-green-300"
+                                      : level.color === "blue"
+                                        ? "bg-blue-500/20 border-blue-500 text-blue-300"
+                                        : level.color === "yellow"
+                                          ? "bg-yellow-500/20 border-yellow-500 text-yellow-300"
+                                          : level.color === "orange"
+                                            ? "bg-orange-500/20 border-orange-500 text-orange-300"
+                                            : "bg-red-500/20 border-red-500 text-red-300"
+                                    : "bg-gray-800/50 border-gray-600 text-gray-400 hover:border-gray-500"
+                                }`}
+                              >
+                                <div className="text-xl mb-1">
+                                  {level.emoji}
+                                </div>
+                                <div className="text-xs font-medium">
+                                  {level.label}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                     </div>
 
                     {/* Level Requirement */}
@@ -2443,53 +2480,53 @@ export default function GMCreateCompetitionContent({
                       </h3>
 
                       {!locked("levelRequirementEnabled") && (
-                      <div className="flex items-center space-x-3 mb-4">
-                        <input
-                          type="checkbox"
-                          id="levelEnabled"
-                          checked={levelRequirement.enabled}
-                          onChange={(e) =>
-                            setLevelRequirement((prev) => ({
-                              ...prev,
-                              enabled: e.target.checked,
-                            }))
-                          }
-                          className="w-4 h-4 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
-                        />
-                        <label
-                          htmlFor="levelEnabled"
-                          className="text-sm font-medium text-gray-200 cursor-pointer"
-                        >
-                          Enable Level Restrictions
-                        </label>
-                      </div>
+                        <div className="flex items-center space-x-3 mb-4">
+                          <input
+                            type="checkbox"
+                            id="levelEnabled"
+                            checked={levelRequirement.enabled}
+                            onChange={(e) =>
+                              setLevelRequirement((prev) => ({
+                                ...prev,
+                                enabled: e.target.checked,
+                              }))
+                            }
+                            className="w-4 h-4 rounded border-gray-600 text-red-500 focus:ring-red-500 bg-gray-800"
+                          />
+                          <label
+                            htmlFor="levelEnabled"
+                            className="text-sm font-medium text-gray-200 cursor-pointer"
+                          >
+                            Enable Level Restrictions
+                          </label>
+                        </div>
                       )}
 
                       {levelRequirement.enabled && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 rounded-lg bg-gray-900/50 border border-gray-700">
                           {!locked("minLevel") && (
-                          <div>
-                            <label className="text-gray-200 text-sm">
-                              Minimum Level Required
-                            </label>
-                            <select
-                              value={levelRequirement.minLevel}
-                              onChange={(e) =>
-                                setLevelRequirement((prev) => ({
-                                  ...prev,
-                                  minLevel: Number(e.target.value),
-                                }))
-                              }
-                              className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
-                            >
-                              {levelLadder.map((level) => (
-                                <option key={level.level} value={level.level}>
-                                  Level {level.level}: {level.title} (
-                                  {level.minXP}+ XP)
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                            <div>
+                              <label className="text-gray-200 text-sm">
+                                Minimum Level Required
+                              </label>
+                              <select
+                                value={levelRequirement.minLevel}
+                                onChange={(e) =>
+                                  setLevelRequirement((prev) => ({
+                                    ...prev,
+                                    minLevel: Number(e.target.value),
+                                  }))
+                                }
+                                className="w-full mt-2 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                              >
+                                {levelLadder.map((level) => (
+                                  <option key={level.level} value={level.level}>
+                                    Level {level.level}: {level.title} (
+                                    {level.minXP}+ XP)
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           )}
 
                           <div>
@@ -2580,7 +2617,8 @@ export default function GMCreateCompetitionContent({
                           <p className="text-sm font-semibold text-gray-100">
                             {platformSettings.currencySymbol}
                             {formData.entryFeeCredits}
-                            {effectiveFunding === "gm_funded" && " - paid by you"}
+                            {effectiveFunding === "gm_funded" &&
+                              " - paid by you"}
                           </p>
                         </div>
                         <div className="p-4 bg-gray-900/50 rounded-lg">

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Clock, Link2, Trophy, Users } from "lucide-react";
 import { StatCard } from "@/components/neon/Cards";
 import InlineCountdown from "@/components/trading/InlineCountdown";
@@ -39,6 +40,7 @@ export function TradingLobbySummary({
           competition.prizePool || competition.prizePoolCredits || 0,
           { symbol: creditSymbol },
         )}
+        note={<SummaryHint>What the top places share at the end</SummaryHint>}
       />
       <StatCard
         size="showcase"
@@ -50,6 +52,7 @@ export function TradingLobbySummary({
           competition.entryFee || competition.entryFeeCredits || 0,
           { symbol: creditSymbol },
         )}
+        note={<SummaryHint>Paid once to grab your seat</SummaryHint>}
       />
       <StatCard
         size="showcase"
@@ -116,5 +119,14 @@ export function TradingLobbySummary({
         }
       />
     </div>
+  );
+}
+
+/** A one-line plain-words caption under a figure, so a first-time player knows what it is. */
+function SummaryHint({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-2 border-t border-white/10 pt-2 text-xs leading-snug text-gray-400">
+      {children}
+    </p>
   );
 }

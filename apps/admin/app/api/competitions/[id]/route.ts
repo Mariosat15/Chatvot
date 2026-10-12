@@ -8,6 +8,8 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import { filterTradingCompetitionUpdate } from "@/lib/admin/competition-update-fields";
 import { refuseFundedReserveEdit } from "@/lib/admin/free-private-edit-guard";
+import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
+import { resolveCompetitionLeverage } from "@/lib/services/trading/competition-leverage";
 
 /**
  * Read, edit and delete one competition.
@@ -225,7 +227,21 @@ export async function PUT(
       return NextResponse.json({ error: fundedRefusal }, { status: 400 });
     }
 
+    // Reason: `leverageAllowed` is what the trading editor sends, and the schema stores the cap
+    // as `leverage.max`. Assigned as-is, strict mode discards it and the edit "saved" a leverage
+    // nothing ever read - so it is mapped onto `leverage` below. A zero or blank value means
+    // "not set" and leaves the stored cap alone, because the editor pre-fills 0 for a contest
+    // that declares none.
+    const leverageAllowed = (filtered.update as Record<string, unknown>).leverageAllowed;
     Object.assign(competition, filtered.update);
+    if (Number(leverageAllowed) > 0) {
+      const riskSettings = await TradingRiskSettings.getSingleton();
+      competition.leverage = resolveCompetitionLeverage(leverageAllowed, {
+        minLeverage: riskSettings.minLeverage,
+        maxLeverage: riskSettings.maxLeverage,
+        defaultLeverage: riskSettings.defaultLeverage,
+      });
+    }
     await competition.save();
 
     console.log(`✅ Competition updated: ${competition.name} (ID: ${id})`);

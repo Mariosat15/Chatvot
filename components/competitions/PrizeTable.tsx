@@ -1,12 +1,10 @@
 import { Gift, Info } from "lucide-react";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
-import {
-  NEON_FACE_TILE,
-  NEON_FACE_TILE_MUTED,
-} from "@/components/neon/tokens";
+import { NEON_FACE_TILE, NEON_FACE_TILE_MUTED } from "@/components/neon/tokens";
 import { projectPrizeDistribution } from "@/lib/utils/prize-projection";
 import { formatVolts } from "@/lib/utils/format-volts";
+import PrizePager from "./PrizePager";
 
 /**
  * The ranked prize table, with the unclaimed-position redistribution the trading lobby has
@@ -139,8 +137,8 @@ export default function PrizeTable({
           <span>{bannerText}</span>
         </div>
 
-        <div className="space-y-3">
-          {rows.map((row, index) => (
+        <PrizePager
+          rows={rows.map((row, index) => (
             <div
               key={index}
               className={`flex items-center gap-4 rounded-xl border px-4 py-3.5 ${
@@ -171,13 +169,17 @@ export default function PrizeTable({
               <span
                 className={`shrink-0 text-2xl font-black tabular-nums ${row.filled ? "text-amber-300" : "text-gray-500"}`}
               >
-                {row.filled ? formatVolts(row.netAmount, { symbol: creditSymbol }) : "-"}
+                {row.filled
+                  ? formatVolts(row.netAmount, { symbol: creditSymbol })
+                  : "-"}
               </span>
             </div>
           ))}
-        </div>
+        />
 
-        <div className={`mt-4 flex items-start gap-3 px-4 py-3 ${NEON_FACE_TILE}`}>
+        <div
+          className={`mt-4 flex items-start gap-3 px-4 py-3 ${NEON_FACE_TILE}`}
+        >
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
           <p className="text-xs leading-relaxed text-gray-300">{caution}</p>
         </div>
@@ -238,7 +240,9 @@ export default function PrizeTable({
                 row.filled ? "text-amber-300" : "text-gray-500"
               }`}
             >
-              {row.filled ? formatVolts(row.netAmount, { symbol: creditSymbol }) : "-"}
+              {row.filled
+                ? formatVolts(row.netAmount, { symbol: creditSymbol })
+                : "-"}
             </span>
           </div>
         ))}

@@ -48,15 +48,18 @@ async function ensureMarketOpen(): Promise<void> {
  * Check competition risk limits (max drawdown and daily loss)
  * Returns { allowed: boolean, reason?: string }
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function checkCompetitionRiskLimits(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   participant: any,
 ): Promise<{ allowed: boolean; reason?: string }> {
-  // Check if risk limits are enabled for this competition
-  if (!competition.riskLimits?.enabled) {
+  // Check if risk limits are enabled for this competition.
+  // Reason: the equity check is its own switch - mandatory on Game Master contests - so it must
+  // still run when the drawdown and daily-loss limits are off. It used to sit behind `enabled`,
+  // which made a ticked equity check on a contest without risk limits do nothing at all.
+  const limitsEnabled = competition.riskLimits?.enabled === true;
+  if (!limitsEnabled && !competition.riskLimits?.equityCheckEnabled) {
     console.log(`📊 [RISK] Risk limits NOT enabled for this competition`);
     return { allowed: true };
   }
@@ -81,7 +84,7 @@ async function checkCompetitionRiskLimits(
     `   Balance Threshold: $${maxDrawdownThreshold.toFixed(2)} | Current: $${currentCapital.toFixed(2)}`,
   );
 
-  if (currentCapital <= maxDrawdownThreshold) {
+  if (limitsEnabled && currentCapital <= maxDrawdownThreshold) {
     console.log(
       `🛑 [RISK] Max drawdown exceeded: Balance $${currentCapital.toFixed(2)} <= Threshold $${maxDrawdownThreshold.toFixed(2)} (${maxDrawdownPercent}% limit)`,
     );
@@ -132,6 +135,7 @@ async function checkCompetitionRiskLimits(
   );
 
   if (
+    limitsEnabled &&
     todaysRealizedPnL < 0 &&
     Math.abs(todaysRealizedPnL) >= dailyLossThresholdAmount
   ) {
@@ -194,7 +198,7 @@ async function checkCompetitionRiskLimits(
               (eqRate > 0 ? eqRate : 1);
             totalUnrealizedPnL += positionUnrealizedPnL;
           }
-        } catch (e) {
+        } catch {
           console.warn(
             `Could not get price for ${position.symbol}, using last known PnL`,
           );
@@ -356,7 +360,10 @@ export const placeOrder = async (params: {
 
     // ✅ CHECK RISK LIMITS (Max Drawdown & Daily Loss) - Only for competitions with risk limits
     console.log(`📊 Checking ${contestType} risk limits...`);
-    if (contestData.riskLimits?.enabled) {
+    if (
+      contestData.riskLimits?.enabled ||
+      contestData.riskLimits?.equityCheckEnabled
+    ) {
       const riskLimitCheck = await checkCompetitionRiskLimits(
         contest,
         participant,
@@ -383,7 +390,7 @@ export const placeOrder = async (params: {
     }
 
     // Validate symbol is in competition's allowed assets
-    if (!FOREX_PAIRS[symbol]) {
+    if (!Object.prototype.hasOwnProperty.call(FOREX_PAIRS, symbol)) {
       throw new Error(`Invalid forex pair: ${symbol}`);
     }
 
@@ -789,7 +796,8 @@ export const placeOrder = async (params: {
       return {
         success: true,
         orderId: createdOrder._id.toString(),
-        positionId: orderType === "market" ? createdOrder.positionId : undefined,
+        positionId:
+          orderType === "market" ? createdOrder.positionId : undefined,
         position: positionData, // ⚡ Include position for immediate UI update!
         message:
           orderType === "market"

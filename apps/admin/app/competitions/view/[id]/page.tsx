@@ -44,6 +44,7 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import GameRound from "@/database/models/games/game-round.model";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { storedLeverageCeiling } from "@/lib/services/trading/competition-leverage";
 import { getTerms } from "@/lib/services/terminology.service";
 
 // Derived from the actions rather than hand-written. Reason: a hand-written row interface is
@@ -490,7 +491,7 @@ const AdminCompetitionViewPage = async ({
                           Max Leverage
                         </p>
                         <p className="text-lg font-semibold text-gray-100">
-                          1:{competition.leverageAllowed || 1}
+                          1:{storedLeverageCeiling(competition.leverage) ?? 1}
                         </p>
                       </div>
                     </>

@@ -1,7 +1,10 @@
 "use server";
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- pre-existing: `contest` and `participant` are a competition OR a challenge document; typing that union is its own change. Silenced so the lint-staged hook does not block unrelated edits here. */
+
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
+import { storedLeverageCeiling } from "@/lib/services/trading/competition-leverage";
 import Challenge from "@/database/models/trading/challenge.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
@@ -28,6 +31,8 @@ export interface ContestData {
     maxDrawdownPercent?: number;
     dailyLossLimitPercent?: number;
     dailyLossLimitEnabled?: boolean;
+    equityCheckEnabled?: boolean;
+    equityDrawdownPercent?: number;
   };
   startingCapital: number;
   assetClasses: string[];
@@ -63,7 +68,11 @@ export async function getContestAndParticipant(
       leverage: {
         enabled: competition.leverage?.enabled ?? false,
         min: competition.leverage?.min || 1,
-        max: competition.leverage?.max || competition.leverageAllowed || 100,
+        // Reason: Game Master contests before 12 Oct 2026 stored `leverage` as a bare number,
+        // which `leverage?.max` read as undefined and so allowed 1:100.
+        max:
+          storedLeverageCeiling(competition.leverage) ??
+          (competition.leverageAllowed || 100),
       },
       maxPositionSize: competition.maxPositionSize || 100,
       maxOpenPositions: competition.maxOpenPositions || 10,
