@@ -13,6 +13,10 @@ import {
 import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import ProfileCard from "@/components/profile/ProfileCard";
 import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
+import {
+  isLeaderboardEntryDisqualified,
+  leaderboardDisqualificationReason,
+} from "./leaderboard-qualification";
 
 interface LeaderboardEntry {
   _id: string;
@@ -102,33 +106,13 @@ export default function CompetitionLeaderboard({
 
   // Check if entry is disqualified (either explicitly or via status)
   // Only check minimum trades when competition is completed - don't confuse users during active competition
-  const isEntryDisqualified = (entry: LeaderboardEntry) => {
-    if (entry.qualificationStatus === "disqualified") return true;
-    if (entry.status === "liquidated") return true;
-    // Only disqualify for minimum trades when competition is COMPLETED
-    if (
-      competitionStatus === "completed" &&
-      minimumTrades > 0 &&
-      entry.totalTrades < minimumTrades
-    )
-      return true;
-    return false;
-  };
+  const qualification = { competitionStatus, minimumTrades };
+  const isEntryDisqualified = (entry: LeaderboardEntry) =>
+    isLeaderboardEntryDisqualified(entry, qualification);
 
   // Get disqualification reason
-  const getDisqualificationReason = (entry: LeaderboardEntry) => {
-    if (entry.disqualificationReason) return entry.disqualificationReason;
-    if (entry.status === "liquidated") return "Liquidated";
-    // Only show min trades reason when competition is completed
-    if (
-      competitionStatus === "completed" &&
-      minimumTrades > 0 &&
-      entry.totalTrades < minimumTrades
-    ) {
-      return `Insufficient trades (${entry.totalTrades}/${minimumTrades})`;
-    }
-    return "Disqualified";
-  };
+  const getDisqualificationReason = (entry: LeaderboardEntry) =>
+    leaderboardDisqualificationReason(entry, qualification);
 
   const calculateProfitFactor = (entry: LeaderboardEntry) => {
     if (entry.losingTrades === 0) return entry.winningTrades > 0 ? 9999 : 0;

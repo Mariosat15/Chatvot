@@ -47,6 +47,9 @@ import {
   contestNotInTitle,
 } from "@/components/competitions/lobby/contest-lobby-copy";
 
+const MOBILE_FACT_ROW =
+  "flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 px-3 py-2.5";
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
    
@@ -72,6 +75,12 @@ interface CompetitionEntryButtonProps {
    * visible half so they do not hit terms then a toast.
    */
   currentUserId?: string;
+  /**
+   * `mobile` drops the grey outer box (the phone card supplies its own), puts the entry CTA
+   * beside the heading and the fee/balance pair on one row. Every rule and every sentence is
+   * the same; only the arrangement differs.
+   */
+  layout?: "panel" | "mobile";
 }
 
 export default function CompetitionEntryButton({
@@ -84,7 +93,9 @@ export default function CompetitionEntryButton({
   registrationClosed = false,
   levelLadder,
   currentUserId,
+  layout = "panel",
 }: CompetitionEntryButtonProps) {
+  const mobile = layout === "mobile";
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showFundedTerms, setShowFundedTerms] = useState(false);
@@ -353,8 +364,55 @@ export default function CompetitionEntryButton({
     }
   };
 
+  /*
+    Built once and placed in one of two spots: under the entry check on the desktop panel,
+    beside the heading on the phone card. One node, so the label chain cannot drift.
+  */
+  const entryCta =
+    canEnter || entering ? (
+      <LobbyJoinArtworkButton
+        variant={isUpcoming ? "reserve" : "join"}
+        label={
+          entering
+            ? "Joining…"
+            : isUpcoming
+              ? "Reserve Spot"
+              : "Join Competition"
+        }
+        onClick={handleEnter}
+        disabled={!canEnter}
+        busy={entering}
+      />
+    ) : (
+      <LobbyJoinArtworkButton
+        variant="join"
+        label={
+          registrationClosed
+            ? "Registration Closed"
+            : isOwnContest
+              ? "Your Own Competition"
+              : !meetsLevelReq
+                ? "Level Restricted"
+                : isFull
+                  ? "Competition Full"
+                  : !canAfford
+                    ? `Need ${volts(Math.abs(entryFee - userBalance))} More`
+                    : fundedRefusal
+                      ? "Minimum Balance Required"
+                      : "Join Competition"
+        }
+        disabled
+      />
+    );
+
   return (
-    <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
+    <div
+      className={
+        mobile
+          ? "min-w-0"
+          : "rounded-xl bg-gray-800/50 border border-gray-700 p-6"
+      }
+    >
       {/* Already Entered */}
       {isUserIn ? (
         <div className="space-y-4">
@@ -503,25 +561,46 @@ export default function CompetitionEntryButton({
             gameMasterName={competition.gameMasterName}
           />
           <div>
-            <h3 className="text-lg font-semibold text-gray-100 mb-1">
-              {contestNotInTitle(isProviderGame ? "game" : "trading")}
-            </h3>
-            <p className="mb-3 text-xs text-gray-400">
-              {contestNotInDetail(isProviderGame ? "game" : "trading")}
-            </p>
-            <h4 className="text-sm font-semibold text-gray-300 mb-2">
-              Entry check
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
-                <span className="text-sm text-gray-400">Entry Fee</span>
+            <div
+              className={
+                mobile
+                  ? "mb-3 grid grid-cols-[minmax(0,1fr)_7.5rem] items-center gap-3"
+                  : ""
+              }
+            >
+              <div className="min-w-0">
+                <h3
+                  className={`font-semibold text-gray-100 mb-1 ${mobile ? "text-base leading-snug" : "text-lg"}`}
+                >
+                  {contestNotInTitle(isProviderGame ? "game" : "trading")}
+                </h3>
+                <p className={`text-xs text-gray-400 ${mobile ? "" : "mb-3"}`}>
+                  {contestNotInDetail(isProviderGame ? "game" : "trading")}
+                </p>
+              </div>
+              {mobile && <div className="min-w-0">{entryCta}</div>}
+            </div>
+            {!mobile && (
+              <h4 className="text-sm font-semibold text-gray-300 mb-2">
+                Entry check
+              </h4>
+            )}
+            <div
+              className={
+                mobile
+                  ? `grid overflow-hidden rounded-xl border border-white/10 bg-black/25 ${isFunded ? "grid-cols-1" : "grid-cols-2 divide-x divide-white/10"}`
+                  : "space-y-2"
+              }
+            >
+              <div className={mobile ? MOBILE_FACT_ROW : "flex items-center justify-between p-3 rounded-lg bg-gray-800/50"}>
+                <span className={mobile ? "text-xs text-gray-400" : "text-sm text-gray-400"}>Entry Fee</span>
                 <span className="text-sm font-semibold text-gray-100">
                   {isFunded ? `FREE - paid by ${gameMasterName}` : volts(entryFee)}
                 </span>
               </div>
               {!isFunded && (
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
-                <span className="text-sm text-gray-400">Your Balance</span>
+              <div className={mobile ? MOBILE_FACT_ROW : "flex items-center justify-between p-3 rounded-lg bg-gray-800/50"}>
+                <span className={mobile ? "text-xs text-gray-400" : "text-sm text-gray-400"}>Your Balance</span>
                 <span
                   className={`text-sm font-semibold ${
                     canAfford ? "text-green-500" : "text-red-500"
@@ -562,7 +641,7 @@ export default function CompetitionEntryButton({
                     zeroLabel="Closed"
                     className="font-semibold text-amber-300"
                   />
-                  <span className="ml-1 text-gray-500">
+                  <span className={mobile ? "mt-0.5 block text-gray-500" : "ml-1 text-gray-500"}>
                     ({entryDeadline.toUTCString()})
                   </span>
                   {/*
@@ -608,41 +687,7 @@ export default function CompetitionEntryButton({
             browser CTA. Refusal states keep a greyed Join so the control never
             vanishes; the reason below still names why.
           */}
-          {canEnter || entering ? (
-            <LobbyJoinArtworkButton
-              variant={isUpcoming ? "reserve" : "join"}
-              label={
-                entering
-                  ? "Joining…"
-                  : isUpcoming
-                    ? "Reserve Spot"
-                    : "Join Competition"
-              }
-              onClick={handleEnter}
-              disabled={!canEnter}
-              busy={entering}
-            />
-          ) : (
-            <LobbyJoinArtworkButton
-              variant="join"
-              label={
-                registrationClosed
-                  ? "Registration Closed"
-                  : isOwnContest
-                    ? "Your Own Competition"
-                    : !meetsLevelReq
-                      ? "Level Restricted"
-                      : isFull
-                        ? "Competition Full"
-                        : !canAfford
-                          ? `Need ${volts(Math.abs(entryFee - userBalance))} More`
-                          : fundedRefusal
-                            ? "Minimum Balance Required"
-                            : "Join Competition"
-              }
-              disabled
-            />
-          )}
+          {!mobile && entryCta}
 
           {/* Registration Closed Warning */}
           {registrationClosed && !isUserIn && (

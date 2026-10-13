@@ -1,20 +1,36 @@
 import type { ReactNode } from "react";
-import { Clock, Link2, Trophy, Users } from "lucide-react";
-import { StatCard } from "@/components/neon/Cards";
 import InlineCountdown from "@/components/trading/InlineCountdown";
-import UTCClock from "@/components/trading/UTCClock";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
-import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
 import { contestPlayersLabel } from "@/components/competitions/lobby/contest-lobby-copy";
+import { MobileIcon } from "./MobileLobbyCard";
 
 /**
- * Essentials 2×2 grid (Complobyymobile §6). Never four-across; never desktop `showcase`.
- * Volts only — never EUR. Sponsored seats show FREE when the contest is GM-funded.
+ * Essentials as four EQUAL tiles in a 2×2 grid (mobile fix guide, point 4).
  *
- * Reason: do not import `isFundedContest` from free-private-entry — that module pulls
+ * Every tile has the same shape: icon box, label, value, one short line underneath. The
+ * row stretches each pair to the taller tile so the grid never looks ragged. Volts only,
+ * never EUR. A sponsored seat reads FREE when the contest is GM-funded.
+ *
+ * Reason: do not import `isFundedContest` from free-private-entry - that module pulls
  * mongoose and must not sit in a tree that can reach a client boundary (R58).
  */
+
+type Tone = "gold" | "red" | "blue" | "purple";
+
+const TONE_BOX = new Map<Tone, string>([
+  ["gold", "border-amber-400/25 bg-amber-500/10"],
+  ["red", "border-rose-400/25 bg-rose-500/10"],
+  ["blue", "border-sky-400/25 bg-sky-500/10"],
+  ["purple", "border-violet-400/25 bg-violet-500/10"],
+]);
+
+const TONE_VALUE = new Map<Tone, string>([
+  ["gold", "text-amber-200"],
+  ["red", "text-white"],
+  ["blue", "text-white"],
+  ["purple", "text-white"],
+]);
 
 export function MobileLobbyMetrics({
   competition,
@@ -24,6 +40,7 @@ export function MobileLobbyMetrics({
   isUpcoming,
   isCompleted,
   isCancelled,
+  formatUTCDate,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
@@ -33,115 +50,105 @@ export function MobileLobbyMetrics({
   isUpcoming: boolean;
   isCompleted: boolean;
   isCancelled: boolean;
+  formatUTCDate: (date: Date) => string;
 }) {
   const pool = competition.prizePool || competition.prizePoolCredits || 0;
   const maxPool = maxPrizePool(competition, pool);
   const fee = Number(competition.entryFee || competition.entryFeeCredits || 0);
   // Reason: same predicate as isFundedContest, without importing the mongoose-backed service.
   const funded = competition.fundingMode === "gm_funded";
+  const joined = Number(competition.currentParticipants ?? 0);
+  const minPlayers = Number(competition.minParticipants ?? 0);
+  const maxSeats = Number(competition.maxParticipants ?? 0);
+  // Reason: "filled" means seats taken. Measured on money, a fixed sponsor pool would read
+  // as nearly full before anybody had joined.
+  const filledPct = maxSeats > 0 ? Math.min(100, Math.round((joined / maxSeats) * 100)) : 0;
+  const clockTarget = isActive ? competition.endTime : competition.startTime;
 
   return (
-    <div className="grid min-w-0 grid-cols-2 gap-2.5">
-      <StatCard
-        size="lg"
-        icon={Trophy}
-        imageSrc={COMPETITION_ICON.volts}
-        accent="prize"
+    <div className="grid min-w-0 grid-cols-2 gap-3">
+      <Tile
+        tone="gold"
+        iconSrc={COMPETITION_ICON.volts}
         label="Prize pool"
         value={formatVolts(maxPool, { symbol: creditSymbol })}
-        note={
-          <>
-            <LobbyFillBar current={pool} max={maxPool} tone="amber" />
-            <Hint>
-              {formatVolts(pool, { symbol: creditSymbol })} collected
-            </Hint>
-          </>
-        }
+        sub={`${filledPct}% filled`}
       />
-      <StatCard
-        size="lg"
-        icon={Link2}
-        imageSrc={COMPETITION_ICON.entryFee}
-        accent="entry"
+      <Tile
+        tone="red"
+        iconSrc={COMPETITION_ICON.entryFee}
         label="Entry fee"
-        value={
-          funded
-            ? "FREE"
-            : formatVolts(fee, { symbol: creditSymbol })
-        }
-        note={
-          <Hint>
-            {funded ? "GM pays your seat" : "Paid once for your seat"}
-          </Hint>
-        }
+        value={funded ? "FREE" : formatVolts(fee, { symbol: creditSymbol })}
+        sub={funded ? "GM pays your seat" : "Paid once for your seat"}
       />
-      <StatCard
-        size="lg"
-        icon={Users}
-        imageSrc={COMPETITION_ICON.players}
-        accent="players"
+      <Tile
+        tone="blue"
+        iconSrc={COMPETITION_ICON.players}
         label={contestPlayersLabel(kind)}
-        value={`${competition.currentParticipants ?? 0} / ${competition.maxParticipants ?? 0}`}
-        note={
-          <>
-            <LobbyFillBar
-              current={competition.currentParticipants ?? 0}
-              max={competition.maxParticipants ?? 0}
-            />
-            {isUpcoming && competition.minParticipants > 0 ? (
-              <p
-                className={`mt-1.5 text-[11px] ${
-                  (competition.currentParticipants ?? 0) <
-                  competition.minParticipants
-                    ? "text-orange-400"
-                    : "text-emerald-400"
-                }`}
-              >
-                Min {competition.minParticipants} to start
-              </p>
-            ) : null}
-          </>
+        value={`${joined} / ${maxSeats}`}
+        sub={
+          isUpcoming && minPlayers > 0 ? (
+            <span className={joined < minPlayers ? "text-orange-300" : "text-emerald-300"}>
+              Min {minPlayers} to start
+            </span>
+          ) : (
+            `${joined} joined`
+          )
         }
       />
-      <StatCard
-        size="lg"
-        icon={Clock}
-        imageSrc={COMPETITION_ICON.clock}
-        accent={isCancelled ? "ended" : isActive ? "entry" : "waiting"}
-        label={
-          isCancelled || isCompleted
-            ? "Status"
-            : isActive
-              ? "Ends in"
-              : "Starts in"
-        }
+      <Tile
+        tone="purple"
+        iconSrc={COMPETITION_ICON.clock}
+        label={isCancelled || isCompleted ? "Status" : isActive ? "Ends in" : "Starts in"}
         value={
           isCancelled ? (
             "Cancelled"
           ) : isCompleted ? (
             "Completed"
           ) : (
-            <InlineCountdown
-              targetDate={
-                isActive ? competition.endTime : competition.startTime
-              }
-              type={isActive ? "end" : "start"}
-            />
+            <InlineCountdown targetDate={clockTarget} type={isActive ? "end" : "start"} />
           )
         }
-        note={
-          <div className="mt-1 border-t border-white/10 pt-2">
-            <UTCClock variant="inline" />
-          </div>
-        }
+        sub={isCancelled || isCompleted ? null : formatUTCDate(new Date(clockTarget))}
       />
     </div>
   );
 }
 
-function Hint({ children }: { children: ReactNode }) {
+function Tile({
+  tone,
+  iconSrc,
+  label,
+  value,
+  sub,
+}: {
+  tone: Tone;
+  iconSrc: string;
+  label: string;
+  value: ReactNode;
+  sub: ReactNode;
+}) {
   return (
-    <p className="mt-1.5 text-[11px] leading-snug text-gray-400">{children}</p>
+    <div className="flex h-full min-h-[92px] min-w-0 items-start gap-2.5 rounded-2xl border border-white/[0.07] bg-[#0A1024]/85 p-3">
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${TONE_BOX.get(tone) ?? ""}`}
+      >
+        <MobileIcon src={iconSrc} className="h-6 w-6" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+          {label}
+        </p>
+        <div
+          className={`mt-0.5 text-[15px] font-bold leading-tight tabular-nums break-words min-[390px]:text-[16px] ${TONE_VALUE.get(tone) ?? "text-white"}`}
+        >
+          {value}
+        </div>
+        {sub ? (
+          <p className="mt-1 text-[11px] leading-snug text-gray-400 break-words">{sub}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

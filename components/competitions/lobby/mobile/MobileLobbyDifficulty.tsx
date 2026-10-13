@@ -1,6 +1,6 @@
 import type { DifficultyLevel } from "@/lib/utils/competition-difficulty";
-import { NeonNote, NeonPanel } from "@/components/neon/Cards";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
+import { MobileChip, MobileLobbyCard } from "./MobileLobbyCard";
 
 /**
  * Difficulty from real configured data (Complobyymobile §12).
@@ -35,28 +35,25 @@ const DIFFICULTY_COPY = new Map<DifficultyLevel, string>([
 
 export function MobileLobbyDifficulty({
   difficultyData,
+  id = "lobby-difficulty",
 }: {
   difficultyData: {
     level: DifficultyLevel;
     label: string;
     score: number;
   };
+  id?: string;
 }) {
   const tone = DIFFICULTY_TEXT.get(difficultyData.level) ?? "text-gray-300";
 
   return (
-    <NeonPanel
+    <MobileLobbyCard
+      id={id}
       iconSrc={NEON_ICON("target-purple")}
-      accent="score"
       title="Difficulty"
-      size="lg"
-      action={
-        <span className={`text-sm font-black ${tone}`}>
-          {difficultyData.label}
-        </span>
-      }
+      action={<MobileChip>{difficultyData.label}</MobileChip>}
     >
-      <div className="h-2.5 overflow-hidden rounded-full border border-white/10 bg-black/40">
+      <div className="h-2 overflow-hidden rounded-full bg-black/40">
         <div
           className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-rose-500"
           style={{
@@ -69,10 +66,10 @@ export function MobileLobbyDifficulty({
         <span className={`font-bold ${tone}`}>{difficultyData.score}/100</span>
         <span>Harder</span>
       </div>
-      <NeonNote>
+      <p className="mt-3 text-[12px] leading-relaxed text-gray-400">
         {DIFFICULTY_COPY.get(difficultyData.level) ??
           "A fair fight - not too easy, not too hard."}
-      </NeonNote>
-    </NeonPanel>
+      </p>
+    </MobileLobbyCard>
   );
 }

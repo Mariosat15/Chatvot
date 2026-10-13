@@ -1,11 +1,14 @@
 import type { TitleLevel } from "@/lib/constants/levels";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
-import { NeonPanel } from "@/components/neon/Cards";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
+import { MobileLobbyCard } from "./MobileLobbyCard";
 
 /**
- * Full-width entry card above long rules (Complobyymobile §7).
- * Same `CompetitionEntryButton` as desktop — eligibility stays server-side.
+ * "Your entry" - the status, the Reserve / Join button, the fee and balance and the entry
+ * deadline in one card (mobile fix guide, point 5).
+ *
+ * Same `CompetitionEntryButton` as desktop: every eligibility rule, sentence and the button
+ * itself live there, and `layout="mobile"` changes only how they are arranged.
  */
 
 export function MobileLobbyEntryPanel({
@@ -36,12 +39,7 @@ export function MobileLobbyEntryPanel({
   if (!show) return null;
 
   return (
-    <NeonPanel
-      iconSrc={NEON_ICON("wallet-blue")}
-      accent="entry"
-      title="Your entry"
-      size="lg"
-    >
+    <MobileLobbyCard id="lobby-entry" iconSrc={NEON_ICON("wallet-blue")} title="Your entry">
       <CompetitionEntryButton
         competition={competition}
         userBalance={walletBalance}
@@ -52,7 +50,8 @@ export function MobileLobbyEntryPanel({
         registrationClosed={registrationClosed}
         levelLadder={levelLadder}
         currentUserId={currentUserId}
+        layout="mobile"
       />
-    </NeonPanel>
+    </MobileLobbyCard>
   );
 }

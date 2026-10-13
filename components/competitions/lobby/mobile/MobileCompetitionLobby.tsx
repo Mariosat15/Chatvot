@@ -6,26 +6,40 @@ import type { TitleLevel } from "@/lib/constants/levels";
 import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
 import type { TradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
-import { NeonPanel } from "@/components/neon/Cards";
 import { NeonPill } from "@/components/neon/Buttons";
 import { resolveLevelName } from "@/lib/utils/level-title";
 import { resolveTradingBanner } from "@/components/neon/banners";
 import { MobileLobbyHero } from "./MobileLobbyHero";
 import { MobileLobbyMetrics } from "./MobileLobbyMetrics";
 import { MobileLobbyEntryPanel } from "./MobileLobbyEntryPanel";
-import { MobileLobbyCountdown } from "./MobileLobbyCountdown";
-import { MobileLobbyTabs } from "./MobileLobbyTabs";
+import { MobileLobbyChips, type MobileLobbyChip } from "./MobileLobbyChips";
+import { MobileLobbyOverview } from "./MobileLobbyOverview";
+import { MobileLobbyBattlePlan } from "./MobileLobbyBattlePlan";
+import { MobileLobbySections, mobileSectionAnchor } from "./MobileLobbySections";
 import { MobileLobbyLeaderboard } from "./MobileLobbyLeaderboard";
 import { MobileLobbySchedule } from "./MobileLobbySchedule";
 import { MobileLobbyDifficulty } from "./MobileLobbyDifficulty";
 import { MobileLobbyRewards } from "./MobileLobbyRewards";
+import { MobileLobbyCard } from "./MobileLobbyCard";
 
 /**
- * Dedicated phone Competition Lobby (Complobyymobile).
+ * Dedicated phone Competition Lobby (Complobyymobile, rebuilt to the 13 Oct 2026 mobile
+ * fix guide).
  *
  * Breakpoint: widths under 769px via the page wrapper. Never imports the desktop
- * two-column shell. Same loaders, entry rules, neon graphics and prize logic as desktop.
+ * two-column shell. Same loaders, entry rules and prize logic as desktop.
+ *
+ * ONE VERTICAL FLOW: hero, four equal tiles, the entry card, a row of jump chips, then
+ * every block one after another. Nothing is hidden behind a tab, so nothing can be cut
+ * off by a strip that is wider than the phone - the chips only scroll to a block.
  */
+
+/** Short chip labels; anything unlisted uses the section's own title. */
+const CHIP_LABELS = new Map<string, string>([
+  ["eligible-assets", "Assets"],
+  ["trading-rules", "Rules"],
+  ["risk-management", "Risk"],
+]);
 
 export type MobileCompetitionLobbyProps = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -85,7 +99,20 @@ export function MobileCompetitionLobby({
     typeof competition.description === "string" &&
     competition.description.trim().length > 0
       ? competition.description.trim()
-      : "Compete for the prize pool. Check the rules tabs for how this contest works.";
+      : "Compete for the prize pool. Check the rules below for how this contest works.";
+
+  const chips: MobileLobbyChip[] = [
+    { id: "lobby-overview", label: "Overview" },
+    { id: "lobby-battle-plan", label: "Battle Plan" },
+    { id: "competition-leaderboard-mobile", label: "Leaderboard" },
+    { id: "lobby-schedule", label: "Schedule" },
+    { id: "lobby-difficulty", label: "Difficulty" },
+    { id: "lobby-prizes", label: "Prizes" },
+    ...sections.map((s) => ({
+      id: mobileSectionAnchor(s.id),
+      label: CHIP_LABELS.get(s.id) ?? s.title,
+    })),
+  ];
 
   return (
     <div
@@ -97,7 +124,7 @@ export function MobileCompetitionLobby({
       }}
     >
       <div
-        className="mx-auto flex w-full max-w-[430px] min-w-0 flex-col gap-4 overflow-x-hidden px-4 pt-4"
+        className="mx-auto flex w-full max-w-[430px] min-w-0 flex-col gap-3.5 overflow-x-hidden px-4 pt-4"
         style={{
           paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))",
           paddingLeft: "max(1rem, env(safe-area-inset-left))",
@@ -137,6 +164,7 @@ export function MobileCompetitionLobby({
           isUpcoming={isUpcoming}
           isCompleted={isCompleted}
           isCancelled={isCancelled}
+          formatUTCDate={formatUTCDate}
         />
 
         <MobileLobbyEntryPanel
@@ -152,18 +180,11 @@ export function MobileCompetitionLobby({
           show={!isCompleted || isUserIn}
         />
 
-        <MobileLobbyCountdown
-          startTime={competition.startTime}
-          endTime={competition.endTime}
-          isUpcoming={isUpcoming}
-          isActive={isActive}
-        />
+        <MobileLobbyChips chips={chips} />
 
-        <MobileLobbyTabs
-          about={about}
-          overview={overview}
-          sections={sections}
-        />
+        <MobileLobbyOverview id="lobby-overview" about={about} overview={overview} />
+
+        <MobileLobbyBattlePlan id="lobby-battle-plan" overview={overview} />
 
         <MobileLobbyLeaderboard
           leaderboard={leaderboard}
@@ -230,12 +251,7 @@ export function MobileCompetitionLobby({
         <MobileLobbyDifficulty difficultyData={difficultyData} />
 
         {competition.levelRequirement?.enabled ? (
-          <NeonPanel
-            iconSrc={NEON_ICON("crown")}
-            accent="score"
-            title="Level requirement"
-            size="lg"
-          >
+          <MobileLobbyCard iconSrc={NEON_ICON("crown")} title="Level requirement">
             <p className="text-sm font-medium text-gray-100 break-words">
               {(() => {
                 const min = Number(competition.levelRequirement.minLevel);
@@ -247,13 +263,15 @@ export function MobileCompetitionLobby({
                   : `${resolveLevelName(min, levelLadder)} or higher`;
               })()}
             </p>
-          </NeonPanel>
+          </MobileLobbyCard>
         ) : null}
 
         <MobileLobbyRewards
           competition={competition}
           creditSymbol={creditSymbol}
         />
+
+        <MobileLobbySections sections={sections} openIds={["eligible-assets"]} />
       </div>
     </div>
   );

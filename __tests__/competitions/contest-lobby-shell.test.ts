@@ -100,14 +100,29 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(mobileTrading).not.toContain("lg:grid-cols-[minmax(0,2fr)");
     expect(mobileTrading).toContain("max-w-[430px]");
     expect(mobileTrading).toContain("env(safe-area-inset-bottom)");
-    expect(mobileTrading).toContain("<MobileLobbyTabs");
-    // Battle Plan is stacked inside the Overview tab body, not beside About.
-    const mobileTabs = readCode(
-      "components/competitions/lobby/mobile/MobileLobbyTabs.tsx",
+    // Flipped 13 Oct 2026 (mobile fix guide), not deleted: the swipe tab strip was wider
+    // than the phone and hid every block but one, so the page is now ONE vertical flow -
+    // jump chips that only scroll, then every block in order. A tab strip must not return.
+    expect(mobileTrading).not.toContain("<MobileLobbyTabs");
+    expect(mobileTrading).toContain("<MobileLobbyChips");
+    expect(mobileTrading).toContain("<MobileLobbyOverview");
+    expect(mobileTrading).toContain("<MobileLobbyBattlePlan");
+    expect(mobileTrading).toContain("<MobileLobbySections");
+    // The phone leaderboard must not wrap the 760px desktop table (the cut-off).
+    const mobileBoard = readCode(
+      "components/competitions/lobby/mobile/MobileLobbyLeaderboard.tsx",
     );
-    expect(mobileTabs).toContain("<MobileLobbyOverview");
-    expect(mobileTabs).toContain("<MobileLobbyBattlePlan");
-    expect(mobileStats).toContain('size="lg"');
+    expect(mobileBoard).not.toContain("CompetitionLeaderboard");
+    expect(mobileBoard).toContain("isLeaderboardEntryDisqualified");
+    // The entry card is the shared button, arranged for the phone.
+    const mobileEntry = readCode(
+      "components/competitions/lobby/mobile/MobileLobbyEntryPanel.tsx",
+    );
+    expect(mobileEntry).toContain('layout="mobile"');
+    // Flipped 13 Oct 2026, not deleted: the KPI row is a real equal 2x2 grid of tiles,
+    // not the desktop StatCard at `lg`.
+    expect(mobileStats).toContain("grid-cols-2");
+    expect(mobileStats).not.toContain('size="lg"');
     expect(mobileStats).not.toContain('size="showcase"');
     expect(mobileStats).toContain("COMPETITION_ICON.entryFee");
     expect(mobileStats).toContain("COMPETITION_ICON.volts");

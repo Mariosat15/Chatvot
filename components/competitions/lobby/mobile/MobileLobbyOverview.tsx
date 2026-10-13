@@ -15,10 +15,11 @@ import type {
   TradingOverviewFact,
   TradingOverviewFactIcon,
 } from "@/components/competitions/lobby/trading-overview-copy";
+import { MOBILE_CARD } from "./MobileLobbyCard";
 
 /**
- * About this competition — full-width phone card (Complobyymobile §10).
- * Feature tiles stay 2-up only when they fit; never beside Battle Plan.
+ * About this competition - full-width phone card (Complobyymobile §10, mobile fix guide).
+ * Feature tiles stack one per row: icon and title on one line, facts listed beneath.
  */
 
 const FACT_ICONS = new Map<TradingOverviewFactIcon, LucideIcon>([
@@ -33,59 +34,52 @@ const FACT_ICONS = new Map<TradingOverviewFactIcon, LucideIcon>([
 ]);
 
 const TILE_TONES = [
-  {
-    frame: "border-emerald-400/35 shadow-[0_0_18px_rgba(52,211,153,0.14)]",
-    bar: "bg-emerald-400",
-    dot: "border-emerald-400/50 text-emerald-300",
-  },
-  {
-    frame: "border-violet-400/35 shadow-[0_0_18px_rgba(167,139,250,0.14)]",
-    bar: "bg-violet-400",
-    dot: "border-violet-400/50 text-violet-300",
-  },
+  { dot: "border-emerald-400/40 text-emerald-300" },
+  { dot: "border-violet-400/40 text-violet-300" },
 ] as const;
 
 export function MobileLobbyOverview({
+  id,
   about,
   overview,
 }: {
+  id?: string;
   about: string;
   overview: TradingOverviewCopy;
 }) {
   return (
-    <section className="min-w-0 rounded-2xl border border-sky-400/40 bg-[#060A18]/85 p-4 shadow-[0_0_26px_rgba(56,189,248,0.14)]">
-      <h2 className="flex items-center gap-2 text-lg font-bold text-white">
-        <Info className="h-6 w-6 shrink-0 text-cyan-300" aria-hidden />
+    <section id={id} className={`scroll-mt-4 ${MOBILE_CARD}`}>
+      <h2 className="flex items-center gap-2 text-[15px] font-bold text-white">
+        <Info className="h-5 w-5 shrink-0 text-cyan-300" aria-hidden />
         <span>
           About this <span className="text-cyan-300">competition</span>
         </span>
       </h2>
-      <p className="mt-3 text-[14px] leading-relaxed text-gray-300 break-words">
+      <p className="mt-2.5 text-[14px] leading-relaxed text-gray-300 break-words">
         {about}
       </p>
       {overview.features.length > 0 ? (
-        <ul className="mt-4 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+        <ul className="mt-4 flex min-w-0 flex-col gap-3">
           {overview.features.map((feature, index) => {
             const tone = TILE_TONES[index % TILE_TONES.length];
             return (
               <li
                 key={feature.iconSrc}
-                className={`flex min-w-0 flex-col items-center rounded-xl border bg-[#0A1024]/80 px-3 pb-3.5 pt-4 text-center ${tone.frame}`}
+                className="min-w-0 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
-                <img
-                  src={feature.iconSrc}
-                  alt=""
-                  draggable={false}
-                  className="h-14 w-14 shrink-0 object-contain"
-                />
-                <p className="mt-2 text-base font-bold leading-tight text-white break-words">
-                  {feature.title}
-                </p>
-                <span
-                  className={`mt-2 h-0.5 w-8 shrink-0 rounded-full ${tone.bar}`}
-                />
-                <ul className="mt-3 w-full divide-y divide-white/10 border-t border-white/10 pt-2 text-left">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
+                  <img
+                    src={feature.iconSrc}
+                    alt=""
+                    draggable={false}
+                    className="h-9 w-9 shrink-0 object-contain"
+                  />
+                  <p className="min-w-0 text-[15px] font-bold leading-tight text-white break-words">
+                    {feature.title}
+                  </p>
+                </div>
+                <ul className="mt-2.5 w-full divide-y divide-white/[0.06] border-t border-white/[0.06] pt-2 text-left">
                   {feature.facts.map((fact) => (
                     <FactRow
                       key={`${fact.icon}-${fact.strong}`}
