@@ -3,8 +3,8 @@ import {applyLavaHazards} from './lava-hazards.js';
 import {SHIPS,pickupAt,hazardAt} from './catalog.js';
 import {DRIVE_LIMIT,road} from './road-width.js';
 import {POWER_TUNING,pickupRadius} from './power-tuning.js';
-/* CHARTVOLT PATCH: bumped from 'velocity-3d-13' because the skill-only item set changed (13 Oct 2026; '-13' was the gate-scoring change). The client refuses a race server with another version, so the race server and games-service must be deployed together. */
-export const PHYSICS_VERSION='velocity-3d-14';
+/* CHARTVOLT PATCH: bumped to '-15' for the quicker steering response (13 Oct 2026); '-14' was the skill-only item set, '-13' the gate-scoring change. The client refuses a race server with another version, so the race server and games-service must be deployed together. */
+export const PHYSICS_VERSION='velocity-3d-15';
 export const GATE_HALF_WIDTH=4.5;
 export const RESPAWN_SECONDS=3;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -47,7 +47,8 @@ export class RaceSimulation{
     else if(this.throttle)this.speed=clamp(this.speed+ship.acceleration*(this.boosting?1.65:1)*(1-this.speed/(limit*1.14))*dt,0,limit);
     else this.speed=Math.max(0,this.speed-(8+this.speed*.055)*dt);
     this.energy=clamp(this.energy+dt*(this.boosting?-(ship.boostDrain||.22):.075),0,1);
-    const motion=Math.min(1,this.speed/22),grip=this.braking?6:4;
+    /* CHARTVOLT PATCH (13 Oct 2026, owner: "the ships when turn react very slow"): the yaw rate settled towards the stick at 4/s (6/s braking), a ~0.25 s lag before a turn took hold. 10/s (13/s braking) is ~0.1 s; the turn ceiling is unchanged, so no ship gains a tighter line, only a quicker response. */
+    const motion=Math.min(1,this.speed/22),grip=this.braking?13:10;
     this.yawRate+=(steer*ship.handling/25*.75*motion-this.yawRate)*Math.min(1,dt*grip);
     this.heading=clamp(this.heading+(this.yawRate-this.curvature(this.distance)*this.speed*Math.cos(this.heading))*dt,-1.3,1.3);
     this.lateralVelocity=this.speed*Math.sin(this.heading);

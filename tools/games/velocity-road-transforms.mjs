@@ -48,10 +48,11 @@ export async function roadTransforms(repo) {
     "tests/content.test.mjs": [
       ["Math.abs(p.lane)<=8)", `Math.abs(p.lane)<=${n(8 * S)})`, 1],
       // Not a width edit: three circuits are appended in velocity-server/src/tracks.js
-      // (28 Sep 2026), so the pinned count moves from fifteen to eighteen, ids still unique.
+      // (28 Sep 2026) and three ELITE circuits after them (13 Oct 2026), so the pinned count
+      // moves from fifteen to twenty-one, ids still unique.
       [
         "test('fifteen unique circuits and a nonrepeating shuffled rotation',()=>{assert.equal(TRACKS.length,15);const a=shuffledTracks(12);assert.equal(new Set(a).size,15);",
-        "test('eighteen unique circuits and a nonrepeating shuffled rotation',()=>{assert.equal(TRACKS.length,18);assert.equal(new Set(TRACKS.map(t=>t.id)).size,18);const a=shuffledTracks(12);assert.equal(new Set(a).size,18);",
+        "test('twenty-one unique circuits and a nonrepeating shuffled rotation',()=>{assert.equal(TRACKS.length,21);assert.equal(new Set(TRACKS.map(t=>t.id)).size,21);const a=shuffledTracks(12);assert.equal(new Set(a).size,21);",
         1,
       ],
     ],

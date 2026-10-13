@@ -64,7 +64,11 @@ export const ENVIRONMENTS={
  // every builder already knows how to dress them; setupEnvironment reads this table by track id.
  aurora:{sky:'night',skyTint:0x9cffe0,fog:0x0f2433,road:0x7b98a8,land:0xa9d6e8,type:'ice',label:'AURORA HIGHWAY · POLAR NIGHT',sun:1.8,aurora:true},
  harbor:{sky:'night',skyTint:0xe0a6ff,fog:0x1a1430,road:0x6f7f9c,land:0x5f6f86,type:'city',label:'NEON HARBOUR · MIDNIGHT DOCKS',sun:1.7},
- nebula:{sky:'night',skyTint:0xd2a8ff,fog:0x170f2e,road:0x80879c,land:0x6e6078,type:'asteroids',label:'NEBULA DRIFT · DEEP SPACE',sun:1.7,planet:true}
+ nebula:{sky:'night',skyTint:0xd2a8ff,fog:0x170f2e,road:0x80879c,land:0x6e6078,type:'asteroids',label:'NEBULA DRIFT · DEEP SPACE',sun:1.7,planet:true},
+ // CHARTVOLT PATCH (13 Oct 2026): the ELITE circuits, again on existing scenery builders.
+ gauntlet:{sky:'night',skyTint:0xffe08a,fog:0x1f1a2a,road:0x8d8796,land:0x7d7488,type:'foundry',label:'VOLT GAUNTLET · ELITE',sun:1.9,tunnel:true},
+ viper:{sky:'dusk',skyTint:0xffb38f,fog:0xa8735a,road:0x8f7a6c,land:0xb0643f,type:'canyon',label:'VIPER PASS · ELITE',sun:2.7},
+ zenith:{sky:'night',skyTint:0x8fe9ff,fog:0x101a30,road:0x6e82a8,land:0x65708a,type:'eclipse',label:'ZENITH STORM · ELITE',sun:1.6,planet:true}
 };
 export async function loadEnvironmentAssets(){
  const loader=new T.TextureLoader();await Promise.all([new HDRLoader().loadAsync(sunsetURL).then(t=>{const data=t.image.data;for(let i=0;i<data.length;i+=4){const rgb=[0,1,2].map(k=>T.DataUtils.fromHalfFloat(data[i+k])),peak=Math.max(...rgb),scale=peak>8?8/peak:1;for(let k=0;k<3;k++)data[i+k]=T.DataUtils.toHalfFloat(rgb[k]*scale);}t.needsUpdate=true;sunsetHDR=t;t.mapping=T.EquirectangularReflectionMapping;}),new HDRLoader().loadAsync(hdr).then(t=>{environmentHDR=t;}),...Object.entries({understory:understoryURL,foliage:foliageURL,cloud:cloudURL,rock,rockNormal,dawn,dusk,night,asphalt,asphaltNormal,asphaltRough,concrete,concreteNormal,concreteRough}).map(async([name,url])=>{const t=await loader.loadAsync(url);if(!/Normal|Rough/.test(name))t.colorSpace=T.SRGBColorSpace;textures[name]=t;})]);

@@ -13,9 +13,30 @@ import { useCallback, useEffect, useState, type RefObject } from "react";
  * phone. When the API is missing or refuses, the stage is pinned over the whole window instead
  * ("pseudo" mode), which looks the same apart from the browser's own address bar.
  */
+/**
+ * A phone, as opposed to a tablet or a touch laptop: a touch pointer and a short side of at most
+ * 500px, whichever way up it is held.
+ */
+export const PHONE_STAGE_QUERY =
+  "(pointer: coarse) and (max-width: 500px), (pointer: coarse) and (max-height: 500px)";
+
 export function useStageFullscreen(stageRef: RefObject<HTMLElement | null>) {
   const [native, setNative] = useState(false);
   const [pseudo, setPseudo] = useState(false);
+  const [phone, setPhone] = useState(false);
+
+  // Reason (owner, 13 Oct 2026: "we need to see the game in mobile full screen"): on a phone the
+  // stage starts pinned over the whole window rather than as a box inside the page, the way a
+  // native game opens. It is the window-sized view, not the Fullscreen API, because the API needs
+  // a tap and refuses on mount; the game may still ask for true full screen from its own first tap.
+  // Read after mount so the server render and the first client render agree. The player can leave
+  // with the same button, and this never re-enters behind their back.
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    if (!window.matchMedia(PHONE_STAGE_QUERY).matches) return;
+    setPhone(true);
+    setPseudo(true);
+  }, []);
 
   useEffect(() => {
     const sync = () => setNative(document.fullscreenElement === stageRef.current);
@@ -66,5 +87,5 @@ export function useStageFullscreen(stageRef: RefObject<HTMLElement | null>) {
   const active = native || pseudo;
   const toggle = useCallback(() => (active ? exit() : enter()), [active, enter, exit]);
 
-  return { active, pseudo, toggle };
+  return { active, pseudo, phone, toggle };
 }

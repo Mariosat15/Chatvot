@@ -33,6 +33,9 @@ export const VELOCITY_TRACK_IDS = [
   "aurora",
   "harbor",
   "nebula",
+  "gauntlet",
+  "viper",
+  "zenith",
 ] as const;
 
 export type VelocityTrackId = (typeof VELOCITY_TRACK_IDS)[number];

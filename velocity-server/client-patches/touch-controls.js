@@ -13,7 +13,8 @@ export function createTouchControls({root,pointers,canDrive,queueFire}){
  setting.addEventListener('change',apply);hand.addEventListener('change',apply);size.addEventListener('change',apply);
  function clear(){analog=0;stickPointer=null;pad.classList.remove('pressed');knob.style.transform='translate(-50%,-50%)';}
  function resetAll(){clear();pointers.clear();root.querySelectorAll('.pressed').forEach(b=>b.classList.remove('pressed'));}
- function steer(event){const box=pad.getBoundingClientRect(),x=Math.max(-1,Math.min(1,(event.clientX-box.x-box.width/2)/(box.width*.37)));analog=Math.abs(x)<.06?0:Math.sign(x)*(Math.abs(x)-.06)/.94;knob.style.transform=`translate(calc(-50% + ${x*box.width*.3}px),-50%)`;}
+ /* CHARTVOLT PATCH (13 Oct 2026, owner: "the mobile joystick is very slow responsive"): full lock needed the thumb 37% of the pad's width out from centre with a linear response, so a thumb-sized nudge barely turned. Full lock is now 26% out, the dead zone 4%, and the response curve (power .7) gives more turn for small movements while still reaching exactly 1 at full lock. */
+ function steer(event){const box=pad.getBoundingClientRect(),x=Math.max(-1,Math.min(1,(event.clientX-box.x-box.width/2)/(box.width*.26))),m=Math.abs(x);analog=m<.04?0:Math.sign(x)*Math.pow((m-.04)/.96,.7);knob.style.transform=`translate(calc(-50% + ${x*box.width*.26}px),-50%)`;}
  pad.addEventListener('pointerdown',event=>{if(!canDrive()||stickPointer!==null)return;event.preventDefault();stickPointer=event.pointerId;pad.setPointerCapture(event.pointerId);pad.classList.add('pressed');steer(event);});
  pad.addEventListener('pointermove',event=>{if(event.pointerId===stickPointer){event.preventDefault();steer(event);}});
  for(const name of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(name,event=>{if(event.pointerId===stickPointer)clear();});

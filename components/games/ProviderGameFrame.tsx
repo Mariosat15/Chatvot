@@ -11,6 +11,9 @@ import {
   parseProviderFrameMessage,
 } from "./provider-frame-messages";
 
+const PSEUDO_STAGE_PADDING =
+  "max(4px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left))";
+
 /**
  * Hosts a provider's game in an iframe, and treats everything it says as untrusted.
  *
@@ -215,15 +218,21 @@ export function ProviderGameFrame({
     <div
       ref={stageRef}
       className={`relative flex flex-1 flex-col overflow-hidden ${NEON_STAGE_FRAME} ${
-        fullscreen.pseudo ? "fixed inset-0 z-[200] rounded-none" : ""
+        fullscreen.pseudo ? "fixed inset-0 z-[200] h-[100dvh] rounded-none" : ""
       } [&:fullscreen]:rounded-none [&:fullscreen]:bg-[#060C1A]`}
+      // Reason: pinned over a phone's whole window the stage meets the notch, the rounded corners
+      // and the home indicator, so it pads by each side's safe-area inset (0 where there is none).
+      style={fullscreen.pseudo ? { padding: PSEUDO_STAGE_PADDING } : undefined}
     >
       {/*
         A bar ABOVE the game, never a button on top of it: every game draws its own controls in
         its corners, so an overlay would sit on somebody's pause or fire button. The bar names no
-        game-specific control and works for every title.
+        game-specific control and works for every title. On a phone it is slimmer, because a
+        phone held sideways has about 360px of height and every pixel of bar comes off the game.
       */}
-      <div className="flex items-center justify-between gap-3 px-2 pb-2">
+      <div
+        className={`flex items-center justify-between gap-3 px-2 ${fullscreen.phone ? "pb-1" : "pb-2"}`}
+      >
         <span className="truncate text-xs font-semibold uppercase tracking-wider text-cyan-200/70">
           {gameName}
         </span>
@@ -231,7 +240,9 @@ export function ProviderGameFrame({
           type="button"
           onClick={fullscreen.toggle}
           aria-pressed={fullscreen.active}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-cyan-400/60 bg-cyan-500/15 px-3 py-1.5 text-sm font-bold text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.35)] transition-colors hover:bg-cyan-500/30"
+          className={`inline-flex shrink-0 items-center gap-2 rounded-lg border border-cyan-400/60 bg-cyan-500/15 font-bold text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.35)] transition-colors hover:bg-cyan-500/30 ${
+            fullscreen.phone ? "min-h-[32px] px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm"
+          }`}
         >
           {fullscreen.active ? (
             <Minimize2 className="h-4 w-4" aria-hidden />

@@ -54,4 +54,25 @@ describe("the game stage full screen control", () => {
   it("stops the game's own height request pushing the stage past the screen", () => {
     expect(read(FRAME)).toMatch(/minHeight:\s*fullscreen\.active\s*\?\s*0/);
   });
+
+  // Owner, 13 Oct 2026: "We need to see the game in mobile full screen and adjusted correctly".
+  it("opens pinned over the whole window on a phone, after mount, and only on a phone", () => {
+    const hook = read(HOOK);
+    const effect = hook.slice(hook.indexOf("PHONE_STAGE_QUERY).matches"), hook.indexOf("}, []);"));
+    expect(effect.length).toBeGreaterThan(20);
+    expect(effect).toMatch(/setPseudo\(true\)/);
+    // A tablet or touch laptop keeps the in-page stage: the query needs a short side of 500px.
+    expect(hook).toMatch(/pointer: coarse\) and \(max-width: 500px\), \(pointer: coarse\) and \(max-height: 500px\)/);
+    // Reading the media query during render would disagree with the server render.
+    expect(hook).not.toMatch(/useState\(\s*\(\)\s*=>\s*window/);
+  });
+
+  it("fills the dynamic viewport and keeps clear of the notch when pinned", () => {
+    const frame = read(FRAME);
+    expect(frame).toMatch(/fullscreen\.pseudo \? "fixed inset-0 z-\[200\] h-\[100dvh\]/);
+    expect(frame).toMatch(/style=\{fullscreen\.pseudo \? \{ padding: PSEUDO_STAGE_PADDING \}/);
+    for (const side of ["top", "right", "bottom", "left"]) {
+      expect(frame).toContain(`env(safe-area-inset-${side})`);
+    }
+  });
 });

@@ -135,8 +135,30 @@ solo included**, so practice teaches the same race a paid contest runs.
 | **Client combat UI removed.** Hits/KOs counter, combat feed, spin and shockwave callouts; the item slot reads EMPTY SLOT and the missile hint reads TOWER LOCKED / ALIGN WITH A RED TOWER. `ITEMS` lookups tolerate a removed kind, because `scene.js` still builds mine meshes. **Correction, same day:** that sentence said the array was "always empty"; it was *absent* - `sim.mines` was deleted - and `scene.js`'s per-frame loop indexed it, so every start failed with "Unable to start the 3D renderer ... Cannot read properties of undefined (reading '0')". The loop now reads `s.threats\|\|[]` and `s.mines\|\|[]`. A deleted field is not an empty one; check every reader before removing state | `client-patches/main.js`, `scene.js`, `powerups.js`, `power-visuals.js` |
 | **Four vendor tests now fail by design** and are named in `EXPECTED_VENDOR_FAILURES`: the carried-item rule, the capsule quota (offense drops 5 -> 3), the proximity mine and the EMP radius | `tools/games/rebuild-velocity-client.mjs` |
 
-**`PHYSICS_VERSION` is now `velocity-3d-14`** (skill-only), so the race server and games-service
-must be deployed together. `ROUTE_VERSION` is unchanged at `circuits-8`. 94 tests.
+**`PHYSICS_VERSION` was `velocity-3d-14`** (skill-only) and is now **`velocity-3d-15`** (next
+section), so the race server and games-service must be deployed together. `ROUTE_VERSION` is
+unchanged at `circuits-8`. 94 tests.
+
+### Performance, handling, harder tracks and the phone (13 Oct 2026, second pass)
+
+Owner report: stutters with 16 pilots, too many power-ups, tracks too easy, ships and the phone
+joystick slow to turn, and on a phone "you just shrink the game".
+
+| Change | Where |
+|---|---|
+| **Rival ships come from a pool, built before the race.** A new rival used to build its procedural hull and paint a 1024² livery canvas on the frame it appeared, which is the freeze seen when a 16-pilot grid fills. Hulls are prewarmed and refilled in idle time, shaders compiled and textures uploaded ahead (`renderer.compile`, `initTexture`); a pilot who leaves returns their hull to the pool | `client-patches/scene.js` (`prewarmShips`, `takeShip`, `releaseShip`, `refillPool`, `warmShips`) |
+| **Liveries are cached per ship and colour, 512² on a touch device.** ~5.6 MB of texture per hull at 1024², ~84 MB for 16; a phone gets a quarter of that | `client-patches/fleet-livery.js` (replaces the vendor file) |
+| **Rival hover height samples 9 points every 3rd frame, then smooths**, instead of 25 points every frame per rival; the per-frame loops allocate nothing (scratch vectors, a reused id set, an allocation-free nearest-pickup search) | `client-patches/scene.js` |
+| **Adaptive resolution.** The render scale drops 0.1 (to 0.6) when the frame cost averages above 21 ms and climbs back 0.05 below 17.8 ms; antialiasing is off. **Trade-off:** a display locked to 30 Hz reads as slow and settles at 0.6 | `client-patches/scene.js` |
+| **Phone pixel ratio 1.25** on a high-density screen (was the full device ratio), and the standings list rebuilds only when the order changes, at most every 250 ms | `client-patches/main.js` |
+| **Sharper handling.** Grip raised to 13 / 10; the touch pad steers at full lock from a quarter of its width with a `pow(x, .7)` curve, so a small thumb movement turns | `src/simulation.js`, `client-patches/touch-controls.js` |
+| **Fewer, balanced power-ups.** A fixed 12-capsule mix plus specials at gaps 2/7/4/9/10: 14 per lap, the same for every entrant | `src/race-content.js`, `tests/chartvolt-powerups.test.mjs` |
+| **Three ELITE circuits: Gauntlet, Viper, Zenith** - tighter corners and steeper grades within the vendor smoothness limits. Appended, so ids and `ROUTE_VERSION` are untouched; 21 tracks. A catalogue re-sync is needed for games-service to list them | `src/tracks.js`, `tools/games/velocity-road-transforms.mjs`, `games-service/src/games/volt-velocity/tracks.ts` |
+| **A phone plays full screen and sideways.** On the first tap the race asks for true full screen and a landscape lock (Android/iPadOS; iPhone has no element Fullscreen API), a "turn your phone sideways" banner shows in portrait while racing (non-blocking, dismissible, remembered for the session), and side panels step in by the safe-area insets. The platform frame separately opens pinned over the whole window on any phone (`components/games/use-stage-fullscreen.ts`) | `client-patches/mobile-immersive.js`, `client-patches/main.js`, `client-patches/root/chartvolt.css` |
+
+**`PHYSICS_VERSION` is `velocity-3d-15`.** Deploy race server and games-service together (games-service
+needs `npm run build`), then re-sync the catalogue. **Never verified by eye**, and the frame-time
+gain has not been measured on a real phone.
 
 The lighten step is **not idempotent**: it deletes the 4k originals it shrinks, so a second rebuild
 over the same `%TEMP%\vvfull` fails with `Input file is missing: ...rock_3_diff_4k.webp`. Pass

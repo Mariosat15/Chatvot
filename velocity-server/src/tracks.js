@@ -21,7 +21,15 @@ export const TRACKS=[
  // first fifteen ids (games-service AUTO_TRACK_POOL), so these three are chosen by name only.
  {id:'aurora',name:'AURORA HIGHWAY',theme:'ice',difficulty:2,color:0x6dffc8,accent:0xb58cff},
  {id:'harbor',name:'NEON HARBOUR',theme:'city',difficulty:2,color:0xff5fb7,accent:0x49e3ff},
- {id:'nebula',name:'NEBULA DRIFT',theme:'rock',difficulty:3,color:0xc07bff,accent:0x5dfff0}
+ {id:'nebula',name:'NEBULA DRIFT',theme:'rock',difficulty:3,color:0xc07bff,accent:0x5dfff0},
+ // CHARTVOLT PATCH (13 Oct 2026, owner: "the tracks are very easy... need more hard levels").
+ // ELITE tier (difficulty 4), appended for the same reasons as the three above. The vendor
+ // smoothness rule caps every bend at a 120 m radius, so these are hard by density, not by
+ // hairpins: chained esses held near that limit, 5-11 direction changes a lap and grades up to
+ // ~0.32, against 0-2 changes and at most 0.2 on every earlier circuit.
+ {id:'gauntlet',name:'VOLT GAUNTLET',theme:'factory',difficulty:4,color:0xffe14d,accent:0xff4fa3},
+ {id:'viper',name:'VIPER PASS',theme:'canyon',difficulty:4,color:0xff5d4a,accent:0xffd36b},
+ {id:'zenith',name:'ZENITH STORM',theme:'night',difficulty:4,color:0x7cf3ff,accent:0xc56bff}
 ];
 export function rng(seed){let a=seed>>>0;return ()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
 export function shuffledTracks(seed){const a=TRACKS.map(t=>t.id),r=rng(seed);for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -49,14 +57,19 @@ const layouts=[
  {scale:81,rise:1.2,label:'Grandstand straight · technical infield · stadium climb',p:[[-12,-7,38],[-8,-7,38],[-4,-7,38],[0,-7,47],[3,-6,68],[6,-4,95],[7,-1,112],[6,2,103],[3,3,77],[1,1,54],[0,-2,43],[-3,-3,54],[-5,-1,78],[-4,2,108],[-2,4,132],[0,6,140],[3,7,120],[4,10,91],[1,13,65],[-3,13,45],[-5,10,38],[-6,7,45],[-9,6,70],[-12,8,95],[-15,6,89],[-16,2,65],[-14,-2,40],[-14,-5,38]]},
  {scale:91,rise:1.3,label:'Polar straight · aurora sweep · glacier crest',p:[[-9,-6,38],[-5,-6,38],[-1,-6,44],[3,-6,60],[7,-5,84],[10,-2,100],[10,2,96],[7,4,78],[4,3,60],[1,4,48],[0,7,52],[2,10,70],[-1,12,92],[-5,11,104],[-8,8,90],[-9,4,66],[-12,2,50],[-12,-3,40]]},
  {scale:82,rise:1.2,label:'Dockside sprint · crane chicane · harbour-light climb',p:[[-11,-6,34],[-7,-6,34],[-3,-6,34],[1,-6,40],[5,-5,56],[8,-2,74],[8,2,80],[5,4,70],[2,3,54],[-1,4,44],[-2,7,50],[1,9,64],[3,12,78],[1,15,90],[-3,15,84],[-6,11,66],[-9,10,54],[-12,7,44],[-13,2,38],[-12,-3,34]]},
- {scale:91,rise:1.3,label:'Starfield straight · drifting esses · nebula dive',p:[[-8,-7,40],[-4,-7,40],[0,-7,48],[4,-6,70],[8,-4,96],[10,0,112],[9,4,108],[6,6,90],[6,9,72],[3,11,58],[-1,10,50],[-2,7,62],[-1,4,80],[-4,2,96],[-8,3,100],[-10,6,86],[-13,4,66],[-13,0,50],[-11,-4,40]]}
+ {scale:91,rise:1.3,label:'Starfield straight · drifting esses · nebula dive',p:[[-8,-7,40],[-4,-7,40],[0,-7,48],[4,-6,70],[8,-4,96],[10,0,112],[9,4,108],[6,6,90],[6,9,72],[3,11,58],[-1,10,50],[-2,7,62],[-1,4,80],[-4,2,96],[-8,3,100],[-10,6,86],[-13,4,66],[-13,0,50],[-11,-4,40]]},
+ // ELITE layouts. `start` moves the grid onto the straightest stretch of each lap (launch radius
+ // 279 / 275 / 176 m over the first 260 m), because these loops have no authored start straight.
+ {scale:90,rise:1.45,start:.695,label:'Seven-wave slalom · factory climbs · no rest',p:[[12,0,127],[12.82,1.05,132],[12.83,2.17,131],[12.13,3.06,125],[10.81,3.47,115],[9.5,3.63,102],[8.61,4.07,87],[7.98,4.9,72],[7.48,6.25,58],[6.74,7.61,48],[5.57,8.35,41],[4.17,8.44,40],[2.67,7.8,44],[1.28,7.04,53],[0,6.8,65],[-1.28,7.04,80],[-2.67,7.8,95],[-4.17,8.44,110],[-5.57,8.35,121],[-6.74,7.61,129],[-7.48,6.25,132],[-7.98,4.9,130],[-8.61,4.07,123],[-9.5,3.63,111],[-10.81,3.47,97],[-12.13,3.06,82],[-12.83,2.17,67],[-12.82,1.05,54],[-12,0,45],[-11.03,-0.74,40],[-10.56,-1.39,41],[-10.52,-2.22,47],[-10.81,-3.47,57],[-10.82,-4.88,70],[-10.15,-5.91,85],[-8.99,-6.41,100],[-7.48,-6.25,114],[-6.03,-5.93,124],[-4.84,-6.07,131],[-3.76,-6.67,132],[-2.67,-7.8,128],[-1.41,-8.86,119],[0,-9.2,107],[1.41,-8.86,92],[2.67,-7.8,77],[3.76,-6.67,62],[4.84,-6.07,51],[6.03,-5.93,43],[7.48,-6.25,40],[8.99,-6.41,42],[10.15,-5.91,49],[10.82,-4.88,61],[10.81,-3.47,75],[10.52,-2.22,90],[10.56,-1.39,105],[11.03,-0.74,118]]},
+ {scale:90,rise:1.45,start:.7525,label:'Switchback canyon · four summits · blind crests',p:[[13.16,0,120],[12.98,1.07,125],[12.09,1.92,121],[10.72,2.33,110],[9.87,2.79,93],[9.38,3.52,74],[9.11,4.67,57],[8.86,6.22,45],[8.03,7.28,40],[6.8,7.76,44],[5.33,7.61,55],[3.81,6.89,72],[2.5,6.65,91],[1.26,6.88,108],[0,7.58,120],[-1.39,8.63,125],[-2.85,8.95,121],[-4.21,8.6,110],[-5.33,7.61,93],[-6.12,6.15,74],[-6.94,5.23,57],[-7.89,4.76,45],[-9.11,4.67,40],[-10.66,4.72,44],[-11.76,4.15,55],[-12.28,3.14,72],[-12.09,1.92,91],[-11.25,0.78,108],[-10.84,0,120],[-10.87,-0.72,125],[-11.3,-1.64,121],[-11.93,-2.96,110],[-11.76,-4.15,93],[-10.94,-4.99,74],[-9.65,-5.31,57],[-8.11,-5.09,45],[-6.94,-5.23,40],[-5.97,-5.78,44],[-5.08,-6.81,55],[-4.12,-8.21,72],[-2.85,-8.95,91],[-1.42,-9.02,108],[0,-8.42,120],[1.29,-7.27,125],[2.5,-6.65,121],[3.72,-6.51,110],[5.08,-6.81,93],[6.65,-7.4,74],[8.03,-7.28,57],[9.08,-6.55,45],[9.65,-5.31,40],[9.67,-3.79,44],[9.87,-2.79,55],[10.38,-2.14,72],[11.3,-1.64,91],[12.6,-1.01,108]]},
+ {scale:88,rise:1.45,start:.81,label:'Eight-wave storm · five summits · eleven flicks',p:[[11,0,108],[11.83,1.13,112],[11.76,2.29,105],[10.9,3.19,89],[9.42,3.62,69],[8.46,4.13,51],[7.95,4.98,41],[7.78,6.36,42],[7.35,7.79,53],[6.35,8.58,71],[4.98,8.63,91],[3.48,7.95,106],[2.25,7.71,112],[1.15,8.04,107],[0,9,92],[-1.31,9.84,73],[-2.65,9.83,54],[-3.79,9.04,42],[-4.57,7.58,41],[-5.36,6.66,50],[-6.36,6.28,67],[-7.78,6.36,87],[-9.25,6.24,104],[-10.17,5.44,112],[-10.4,4.19,109],[-9.86,2.75,96],[-9.69,1.71,77],[-10.04,0.88,58],[-11,0,44],[-11.83,-1.13,40],[-11.76,-2.29,47],[-10.9,-3.19,63],[-9.42,-3.62,83],[-8.46,-4.13,101],[-7.95,-4.98,111],[-7.78,-6.36,110],[-7.35,-7.79,99],[-6.35,-8.58,81],[-4.98,-8.63,61],[-3.48,-7.95,46],[-2.25,-7.71,40],[-1.15,-8.04,45],[0,-9,60],[1.31,-9.84,79],[2.65,-9.83,98],[3.79,-9.04,110],[4.57,-7.58,111],[5.36,-6.66,102],[6.36,-6.28,85],[7.78,-6.36,65],[9.25,-6.24,48],[10.17,-5.44,40],[10.4,-4.19,43],[9.86,-2.75,56],[9.69,-1.71,75],[10.04,-0.88,94]]}
 ];
 TRACKS.forEach((t,index)=>{const l=layouts[index];
  // One conservative fairing pass broadens only abrupt control corners; it does
  // not radialize the route or remove its authored straights and infield sections.
  const p=l.p;
  t.points=p.map(([x,z,y],i)=>{const prev=p[(i+p.length-1)%p.length],next=p[(i+1)%p.length];return [(x*.94+(prev[0]+next[0])*.03)*l.scale,30+(y-30)*l.rise,(z*.94+(prev[1]+next[1])*.03)*l.scale];});
- t.routeVersion=ROUTE_VERSION;t.startFraction=0;t.layoutLabel=l.label;
+ t.routeVersion=ROUTE_VERSION;t.startFraction=l.start||0;t.layoutLabel=l.label;
 });
 let rotation;
 function getRotation(){if(!rotation){let storage;try{storage=localStorage;}catch{}rotation=new TrackRotation(TRACKS.map(t=>t.id),shuffledTracks,storage);}return rotation;}

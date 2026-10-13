@@ -187,7 +187,23 @@ html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6p
 @media (pointer:coarse) and (max-height:500px){
   html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{left:208px;right:auto;top:60px;bottom:auto;width:146px;min-height:0;max-height:84px;padding:5px 9px;overflow:hidden}
   html body[data-state]:not([data-state=hangar])[data-mode] #raceOrder li:nth-child(n+3){display:none}
+  /* CHARTVOLT PATCH (13 Oct 2026): full screen sideways puts the camera notch over a side column,
+     so every side-anchored panel steps in by that side's safe-area inset (0 on phones without one).
+     A margin rather than a new left/right keeps hud-layout.js's collision stacking unchanged. */
+  html body[data-state][data-mode] #hud :is(.race-stats,.integrity,.item-slot){margin-left:env(safe-area-inset-left,0px)}
+  html body[data-state][data-mode] #hud :is(.map,.speed){margin-right:env(safe-area-inset-right,0px)}
+  html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{margin-left:env(safe-area-inset-left,0px)}
 }
+/* CHARTVOLT PATCH (13 Oct 2026): "turn your phone sideways" hint (src/mobile-immersive.js).
+   A banner rather than a blocking overlay: the race is live and multiplayer, so nothing may stand
+   between a player and the controls while it runs. Only the OK button takes taps. */
+#cvRotate{position:fixed;z-index:60;left:50%;top:calc(env(safe-area-inset-top,0px) + 64px);transform:translateX(-50%);
+  display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:8px 8px 8px 14px;border-radius:999px;
+  border:1px solid #5fe3f4b0;background:#061321ee;box-shadow:0 10px 28px #000a;color:#effcff;
+  font:700 12px/1.25 Arial,Helvetica,sans-serif;pointer-events:none}
+#cvRotate[hidden]{display:none}
+#cvRotate span{font-size:20px;color:#65e7ff}
+#cvRotate button{pointer-events:auto;min-width:44px;min-height:36px;border:0;border-radius:999px;background:#65e7ff;color:#03121d;font:800 12px/1 Arial,Helvetica,sans-serif}
 /* Short desktop windows: with the logo gone the lap panel takes the very top corner. */
 @media (hover:hover) and (pointer:fine) and (max-height:700px){
   html body[data-state][data-mode] #hud :is(.race-stats,.map){top:12px}

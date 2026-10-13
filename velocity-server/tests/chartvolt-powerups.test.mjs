@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {RaceRoom} from '../server/race-room.mjs';
 import {RaceSimulation} from '../src/simulation.js';
 import {createTrack} from '../src/track.js';
-import {generateContent} from '../src/race-content.js';
+import {generateContent, BALANCED_MIX} from '../src/race-content.js';
 import {TRACKS} from '../src/tracks.js';
 import {ITEMS} from '../src/catalog.js';
 import {SPECIAL_KINDS, POWER_TUNING, pickupRadius, PICKUP_RADIUS} from '../src/power-tuning.js';
@@ -22,10 +22,15 @@ function setup() {
 }
 const stepCombat = (r, dt, prev) => r.feed.step(dt, new Map(Object.entries(prev).map(([id, distance]) => [id, {distance}])));
 
-test('every track and seed keeps the vendor 24 capsules and adds each new kind exactly once', () => {
+// Reason (13 Oct 2026, owner: "too many power-ups, no balance"): the base is 12 capsules with one fixed mix,
+// so the balance is the same on every track and seed rather than whatever a shuffle of 24 dealt.
+test('every track and seed carries the 12 balanced capsules and adds each new kind exactly once', () => {
   for (const def of TRACKS) for (const seed of [1, 7, 123, 99991]) {
     const pickups = generateContent(createTrack(def.id), seed).pickups;
-    assert.equal(pickups.filter(p => !SPECIAL_KINDS.includes(p.kind)).length, 24, def.id);
+    const base = pickups.filter(p => !SPECIAL_KINDS.includes(p.kind)).map(p => p.kind).sort();
+    assert.deepEqual(base, [...BALANCED_MIX].sort(), `${def.id} seed ${seed}`);
+    const d = pickups.map(p => p.distance), len = createTrack(def.id).length;
+    assert.ok(d[0] < len * .2 && d[d.length - 1] > len * .8, `${def.id} capsules still span the lap`);
     assert.deepEqual(pickups.filter(p => SPECIAL_KINDS.includes(p.kind)).map(p => p.kind).sort(), [...SPECIAL_KINDS].sort(), def.id);
   }
 });
