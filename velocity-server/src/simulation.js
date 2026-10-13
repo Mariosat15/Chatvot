@@ -3,8 +3,12 @@ import {applyLavaHazards} from './lava-hazards.js';
 import {SHIPS,pickupAt,hazardAt} from './catalog.js';
 import {DRIVE_LIMIT,road} from './road-width.js';
 import {POWER_TUNING,pickupRadius} from './power-tuning.js';
-/* CHARTVOLT PATCH: bumped to '-16' for the two-abreast F1 staggered grid (13 Oct 2026, src/start-grid.js), so a cached client cannot paint grid boxes where no ship starts; '-15' was the quicker steering response; '-14' was the skill-only item set, '-13' the gate-scoring change. The client refuses a race server with another version, so the race server and games-service must be deployed together. */
-export const PHYSICS_VERSION='velocity-3d-17';
+/* CHARTVOLT PATCH: bumped to '-18' for brake-then-reverse and the wall scrape (13 Oct 2026); '-17' was the previous release; '-16' was for the two-abreast F1 staggered grid (13 Oct 2026, src/start-grid.js), so a cached client cannot paint grid boxes where no ship starts; '-15' was the quicker steering response; '-14' was the skill-only item set, '-13' the gate-scoring change. The client refuses a race server with another version, so the race server and games-service must be deployed together. */
+export const PHYSICS_VERSION='velocity-3d-18';
+/* CHARTVOLT PATCH (13 Oct 2026, owner: "add also back so it can reverse... at first brake then if keep press reverse"): brake slows to a stop; still held for REVERSE_DELAY seconds it reverses, capped well below racing speed so reversing can never gain a place. */
+export const REVERSE_SPEED=14,REVERSE_ACCEL=16,REVERSE_DELAY=.35;
+/* CHARTVOLT PATCH (13 Oct 2026, owner: "sometimes it stuck on the side of the road and not move"): every frame over the edge used to cost 17% of speed, so the curve's outward pull scraping a ship along the outer barrier scrubbed it to a standstill. Only a real hit (into the wall faster than this) now bounces and damages; a glancing scrape slides the ship back off the barrier. */
+export const WALL_IMPACT_SPEED=4;
 export const GATE_HALF_WIDTH=4.5;
 export const RESPAWN_SECONDS=3;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -12,7 +16,7 @@ export class RaceSimulation{
   constructor(length,curvature=()=>0,config={}){this.competitiveCombat=Boolean(config.competitiveCombat);/* CHARTVOLT PATCH (13 Oct 2026): the race server times the perfect start itself, so client prediction must not guess it. This used to ride on competitiveCombat, which is now false in every room. */this.serverTimedStart=Boolean(config.serverTimedStart);this.length=length;this.curvature=curvature;this.lapsTarget=Number.isInteger(config.laps)&&config.laps>=1&&config.laps<=10?config.laps:3;this.maxTime=Number.isFinite(config.maxSeconds)&&config.maxSeconds>0?config.maxSeconds:300;this.shipId='vanguard';this.seed=config.seed||0;this.trackId=config.trackId||'orbital';this.content=config.content||{pickups:Array.from({length:24},(_,i)=>pickupAt(i,length)),hazards:Array.from({length:12},(_,i)=>hazardAt(i,length)),pads:[]};this.reset();}
   get ship(){return SHIPS.find(s=>s.id===this.shipId)||SHIPS[0];}
   selectShip(id){if(this.state==='hangar'&&SHIPS.some(s=>s.id===id))this.shipId=id;}
-  reset(){Object.assign(this,{state:'hangar',distance:0,lateral:0,lateralVelocity:0,heading:0,yawRate:0,speed:0,time:0,energy:1,hull:1,lap:1,checkpoints:0,bestLap:null,lapStart:0,shield:0,overdrive:0,boosting:false,throttle:false,braking:false,step:0,countdown:3,events:[],replay:[],respawns:0,respawnRemaining:0,servicing:false,serviceSeconds:0,item:null,fireHeld:false,cooldown:0,pickupCount:0,targetsHit:0,flash:0,magnet:0,draft:0,launchHeld:false,launchPressAt:Infinity});this.used=new Set();this.destroyed=new Set();this.projectiles=[];this.threats=[];this.fired=new Set();this.counter=0;this.threatCooldown=0;this.padUsed=new Set();this.padBoost=0;this.nearMisses=0;this.sectors=[];this.sectorStart=0;this.gatesHit=new Set();this.gatesMissed=new Set();this.skillScore=0;this.chain=0;this.maxChain=0;this.cleanCorner=0;this.cornerRewardAt=0;}
+  reset(){Object.assign(this,{state:'hangar',distance:0,lateral:0,lateralVelocity:0,heading:0,yawRate:0,speed:0,time:0,energy:1,hull:1,lap:1,checkpoints:0,bestLap:null,lapStart:0,shield:0,overdrive:0,boosting:false,throttle:false,braking:false,step:0,countdown:3,events:[],replay:[],respawns:0,respawnRemaining:0,servicing:false,serviceSeconds:0,item:null,fireHeld:false,cooldown:0,pickupCount:0,targetsHit:0,flash:0,magnet:0,draft:0,launchHeld:false,launchPressAt:Infinity,reverseHold:0});this.used=new Set();this.destroyed=new Set();this.projectiles=[];this.threats=[];this.fired=new Set();this.counter=0;this.threatCooldown=0;this.padUsed=new Set();this.padBoost=0;this.nearMisses=0;this.sectors=[];this.sectorStart=0;this.gatesHit=new Set();this.gatesMissed=new Set();this.skillScore=0;this.chain=0;this.maxChain=0;this.cleanCorner=0;this.cornerRewardAt=0;}
   start(){this.reset();this.state='countdown';}
   pause(){if(['racing','countdown'].includes(this.state)){this.pausedFrom=this.state;this.state='paused';}}
   resume(){if(this.state==='paused')this.state=this.pausedFrom;}
@@ -43,31 +47,35 @@ export class RaceSimulation{
     const steer=clamp(input.steer||0,-1,1),ship=this.ship;
     this.boosting=Boolean(input.boost)&&this.throttle&&!this.braking&&this.energy>.02;
     const limit=ship.speed+(this.boosting?(ship.boostExtra||36):0)+(this.overdrive>0?22:0)+(this.padBoost>0?18:0)+(this.draft>0?POWER_TUNING.slipstream.extraSpeed:0);
-    if(this.braking)this.speed=Math.max(0,this.speed-78*dt);
-    else if(this.throttle)this.speed=clamp(this.speed+ship.acceleration*(this.boosting?1.65:1)*(1-this.speed/(limit*1.14))*dt,0,limit);
-    else this.speed=Math.max(0,this.speed-(8+this.speed*.055)*dt);
+    if(this.braking){if(this.speed>0){this.speed=Math.max(0,this.speed-78*dt);this.reverseHold=0;}else{this.reverseHold+=dt;if(this.reverseHold>=REVERSE_DELAY)this.speed=Math.max(-REVERSE_SPEED,this.speed-REVERSE_ACCEL*dt);}}
+    else if(this.speed<0){this.reverseHold=0;this.speed=Math.min(0,this.speed+(this.throttle?48:14)*dt);}
+    else if(this.throttle){this.reverseHold=0;this.speed=clamp(this.speed+ship.acceleration*(this.boosting?1.65:1)*(1-this.speed/(limit*1.14))*dt,0,limit);}
+    else {this.reverseHold=0;this.speed=Math.max(0,this.speed-(8+this.speed*.055)*dt);}
     this.energy=clamp(this.energy+dt*(this.boosting?-(ship.boostDrain||.22):.075),0,1);
     /* CHARTVOLT PATCH (13 Oct 2026, owner: "the ships when turn react very slow"): the yaw rate settled towards the stick at 4/s (6/s braking), a ~0.25 s lag before a turn took hold. 10/s (13/s braking) is ~0.1 s; the turn ceiling is unchanged, so no ship gains a tighter line, only a quicker response. */
     /* CHARTVOLT PATCH (13 Oct 2026, owner: "still late response when turning the ship on mobile analog"): reversing a turn waited for the yaw rate to unwind at the ordinary rate and then for the built-up heading to swing back, with nothing pulling it - the nose kept drifting until counter-steered. A counter-steer now settles 1.6x faster, and with the stick at rest (|steer| < 0.15) the heading eases back towards the road at 1.8/s. The turn ceiling is unchanged, so no ship gains a tighter line. */
-    const motion=Math.min(1,this.speed/22),target=steer*ship.handling/25*.75*motion,counter=target*this.yawRate<0,grip=(this.braking?13:10)*(counter?1.6:1);
+    /* Reason: signed so a reversing ship steers like a car backing up; the heading return below uses its size only, or reversing would push the nose away from the road. */
+    const motion=Math.sign(this.speed)*Math.min(1,Math.abs(this.speed)/22),target=steer*ship.handling/25*.75*motion,counter=target*this.yawRate<0,grip=(this.braking?13:10)*(counter?1.6:1);
     this.yawRate+=(target-this.yawRate)*Math.min(1,dt*grip);
     this.heading=clamp(this.heading+(this.yawRate-this.curvature(this.distance)*this.speed*Math.cos(this.heading))*dt,-1.3,1.3);
-    if(Math.abs(steer)<.15)this.heading-=this.heading*Math.min(1,dt*1.8*motion);
+    if(Math.abs(steer)<.15)this.heading-=this.heading*Math.min(1,dt*1.8*Math.abs(motion));
     this.lateralVelocity=this.speed*Math.sin(this.heading);
     this.lateral+=this.lateralVelocity*dt;
-    if(Math.abs(this.lateral)>DRIVE_LIMIT){this.lateral=Math.sign(this.lateral)*DRIVE_LIMIT;this.heading*=-.25;this.lateralVelocity*=-.25;this.speed*=.83;this.damage(Math.min(.09,this.speed*.001));this.events.push({type:'impact'});}
+    if(Math.abs(this.lateral)>DRIVE_LIMIT){const side=Math.sign(this.lateral),into=this.lateralVelocity*side;this.lateral=side*DRIVE_LIMIT;
+      if(into>WALL_IMPACT_SPEED){this.heading*=-.25;this.lateralVelocity*=-.25;this.speed*=.83;this.damage(Math.min(.09,Math.abs(this.speed)*.001));this.events.push({type:'impact'});}
+      else {this.heading=-side*Math.sign(this.speed||1)*.04;this.lateralVelocity=0;this.speed*=1-Math.min(1,.6*dt);}}
     if(input.fire&&!this.fireHeld)this.useItem();this.fireHeld=Boolean(input.fire);
     for(const p of this.projectiles){p.distance+=240*dt;p.height=1.6+((p.targetHeight||1.6)-1.6)*Math.min(1,(p.distance-p.startDistance)/Math.max(1,p.targetDistance-p.startDistance));p.lane=p.startLane+(p.targetLane-p.startLane)*Math.min(1,(p.distance-p.startDistance)/Math.max(1,p.targetDistance-p.startDistance));if(p.distance>=p.targetDistance)this.destroy(p.target);}
     this.projectiles=this.projectiles.filter(p=>p.distance<p.targetDistance);
     this.updateCombat(dt);
-    const old=this.distance;this.distance+=this.speed*Math.cos(this.heading)*dt;
+    const old=this.distance;this.distance+=this.speed*Math.cos(this.heading)*dt;/* Reason: grid slots legitimately start behind the line (negative distance); only reversing back past it is refused. */if(this.speed<0&&this.distance<Math.min(0,old)){this.distance=Math.min(0,old);this.speed=0;}
     for(const h of this.targets())if(!(h.height>3)&&old<h.distance&&this.distance>=h.distance&&Math.abs(this.lateral-h.lane)<2.4){this.destroyed.add(h.key);if(this.shield<=0){this.damage(.28);this.speed*=.55;this.events.push({type:'impact'});}else this.events.push({type:'blocked'});}
     applyLavaHazards(this,old);
     if(this.hull<=0){this.beginDestruction();if(this.time>=this.maxTime)this.finish('time-up');return;}
-    for(let i=0;i<(this.content.gates||[]).length;i++){const gate=this.content.gates[i],key=`${this.lap}:${i}`,at=(this.lap-1)*this.length+gate.distance;if(old<at&&this.distance>=at){/* CHARTVOLT PATCH (28 Sep 2026, owner: "the rings that give you points don't work"): the vendor scored only within 3.2 m of the centre and above 45 m/s, while the gate is drawn 9 m wide, so flying through it visibly still missed. The score zone is now the drawn opening (GATE_HALF_WIDTH, read by skill-gates.js too) and there is no hidden speed rule. */if(Math.abs(this.lateral-gate.lane)<GATE_HALF_WIDTH){this.gatesHit.add(key);this.rewardSkill(100,'PRECISION GATE');this.events.push({type:'gate-hit',gate:i});}else{this.gatesMissed.add(key);this.chain=0;this.events.push({type:'gate-missed',gate:i});}}}
+    for(let i=0;i<(this.content.gates||[]).length;i++){const gate=this.content.gates[i],key=`${this.lap}:${i}`,at=(this.lap-1)*this.length+gate.distance;/* Reason: reversing back over a gate and driving through again must not score it twice. */if(old<at&&this.distance>=at&&!this.gatesHit.has(key)&&!this.gatesMissed.has(key)){/* CHARTVOLT PATCH (28 Sep 2026, owner: "the rings that give you points don't work"): the vendor scored only within 3.2 m of the centre and above 45 m/s, while the gate is drawn 9 m wide, so flying through it visibly still missed. The score zone is now the drawn opening (GATE_HALF_WIDTH, read by skill-gates.js too) and there is no hidden speed rule. */if(Math.abs(this.lateral-gate.lane)<GATE_HALF_WIDTH){this.gatesHit.add(key);this.rewardSkill(100,'PRECISION GATE');this.events.push({type:'gate-hit',gate:i});}else{this.gatesMissed.add(key);this.chain=0;this.events.push({type:'gate-missed',gate:i});}}}
     if(this.speed>65&&Math.abs(this.curvature(this.distance))>.003&&Math.abs(this.lateral)<road(9)&&!this.braking)this.cleanCorner+=dt;else this.cleanCorner=0;if(this.cleanCorner>2&&this.distance-this.cornerRewardAt>180){this.rewardSkill(60,'CLEAN CORNER');this.cornerRewardAt=this.distance;this.cleanCorner=0;}
     const sector=this.length/8,passed=Math.floor(this.distance/sector),previous=Math.floor(old/sector);
-    if(passed>previous){this.sectors.push(this.time-this.sectorStart);this.sectorStart=this.time;this.checkpoints=passed;this.events.push({type:'checkpoint',checkpoint:passed});}
+    if(passed>previous&&passed>this.checkpoints){this.sectors.push(this.time-this.sectorStart);this.sectorStart=this.time;this.checkpoints=passed;this.events.push({type:'checkpoint',checkpoint:passed});}
     for(let i=0;!this.competitiveCombat&&i<this.content.pickups.length;i++){const p=this.content.pickups[i],key=`${this.lap}:${i}`,absolute=(this.lap-1)*this.length+p.distance;
       if(old<absolute&&this.distance>=absolute&&!this.used.has(key)&&Math.abs(this.lateral-p.lane)<pickupRadius(this)&&this.collect(p.kind))this.used.add(key);
     }

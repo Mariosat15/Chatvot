@@ -1,74 +1,46 @@
-// CHARTVOLT PATCH (13 Oct 2026): a phone plays the race as a full-screen landscape game.
+// CHARTVOLT PATCH (13 Oct 2026): on a phone the race fills the whole screen, in portrait or landscape.
 //
-// Reason it lives inside the race client rather than on the platform: only the game knows it is a
-// landscape game, and the platform's frame is shared by every title (a puzzle must not be forced
-// sideways). Both iframes above this document carry `allow="fullscreen"`, so a request made here
-// from a player's tap makes this document the full-screen element on Android and iPadOS.
+// The platform owns the frame: in full screen it pins the game stage over the whole window
+// (`position:fixed; inset:0; 100dvw x 100dvh`), which is what makes it fill an iPhone, whose Safari
+// has no element Fullscreen API. On Android and iPadOS this document may additionally ask for real
+// full screen to hide the browser's own bars.
 //
-// iPhone Safari has no element Fullscreen API at all, so there the request is simply unavailable;
-// the platform already pins the game stage over the whole window on a phone, and the hint below
-// tells the player to turn the phone, which on iPhone also collapses Safari's bars.
+// Reason this was rewritten (owner: "the game must take the whole mobile screen when full screen
+// either portrait or landscape", and "it keep freezing"): the first version locked the phone to
+// landscape, showed a rotate banner in portrait, and re-requested full screen on EVERY tap while not
+// full screen. Each request that was granted and then dropped by a system gesture resized the
+// renderer, and every resize reallocates the canvas and all post-processing targets - a visible
+// freeze. Now: at most one request per race, from a tap during the countdown or the race, never an
+// orientation lock, and no banner.
 //
 // Nothing here touches the simulation, inputs or scoring - it is presentation only.
 
 const coarse = typeof matchMedia === 'function' && matchMedia('(pointer:coarse)').matches;
 const DRIVING = new Set(['racing', 'countdown']);
-const HINT_MS = 6000;
-const DISMISS_KEY = 'cv-rotate-dismissed';
 
-function remembered() {
-  // Reason: sessionStorage THROWS (not null) when a browser refuses storage.
-  try { return sessionStorage.getItem(DISMISS_KEY) === '1'; } catch { return false; }
-}
-function remember() {
-  try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* storage refused: hint may reappear */ }
-}
-
-async function goImmersive() {
+function canRequest() {
   const root = document.documentElement;
-  if (!document.fullscreenElement && document.fullscreenEnabled && typeof root.requestFullscreen === 'function') {
-    try { await root.requestFullscreen({ navigationUI: 'hide' }); } catch { /* refused: stay windowed */ }
-  }
-  // Only meaningful (and only permitted on most browsers) while full screen.
-  if (document.fullscreenElement && screen.orientation && typeof screen.orientation.lock === 'function') {
-    try { await screen.orientation.lock('landscape'); } catch { /* unsupported device or policy */ }
-  }
+  return !document.fullscreenElement && document.fullscreenEnabled && typeof root.requestFullscreen === 'function';
 }
 
 export function installMobileImmersive() {
   if (!coarse || typeof document === 'undefined') return;
 
-  // Every tap while not full screen retries: the first one may land on a control whose own handler
-  // runs first, and a player who left full screen with the system gesture gets it back on the next tap.
-  document.addEventListener('pointerup', () => { if (!document.fullscreenElement) void goImmersive(); }, { passive: true });
-
-  const hint = document.createElement('div');
-  hint.id = 'cvRotate';
-  hint.setAttribute('role', 'status');
-  hint.hidden = true;
-  hint.innerHTML = '<span aria-hidden="true">⟳</span><b>Turn your phone sideways for the full track</b><button type="button">OK</button>';
-  document.body.appendChild(hint);
-  let timer = 0;
-  hint.querySelector('button').addEventListener('click', () => { remember(); hint.hidden = true; });
-
-  const update = () => {
-    const portrait = innerHeight > innerWidth;
-    const show = portrait && DRIVING.has(document.body.dataset.state) && !remembered();
-    if (show && hint.hidden) {
-      hint.hidden = false;
-      clearTimeout(timer);
-      timer = setTimeout(() => { hint.hidden = true; }, HINT_MS);
-    } else if (!show && !hint.hidden) {
-      hint.hidden = true;
-    }
-  };
+  let askedThisRace = false;
+  let lastState = '';
   // Reason: main.js rewrites data-state every frame and an attribute write fires a mutation record
   // even when the value is unchanged, so react to genuine transitions only.
-  let lastState = '';
   new MutationObserver(() => {
     const state = document.body.dataset.state || '';
-    if (state !== lastState) { lastState = state; update(); }
+    if (state === lastState) return;
+    if (state === 'countdown') askedThisRace = false;
+    lastState = state;
   }).observe(document.body, { attributes: true, attributeFilter: ['data-state'] });
-  addEventListener('resize', update, { passive: true });
-  addEventListener('orientationchange', update, { passive: true });
+
+  // A browser only grants full screen inside a user gesture, so ask from the player's own tap.
+  document.addEventListener('pointerup', () => {
+    if (askedThisRace || !DRIVING.has(document.body.dataset.state) || !canRequest()) return;
+    askedThisRace = true;
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => { /* refused: the platform's pinned stage still fills the window */ });
+  }, { passive: true });
 }

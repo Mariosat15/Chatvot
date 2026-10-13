@@ -67,23 +67,29 @@ describe("the game stage full screen control", () => {
     expect(hook).not.toMatch(/useState\(\s*\(\)\s*=>\s*window/);
   });
 
-  // Owner, 13 Oct 2026: "the game must go to fullscreen when turn complete fullscreen".
-  it("gives a phone held sideways the whole screen, and only a pinned phone", () => {
+  // Owner, 13 Oct 2026: "the game must take the whole mobile screen when full screen either
+  // portrait or landscape" and "in desktop ... the game takes the full screen" (like F11).
+  // Flipped from the landscape-only rule: full screen now shows only the game on every device.
+  it("shows only the game in full screen: no bar, no bezel, on every device", () => {
     const frame = read(FRAME);
-    expect(frame).toMatch(
-      /fullscreen\.phone && fullscreen\.pseudo \? "landscape:border-0 landscape:p-0 landscape:shadow-none"/,
-    );
-    expect(frame).toMatch(/fullscreen\.phone && fullscreen\.pseudo \? "landscape:hidden"/);
-    // Never unconditional: a desktop or tablet stage keeps its bar and its exit control.
-    expect(frame.match(/landscape:hidden/g)).toHaveLength(1);
+    expect(frame).toMatch(/fullscreen\.active \? "hidden" : ""/);
+    expect(frame).not.toMatch(/landscape:hidden/);
+    const pinned = frame.match(/"fixed inset-0 z-\[9999\] h-\[100dvh\] w-\[100dvw\][^"]*"/)?.[0] ?? "";
+    expect(pinned).toMatch(/border-0/);
+    expect(pinned).toMatch(/\bp-0\b/);
+    expect(pinned).not.toMatch(/NEON_STAGE_FRAME|shadow-\[/);
   });
 
-  it("fills the dynamic viewport and keeps clear of the notch when pinned", () => {
+  // Reason (owner, 13 Oct 2026: "it shows half and cant go down to view it"): the compiled CSS
+  // emits `.relative` after `.fixed`, so a stage carrying both was never pinned - it sat in the
+  // page at full-screen height under a locked scroll. The pinned branch must not carry `relative`.
+  it("never puts relative and fixed on the stage together", () => {
     const frame = read(FRAME);
-    expect(frame).toMatch(/fullscreen\.pseudo \? "fixed inset-0 z-\[200\] h-\[100dvh\]/);
-    expect(frame).toMatch(/style=\{fullscreen\.pseudo \? \{ padding: PSEUDO_STAGE_PADDING \}/);
-    for (const side of ["top", "right", "bottom", "left"]) {
-      expect(frame).toContain(`env(safe-area-inset-${side})`);
-    }
+    const stage = frame.slice(frame.indexOf("ref={stageRef}"), frame.indexOf("style={fullscreen.active"));
+    expect(stage.length).toBeGreaterThan(50);
+    expect(stage).toMatch(/fullscreen\.active\s*\?\s*"fixed inset-0/);
+    const pinned = stage.slice(stage.indexOf('"fixed inset-0'), stage.indexOf(":", stage.indexOf('"fixed inset-0')));
+    expect(pinned).not.toMatch(/\brelative\b/);
+    expect(stage).toMatch(/: `relative flex-1 \$\{NEON_STAGE_FRAME\}`/);
   });
 });

@@ -93,7 +93,7 @@ async function rewrites() {
     // Without this the client's join hits a Next.js HTML page and fails with
     // `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`.
     {
-      source: "/race/v1/races/:raceId([A-Za-z0-9_-]{1,80})/:action(join|events|input|ship|ready|leave)",
+      source: "/race/v1/races/:raceId([A-Za-z0-9_-]{1,80})/:action(join|events|input|ship|track|ready|leave)",
       destination: `${VELOCITY_RACE_UPSTREAM}/v1/races/:raceId/:action`,
     },
   ];

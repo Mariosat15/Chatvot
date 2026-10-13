@@ -203,6 +203,24 @@ Measured in Playwright's phone emulation (390x844, 3x, touch) on a **desktop GPU
 is unknown. **`PHYSICS_VERSION` is `velocity-3d-17`** (steering changed), so the race server and
 games-service deploy together. **Never verified by eye.**
 
+### Reverse, the wall, Leave Race in Settings, fewer freezes (13 Oct 2026, owner)
+
+Owner report: full screen was a mess on a phone, Leave Race should be in Settings, the frame rate
+kept freezing, a ship sometimes stuck on the side of the road, and braking should reverse when held.
+
+| Change | Where |
+|---|---|
+| **Hold brake to reverse.** Brake stops the ship first; held for 0.35 s more at a standstill (and without throttle) it reverses to at most 14 m/s. Releasing the brake, or pressing throttle, brings it back to 0. A ship cannot reverse behind its own start distance, so it cannot back over the line or score a gate or sector twice. `reverseHold` is serialized. The HUD shows positive speed and the word REVERSE | `src/simulation.js`, `src/multiplayer-state.js`, `client-patches/main.js`, `tests/chartvolt-reverse.test.mjs` (6) |
+| **No more sticking on the barrier.** A slow scrape (under 4 m/s into the wall) no longer bounces the heading and scrubs 17% of speed every frame; it slides along with mild drag and the nose eased off the wall. A real impact still bounces and damages | `src/simulation.js` |
+| **Leave Race lives in Settings** on desktop and mobile, as a full-width danger button above DONE, still only in a shared race | `client-patches/root/index.html`, `main.js`, `root/chartvolt.css` |
+| **Freeze sources removed.** The HUD layout pass no longer forces layout every second (only after a real state change); the dynamic resolution may change direction at most twice per race instead of oscillating and reallocating render targets; a phone asks for full screen once per race on a tap instead of repeatedly with a landscape lock, which caused resize storms. The "turn your phone sideways" banner is gone: portrait is a supported layout | `client-patches/hud-layout.js`, `scene.js`, `mobile-immersive.js` |
+| **Portrait field of view widened by 4°**, so the road is not cropped on a tall screen | `client-patches/scene.js` |
+
+This **supersedes** the "phone plays full screen and sideways" row above. The vendor test "throttle
+accelerates, release coasts, brake stops fully" now fails by design and is named in
+`EXPECTED_VENDOR_FAILURES`. **`PHYSICS_VERSION` is `velocity-3d-18`**, so the race server and
+games-service deploy together. **Never verified by eye.**
+
 The lighten step is **not idempotent**: it deletes the 4k originals it shrinks, so a second rebuild
 over the same `%TEMP%\vvfull` fails with `Input file is missing: ...rock_3_diff_4k.webp`. Pass
 `--fresh` when that happens.

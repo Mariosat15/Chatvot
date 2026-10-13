@@ -97,11 +97,18 @@ export function initHudLayout() {
   new MutationObserver(() => {
     const b = document.body.dataset;
     const key = `${b.state}|${b.mode}|${b.touch}|${b.controlSize}`;
-    if (key !== last) { last = key; schedule(); }
+    if (key !== last) { last = key; schedule(); afterFade(); }
   }).observe(document.body, { attributes: true, attributeFilter: ['data-state', 'data-mode', 'data-touch', 'data-control-size'] });
   const standings = document.getElementById('liveStandings');
   if (standings) new MutationObserver(schedule).observe(standings, { attributes: true, attributeFilter: ['class'] });
-  // Panels fade in and out with CSS (opacity), which no observer reports; a slow sweep catches those.
-  setInterval(() => { if (document.body.dataset.state !== 'hangar' && !document.hidden) schedule(); }, 1000);
+  // Panels fade in and out with CSS (opacity), which no observer reports, and the fades follow a state
+  // change. Reason (13 Oct 2026, owner: "framerate is terrible it keep freezing"): this used to be a
+  // sweep every second for the whole race, forcing a synchronous layout of every HUD panel in the
+  // middle of the WebGL frame loop; two passes after each real change cover the fades and nothing else.
+  const fadeTimers = [];
+  function afterFade() {
+    for (const t of fadeTimers.splice(0)) clearTimeout(t);
+    for (const ms of [450, 1300]) fadeTimers.push(setTimeout(schedule, ms));
+  }
   schedule();
 }

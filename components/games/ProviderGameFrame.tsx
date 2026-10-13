@@ -11,9 +11,6 @@ import {
   parseProviderFrameMessage,
 } from "./provider-frame-messages";
 
-const PSEUDO_STAGE_PADDING =
-  "max(4px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left))";
-
 /**
  * Hosts a provider's game in an iframe, and treats everything it says as untrusted.
  *
@@ -217,16 +214,18 @@ export function ProviderGameFrame({
     */
     <div
       ref={stageRef}
-      className={`relative flex flex-1 flex-col overflow-hidden ${NEON_STAGE_FRAME} ${
-        fullscreen.pseudo ? "fixed inset-0 z-[200] h-[100dvh] rounded-none" : ""
-      } ${
-        // Reason (owner, 13 Oct 2026: "complete fullscreen" when the phone is turned): held
-        // sideways a phone has ~360px of height, so the bezel and border come off too.
-        fullscreen.phone && fullscreen.pseudo ? "landscape:border-0 landscape:p-0 landscape:shadow-none" : ""
-      } [&:fullscreen]:rounded-none [&:fullscreen]:bg-[#060C1A]`}
-      // Reason: pinned over a phone's whole window the stage meets the notch, the rounded corners
-      // and the home indicator, so it pads by each side's safe-area inset (0 where there is none).
-      style={fullscreen.pseudo ? { padding: PSEUDO_STAGE_PADDING } : undefined}
+      className={`flex flex-col overflow-hidden ${
+        // Reason (owner, 13 Oct 2026: "it shows half and cant go down"): `relative` and `fixed`
+        // must never both be on the stage. Tailwind emits `.relative` after `.fixed`, so with both
+        // present the pinned stage stayed in the page at full-screen height while the page scroll
+        // was locked - the bottom half of the game was unreachable. Full screen shows the game and
+        // nothing else, like F11; z-[9999] so no page chrome (logo bar, menu drawer, toasts) covers it.
+        fullscreen.active
+          ? "fixed inset-0 z-[9999] h-[100dvh] w-[100dvw] rounded-none border-0 bg-[#020817] p-0"
+          : `relative flex-1 ${NEON_STAGE_FRAME}`
+      }`}
+      // Reason: the canvas reaches every edge; the game pads its own HUD by the safe-area insets.
+      style={fullscreen.active ? { padding: 0 } : undefined}
     >
       {/*
         A bar ABOVE the game, never a button on top of it: every game draws its own controls in
@@ -238,8 +237,10 @@ export function ProviderGameFrame({
         // Reason: pinned on a phone held sideways the bar is withheld so the game owns the whole
         // screen. Turning the phone upright brings it back, which is the way out of full screen;
         // every game also has its own Leave, which ends the frame.
+        // Full screen withholds the bar on every device so only the game is visible. Desktop leaves
+        // with Escape; on a phone the game's own Leave Race (in its settings) ends the frame.
         className={`flex items-center justify-between gap-3 px-2 ${fullscreen.phone ? "pb-1" : "pb-2"} ${
-          fullscreen.phone && fullscreen.pseudo ? "landscape:hidden" : ""
+          fullscreen.active ? "hidden" : ""
         }`}
       >
         <span className="truncate text-xs font-semibold uppercase tracking-wider text-cyan-200/70">
@@ -338,7 +339,7 @@ export function ProviderGameFrame({
         // Reason: the launch URL is single-use and short-lived, but our own contest URL is
         // still ours. No need to hand a third party the page the player came from.
         referrerPolicy="no-referrer"
-        className="h-full min-h-0 w-full flex-1 rounded-xl border-0 bg-[#060C1A]"
+        className={`h-full min-h-0 w-full flex-1 border-0 bg-[#060C1A] ${fullscreen.active ? "rounded-none" : "rounded-xl"}`}
         // In full screen the stage IS the screen, so the game's requested height must not push
         // the frame past it and make the page scroll.
         style={{ minHeight: fullscreen.active ? 0 : `${height}px` }}

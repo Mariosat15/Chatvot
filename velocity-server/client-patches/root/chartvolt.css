@@ -270,16 +270,6 @@ html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6p
   html body[data-state][data-mode] #hud .item-slot>span{font-size:22px}
   html body[data-state][data-mode] #cornerHint{top:30%}
 }
-/* CHARTVOLT PATCH (13 Oct 2026): "turn your phone sideways" hint (src/mobile-immersive.js).
-   A banner rather than a blocking overlay: the race is live and multiplayer, so nothing may stand
-   between a player and the controls while it runs. Only the OK button takes taps. */
-#cvRotate{position:fixed;z-index:60;left:50%;top:calc(env(safe-area-inset-top,0px) + 64px);transform:translateX(-50%);
-  display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:8px 8px 8px 14px;border-radius:999px;
-  border:1px solid #5fe3f4b0;background:#061321ee;box-shadow:0 10px 28px #000a;color:#effcff;
-  font:700 12px/1.25 Arial,Helvetica,sans-serif;pointer-events:none}
-#cvRotate[hidden]{display:none}
-#cvRotate span{font-size:20px;color:#65e7ff}
-#cvRotate button{pointer-events:auto;min-width:44px;min-height:36px;border:0;border-radius:999px;background:#65e7ff;color:#03121d;font:800 12px/1 Arial,Helvetica,sans-serif}
 /* Short desktop windows: with the logo gone the lap panel takes the very top corner. */
 @media (hover:hover) and (pointer:fine) and (max-height:700px){
   html body[data-state][data-mode] #hud :is(.race-stats,.map){top:12px}
@@ -301,3 +291,7 @@ html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6p
 /* CHARTVOLT PATCH (13 Oct 2026, owner: scrolling to the end during a race crashed the game): the frame never scrolls or rubber-bands, and during a race no touch gesture is handed to the browser at all. */
 html,body{overscroll-behavior:none}
 body[data-state]:not([data-state=hangar]){touch-action:none;overflow:hidden}
+
+/* CHARTVOLT PATCH (13 Oct 2026, owner: "move the leave race and put it into the settings for both versions"): the vendor pins #leaveRace to a corner of the race screen; inside Settings it is an ordinary full-width button above DONE. Display is left to .hidden, so the button still only appears in a live race. */
+#settingsDialog #leaveRace{position:static;inset:auto;width:100%;margin:14px 0 8px;padding:12px;font-size:13px;font-weight:700;letter-spacing:.08em;border:1px solid #ff94867a;background:#291721;color:#ffd4ce;border-radius:8px;cursor:pointer}
+#settingsDialog #leaveRace.hidden{display:none}

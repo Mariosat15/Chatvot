@@ -38,6 +38,10 @@ const EXPECTED_VENDOR_FAILURES = [
   "every track has support/defense/offense/overdrive quotas and safe launch",
   "proximity mine intercepts a bolt before it can damage the ship",
   "EMP affects only nearby hazards",
+  // 13 Oct 2026, owner: "at first brake then if keep press reverse". This test holds brake for 3 s and
+  // expects a standstill; a held brake now reverses. velocity-server/tests/chartvolt-reverse.test.mjs
+  // pins the new behaviour (stop first, reverse only while still held).
+  "throttle accelerates, release coasts, brake stops fully",
 ];
 
 const run = (cmd, cmdArgs, cwd = tree) =>
