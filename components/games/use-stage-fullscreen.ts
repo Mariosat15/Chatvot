@@ -47,14 +47,26 @@ export function useStageFullscreen(stageRef: RefObject<HTMLElement | null>) {
   // Pseudo mode has no browser Escape handling and must not leave the page scrolling underneath.
   useEffect(() => {
     if (!pseudo) return;
+    // Reason (owner, 13 Oct 2026: "when scroll to end while play game the game crashes"): iOS
+    // Safari ignores `overflow: hidden` on the body alone, so a swipe still scrolled and
+    // rubber-banded the page, and every scroll step resized the visual viewport the game measures
+    // itself against - a storm of canvas reallocations on the device least able to afford them.
+    // Both elements are locked and overscroll is switched off for as long as the stage is pinned.
+    const html = document.documentElement;
     const previous = document.body.style.overflow;
+    const previousHtml = html.style.overflow;
+    const previousOverscroll = html.style.overscrollBehavior;
     document.body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setPseudo(false);
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = previous;
+      html.style.overflow = previousHtml;
+      html.style.overscrollBehavior = previousOverscroll;
       window.removeEventListener("keydown", onKey);
     };
   }, [pseudo]);

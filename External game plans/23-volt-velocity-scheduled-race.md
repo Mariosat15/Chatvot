@@ -23,6 +23,12 @@
 > deploy together. Detail: `velocity-server/CHARTVOLT-PATCHES.md` "Skill-only races",
 > "Performance, handling, harder tracks and the phone" and "F1 grid, practice circuit choice, the
 > menu and the phone again". **Never verified by eye.**
+> **Amended 13 Oct 2026 (later):** `PHYSICS_VERSION` is now **`velocity-3d-17`** - the analog
+> answers a reversed turn faster and straightens when released - alongside a phone pass (lighter
+> textures, shadows and detail range, no page scroll during a race, a frame loop that survives a
+> bad frame, the HUD placed per the owner's mobile guide, and a boot crash from `55368fec` fixed).
+> Deploy the race server and games-service together. Detail: `CHARTVOLT-PATCHES.md` "Phone:
+> steering response, lighter frames, no scroll, never crash". **Never verified by eye.**
 
 > **Status: PLAN, not built (27 September 2026).** Nothing in this chapter exists in code yet.
 > It was written after reading the whole of `Volt-Velocity-0.21-Complete.zip` (server, client

@@ -14,8 +14,10 @@ export function createTouchControls({root,pointers,canDrive,queueFire}){
  function clear(){analog=0;stickPointer=null;pad.classList.remove('pressed');knob.style.transform='translate(-50%,-50%)';}
  function resetAll(){clear();pointers.clear();root.querySelectorAll('.pressed').forEach(b=>b.classList.remove('pressed'));}
  /* CHARTVOLT PATCH (13 Oct 2026, owner: "the mobile joystick is very slow responsive"): full lock needed the thumb 37% of the pad's width out from centre with a linear response, so a thumb-sized nudge barely turned. Full lock is now 26% out, the dead zone 4%, and the response curve (power .7) gives more turn for small movements while still reaching exactly 1 at full lock. */
- function steer(event){const box=pad.getBoundingClientRect(),x=Math.max(-1,Math.min(1,(event.clientX-box.x-box.width/2)/(box.width*.26))),m=Math.abs(x);analog=m<.04?0:Math.sign(x)*Math.pow((m-.04)/.96,.7);knob.style.transform=`translate(calc(-50% + ${x*box.width*.26}px),-50%)`;}
- pad.addEventListener('pointerdown',event=>{if(!canDrive()||stickPointer!==null)return;event.preventDefault();stickPointer=event.pointerId;pad.setPointerCapture(event.pointerId);pad.classList.add('pressed');steer(event);});
+ /* CHARTVOLT PATCH (13 Oct 2026, owner: still "late response" on the analog): the pad's box is read once when the thumb lands, not on every move. getBoundingClientRect after the knob's transform was written forces a synchronous layout on each pointermove, which on a phone delayed the very input the stick exists to deliver. */
+ let box=null;
+ function steer(event){box??=pad.getBoundingClientRect();const x=Math.max(-1,Math.min(1,(event.clientX-box.x-box.width/2)/(box.width*.26))),m=Math.abs(x);analog=m<.04?0:Math.sign(x)*Math.pow((m-.04)/.96,.7);knob.style.transform=`translate(calc(-50% + ${x*box.width*.26}px),-50%)`;}
+ pad.addEventListener('pointerdown',event=>{if(!canDrive()||stickPointer!==null)return;event.preventDefault();stickPointer=event.pointerId;box=pad.getBoundingClientRect();pad.setPointerCapture(event.pointerId);pad.classList.add('pressed');steer(event);});
  pad.addEventListener('pointermove',event=>{if(event.pointerId===stickPointer){event.preventDefault();steer(event);}});
  for(const name of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(name,event=>{if(event.pointerId===stickPointer)clear();});
  root.querySelectorAll('[data-action]').forEach(button=>{
@@ -31,6 +33,8 @@ export function createTouchControls({root,pointers,canDrive,queueFire}){
   for(const name of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(name,release);
  });
  root.addEventListener('contextmenu',event=>event.preventDefault());
+ /* CHARTVOLT PATCH (13 Oct 2026, owner: "view must be uninterrupted ... when scroll to end while play game the game crashes"): during a race no touch may scroll or rubber-band anything - inside this frame or, through scroll chaining, the page hosting it. The hangar keeps its scrolling lists. */
+ document.addEventListener('touchmove',event=>{const state=document.body.dataset.state;if(state&&state!=='hangar'&&event.cancelable)event.preventDefault();},{passive:false});
  // Safari/embedded browsers can cancel the touch gesture before forwarding a
  // final PointerEvent. Release every action when that gesture is cancelled.
  root.addEventListener('touchcancel',resetAll,{passive:true});

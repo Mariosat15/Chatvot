@@ -4,7 +4,7 @@ import {SHIPS,pickupAt,hazardAt} from './catalog.js';
 import {DRIVE_LIMIT,road} from './road-width.js';
 import {POWER_TUNING,pickupRadius} from './power-tuning.js';
 /* CHARTVOLT PATCH: bumped to '-16' for the two-abreast F1 staggered grid (13 Oct 2026, src/start-grid.js), so a cached client cannot paint grid boxes where no ship starts; '-15' was the quicker steering response; '-14' was the skill-only item set, '-13' the gate-scoring change. The client refuses a race server with another version, so the race server and games-service must be deployed together. */
-export const PHYSICS_VERSION='velocity-3d-16';
+export const PHYSICS_VERSION='velocity-3d-17';
 export const GATE_HALF_WIDTH=4.5;
 export const RESPAWN_SECONDS=3;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -48,9 +48,11 @@ export class RaceSimulation{
     else this.speed=Math.max(0,this.speed-(8+this.speed*.055)*dt);
     this.energy=clamp(this.energy+dt*(this.boosting?-(ship.boostDrain||.22):.075),0,1);
     /* CHARTVOLT PATCH (13 Oct 2026, owner: "the ships when turn react very slow"): the yaw rate settled towards the stick at 4/s (6/s braking), a ~0.25 s lag before a turn took hold. 10/s (13/s braking) is ~0.1 s; the turn ceiling is unchanged, so no ship gains a tighter line, only a quicker response. */
-    const motion=Math.min(1,this.speed/22),grip=this.braking?13:10;
-    this.yawRate+=(steer*ship.handling/25*.75*motion-this.yawRate)*Math.min(1,dt*grip);
+    /* CHARTVOLT PATCH (13 Oct 2026, owner: "still late response when turning the ship on mobile analog"): reversing a turn waited for the yaw rate to unwind at the ordinary rate and then for the built-up heading to swing back, with nothing pulling it - the nose kept drifting until counter-steered. A counter-steer now settles 1.6x faster, and with the stick at rest (|steer| < 0.15) the heading eases back towards the road at 1.8/s. The turn ceiling is unchanged, so no ship gains a tighter line. */
+    const motion=Math.min(1,this.speed/22),target=steer*ship.handling/25*.75*motion,counter=target*this.yawRate<0,grip=(this.braking?13:10)*(counter?1.6:1);
+    this.yawRate+=(target-this.yawRate)*Math.min(1,dt*grip);
     this.heading=clamp(this.heading+(this.yawRate-this.curvature(this.distance)*this.speed*Math.cos(this.heading))*dt,-1.3,1.3);
+    if(Math.abs(steer)<.15)this.heading-=this.heading*Math.min(1,dt*1.8*motion);
     this.lateralVelocity=this.speed*Math.sin(this.heading);
     this.lateral+=this.lateralVelocity*dt;
     if(Math.abs(this.lateral)>DRIVE_LIMIT){this.lateral=Math.sign(this.lateral)*DRIVE_LIMIT;this.heading*=-.25;this.lateralVelocity*=-.25;this.speed*=.83;this.damage(Math.min(.09,this.speed*.001));this.events.push({type:'impact'});}

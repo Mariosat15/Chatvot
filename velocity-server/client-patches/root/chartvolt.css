@@ -256,10 +256,12 @@ html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6p
   html body[data-state]:not([data-state=hangar]):not([data-state=finished])[data-mode] #liveStandings{left:10px;top:calc(env(safe-area-inset-top,0px) + 62px);width:auto;min-height:0;max-height:none;padding:4px 9px;overflow:hidden}
   html body[data-state]:not([data-state=hangar]):not([data-state=finished])[data-mode] :is(#raceOrder,#combatStats){display:none}
   html body[data-state]:not([data-state=hangar]):not([data-state=finished])[data-mode] .position-head strong{font-size:20px}
-  html body[data-state][data-mode] #hud .integrity{left:10px;top:auto;bottom:174px;width:104px;height:auto;padding:5px 8px}
+  /* CHARTVOLT PATCH (13 Oct 2026, owner's mobile UI guide): hull top-left under the lap panel and
+     speed top-right under the map, so the row above the pads holds only the equipment icon. */
+  html body[data-state][data-mode] #hud .integrity{left:10px;top:calc(env(safe-area-inset-top,0px) + 84px);bottom:auto;width:104px;height:auto;padding:5px 8px}
   html body[data-state][data-mode] #hud :is(#checkpoint,#buffs){display:none}
   html body[data-state][data-mode] #hud .integrity .meter{margin:4px 0 0}
-  html body[data-state][data-mode] #hud .speed{right:10px;top:auto;bottom:174px;width:92px;height:auto;padding:5px 8px}
+  html body[data-state][data-mode] #hud .speed{right:10px;top:calc(env(safe-area-inset-top,0px) + 128px);bottom:auto;width:92px;height:auto;padding:5px 8px}
   html body[data-state][data-mode] #hud .speed strong{font-size:26px;line-height:1.05;letter-spacing:-1px}
   html body[data-state][data-mode] #hud .speed small,html body[data-state][data-mode] #hud .speed>span{display:none}
   html body[data-state][data-mode] #hud .speed .meter{margin:3px 0 0}
@@ -295,3 +297,7 @@ html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6p
   html body[data-state][data-mode] #hud .speed{bottom:178px}
   html body[data-state][data-mode] .skill-panel{top:22px;transform:translateX(-50%) scale(.8);transform-origin:top center}
 }
+
+/* CHARTVOLT PATCH (13 Oct 2026, owner: scrolling to the end during a race crashed the game): the frame never scrolls or rubber-bands, and during a race no touch gesture is handed to the browser at all. */
+html,body{overscroll-behavior:none}
+body[data-state]:not([data-state=hangar]){touch-action:none;overflow:hidden}

@@ -182,6 +182,27 @@ and games-service deploy together. 98 race-server tests. **Never verified by eye
 has no element Fullscreen API, so its own toolbars can still show in landscape; adding the game to
 the Home Screen is the only true full screen there.
 
+### Phone: steering response, lighter frames, no scroll, never crash (13 Oct 2026, owner)
+
+Owner report: the analog still answered late, the game was clunky and looked bad on a phone,
+iPhone Safari killed the tab ("A problem repeatedly occurred"), scrolling to the end mid-race
+crashed it, and a mobile UI guide fixed where the HUD goes.
+
+| Change | Where |
+|---|---|
+| **Boot crash fixed.** Commit `55368fec` called `setRawPixelRatio` in a way that threw "reading 'call'" inside the resize path, so the 3D view never started | `client-patches/scene.js` |
+| **Steering answers a reversal at once.** A turn pulling against the current yaw now closes the gap 1.6x faster, and with the stick near centre (\|steer\| < .15) the built-up heading eases back, so letting go straightens the ship instead of carrying the old turn. The pad's box is read once when the thumb lands rather than on every move, which forced a synchronous layout per `pointermove` | `src/simulation.js`, `client-patches/touch-controls.js` |
+| **Lighter frames on a phone.** Textures keep only their drawn size and normal/roughness maps are halved; scanned rock faces and detail props cast no shadow and are drawn to 220 m instead of 350 m; cylinders use 16 sides instead of 40; PCF rather than soft shadows on touch; no clearcoat; the HDR clamp no longer allocates two arrays per pixel. The detail-range and shadow change cannot be raised again until reload - accepted, since a phone starts on Low | `client-patches/graphics-quality.js` (new override), `scene.js`, `architecture.js` (new copy), `environment.js`, `main.js` |
+| **The page never scrolls during a race.** The host stage locks `html` and `body` overflow and overscroll in pseudo-fullscreen; inside the frame `touch-action:none`, `overflow:hidden` and a non-passive `touchmove` that cancels every gesture outside the hangar. iOS ignores body `overflow:hidden` alone, which is why both halves exist | `components/games/use-stage-fullscreen.ts`, `client-patches/root/chartvolt.css`, `touch-controls.js` |
+| **One bad frame no longer ends the race.** The frame loop catches a throw, warns once and carries on; only 120 consecutive failures stop it and show the error | `client-patches/main.js` |
+| **Portrait HUD per the guide.** Hull top-left under the lap panel, speed top-right under the map, equipment alone above the pads; USE and BOOST above, STEER bottom-left, BRAKE/ACCELERATE bottom-right. Measured at 390x844 and 844x390: no panel overlaps another or leaves the screen. This **supersedes** the "integrity, item and speed in one row above the pads" line in the table above | `client-patches/root/chartvolt.css` |
+
+Measured in Playwright's phone emulation (390x844, 3x, touch) on a **desktop GPU**: draw calls
+1,042 -> 658, shadow-pass triangles ~550k -> ~370k, frame median and p95 16.7 ms, JS heap
+220-242 MB, no page errors, `scrollY` stays 0 after scrolling to 9999. A real phone's frame rate
+is unknown. **`PHYSICS_VERSION` is `velocity-3d-17`** (steering changed), so the race server and
+games-service deploy together. **Never verified by eye.**
+
 The lighten step is **not idempotent**: it deletes the 4k originals it shrinks, so a second rebuild
 over the same `%TEMP%\vvfull` fails with `Input file is missing: ...rock_3_diff_4k.webp`. Pass
 `--fresh` when that happens.
