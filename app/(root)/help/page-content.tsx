@@ -1323,6 +1323,46 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                 receive a prize.
               </p>
 
+              {/* Live races (Volt Velocity): skill-only rules and the published disconnection rule */}
+              <div
+                id="live-races"
+                className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4"
+              >
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-cyan-400" />
+                  Live races (Volt Velocity)
+                </h3>
+                <ul className="text-sm text-gray-300 space-y-1.5 ml-2 list-disc list-inside marker:text-cyan-400/60">
+                  <li>
+                    <strong className="text-white">Skill only.</strong> Nothing
+                    you pick up can touch another pilot. Missiles only destroy
+                    towers on the track; shields, repairs, energy and boosts help
+                    only the pilot who collects them. Ships that touch bounce
+                    apart without damage, and every pilot collects every pickup
+                    for themselves.
+                  </li>
+                  <li>
+                    <strong className="text-white">Starting grid.</strong> Your
+                    place on the grid comes from your settled Volt Velocity
+                    points (competitions and challenges both count): most points
+                    at the front, then whoever joined first. A race in progress
+                    never moves anyone up the grid.
+                  </li>
+                  <li>
+                    <strong className="text-white">If you disconnect</strong>,
+                    your ship stops and the clock keeps running. Reconnect within{" "}
+                    <strong className="text-white">30 seconds</strong> to carry
+                    on. After that you are out with no score, and dropping out
+                    does not return your entry fee.
+                  </li>
+                  <li>
+                    A race cancelled before it starts is refunded in full. If a
+                    fault on our side stops a race, the contest&apos;s stated rule
+                    for unfinished rounds applies.
+                  </li>
+                </ul>
+              </div>
+
               {/* What a competition is */}
               <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-4">
                 <h3 className="font-semibold text-white mb-3 flex items-center gap-2">

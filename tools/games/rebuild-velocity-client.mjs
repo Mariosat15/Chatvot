@@ -28,9 +28,17 @@ const root = opt("--tree", path.join(os.tmpdir(), "vvfull"));
 const tree = path.join(root, "volt-velocity-3d");
 const patches = path.join(repo, "velocity-server/client-patches");
 
-// The one vendor test that pins behaviour the owner deliberately changed (a new weapon replaces
-// the held one). Any other failure stops the rebuild.
-const EXPECTED_VENDOR_FAILURES = ["one carried item, immediate repair and energy, no overwriting"];
+// Vendor tests that pin behaviour the owner deliberately changed. Any other failure stops the rebuild.
+// - a new weapon replaces the held one;
+// - skill-only races (13 Oct 2026): EMP and mines are gone, so their slots in the capsule bag become
+//   missile / counter / shield, the offense quota drops from 5 to 3, and the mine and EMP tests
+//   exercise items that no longer exist.
+const EXPECTED_VENDOR_FAILURES = [
+  "one carried item, immediate repair and energy, no overwriting",
+  "every track has support/defense/offense/overdrive quotas and safe launch",
+  "proximity mine intercepts a bolt before it can damage the ship",
+  "EMP affects only nearby hazards",
+];
 
 const run = (cmd, cmdArgs, cwd = tree) =>
   execFileSync(cmd, cmdArgs, { cwd, stdio: "inherit", shell: process.platform === "win32" });

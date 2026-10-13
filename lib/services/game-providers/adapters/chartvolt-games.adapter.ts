@@ -372,6 +372,7 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
           : {}),
         resultCallbackUrl: request.resultCallbackUrl,
         progressCallbackUrl: request.progressCallbackUrl,
+        ...(request.standingsUrl ? { standingsUrl: request.standingsUrl } : {}),
         returnUrl: request.returnUrl,
         parentOrigin: request.parentOrigin,
       },

@@ -22,11 +22,13 @@
 import { spawn, type ChildProcess } from "child_process";
 import crypto from "crypto";
 import fs from "fs";
+import http from "http";
 import net from "net";
 import os from "os";
 import path from "path";
 
 import {
+  CALLBACK_SECRET,
   callApi,
   callPlay,
   clearRounds,
@@ -477,6 +479,69 @@ async function main(): Promise<number> {
       body: velocityBody(seed, { resultCallbackUrl: callbackUrl, contestType: "duel" }),
     });
     assert(bad.status === 400, `expected 400 for an unknown contestType, got ${bad.status}`);
+  });
+
+  // CHARTVOLT (13 Oct 2026, skill-only races): the grid comes from the platform's settled points.
+  const { orderGrid, parseStandings, refreshGrid } = await import("../src/games/volt-velocity/grid");
+  await test("grid order: points first, then join time, then registration order", () => {
+    const seated = ["r1", "r2", "r3", "r4", "r5"].map((roundId) => ({ roundId, providerRoundId: "p_" + roundId }));
+    const order = orderGrid(seated, [
+      { roundId: "r1", points: 0, joinedAt: "2026-10-13T10:00:00Z" },
+      { roundId: "r2", points: 40 },
+      { roundId: "r3", points: 0, joinedAt: "2026-10-13T09:00:00Z" },
+      { roundId: "r4", points: 120 },
+    ]);
+    assert(JSON.stringify(order) === JSON.stringify(["p_r4", "p_r2", "p_r3", "p_r1", "p_r5"]), `order was ${order}`);
+    const none = orderGrid(seated, []);
+    assert(JSON.stringify(none) === JSON.stringify(seated.map((s) => s.providerRoundId)), "fallback is not join order");
+    assert(orderGrid(seated, [{ roundId: "r5", points: Number.NaN }])[0] === "p_r1", "a non-finite point total moved a pilot");
+    assert(parseStandings({ standings: [{ roundId: "x", points: "9" }, { roundId: "y", points: 3 }] }).length === 1, "a malformed line was kept");
+  });
+
+  await test("a shared race asks the platform for standings, signed, and the race server accepts the order", async () => {
+    await clearRounds();
+    const seed = `cv_vv_grid_${crypto.randomBytes(3).toString("hex")}`;
+    const asked: { body: { roundIds?: string[] }; signed: boolean }[] = [];
+    let reply: { status: number; points: Map<string, number> } = { status: 200, points: new Map() };
+    const platform = http.createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c as Buffer));
+      req.on("end", () => {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        const sig = String(req.headers["x-signature"] ?? "").replace(/^sha256=/, "");
+        const want = crypto.createHmac("sha256", CALLBACK_SECRET).update(raw, "utf8").digest("hex");
+        const body = JSON.parse(raw) as { roundIds?: string[] };
+        asked.push({ body, signed: sig === want });
+        res.writeHead(reply.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ standings: (body.roundIds ?? []).map((roundId) => ({ roundId, points: reply.points.get(roundId) ?? 0 })) }));
+      });
+    });
+    await new Promise<void>((r) => platform.listen(0, "127.0.0.1", r));
+    const standingsUrl = `http://127.0.0.1:${(platform.address() as net.AddressInfo).port}/api/games/providers/chartvolt-games/standings`;
+    try {
+      const startAt = new Date(Date.now() + 10 * 60_000).toISOString();
+      const bodies = [0, 1].map(() => velocityBody(seed, { resultCallbackUrl: callbackUrl, standingsUrl, scheduledStartAt: startAt }));
+      for (const body of bodies) {
+        const created = await callApi("/v1/rounds", { method: "POST", body });
+        assert(created.status === 201, `create returned ${created.status}: ${created.raw}`);
+      }
+      // The second seat fires its own refresh; let it land so it cannot overwrite ours afterwards.
+      for (let i = 0; i < 50 && asked.length === 0; i++) await new Promise((r) => setTimeout(r, 20));
+      assert(asked.length === 1, `the second seat should have asked once, asked ${asked.length}`);
+      await new Promise((r) => setTimeout(r, 100));
+      const rounds = await Round.find({ contentSeed: seed }).sort({ createdAt: 1 }).lean();
+      reply = { status: 200, points: new Map([[rounds[1].roundId, 250]]) };
+      const order = await refreshGrid(rounds[0].race!.raceId, standingsUrl);
+      assert(JSON.stringify(order) === JSON.stringify([rounds[1].providerRoundId, rounds[0].providerRoundId]), `pushed ${order}`);
+      const last = asked[asked.length - 1];
+      assert(last.signed, "the standings request was not signed with the callback secret");
+      assert(JSON.stringify(last.body.roundIds) === JSON.stringify(rounds.map((r) => r.roundId)), "asked about the wrong rounds");
+      reply = { status: 500, points: new Map() };
+      assert((await refreshGrid(rounds[0].race!.raceId, standingsUrl)) === null, "a refused standings call still pushed an order");
+      assert((await refreshGrid(rounds[0].race!.raceId, undefined)) === null, "no standingsUrl still pushed an order");
+    } finally {
+      await new Promise<void>((r) => platform.close(() => r()));
+    }
   });
 
   await test("a faster time always wins, and points only break an exact tie", () => {

@@ -1,5 +1,24 @@
 # 23 - Volt Velocity: a scheduled 16-player race
 
+> **BUILT 13 October 2026 - races are skill-only (owner, after the preliminary legal opinion).**
+> Nothing a pilot does can touch another pilot, in every room including solo. **Removed:** EMP,
+> Shockwave, Mines, Oil slick, Cloak and - a deviation from the brief, which kept weapons for
+> towers - the **Blaster**, whose bolts expire at the road edge (20 m) while towers stand at
+> lane 23-26 m, so it could hit nothing but ships. **Kept:** Missile and Seeker (towers only),
+> Shield, Counter, Overdrive, Repair, Energy, Magnet. **Ship contact bounces with no damage**
+> (a small speed scrub and yaw wobble remain - they are physics). **Pickups are per pilot.**
+> **The grid** is ordered by each pilot's settled Volt Velocity points, then join time, from the
+> new optional standings endpoint (`01` s5.6, requirements HTML **v1.25**); on any failure the
+> race starts in join order and logs it. It is points, **not a per-race qualifying lap**.
+> Challenges already add points (settlement → `awardContestRewards` → `recordContestFinish`).
+> **Disconnection:** the ship stops and the clock runs; reconnect within 30 seconds or the pilot
+> is out with no score and the entry fee is not returned - published in the game rules and race
+> start screen, the help page and legal opinion §3.3/§9. A race cancelled before start is
+> refunded in full; a fault on our side falls to the contest's unfinished-round rule.
+> `PHYSICS_VERSION` is `velocity-3d-14`, so the race server and games-service must deploy
+> together. Detail: `velocity-server/CHARTVOLT-PATCHES.md` "Skill-only races". **Never verified
+> by eye.**
+
 > **Status: PLAN, not built (27 September 2026).** Nothing in this chapter exists in code yet.
 > It was written after reading the whole of `Volt-Velocity-0.21-Complete.zip` (server, client
 > integration surface, examples, tests) and the parts of the platform it touches. Owner approval

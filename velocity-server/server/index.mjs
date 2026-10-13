@@ -34,11 +34,13 @@ export async function createRaceServer({secret=raceEnvironment(process.env,root)
    }
    if(parts[0]!=='v1'||parts[1]!=='races'||parts.length!==4||!/^[-\w]{1,80}$/.test(parts[2])){json(404,{error:'Unknown endpoint'});return;}
    const [, ,raceId,action]=parts,room=rooms.get(raceId);
-   if(action==='result'||action==='start'||action==='players'){
+   if(action==='result'||action==='start'||action==='players'||action==='grid'){
     if(!equal(bearer,adminKey)){json(401,{error:'Admin authentication required'});return;}
     // CHARTVOLT PATCH: register late entrants into an open-roster lobby. Idempotent per player id.
     if(action==='players'&&req.method==='POST'&&room){const b=await body();if(!Array.isArray(b.players)||b.players.length<1||b.players.length>16)throw Error('players must be a non-empty array');const now=Date.now();for(const p of b.players)room.addPlayer(p,now);json(200,{raceId:room.id,registered:[...room.players.keys()],scheduledStartAt:room.scheduledStartAt,status:room.status});return;}
     if(action==='result'&&req.method==='GET'){if(room?.isClosed())await archive(room);try{json(200,JSON.parse(await readFile(resolve(dataDir,raceId+'.json'),'utf8')));}catch(e){if(e.code!=='ENOENT')throw e;json(room?202:404,{raceId,status:room?.status||'unavailable',final:false});}return;}
+    // CHARTVOLT PATCH (13 Oct 2026): the starting grid, best first, from the platform's leaderboard standings. `accepted:false` is not an error - a stale or late order is simply ignored.
+    if(action==='grid'&&req.method==='POST'&&room){const b=await body();if(!Array.isArray(b.order)||b.order.length>16||!b.order.every(id=>typeof id==='string'))throw Error('order must be an array of at most 16 player ids');json(200,{accepted:room.setGridOrder(b.order),status:room.status});return;}
     if(action==='start'&&req.method==='POST'&&room){room.start(Date.now());json(200,{startAt:room.startAt});return;}
     json(404,{error:'Race not found'});return;
    }

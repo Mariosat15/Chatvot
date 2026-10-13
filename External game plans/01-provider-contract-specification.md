@@ -416,6 +416,7 @@ producing one score.
   "expiresAt": "2026-08-18T14:00:00Z",
   "resultCallbackUrl": "https://chartvolt.com/api/games/providers/acme/events",
   "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
+  "standingsUrl": "https://chartvolt.com/api/games/providers/acme/standings",
   "returnUrl": "https://chartvolt.com/contests/774219",
   "parentOrigin": "https://chartvolt.com"
 }
@@ -713,6 +714,61 @@ finished round is a board that goes backwards. A lost report costs one stale lin
 the response, between one board and the next, and a provider should do the same: a
 slow platform must never become a pause in a round somebody has paid to play.
 
+### 5.6 Optional - the standings endpoint (requirements HTML **v1.25**, 13 Oct 2026)
+
+```
+POST {standingsUrl}
+```
+
+A game that has to **order players before play** - a race's starting grid is the case
+that produced this - may ask where each seated player stands on **this game's**
+leaderboard. Before 13 October 2026 ChartVolt's own race shuffled its grid from the seed,
+which hands a random head start to somebody in a paid race. The owner's rule: most points
+in this game first, then whoever joined the contest first.
+
+`standingsUrl` is sent on create-round beside `progressCallbackUrl`, and like it is
+**always offered and never required**. A provider that orders players some other fair
+way, or does not need an order, ignores it and is fully conformant.
+
+```json
+{ "roundIds": ["cv_rnd_01JAV3M7Q2XK8T", "cv_rnd_01JAV3M9ZK4R1B"] }
+```
+
+```json
+{
+  "standings": [
+    { "roundId": "cv_rnd_01JAV3M7Q2XK8T", "points": 1840, "rank": 1, "joinedAt": "2026-10-13T09:02:11.000Z" },
+    { "roundId": "cv_rnd_01JAV3M9ZK4R1B", "points": 0, "joinedAt": "2026-10-13T09:04:40.000Z" }
+  ]
+}
+```
+
+**Authentication is identical to the result callback** (section 2.2), for the same reason
+as section 5.5.
+
+**The points are settled points.** They come from the player's total in this game, which
+accumulates only when a contest settles - so a race still in progress cannot move anybody
+up its own grid. A player with no points carries `points: 0` and **no `rank`**: unranked,
+not last; order them by `joinedAt`. Equal points share a rank.
+
+**What a caller can learn is deliberately narrow.** 1 to 16 distinct round ids per
+request, every one of them launched by **this provider**, all in **one contest** and
+**one game**, each belonging to a player **seated** in that contest. Any id failing any
+of those refuses the **whole** request - a partial answer would let a valid caller slip
+another contest's round into the list and read that player's points. The reply carries
+round ids, never user ids or names. Nothing is written.
+
+| Status | Meaning | Retry? |
+|---|---|---|
+| `200` | Answered, one line per round in the order asked | No |
+| `400` | Not valid JSON, or the round list was refused | No - fix the request |
+| `401` | Credentials, signature or timestamp refused | No - fix the configuration |
+| `500` | ChartVolt failed | Optional, once |
+
+**On any failure, start anyway in join order and log it.** A grid that cannot be
+optimised is still a fair grid; a race that will not start because a lookup failed is
+a contest nobody can play. ChartVolt's own game does exactly this.
+
 ---
 
 ## 6. Required endpoint - fetch a round
@@ -773,6 +829,7 @@ rather than leaving us to infer it.
 | `GET /v1/games/{gameCode}/leaderboard` | Low | We keep our own leaderboards. Useful only for cross-checking |
 | Webhook for `round.started` | Medium | Confirms the player actually began, which distinguishes "never played" from "played and scored zero" |
 | The progress callback (s5.5) | **High for spectacle, zero for correctness** | Nothing settles differently without it. What it buys is a contest board that reads as a live event rather than a list of names marked "playing now" |
+| The standings endpoint (s5.6) | **High for fairness where players are ordered before play** | A start grid ordered by settled points instead of at random. Irrelevant to a game that orders nobody |
 | Sandbox score injection | **High** | The ability to force an arbitrary score in the sandbox makes automated testing of settlement possible |
 
 ---

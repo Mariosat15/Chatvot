@@ -235,6 +235,7 @@ export async function launchChallengeRound(
       // Supplied unconditionally, exactly as the competition launch service does - see
       // `contract.ts` for why the provider's use of it is optional.
       progressCallbackUrl: `${baseUrl}/api/games/providers/${config.providerKey}/progress`,
+      standingsUrl: `${baseUrl}/api/games/providers/${config.providerKey}/standings`,
       displayName: actor.displayName,
       locale: actor.locale,
       country: actor.country,

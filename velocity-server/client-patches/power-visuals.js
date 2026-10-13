@@ -9,7 +9,7 @@ const labelMaterials = new Map();
 /** One texture and material per capsule KIND, shared by every capsule of that kind (29 textures became at most 13). */
 function labelMaterial(kind) {
   if (labelMaterials.has(kind)) return labelMaterials.get(kind);
-  const item = ITEMS[kind], hex = '#' + item.color.toString(16).padStart(6, '0');
+  const item = ITEMS[kind] ?? { name: String(kind).toUpperCase(), color: 0x8a9bb0, icon: '◇' }, hex = '#' + item.color.toString(16).padStart(6, '0');
   const c = document.createElement('canvas'); c.width = 512; c.height = 128;
   const ctx = c.getContext('2d');
   // Reason: the capsule's own light beam is additive and runs straight through the tag, so without
@@ -37,7 +37,8 @@ export function powerupLabel(kind) {
 
 /** A flat slick lying on the road, sized to the server's catch radius. */
 export function createSlickDecal(radius) {
-  const color = ITEMS.slick.color, g = new T.Group();
+  // CHARTVOLT PATCH: the slick left ITEMS with skill-only races (13 Oct 2026); keep its old colour.
+  const color = ITEMS.slick?.color ?? 0x3a3a46, g = new T.Group();
   const pool = new T.Mesh(new T.CircleGeometry(radius, 40).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({color, transparent: true, opacity: 0.32, blending: T.AdditiveBlending, depthWrite: false}));
   const rim = new T.Mesh(new T.RingGeometry(radius * 0.92, radius, 48).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({color, transparent: true, opacity: 0.8, blending: T.AdditiveBlending, depthWrite: false}));
   g.add(pool, rim); g.userData.pool = pool;

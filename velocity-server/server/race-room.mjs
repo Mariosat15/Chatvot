@@ -1,9 +1,9 @@
-import {PlayerCombat} from './player-combat.mjs';
+import {RaceFeed} from './race-feed.mjs';
 import {RaceSimulation,PHYSICS_VERSION} from '../src/simulation.js';
 import {createTrack} from '../src/track.js';
 import {generateContent} from '../src/race-content.js';
 import {SHIPS} from '../src/catalog.js';
-import {TRACKS,rng,ROUTE_VERSION} from '../src/tracks.js';
+import {TRACKS,ROUTE_VERSION} from '../src/tracks.js';
 import {EMPTY_INPUT,validateInput,serializeSimulation,standings,PROTOCOL_VERSION} from '../src/multiplayer-state.js';
 import {decodeFrame,MAX_FRAMES_PER_MESSAGE} from '../src/input-frames.js';
 import {gridSlot,GRID_SLOTS} from '../src/start-grid.js';
@@ -63,12 +63,27 @@ export class RaceRoom {
   this.id=spec.id;this.createdAt=now;this.status='lobby';this.tick=0;this.accumulator=0;this.startAt=null;this.raceElapsed=0;this.finishedAt=null;this.lastNow=now;
   this.openRoster=open;this.solo=solo;this.scheduledStartAt=scheduled;
   this.latestStartAt=scheduled==null?null:(spec.latestStartAt??scheduled+DEFAULT_START_WAIT_MS);
-  this.config={trackId:spec.trackId,seed:spec.seed,routeVersion:ROUTE_VERSION,physicsVersion:PHYSICS_VERSION,laps,maxSeconds:laps*SECONDS_PER_LAP,format:'combat-race',competitiveCombat:true,...(solo?{solo:true}:{})};
+  this.config={trackId:spec.trackId,seed:spec.seed,routeVersion:ROUTE_VERSION,physicsVersion:PHYSICS_VERSION,laps,maxSeconds:laps*SECONDS_PER_LAP,format:'skill-race',competitiveCombat:false,serverTimedStart:true,...(solo?{solo:true}:{})};
+  // CHARTVOLT PATCH (13 Oct 2026): every room is a skill-only race. `competitiveCombat:false` gives each pilot their own
+  // pickups and points missiles at towers; `serverTimedStart` leaves the perfect start to perfectStarts() below, the one clock all pilots share.
   this.track=createTrack(spec.trackId);this.track.content=generateContent(this.track,spec.seed);
-  this.combat=new PlayerCombat(this);
+  this.feed=new RaceFeed(this);
+  /** CHARTVOLT PATCH (13 Oct 2026). Player ids in starting order, pushed by the game server from the platform's leaderboard standings. */
+  this.gridOrder=[];
   this.players=new Map(spec.players.map(p=>[p.id,this.makePlayer(p,now)]));
  }
- makePlayer(p,now){const sim=new RaceSimulation(this.track.length,this.track.curvature,{...this.config,content:this.track.content});const player={id:p.id,name:p.name.trim(),sim,ready:false,connected:false,active:false,dnf:false,finishTimeMs:null,lateOffsetMs:0,lastInput:EMPTY_INPUT,lastSeq:-1,lastInputAt:now,frameQueue:[],queuedStep:-1,ackStep:-1,disconnectedAt:now,connection:null,rateAt:now,rateCount:0,combat:{hits:0,kills:0,damageDealt:0,damageTaken:0,collisions:0},lastAttacker:null};const baseUse=sim.useItem.bind(sim);sim.useItem=()=>this.combat.use(player,baseUse);return player;}
+ makePlayer(p,now){const sim=new RaceSimulation(this.track.length,this.track.curvature,{...this.config,content:this.track.content});return{id:p.id,name:p.name.trim(),sim,ready:false,connected:false,active:false,dnf:false,finishTimeMs:null,lateOffsetMs:0,lastInput:EMPTY_INPUT,lastSeq:-1,lastInputAt:now,frameQueue:[],queuedStep:-1,ackStep:-1,disconnectedAt:now,connection:null,rateAt:now,rateCount:0};}
+ /**
+  * CHARTVOLT PATCH (13 Oct 2026, owner). The starting grid, best first: the game server computes it from each
+  * pilot's settled Volt Velocity points (then join time) and pushes it here before the countdown.
+  * Accepted only in the lobby, and never shorter than an order already accepted - two refreshes racing each
+  * other must not let a stale, smaller grid overwrite a fuller one. Unknown ids are ignored at start().
+  */
+ setGridOrder(order){
+  if(this.status!=='lobby'||!Array.isArray(order)||order.length>MAX_RACERS||!order.every(id=>typeof id==='string'&&PLAYER_ID.test(id))||new Set(order).size!==order.length)return false;
+  if(order.length<this.gridOrder.length)return false;
+  this.gridOrder=[...order];return true;
+ }
  /** CHARTVOLT PATCH. Idempotent: re-adding a registered id returns it unchanged, so a retried launch never errors. */
  addPlayer(p,now=Date.now()){
   if(!this.openRoster)throw Error('Roster is frozen');
@@ -115,7 +130,12 @@ export class RaceRoom {
   if(ready.length>=2){this.start(now,SCHEDULED_COUNTDOWN_MS);return;}
   if(now>=this.latestStartAt){this.status='cancelled';this.finishedAt=now;this.cancelReason='too-few-ready';}
  }
- start(now,countdownMs=COUNTDOWN_MS){if(this.status!=='lobby')throw Error('Race already started');const racers=[...this.players.values()].filter(p=>p.connected&&p.ready);if(racers.length<(this.solo?1:2))throw Error('At least two connected ready players required');const random=rng(this.config.seed);racers.sort((a,b)=>a.id.localeCompare(b.id));for(let i=racers.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[racers[i],racers[j]]=[racers[j],racers[i]];}this.status='countdown';this.startAt=now+countdownMs;this.lastNow=now;for(const [i,p]of racers.entries()){p.active=true;p.sim.start();const at=gridSlot(i,racers.length);p.sim.lateral=at.lateral;p.sim.distance=at.distance;p.grid=i+1;p.sim.countdown=countdownMs/1000;p.sim.shield=2;}}
+ start(now,countdownMs=COUNTDOWN_MS){if(this.status!=='lobby')throw Error('Race already started');const racers=[...this.players.values()].filter(p=>p.connected&&p.ready);if(racers.length<(this.solo?1:2))throw Error('At least two connected ready players required');
+  // CHARTVOLT PATCH (13 Oct 2026): the vendor shuffled the grid by seed - a random advantage in a paid race. Pilots now line up in
+  // the pushed grid order (leaderboard points, then join time); anyone it does not name follows in registration order, which is join order.
+  // Reason: Array.prototype.sort is stable and `players` iterates in insertion order, so the fallback needs no key of its own.
+  const rank=new Map(this.gridOrder.map((id,i)=>[id,i]));racers.sort((a,b)=>(rank.get(a.id)??Infinity)-(rank.get(b.id)??Infinity));
+  this.status='countdown';this.startAt=now+countdownMs;this.lastNow=now;for(const [i,p]of racers.entries()){p.active=true;p.sim.start();const at=gridSlot(i,racers.length);p.sim.lateral=at.lateral;p.sim.distance=at.distance;p.grid=i+1;p.sim.countdown=countdownMs/1000;p.sim.shield=2;}}
  input(id,msg,now){const p=this.player(id);if(!p.connected||p.dnf||p.finishTimeMs!=null)return false;if(now-p.rateAt>=1000){p.rateAt=now;p.rateCount=0;}if(++p.rateCount>45)return false;const input=validateInput(msg.input);if(!Number.isSafeInteger(msg.seq)||msg.seq<0||msg.seq<=p.lastSeq||!input)return false;
   // CHARTVOLT PATCH: optional step-numbered frames. A message without them keeps the vendor behaviour exactly.
   let frames=null;if(msg.frames!==undefined){if(!Array.isArray(msg.frames)||msg.frames.length>MAX_FRAMES_PER_MESSAGE)return false;frames=[];for(const raw of msg.frames){const f=decodeFrame(raw);if(!f)return false;frames.push(f);}}
@@ -144,14 +164,14 @@ export class RaceRoom {
   let control;if(p.frameQueue.length){const f=p.frameQueue.shift();p.lastInput=f.input;p.ackStep=f.step;control=f.input;}else control=now-p.lastInputAt>250?EMPTY_INPUT:p.lastInput;
   p.sim.update(1/60,control);
   if(p.sim.state==='finished'){if(p.sim.result().finished)p.finishTimeMs=p.sim.result().timeMs+p.lateOffsetMs;else p.dnf=true;}
- }this.combat.step(1/60,previous);}
+ }this.feed.step(1/60,previous);}
  /** CHARTVOLT PATCH (28 Sep 2026): a pilot who pressed throttle inside the last POWER_TUNING.perfectStart.window seconds, and is still holding it at the green light, gets a short launch boost. Pressing earlier earns nothing, so holding throttle through the whole countdown is not a free win. */
- perfectStarts(){const w=POWER_TUNING.perfectStart;for(const p of this.players.values()){if(!p.active||!p.launchThrottle||!(p.launchPressedAt>=this.startAt-w.window*1000))continue;p.sim.padBoost=Math.max(p.sim.padBoost,w.boost);this.combat.event('perfect-start',p,null,'launch');}}
+ perfectStarts(){const w=POWER_TUNING.perfectStart;for(const p of this.players.values()){if(!p.active||!p.launchThrottle||!(p.launchPressedAt>=this.startAt-w.window*1000))continue;p.sim.padBoost=Math.max(p.sim.padBoost,w.boost);this.feed.event('perfect-start',p,null,'launch');}}
  ranked(){return standings([...this.players.values()].filter(p=>this.status==='lobby'||p.active));}
- snapshot(id,now){return{type:'snapshot',protocol:PROTOCOL_VERSION,raceId:this.id,serverTime:now,tick:this.tick,status:this.status,startAt:this.startAt,scheduledStartAt:this.scheduledStartAt,latestStartAt:this.latestStartAt,lateEntry:this.lateEntryOpen(),config:this.config,playerId:id,ack:this.player(id).lastSeq,ackStep:this.player(id).ackStep,inputStep:this.player(id).queuedStep,self:serializeSimulation(this.player(id).sim),combat:this.combat.snapshot(id),standings:this.ranked(),players:[...this.players.values()].filter(p=>p.connected||p.active).map(p=>({id:p.id,name:p.name,shipId:p.sim.shipId,connected:p.connected,ready:p.ready,active:p.active,dnf:p.dnf,finishTimeMs:p.finishTimeMs,distance:p.sim.distance,lateral:p.sim.lateral,heading:p.sim.heading,speed:p.sim.speed,hull:p.sim.hull,shield:p.sim.shield,cloak:p.sim.cloak>0,boosting:p.sim.boosting,respawnRemaining:p.sim.respawnRemaining,respawns:p.sim.respawns})),final:this.isClosed()?this.result():null};}
+ snapshot(id,now){return{type:'snapshot',protocol:PROTOCOL_VERSION,raceId:this.id,serverTime:now,tick:this.tick,status:this.status,startAt:this.startAt,scheduledStartAt:this.scheduledStartAt,latestStartAt:this.latestStartAt,lateEntry:this.lateEntryOpen(),config:this.config,playerId:id,ack:this.player(id).lastSeq,ackStep:this.player(id).ackStep,inputStep:this.player(id).queuedStep,self:serializeSimulation(this.player(id).sim),combat:this.feed.snapshot(),standings:this.ranked(),players:[...this.players.values()].filter(p=>p.connected||p.active).map(p=>({id:p.id,name:p.name,shipId:p.sim.shipId,connected:p.connected,ready:p.ready,active:p.active,dnf:p.dnf,finishTimeMs:p.finishTimeMs,distance:p.sim.distance,lateral:p.sim.lateral,heading:p.sim.heading,speed:p.sim.speed,hull:p.sim.hull,shield:p.sim.shield,boosting:p.sim.boosting,respawnRemaining:p.sim.respawnRemaining,respawns:p.sim.respawns})),final:this.isClosed()?this.result():null};}
  /** CHARTVOLT PATCH. A cancelled scheduled race is as final as a finished one: nobody raced, and the receipt must say so. */
  isClosed(){return this.status==='finished'||this.status==='cancelled';}
  result(){return{raceId:this.id,protocol:PROTOCOL_VERSION,config:this.config,authoritative:true,final:this.isClosed(),status:this.status,cancelReason:this.cancelReason??null,scheduledStartAt:this.scheduledStartAt,startedAt:this.startAt,registered:[...this.players.keys()],finishedAt:this.finishedAt,standings:this.ranked(),results:[...this.players.values()].filter(p=>p.active).map(p=>{const r=p.sim.result();
   // Reason: a late pilot's own clock started when they did; the scored time is measured from the race's green light.
-  return{playerId:p.id,dnf:p.dnf,combat:{...p.combat},...r,timeMs:r.timeMs+p.lateOffsetMs,lateStartMs:p.lateOffsetMs};})};}
+  return{playerId:p.id,dnf:p.dnf,...r,timeMs:r.timeMs+p.lateOffsetMs,lateStartMs:p.lateOffsetMs};})};}
 }

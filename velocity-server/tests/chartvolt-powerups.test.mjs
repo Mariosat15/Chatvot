@@ -1,6 +1,6 @@
 // CHARTVOLT PATCH (owner, 28 Sep 2026: "more features, more exciting, more power-ups").
-// Five new capsules, slipstream and the perfect start. Every effect that touches another racer is
-// decided by the server, and every rule is the same for every pilot.
+// Two capsules (seeker, magnet) remain from the five added that day, plus slipstream and the perfect start.
+// Since 13 Oct 2026 no item touches another racer at all; every rule is the same for every pilot.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {RaceRoom} from '../server/race-room.mjs';
@@ -16,11 +16,11 @@ function setup() {
   for (const p of r.players.values()) { r.join(p.id, 0); r.ready(p.id, true, 0); }
   r.advance(5000);
   const a = r.player('a'), b = r.player('b');
-  for (const p of [a, b]) { Object.assign(p.sim, {shield: 0, counter: 0, cloak: 0, lateral: 0, heading: 0, yawRate: 0, speed: 90, cooldown: 0, item: null}); p.sim.content.hazards = []; }
+  for (const p of [a, b]) { Object.assign(p.sim, {shield: 0, counter: 0, lateral: 0, heading: 0, yawRate: 0, speed: 90, cooldown: 0, item: null}); p.sim.content.hazards = []; }
   a.sim.distance = 300; b.sim.distance = 300;
   return {r, a, b};
 }
-const stepCombat = (r, dt, prev) => r.combat.step(dt, new Map(Object.entries(prev).map(([id, distance]) => [id, {distance}])));
+const stepCombat = (r, dt, prev) => r.feed.step(dt, new Map(Object.entries(prev).map(([id, distance]) => [id, {distance}])));
 
 test('every track and seed keeps the vendor 24 capsules and adds each new kind exactly once', () => {
   for (const def of TRACKS) for (const seed of [1, 7, 123, 99991]) {
@@ -41,78 +41,50 @@ test('every new kind has a name for its floating label', () => {
   for (const k of SPECIAL_KINDS) assert.ok(ITEMS[k]?.name, k);
 });
 
-test('a shockwave hits and shoves a nearby rival and leaves a distant one alone', () => {
-  const {r, a, b} = setup();
-  const c = r.player('b');
-  b.sim.distance = 305; b.sim.lateral = 3;
-  a.sim.item = 'shockwave'; a.sim.useItem();
-  assert.ok(b.sim.hull < 1, 'the nearby rival took damage');
-  assert.ok(b.sim.lateral > 3 + 1, 'the nearby rival was pushed away');
-  assert.ok(r.combat.events.some(e => e.type === 'shockwave' && e.source === 'a'));
-  assert.equal(a.sim.item, null, 'the capsule was spent');
-  const far = setup();
-  far.b.sim.distance = 360; far.a.sim.item = 'shockwave'; far.a.sim.useItem();
-  assert.equal(far.b.sim.hull, 1);
-  assert.ok(c);
+// CHARTVOLT PATCH (13 Oct 2026, skill-only races, after the legal opinion). Shockwave, oil slick, cloak,
+// EMP and mines are gone, and the seeker hunts towers. These replace the 28 Sep tests that proved
+// those effects reached a rival - the opposite of what a paid race may now allow.
+const REMOVED = ['emp', 'mine', 'shockwave', 'slick', 'cloak'];
+
+test('no removed item exists in the catalogue or on any track', () => {
+  for (const k of REMOVED) assert.equal(ITEMS[k], undefined, k);
+  for (const def of TRACKS) for (const seed of [1, 7, 123, 99991]) {
+    const kinds = generateContent(createTrack(def.id), seed).pickups.map(p => p.kind);
+    for (const k of REMOVED) assert.ok(!kinds.includes(k), `${def.id} seed ${seed} still places ${k}`);
+  }
 });
 
-test('a shield blocks the shockwave completely', () => {
+test('a seeker locks a tower out of missile range and leaves the rival alone', () => {
   const {r, a, b} = setup();
-  b.sim.distance = 305; b.sim.lateral = 3; b.sim.shield = 2;
-  a.sim.item = 'shockwave'; a.sim.useItem();
+  a.sim.content.hazards = [{distance: 550, lane: 0, height: 0, kind: 'tower'}];
+  b.sim.distance = 320;
+  assert.equal(a.sim.target(180), undefined, 'a plain missile cannot reach it');
+  a.sim.item = 'seeker'; a.sim.useItem();
+  assert.equal(a.sim.projectiles.length, 1, 'the seeker locked the tower');
+  assert.equal(a.sim.item, null);
   assert.equal(b.sim.hull, 1);
-  assert.equal(b.sim.lateral, 3, 'a blocked shockwave does not shove');
-  assert.ok(r.combat.events.some(e => e.type === 'blocked'));
 });
 
-test('an oil slick spins out the rival who drives over it, once', () => {
-  const {r, a, b} = setup();
-  a.sim.item = 'slick'; a.sim.useItem();
-  assert.equal(r.combat.slicks.length, 1);
-  a.sim.lateral = 7; b.sim.distance = 250;
-  stepCombat(r, 0.6, {a: 300, b: 250});
-  b.sim.distance = 295; b.sim.speed = 90;
-  stepCombat(r, 1 / 60, {a: 300, b: 285});
-  assert.ok(Math.abs(b.sim.yawRate) > 1, 'the rival is spinning');
-  assert.ok(b.sim.speed < 90 * POWER_TUNING.slick.slow + 0.01, 'and slowed');
-  assert.equal(b.sim.hull, 1, 'a slick does no damage');
-  const spins = r.combat.events.filter(e => e.type === 'spin').length;
-  stepCombat(r, 1 / 60, {a: 300, b: 285});
-  assert.equal(r.combat.events.filter(e => e.type === 'spin').length, spins, 'the same slick never catches the same racer twice');
+test('using any remaining item never changes a rival', () => {
+  for (const kind of ['missile', 'seeker', 'shield', 'counter', 'overdrive', 'magnet']) {
+    const {r, a, b} = setup();
+    a.sim.content.hazards = [{distance: 400, lane: 0, height: 0, kind: 'tower'}];
+    b.sim.distance = 330; b.sim.lateral = 0;
+    const before = JSON.stringify({hull: b.sim.hull, speed: b.sim.speed, energy: b.sim.energy, lateral: b.sim.lateral, heading: b.sim.heading});
+    a.sim.item = kind; a.sim.useItem();
+    for (let i = 0; i < 90; i++) { b.sim.speed = 90; stepCombat(r, 1 / 60, {a: 300, b: 330}); }
+    b.sim.speed = 90;
+    assert.equal(JSON.stringify({hull: b.sim.hull, speed: b.sim.speed, energy: b.sim.energy, lateral: b.sim.lateral, heading: b.sim.heading}), before, kind);
+  }
 });
 
-test('a pilot may have at most two slicks out; the third capsule is kept', () => {
-  const {r, a} = setup();
-  for (let i = 0; i < 3; i++) { a.sim.cooldown = 0; a.sim.item = 'slick'; a.sim.useItem(); }
-  assert.equal(r.combat.slicks.length, 2);
-  assert.equal(a.sim.item, 'slick');
-});
-
-test('the slick snapshot does not leak who it has already caught', () => {
-  const {r, a} = setup();
-  a.sim.item = 'slick'; a.sim.useItem();
-  const snap = r.combat.snapshot('a');
-  assert.equal(snap.slicks.length, 1);
-  assert.equal('caught' in snap.slicks[0], false);
-});
-
-test('a seeker locks the nearest rival ahead in any lane and hits it', () => {
-  const {r, a, b} = setup();
-  a.sim.lateral = -6; b.sim.distance = 360; b.sim.lateral = 6;
-  a.sim.item = 'seeker'; a.sim.useItem();
-  assert.equal(r.combat.missiles.length, 1);
-  assert.equal(r.combat.missiles[0].kind, 'seeker');
-  for (let i = 0; i < 60; i++) stepCombat(r, 1 / 60, {a: 300, b: 360});
-  assert.ok(b.sim.hull < 1);
-  assert.ok(r.combat.events.some(e => e.type === 'hit' && e.kind === 'seeker'));
-});
-
-test('a cloaked rival cannot be locked by a missile or a seeker', () => {
-  const {r, a, b} = setup();
-  b.sim.distance = 360; b.sim.cloak = 3;
-  assert.equal(r.combat.target(a), undefined);
-  a.sim.item = 'seeker'; a.sim.useItem();
-  assert.equal(r.combat.missiles.length, 0);
+test('the room snapshot describes no rival weapon', () => {
+  const {r} = setup();
+  const snap = r.feed.snapshot();
+  assert.equal(snap.lockTarget, null);
+  for (const k of ['bolts', 'missiles', 'mines', 'slicks', 'unavailablePickups']) assert.deepEqual(snap[k], [], k);
+  assert.equal(snap.skillOnly, true);
+  assert.equal(r.config.competitiveCombat, false);
 });
 
 test('a magnet widens the capsule catch radius and nothing else does', () => {
@@ -129,7 +101,7 @@ test('tucking in behind a rival gives slipstream; alongside or far back does not
   stepCombat(r, 1 / 60, {a: 300, b: 315});
   assert.equal(a.sim.draft, POWER_TUNING.slipstream.hold);
   assert.ok(!(b.sim.draft > 0), 'the leader gets nothing');
-  assert.ok(r.combat.events.some(e => e.type === 'slipstream' && e.source === 'a'));
+  assert.ok(r.feed.events.some(e => e.type === 'slipstream' && e.source === 'a'));
   const wide = setup();
   wide.b.sim.distance = 315; wide.b.sim.lateral = 6;
   stepCombat(wide.r, 1 / 60, {a: 300, b: 315});
@@ -151,7 +123,7 @@ test('pressing throttle in the last half second before green is a perfect start'
   r.advance(r.startAt);
   assert.equal(r.player('a').sim.padBoost, POWER_TUNING.perfectStart.boost);
   assert.ok(!(r.player('b').sim.padBoost > 0));
-  assert.ok(r.combat.events.some(e => e.type === 'perfect-start' && e.source === 'a'));
+  assert.ok(r.feed.events.some(e => e.type === 'perfect-start' && e.source === 'a'));
 });
 
 test('holding throttle through the whole countdown earns nothing', () => {

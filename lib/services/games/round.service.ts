@@ -249,6 +249,7 @@ export async function createRound(
       expiresAt: live.expiresAt,
       resultCallbackUrl: input.resultCallbackUrl,
       progressCallbackUrl: input.progressCallbackUrl,
+      standingsUrl: input.standingsUrl,
       returnUrl: input.returnUrl,
       parentOrigin: input.parentOrigin,
     });
@@ -358,6 +359,7 @@ export async function createRound(
     expiresAt,
     resultCallbackUrl: input.resultCallbackUrl,
     progressCallbackUrl: input.progressCallbackUrl,
+    standingsUrl: input.standingsUrl,
     returnUrl: input.returnUrl,
     parentOrigin: input.parentOrigin,
   });

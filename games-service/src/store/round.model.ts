@@ -196,6 +196,8 @@ export interface RoundDoc {
   resultCallbackUrl: string;
   /** Optional, unlike the result callback - see `progress.ts` for why. */
   progressCallbackUrl?: string;
+  /** Optional. Where a race asks the platform for its seated pilots' settled points - see `volt-velocity/grid.ts`. */
+  standingsUrl?: string;
   returnUrl?: string;
   /**
    * Origin of the page that hosts the play iframe (scheme + host + port).
@@ -327,6 +329,7 @@ const RoundSchema = new Schema<RoundDoc>(
 
     resultCallbackUrl: { type: String, required: true },
     progressCallbackUrl: { type: String },
+    standingsUrl: { type: String },
     returnUrl: { type: String },
     parentOrigin: { type: String },
 

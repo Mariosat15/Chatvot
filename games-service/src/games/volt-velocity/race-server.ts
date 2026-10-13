@@ -178,6 +178,24 @@ export async function seatPlayer(
   }
 }
 
+/**
+ * Push the starting order to the room (pole first). Only honoured while the room is in its lobby,
+ * and a shorter order than the last one is refused, so two refreshes racing each other cannot let
+ * a stale, smaller grid win. Returns whether the room accepted it; never throws.
+ */
+export async function pushGridOrder(
+  config: VelocityConfig,
+  raceId: string,
+  order: string[],
+): Promise<boolean> {
+  try {
+    const response = await admin(config, "POST", `/v1/races/${raceId}/grid`, { order });
+    return response.status === 200 && response.body.accepted === true;
+  } catch {
+    return false;
+  }
+}
+
 /** One racer's line from the SIGNED payload. */
 export interface RaceResultEntry {
   playerId: string;

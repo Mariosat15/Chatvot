@@ -3,6 +3,10 @@ import {road} from './road-width.js';
 import {SPECIAL_KINDS} from './power-tuning.js';
 export function generateContent(track,seed){const r=rng(seed),length=track.length,curvature=track.curvature||(()=>0),bag=['energy','energy','energy','energy','energy','repair','repair','repair','repair','repair','shield','shield','shield','shield','counter','counter','counter','missile','missile','emp','mine','mine','overdrive','overdrive'];
  for(let i=bag.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];}
+ /* CHARTVOLT PATCH (13 Oct 2026, skill-only races): the EMP and both mines are swapped AFTER the shuffle, so every
+  * seed keeps its exact capsule positions and the random stream below is unchanged. EMP becomes a missile (it was
+  * the tower clearer), the first mine a countermeasure and the second a shield. */
+ let mines=0;for(let i=0;i<bag.length;i++){if(bag[i]==='emp')bag[i]='missile';else if(bag[i]==='mine')bag[i]=mines++?'shield':'counter';}
  const pickups=[];for(let i=0;i<24;i++){const span=(length-300)/24;let distance=150+span*(i+.1+r()*.7);let best=distance,score=Math.abs(curvature(distance));for(let j=0;j<3;j++){const d=150+span*(i+.1+r()*.7),c=Math.abs(curvature(d));if(c<score){best=d;score=c;}}const lane=road(-8+r()*16);pickups.push({distance:best,lane,kind:bag[i]});}
  const hazards=[];for(let i=0;i<12;i++){let distance=length*(i+1.1)/13;for(const p of pickups)if(Math.abs(distance-p.distance)<45)distance+=60;hazards.push({distance:Math.min(length-80,distance),lane:road((i%2?1:-1)*(23+r()*3)),height:9+r()*4});}
  const pads=pickups.filter((p,i)=>i%4===1&&Math.abs(curvature(p.distance+40))<.008).map(p=>({distance:p.distance+40,lane:-p.lane}));
@@ -18,7 +22,8 @@ const SPECIAL_GAPS=[2,7,12,17,22];
 function withSpecials(base,seed){const r=rng((seed^0x5bd1e995)>>>0),kinds=[...SPECIAL_KINDS];
  for(let i=kinds.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[kinds[i],kinds[j]]=[kinds[j],kinds[i]];}
  const taken=new Set(),extras=[];
- for(let k=0;k<SPECIAL_GAPS.length;k++){const lane=road(-8+r()*16);
+ /* CHARTVOLT PATCH (13 Oct 2026): one extra capsule per remaining special kind (seeker, magnet). */
+ for(let k=0;k<Math.min(kinds.length,SPECIAL_GAPS.length);k++){const lane=road(-8+r()*16);
   const gap=[0,1,-1,2,-2].map(o=>SPECIAL_GAPS[k]+o).find(g=>g>=0&&g<base.length-1&&!taken.has(g)&&base[g+1].distance-base[g].distance>=SPECIAL_MIN_GAP);
   if(gap===undefined)continue;taken.add(gap);extras.push({after:gap,pickup:{distance:(base[gap].distance+base[gap+1].distance)/2,lane,kind:kinds[k]}});}
  const out=[];for(let i=0;i<base.length;i++){out.push(base[i]);for(const e of extras)if(e.after===i)out.push(e.pickup);}return out;}

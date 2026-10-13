@@ -24,26 +24,23 @@ test('a new weapon replaces the held one', () => {
 
 test('repair and energy never touch the held weapon', () => {
   const s = room().player('a').sim;
-  s.collect('mine');
+  s.collect('counter');
   s.hull = .5; s.energy = .1;
   s.collect('repair'); s.collect('energy');
-  assert.equal(s.item, 'mine');
+  assert.equal(s.item, 'counter');
   assert.ok(s.hull > .5 && s.energy > .1);
 });
 
-test('a shared capsule goes to the first racer through it even when they already hold a weapon', () => {
+// CHARTVOLT PATCH (13 Oct 2026, skill-only races): capsules are per pilot. Replaces the 28 Sep test
+// "a shared capsule goes to the first racer through it" - reaching a capsule first used to take it
+// away from the pilot behind, which is one racer's play changing another's.
+test('two pilots driving through the same capsule each collect it', () => {
   const r = room(), a = r.player('a'), b = r.player('b');
-  const pickup = r.track.content.pickups.find((p) => !['energy', 'repair'].includes(p.kind)) ?? r.track.content.pickups[0];
-  pickup.kind = 'emp';
-  a.sim.item = 'shield';
-  for (const p of [a, b]) { p.sim.lateral = pickup.lane; p.sim.content.hazards = []; }
-  const index = r.track.content.pickups.indexOf(pickup);
-  const previous = new Map([[a.id, {distance: pickup.distance - 2}], [b.id, {distance: pickup.distance - 30}]]);
-  a.sim.distance = pickup.distance + 1;
-  b.sim.distance = pickup.distance - 29;
-  r.combat.sharedPickups([a, b], previous);
-  assert.equal(a.sim.item, 'emp');
-  assert.ok(r.combat.pickups[index] > r.raceElapsed);
+  const pickup = r.track.content.pickups.find(p => !['energy', 'repair'].includes(p.kind));
+  for (const p of [a, b]) { p.sim.lateral = pickup.lane; p.sim.content.hazards = []; p.sim.item = null; p.sim.distance = pickup.distance - 1; p.sim.speed = 60; }
+  for (let i = 0; i < 10; i++) { r.lastNow += 1000 / 60; r.step(r.lastNow); }
+  assert.equal(a.sim.item, pickup.kind);
+  assert.equal(b.sim.item, pickup.kind);
 });
 
 test('a racer who is redeploying still cannot collect', () => {

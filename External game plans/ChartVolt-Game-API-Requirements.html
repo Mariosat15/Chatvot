@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.24</span></div>
+      <div><b>Version</b><span>1.25</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -690,6 +690,7 @@
   "expiresAt":           "2026-08-18T14:00:00Z",
   "resultCallbackUrl":   "https://chartvolt.com/api/games/providers/acme/events",
   "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
+  "standingsUrl":        "https://chartvolt.com/api/games/providers/acme/standings",  <span class="c">// optional (1.25)</span>
   "returnUrl":           "https://chartvolt.com/contests/774219",
   "parentOrigin":        "https://chartvolt.com"   <span class="c">// iframe host origin — postMessage target (1.18)</span>
 }</pre>
@@ -718,6 +719,7 @@
       <tr><td><code>mode</code></td><td><code>ranked</code> counts towards a paid contest and <b>must</b> produce a result callback. <code>practice</code> is free play, is never scored by us, and <b>must not</b> produce a result callback (new clarity in 1.10). Our fetch of the round still works for practice &mdash; we just will not accept a score for it</td></tr>
       <tr><td><code>contentSeed</code></td><td><b>Required on ranked</b> when your title supports seeding. On <code>practice</code> we omit it or send nothing shared with a contest: generate content from a <b>per-round</b> seed of your own. <b>Never reuse a contest seed for practice</b> &mdash; that would let a player rehearse the exact content they are about to be paid to face (1.10)</td></tr>
       <tr><td><code>progressCallbackUrl</code></td><td><b>New in 1.5, and entirely optional.</b> Where you may tell us what the player has done <i>so far</i>, while they are still playing, so a contest board shows more than &ldquo;playing now&rdquo;. We always send the address; ignoring it is fully conformant &mdash; see section 8a</td></tr>
+      <tr><td><code>standingsUrl</code></td><td><b>New in 1.25, and entirely optional.</b> Where you may ask how many settled points each seated player holds in your game, to order a start grid by skill. We always send it; ignoring it is fully conformant &mdash; see section 8b</td></tr>
       <tr><td><code>parentOrigin</code></td><td><b>New in 1.18, always sent.</b> The origin of the page that hosts your iframe (scheme + host + optional port, <b>no path</b>). Use it as the <code>postMessage</code> target origin. It is <b>not</b> <code>returnUrl</code> &mdash; on a white-label those can differ. Deriving a target from <code>returnUrl</code> fails silently: the browser drops the message and we never receive <code>ready</code></td></tr>
     </tbody>
   </table></div>
@@ -856,6 +858,48 @@
   </div>
 
   <p><b>Send it when something happens</b> &mdash; a board solved, a question answered, a lap completed &mdash; rather than on a timer. Each report replaces the last one for that round; nothing accumulates and there is no history to manage.</p>
+</section>
+
+<!-- ===== 8b ===== -->
+<section id="standings">
+  <div class="sec-h"><div class="sec-n">8b</div><h2>Optional &mdash; ask where your players stand</h2></div>
+  <p class="sec-sub">New in version 1.25. Skip this section entirely and nothing changes.</p>
+
+  <div class="ep"><span class="m post">POST</span><span class="u">{standingsUrl}</span><span class="tag">Optional</span></div>
+
+  <p>If your game has to put players in an order <i>before</i> play &mdash; a starting grid in a race is the case that produced this &mdash; a random order hands somebody a head start in a contest they have paid to enter. Ask us instead: we tell you how many points each seated player holds in <b>your game</b>, and you order them most points first, then whoever joined the contest first. We send <code>standingsUrl</code> on every create-round request, beside <code>progressCallbackUrl</code>.</p>
+
+<pre>{ "roundIds": ["cv_rnd_01JAV3M7Q2XK8T", "cv_rnd_01JAV3M9ZK4R1B"] }</pre>
+
+<pre>{
+  "standings": [
+    { "roundId": "cv_rnd_01JAV3M7Q2XK8T", "points": 1840, "rank": 1,
+      "joinedAt": "2026-10-13T09:02:11.000Z" },
+    { "roundId": "cv_rnd_01JAV3M9ZK4R1B", "points": 0,          <span class="c">// no rank: unranked, not last</span>
+      "joinedAt": "2026-10-13T09:04:40.000Z" }
+  ]
+}</pre>
+
+  <p><b>Authentication is exactly the result callback's</b> &mdash; the same bearer token, HMAC and timestamp window from section 4.</p>
+
+  <p><b>The points are settled points</b>: they only change when a contest settles, so a race in progress cannot move anybody up its own grid. A player with no points has <code>points: 0</code> and no <code>rank</code>; order them by <code>joinedAt</code>. Equal points share a rank.</p>
+
+  <p><b>What you can ask is narrow, on purpose.</b> 1 to 16 distinct round ids per request, all launched by you, all in one contest and one game, each belonging to a player seated in it. If any id fails any of those, we refuse the whole request. You get round ids back, never player ids or names.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:90px">We reply</th><th>What it means</th><th style="width:150px">Retry?</th></tr></thead>
+    <tbody>
+      <tr><td><code>200</code></td><td>Answered &mdash; one line per round, in the order you asked</td><td>No</td></tr>
+      <tr><td><code>400</code></td><td>Not valid JSON, or the round list was refused</td><td>No &mdash; fix the request</td></tr>
+      <tr><td><code>401</code></td><td>Credentials, signature or timestamp refused</td><td>No &mdash; check your configuration</td></tr>
+      <tr><td><code>500</code></td><td>We failed</td><td>Once, if you like</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">If the answer does not come, start anyway</div>
+    <p>Use join order and log it. A grid that could not be optimised is still a fair grid; a race that will not start because a lookup failed is a contest nobody can play. Our own game works this way.</p>
+  </div>
 </section>
 
 <!-- ===== 9 ===== -->
@@ -1326,6 +1370,7 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.25</b></td><td>13 Oct 2026</td><td><b>One optional endpoint, backward compatible.</b> Section 8b: a <code>standingsUrl</code> on create-round where you may ask how many settled points each seated player holds in your game, so a start grid can be ordered by skill rather than at random. Same credentials as the result callback. Ignore it and you remain fully conformant</td></tr>
       <tr><td><b>1.24</b></td><td>28 Sep 2026</td><td><b>One optional field, backward compatible.</b> <code>startWaitSeconds</code> on create-round (section 4), sent only beside <code>scheduledStartAt</code>: how long a game that needs two ready players may wait for them. Past it we cancel and refund in full; end every open round at the same moment. A game that starts on time regardless is unaffected</td></tr>
       <tr><td><b>1.23</b></td><td>28 Sep 2026</td><td><b>One optional addition, backward compatible.</b> A second play-clock format, <code>duration-units</code>, with <code>secondsPerUnit</code> and <code>secondsExtra</code> (sections 3.1b and 3.2), for titles whose length is set in laps, questions or levels rather than seconds. A title that declares nothing is unaffected</td></tr>
       <tr><td><b>1.22</b></td><td>28 Sep 2026</td><td><b>Two optional additions, both backward compatible.</b> <code>contestType</code> on create-round (section 4) &mdash; <code>competition</code>, <code>challenge</code> or <code>practice</code> &mdash; so a multiplayer game can tell a play-any-time competition (each player alone) from a challenge (the two race each other); ignore it if your game plays the same way everywhere. And a <code>challengeValue</code> keyword in <code>configSchema</code> (section 3.1b): the value a setting always takes on a 1v1 challenge. We pin it on every challenge round and show it as fixed; competitions ignore it</td></tr>
@@ -1360,7 +1405,7 @@ $headers = [
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.24 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.25 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

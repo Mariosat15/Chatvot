@@ -16,6 +16,7 @@ import {
   seatVelocityPlayer,
   type VelocitySeat,
 } from "../games/volt-velocity/launch";
+import { refreshGrid } from "../games/volt-velocity/grid";
 import { Round, type RoundDoc, type RoundDocument } from "../store/round.model";
 import { parseContestType, pinChallengeSettings } from "./contest-type";
 import { ApiError, badRequest, roundConflict, unknownGame } from "../http/errors";
@@ -43,6 +44,7 @@ export interface CreateRoundInput {
   expiresAt?: unknown;
   resultCallbackUrl?: unknown;
   progressCallbackUrl?: unknown;
+  standingsUrl?: unknown;
   returnUrl?: unknown;
   /** Origin of the hosting page — required (HTML v1.18 / A13). */
   parentOrigin?: unknown;
@@ -319,6 +321,11 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
     input.progressCallbackUrl === undefined || input.progressCallbackUrl === null
       ? undefined
       : requireDeliverableUrl(input.progressCallbackUrl, "progressCallbackUrl");
+  // Optional, same rule: a race that cannot ask for standings falls back to join order.
+  const standingsUrl =
+    input.standingsUrl === undefined || input.standingsUrl === null
+      ? undefined
+      : requireDeliverableUrl(input.standingsUrl, "standingsUrl");
   const returnUrl =
     input.returnUrl === undefined || input.returnUrl === null
       ? undefined
@@ -356,6 +363,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
   // creation, which section 11 says consumes no attempt. `scheduledStartAt` is deliberately not
   // in the fingerprint - it decides which room, not what the player faces inside it.
   let seat: VelocitySeat | undefined;
+  let soloRace = false;
   if (isVelocity) {
     const scheduledStartAt = parseScheduledStart(input.scheduledStartAt, expiresAt, now);
     if (contestType === "challenge" && scheduledStartAt) {
@@ -374,6 +382,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       throw badRequest("'scheduledStartAt' must be absent on a practice round.");
     }
     const solo = practice || (contestType === "competition" && !scheduledStartAt);
+    soloRace = solo;
     seat = await seatVelocityPlayer(
       gameCode,
       contentSeed ?? providerRoundId,
@@ -428,6 +437,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       ),
       resultCallbackUrl,
       progressCallbackUrl,
+      standingsUrl,
       returnUrl,
       parentOrigin,
       status: "created",
@@ -445,6 +455,12 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       sandbox: {},
       delivery: { attempts: 0 },
     });
+
+    // A shared race (not solo, not practice) re-orders its grid on every new seat. Never awaited:
+    // the grid is a nicety and the player's launch must not wait on, or fail with, the platform.
+    if (seat && created.race && !soloRace) {
+      void refreshGrid(created.race.raceId, created.standingsUrl);
+    }
 
     return respond(created);
   } catch (error) {

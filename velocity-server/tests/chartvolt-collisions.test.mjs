@@ -15,7 +15,7 @@ function setup() {
   a.sim.distance = 300; b.sim.distance = 300;
   return {r, a, b};
 }
-const once = (r, a, b) => r.combat.step(1/60, new Map([['a', {distance: a.sim.distance}], ['b', {distance: b.sim.distance}]]));
+const once = (r, a, b) => r.feed.step(1/60, new Map([['a', {distance: a.sim.distance}], ['b', {distance: b.sim.distance}]]));
 const sideways = s => s.speed * Math.sin(s.heading);
 
 test('a side swipe sends both ships away from each other, not just apart', () => {
@@ -26,7 +26,7 @@ test('a side swipe sends both ships away from each other, not just apart', () =>
   assert.ok(sideways(b.sim) > 3, 'the right ship is now moving right');
   assert.ok(sideways(b.sim) - sideways(a.sim) > 7, 'they separate at close to the minimum bounce');
   assert.ok(a.sim.yawRate < 0 && b.sim.yawRate > 0, 'both noses are knocked outward');
-  assert.ok(r.combat.events.some(e => e.type === 'bump' && e.kind === 'side' && e.force > 0));
+  assert.ok(r.feed.events.some(e => e.type === 'bump' && e.kind === 'side' && e.force > 0));
 });
 
 test('a heavier ship is moved less than a lighter one', () => {
@@ -43,7 +43,7 @@ test('ramming from behind slows the rammer and never speeds up the rammed ship',
   once(r, a, b);
   assert.ok(a.sim.speed < 80, 'the rammer bounces back below the ship it hit');
   assert.ok(b.sim.speed <= 80, 'no contact awards forward progress');
-  assert.ok(r.combat.events.some(e => e.type === 'bump' && e.kind === 'rear'));
+  assert.ok(r.feed.events.some(e => e.type === 'bump' && e.kind === 'rear'));
 });
 
 test('a shield no longer makes a ship a ghost: it still bounces but takes no damage', () => {
@@ -54,10 +54,25 @@ test('a shield no longer makes a ship a ghost: it still bounces but takes no dam
   assert.equal(b.sim.hull, 1);
 });
 
+// CHARTVOLT PATCH (13 Oct 2026, skill-only races): contact is physics, never an attack. Neither hull loses anything.
+test('no contact of any kind damages either ship', () => {
+  for (const arrange of [
+    ({a, b}) => { a.sim.lateral = -1; b.sim.lateral = 1; },
+    ({a, b}) => { b.sim.distance = a.sim.distance + 3; a.sim.speed = 120; b.sim.speed = 80; },
+  ]) {
+    const s = setup();
+    arrange(s);
+    once(s.r, s.a, s.b);
+    assert.equal(s.a.sim.hull, 1);
+    assert.equal(s.b.sim.hull, 1);
+    assert.ok(!s.r.feed.events.some(e => e.type === 'hit' || e.type === 'destroyed'));
+  }
+});
+
 test('a freshly respawned ship still phases so it cannot be trapped', () => {
   const {r, a, b} = setup();
   a.sim.lateral = -1; b.sim.lateral = 1; b.phaseUntilTick = r.tick + 100;
   once(r, a, b);
   assert.equal(b.sim.heading, 0);
-  assert.ok(!r.combat.events.some(e => e.type === 'bump'));
+  assert.ok(!r.feed.events.some(e => e.type === 'bump'));
 });

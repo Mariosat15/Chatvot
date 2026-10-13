@@ -351,6 +351,8 @@ export interface CreateRoundInput {
    * always supplied by us - see `contract.ts` for why the asymmetry is deliberate.
    */
   progressCallbackUrl?: string;
+  /** Where the provider may ask for seated players' standings to order a grid. Optional. */
+  standingsUrl?: string;
   /** Non-identifying display name. A provider never receives an email or a wallet. */
   displayName?: string;
   locale?: string;

@@ -214,6 +214,12 @@ export interface CreateRoundRequest {
    * is a second thing to rotate and the first one somebody leaves behind.
    */
   progressCallbackUrl?: string;
+  /**
+   * Where the provider may ASK where each seated player stands on this game's leaderboard
+   * (settled points), to order a start grid. Optional for them, supplied by us; same
+   * credentials as the result callback. Chapter 01 section 5.6, added 13 Oct 2026.
+   */
+  standingsUrl?: string;
   returnUrl: string;
   /**
    * Origin of the page that hosts the play iframe (scheme + host + optional port).

@@ -315,6 +315,7 @@ export async function launchContestRound(
       // URL from a provider who later adds progress reporting would mean a config change on
       // our side before their feature could work. See `contract.ts` for why it is optional.
       progressCallbackUrl: `${baseUrl}/api/games/providers/${config.providerKey}/progress`,
+      standingsUrl: `${baseUrl}/api/games/providers/${config.providerKey}/standings`,
       displayName: actor.displayName,
       locale: actor.locale,
       country: actor.country,
