@@ -15,11 +15,14 @@
 > is out with no score and the entry fee is not returned - published in the game rules and race
 > start screen, the help page and legal opinion §3.3/§9. A race cancelled before start is
 > refunded in full; a fault on our side falls to the contest's unfinished-round rule.
-> `PHYSICS_VERSION` was `velocity-3d-14` for that pass and is **`velocity-3d-15`** since the
-> second pass the same day (performance pool, sharper handling, 14 balanced capsules a lap, three
-> ELITE circuits, full-screen landscape on phones), so the race server and games-service must
-> deploy together. Detail: `velocity-server/CHARTVOLT-PATCHES.md` "Skill-only races" and
-> "Performance, handling, harder tracks and the phone". **Never verified by eye.**
+> `PHYSICS_VERSION` was `velocity-3d-14` for that pass, `velocity-3d-15` after the second pass
+> the same day (performance pool, sharper handling, 14 balanced capsules a lap, three ELITE
+> circuits, full-screen landscape on phones), and is **`velocity-3d-16`** since the third pass
+> (an F1 grid two by two with a half-row stagger, practice choosing its circuit, a rotation crash
+> fixed, the start menu as three numbered steps), so the race server and games-service must
+> deploy together. Detail: `velocity-server/CHARTVOLT-PATCHES.md` "Skill-only races",
+> "Performance, handling, harder tracks and the phone" and "F1 grid, practice circuit choice, the
+> menu and the phone again". **Never verified by eye.**
 
 > **Status: PLAN, not built (27 September 2026).** Nothing in this chapter exists in code yet.
 > It was written after reading the whole of `Volt-Velocity-0.21-Complete.zip` (server, client

@@ -55,6 +55,9 @@ export class RaceRoom {
   if(!Number.isInteger(laps)||laps<MIN_LAPS||laps>MAX_LAPS)throw Error('Invalid laps (1-10)');
   // Reason: a solo room is one pilot's private race - growing it, or scheduling it against a clock, would make it a shared race wearing the wrong label.
   if(solo&&(open||spec.players?.length!==1||(spec.scheduledStartAt!==undefined&&spec.scheduledStartAt!==null)))throw Error('Invalid solo race (exactly one pilot, frozen, unscheduled)');
+  // Reason: a paid "each plays alone" competition is a solo room too, and its track is the contest's. Only the
+  // games service's PRACTICE rounds send trackChoice, and it is refused on anything that is not one pilot alone.
+  const trackChoice=spec?.trackChoice===true;if(trackChoice&&!solo)throw Error('trackChoice requires a solo race');
   if(!spec||!PLAYER_ID.test(spec.id)||!TRACKS.some(t=>t.id===spec.trackId)||!Number.isInteger(spec.seed)||spec.seed<0||spec.seed>0xffffffff||!Array.isArray(spec.players)||spec.players.length<minPlayers||spec.players.length>MAX_RACERS)throw Error('Invalid race configuration (2–16 registered players required)');
   if(new Set(spec.players.map(p=>p.id)).size!==spec.players.length||!spec.players.every(validRosterEntry))throw Error('Invalid roster');
   if(spec.scheduledStartAt!==undefined&&spec.scheduledStartAt!==null){if(!Number.isSafeInteger(spec.scheduledStartAt)||spec.scheduledStartAt>now+MAX_SCHEDULE_AHEAD_MS)throw Error('Invalid scheduledStartAt');}
@@ -63,7 +66,8 @@ export class RaceRoom {
   this.id=spec.id;this.createdAt=now;this.status='lobby';this.tick=0;this.accumulator=0;this.startAt=null;this.raceElapsed=0;this.finishedAt=null;this.lastNow=now;
   this.openRoster=open;this.solo=solo;this.scheduledStartAt=scheduled;
   this.latestStartAt=scheduled==null?null:(spec.latestStartAt??scheduled+DEFAULT_START_WAIT_MS);
-  this.config={trackId:spec.trackId,seed:spec.seed,routeVersion:ROUTE_VERSION,physicsVersion:PHYSICS_VERSION,laps,maxSeconds:laps*SECONDS_PER_LAP,format:'skill-race',competitiveCombat:false,serverTimedStart:true,...(solo?{solo:true}:{})};
+  this.config={trackId:spec.trackId,seed:spec.seed,routeVersion:ROUTE_VERSION,physicsVersion:PHYSICS_VERSION,laps,maxSeconds:laps*SECONDS_PER_LAP,format:'skill-race',competitiveCombat:false,serverTimedStart:true,...(solo?{solo:true}:{}),...(trackChoice?{trackChoice:true}:{})};
+  this.trackChoice=trackChoice;
   // CHARTVOLT PATCH (13 Oct 2026): every room is a skill-only race. `competitiveCombat:false` gives each pilot their own
   // pickups and points missiles at towers; `serverTimedStart` leaves the perfect start to perfectStarts() below, the one clock all pilots share.
   this.track=createTrack(spec.trackId);this.track.content=generateContent(this.track,spec.seed);
@@ -103,6 +107,18 @@ export class RaceRoom {
  join(id,now){const p=this.player(id);if(!this.mayEnter(p))throw Error('Race entry has closed');p.connected=true;p.disconnectedAt=null;p.lastInputAt=now;p.lastInput=EMPTY_INPUT;p.frameQueue=[];return p;}
  disconnect(id,now){const p=this.player(id);p.connected=false;p.disconnectedAt=now;p.lastInput=EMPTY_INPUT;p.frameQueue=[];if(this.status==='lobby')p.ready=false;}
  select(id,shipId){const p=this.player(id);if(p.ready||p.active||(this.status!=='lobby'&&!this.lateEntryOpen()))throw Error('Ship selection is locked');if(!SHIPS.some(s=>s.id===shipId))throw Error('Unknown ship');p.sim.selectShip(shipId);}
+ /**
+  * CHARTVOLT PATCH (13 Oct 2026, owner). A practice pilot may pick the circuit from the hangar. The room keeps its id and
+  * seed; the track, its content and the pilot's simulation are rebuilt, keeping the chosen ship. Refused once Launch is pressed.
+  */
+ changeTrack(id,trackId){const p=this.player(id);
+  if(!this.trackChoice)throw Error('Track is set by the competition');
+  if(this.status!=='lobby'||p.ready||p.active)throw Error('Track selection is locked');
+  if(!TRACKS.some(t=>t.id===trackId))throw Error('Unknown track');
+  if(trackId===this.config.trackId)return this.config;
+  this.config={...this.config,trackId};this.track=createTrack(trackId);this.track.content=generateContent(this.track,this.config.seed);
+  for(const x of this.players.values()){const shipId=x.sim.shipId;x.sim=new RaceSimulation(this.track.length,this.track.curvature,{...this.config,content:this.track.content});if(shipId)x.sim.selectShip(shipId);}
+  return this.config;}
  ready(id,ready,now){const p=this.player(id);
   if(this.status!=='lobby'){if(!this.lateEntryOpen()||p.active||p.dnf)throw Error('Race already started');if(!p.connected)throw Error('Connect before ready');if(ready)this.enterLate(p);return;}
   if(!p.connected)throw Error('Connect before ready');p.ready=Boolean(ready);

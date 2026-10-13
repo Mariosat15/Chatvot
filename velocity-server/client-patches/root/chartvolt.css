@@ -77,6 +77,38 @@ html body[data-state=hangar] header .actions button svg{width:22px;height:22px}
 #hangar .cv-keys b{color:#e8fbff}
 @keyframes cv-launch-glow{0%,100%{box-shadow:0 0 22px #3de1ff55}50%{box-shadow:0 0 40px #3de1ffaa}}
 
+/* CHARTVOLT PATCH (13 Oct 2026, owner: "the start menu needs better organisation, graphics and flow").
+   The hangar reads as three numbered steps - 01 circuit, 02 ship, 03 launch - so a first-time player
+   sees the order to work through. The circuit is a card with the track's own outline (cloned from
+   the picker by main.js); a race that fixes the circuit says so instead of showing two dead buttons. */
+#hangar .cv-step{margin:4px 0 0}
+#hangar .cv-step-head{display:flex;align-items:center;gap:8px;margin:0 0 8px;font:10px ui-monospace,monospace;letter-spacing:2px;color:var(--muted)}
+#hangar .cv-step-head b,#hangar .cv-label b em{display:inline-grid;place-items:center;min-width:22px;height:18px;padding:0 4px;margin-right:6px;
+  border-radius:5px;background:linear-gradient(90deg,#3de1ff,#7af0c8);color:#03121d;font:800 10px/1 Arial,Helvetica,sans-serif;letter-spacing:0;font-style:normal;
+  box-shadow:0 0 12px #3de1ff55}
+#hangar .cv-step-head b{margin-right:0}
+#hangar .cv-track-card{display:grid;grid-template-columns:104px minmax(0,1fr);gap:14px;align-items:center;padding:12px;
+  border:1px solid var(--edge);border-top:2px solid #5fe3f4b0;border-radius:12px;
+  background:linear-gradient(150deg,#0b2236ee,#050f1cee 75%);box-shadow:inset 0 1px 0 #d4f6ff14,0 12px 32px #0007}
+#hangar .cv-track-preview{display:grid;place-items:center;aspect-ratio:5/4;border-radius:9px;border:1px solid #86dcff22;
+  background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--track-color,#5fe3f4) 16%,#0b2131),#040b15 75%)}
+#hangar .cv-track-preview svg{width:88%;height:auto}
+#hangar .cv-track-preview polygon{fill:color-mix(in srgb,var(--track-color,#5fe3f4) 12%,transparent);stroke:var(--track-color,#5fe3f4);
+  stroke-width:2.6;stroke-linejoin:round;filter:drop-shadow(0 0 3px var(--track-color,#5fe3f4))}
+#hangar .cv-intro .track-choice{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;padding:0;border:0;background:none}
+#hangar .cv-intro .track-choice>div{display:grid;gap:3px;flex:1 1 100%;min-width:0}
+#hangar .cv-intro #trackName{display:block;font:800 18px/1.1 Arial,Helvetica,sans-serif;letter-spacing:1px;color:#f1fdff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hangar .cv-intro #trackMeta{font:10px ui-monospace,monospace;letter-spacing:1.2px;color:#9fe8ff}
+#hangar .cv-intro #environmentName{margin:0}
+#hangar .cv-intro .track-choice button{flex:1 1 0;min-height:38px;padding:0 12px;border-radius:8px;white-space:nowrap}
+#hangar .cv-intro #chooseTrack{border:1px solid #5fe3f4;background:#0b2a3c;color:#e8fbff}
+#hangar .cv-track-locked{display:none;font:10px ui-monospace,monospace;letter-spacing:1px;color:var(--muted)}
+#hangar .track-choice:has(#chooseTrack:disabled) :is(#chooseTrack,#shuffle){display:none}
+#hangar .track-choice:has(#chooseTrack:disabled) .cv-track-locked{display:block}
+#hangar .cv-launch .cv-label{margin:0}
+#hangar .cv-ship{border-top:2px solid #5fe3f4b0}
+
 /* Lobby list (multiplayer) sits over the empty centre of the hangar, not over the controls. */
 html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:calc(var(--cv-hangar-top,110px) + 8px);transform:translateX(-50%);
   width:min(300px,30vw);max-height:calc(100dvh - 330px);overflow:auto}
@@ -105,6 +137,11 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:c
   #hangar .cv-ship #shipDescription{display:none}
   #hangar .cv-dock{padding:10px;gap:10px}
   #hangar .cv-keys{display:none}
+  #hangar .cv-intro .rule{display:none}
+  #hangar .cv-step-head{margin:0 0 6px}
+  #hangar .cv-track-card{grid-template-columns:70px minmax(0,1fr);gap:10px;padding:9px}
+  #hangar .cv-intro #trackName{font-size:15px}
+  #hangar .cv-intro .track-choice button{min-height:36px;padding:0 8px;font-size:10px}
 }
 @media (max-width:600px),(max-height:500px){
   #hangar .cv-fleet .ship-picker{display:grid;grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:104px;
@@ -121,6 +158,12 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:c
     grid-template-areas:"intro ship" "dock dock";gap:8px 14px;padding:var(--cv-hangar-top,58px) 14px 10px}
   #hangar .cv-intro .eyebrow,#hangar .cv-ship #shipDescription,#hangar .cv-keys,#hangar .cv-label span{display:none}
   #hangar .cv-intro h1{font-size:24px;margin:0 0 6px}
+  #hangar .cv-intro h1 em{display:inline}
+  #hangar .cv-step-head{display:none}
+  #hangar .cv-track-card{grid-template-columns:58px minmax(0,1fr);gap:9px;padding:7px 9px}
+  #hangar .cv-intro #trackName{font-size:14px}
+  #hangar .cv-intro #environmentName{display:none}
+  #hangar .cv-intro .track-choice button{min-height:34px;padding:0 8px;font-size:10px}
   #hangar .cv-intro .rule{margin:0 0 6px}
   #hangar .cv-ship{padding:8px 12px}
   #hangar .cv-ship #shipName{font-size:17px}
@@ -193,6 +236,37 @@ html body[data-state][data-mode] #hud :is(small,.clock span){letter-spacing:1.6p
   html body[data-state][data-mode] #hud :is(.race-stats,.integrity,.item-slot){margin-left:env(safe-area-inset-left,0px)}
   html body[data-state][data-mode] #hud :is(.map,.speed){margin-right:env(safe-area-inset-right,0px)}
   html body[data-state]:not([data-state=hangar])[data-mode] #liveStandings{margin-left:env(safe-area-inset-left,0px)}
+}
+/* CHARTVOLT PATCH (13 Oct 2026, owner: "the panels are in the user's way"): phones held upright.
+   The vendor stacked lap, hull, skill and position panels down the left from 77px to ~400px and the
+   speed and equipment panels ~180px above the touch pads, which together covered the road ahead.
+   Upright, the race now has one slim row at the top (lap and clock, map) and one slim row just above
+   the pads (hull, equipment icon, speed) - the middle of the screen is the track. The skill score
+   and the full standings list are dropped here; the position number stays. hud-layout.js still
+   separates anything that meets. */
+@media (pointer:coarse) and (orientation:portrait) and (max-width:600px){
+  html body[data-state][data-mode] #hud .race-stats{top:calc(env(safe-area-inset-top,0px) + 8px);left:10px;width:auto;gap:9px;padding:6px 9px}
+  html body[data-state][data-mode] #hud .race-stats strong{font-size:24px;line-height:1.05}
+  html body[data-state][data-mode] #hud .race-stats :is(.clock b){font-size:13px}
+  html body[data-state][data-mode] #hud :is(#best,#sectorSplit,.lap-progress){display:none}
+  html body[data-state][data-mode] #hud .map{top:calc(env(safe-area-inset-top,0px) + 60px);right:10px;width:76px;padding:5px}
+  html body[data-state][data-mode] #hud .map canvas{width:64px;height:46px}
+  html body[data-state][data-mode] #hud .map :is(span,small){display:none}
+  html body[data-state][data-mode] .skill-panel{display:none}
+  html body[data-state]:not([data-state=hangar]):not([data-state=finished])[data-mode] #liveStandings{left:10px;top:calc(env(safe-area-inset-top,0px) + 62px);width:auto;min-height:0;max-height:none;padding:4px 9px;overflow:hidden}
+  html body[data-state]:not([data-state=hangar]):not([data-state=finished])[data-mode] :is(#raceOrder,#combatStats){display:none}
+  html body[data-state]:not([data-state=hangar]):not([data-state=finished])[data-mode] .position-head strong{font-size:20px}
+  html body[data-state][data-mode] #hud .integrity{left:10px;top:auto;bottom:174px;width:104px;height:auto;padding:5px 8px}
+  html body[data-state][data-mode] #hud :is(#checkpoint,#buffs){display:none}
+  html body[data-state][data-mode] #hud .integrity .meter{margin:4px 0 0}
+  html body[data-state][data-mode] #hud .speed{right:10px;top:auto;bottom:174px;width:92px;height:auto;padding:5px 8px}
+  html body[data-state][data-mode] #hud .speed strong{font-size:26px;line-height:1.05;letter-spacing:-1px}
+  html body[data-state][data-mode] #hud .speed small,html body[data-state][data-mode] #hud .speed>span{display:none}
+  html body[data-state][data-mode] #hud .speed .meter{margin:3px 0 0}
+  html body[data-state][data-mode] #hud .item-slot{left:calc(50% - 26px);right:auto;top:auto;bottom:174px;width:52px;min-width:0;max-width:none;padding:5px;gap:0;justify-content:center}
+  html body[data-state][data-mode] #hud .item-slot>div{display:none}
+  html body[data-state][data-mode] #hud .item-slot>span{font-size:22px}
+  html body[data-state][data-mode] #cornerHint{top:30%}
 }
 /* CHARTVOLT PATCH (13 Oct 2026): "turn your phone sideways" hint (src/mobile-immersive.js).
    A banner rather than a blocking overlay: the race is live and multiplayer, so nothing may stand

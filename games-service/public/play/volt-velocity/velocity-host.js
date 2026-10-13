@@ -212,6 +212,8 @@
    * player who crossed the line while others were still racing would be left on the vendor
    * screen with that button in front of them.
    */
+  let raceOver = false;
+
   function watchForRaceEnd(api) {
     let joined = false;
     const timer = setInterval(() => {
@@ -227,6 +229,7 @@
       const left = joined && state.mode === "solo";
       if (!done && !left) return;
       clearInterval(timer);
+      raceOver = true;
       frame.hidden = true;
       try {
         frame.src = "about:blank";
@@ -250,6 +253,35 @@
         handBackToPlatform();
       }
     }, END_POLL_MS);
+    return timer;
+  }
+
+  /**
+   * Rejoin the same race when the client document reloads itself.
+   *
+   * Reason: a phone that reclaims graphics memory (a rotation on iOS is the usual cause) loses
+   * the WebGL context, and the client reloads once the context is handed back. The race server
+   * keeps the pilot's seat and progress across a reconnect on the same ticket, but this page
+   * connected the client only once, so without this the reloaded client sits in solo flight.
+   */
+  function rejoinOnReload(session, firstTimer) {
+    let timer = firstTimer;
+    frame.addEventListener("load", async () => {
+      if (raceOver) return;
+      clearInterval(timer);
+      try {
+        hideVendorExits();
+        showStatus("Rejoining the race\u2026");
+        const api = await waitForClientApi();
+        listenForResult();
+        await connect(api, session);
+        hideStatus();
+        askForRoom();
+        timer = watchForRaceEnd(api);
+      } catch (error) {
+        showStatus("", (error && error.message) || "Could not rejoin the race.");
+      }
+    });
   }
 
   /**
@@ -336,7 +368,7 @@
       await connect(api, session);
       hideStatus();
       askForRoom();
-      watchForRaceEnd(api);
+      rejoinOnReload(session, watchForRaceEnd(api));
     } catch (error) {
       showStatus("", (error && error.message) || "Could not join the race.");
     }

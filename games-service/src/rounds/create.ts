@@ -393,6 +393,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       expiresAt,
       solo ? providerRoundId : undefined,
       parseStartWait(input.startWaitSeconds, scheduledStartAt),
+      practice,
     );
   }
 

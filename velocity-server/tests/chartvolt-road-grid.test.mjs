@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ROAD_SCALE,ROAD_HALF_WIDTH,DRIVE_LIMIT} from '../src/road-width.js';
-import {gridSlot,GRID_SLOTS,GRID_COLUMNS,GRID_ROW_SPACING,GRID_LANE_SPACING} from '../src/start-grid.js';
+import {gridSlot,GRID_SLOTS,GRID_COLUMNS,GRID_ROW_SPACING,GRID_LANE_SPACING,GRID_STAGGER} from '../src/start-grid.js';
 import {HALF_WIDTH,createTrack} from '../src/track.js';
 import {TRACKS} from '../src/tracks.js';
 import {generateContent} from '../src/race-content.js';
@@ -19,8 +19,8 @@ test('the road is wider and the track, drive limit and constants agree',()=>{
   assert.ok(DRIVE_LIMIT<ROAD_HALF_WIDTH);
 });
 
-test('a full 16-ship grid is 3 per row, rows behind the line, unique and inside the road',()=>{
-  assert.equal(GRID_SLOTS,16);
+test('a full 16-ship grid is 2 per row, F1-staggered, rows behind the line, unique and inside the road',()=>{
+  assert.equal(GRID_SLOTS,16);assert.equal(GRID_COLUMNS,2);
   const slots=Array.from({length:GRID_SLOTS},(_,i)=>gridSlot(i,GRID_SLOTS));
   const key=s=>`${s.distance}|${s.lateral}`;
   assert.equal(new Set(slots.map(key)).size,GRID_SLOTS);
@@ -32,9 +32,12 @@ test('a full 16-ship grid is 3 per row, rows behind the line, unique and inside 
   const rows=new Map();for(const s of slots)rows.set(s.row,(rows.get(s.row)??0)+1);
   for(const [row,count] of rows)assert.ok(count<=GRID_COLUMNS,`row ${row} has ${count}`);
   assert.equal(slots[0].distance,0,'pole sits on the line');
-  assert.equal(slots[2].distance,0,'the whole front row starts on the line');
   assert.ok(Object.is(slots[0].distance,0)&&Object.is(slots[0].lateral+0,slots[0].lateral),'no negative zero on pole');
-  assert.equal(slots[3].distance,-GRID_ROW_SPACING,'next row starts one row back');
+  assert.equal(slots[1].distance,-GRID_STAGGER,'P2 is alongside, one stagger back');
+  assert.ok(slots[0].lateral<0&&slots[1].lateral>0,'P1 and P2 take opposite columns');
+  assert.equal(slots[2].distance,-GRID_ROW_SPACING,'P3 is one full row behind pole, same column');
+  // Reason: the F1 rule the leaderboard order relies on - every slot is strictly behind the one before it.
+  for(let i=1;i<slots.length;i++)assert.ok(slots[i].distance<slots[i-1].distance,`slot ${i} is behind slot ${i-1}`);
 });
 
 test('ships on the grid never overlap: every pair keeps clear distance',()=>{
@@ -45,9 +48,9 @@ test('ships on the grid never overlap: every pair keeps clear distance',()=>{
   }
 });
 
-test('a short last row is centred and a late joiner gets a full-row slot',()=>{
-  const lone=gridSlot(3,4);assert.equal(lone.lateral,0,'a single ship in the last row is centred');
-  const pair=[gridSlot(3,5),gridSlot(4,5)];assert.equal(pair[0].lateral,-pair[1].lateral);
+test('a lone ship in the last row keeps its F1 box, and a late joiner gets the same slot',()=>{
+  // Reason (13 Oct 2026): the three-abreast grid centred a short last row; a staggered grid keeps the box, as F1 does.
+  assert.deepEqual(gridSlot(2,3),gridSlot(2,GRID_SLOTS));
   assert.deepEqual(gridSlot(4),gridSlot(4,GRID_SLOTS));
 });
 

@@ -3,8 +3,8 @@ import {applyLavaHazards} from './lava-hazards.js';
 import {SHIPS,pickupAt,hazardAt} from './catalog.js';
 import {DRIVE_LIMIT,road} from './road-width.js';
 import {POWER_TUNING,pickupRadius} from './power-tuning.js';
-/* CHARTVOLT PATCH: bumped to '-15' for the quicker steering response (13 Oct 2026); '-14' was the skill-only item set, '-13' the gate-scoring change. The client refuses a race server with another version, so the race server and games-service must be deployed together. */
-export const PHYSICS_VERSION='velocity-3d-15';
+/* CHARTVOLT PATCH: bumped to '-16' for the two-abreast F1 staggered grid (13 Oct 2026, src/start-grid.js), so a cached client cannot paint grid boxes where no ship starts; '-15' was the quicker steering response; '-14' was the skill-only item set, '-13' the gate-scoring change. The client refuses a race server with another version, so the race server and games-service must be deployed together. */
+export const PHYSICS_VERSION='velocity-3d-16';
 export const GATE_HALF_WIDTH=4.5;
 export const RESPAWN_SECONDS=3;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));

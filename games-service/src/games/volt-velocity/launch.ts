@@ -152,6 +152,7 @@ export async function seatVelocityPlayer(
   expiresAt: Date,
   soloRoundId?: string,
   startWaitSeconds?: number,
+  practice = false,
 ): Promise<VelocitySeat> {
   const velocity = requireVelocityConfig();
   const laps = lapsOf(config);
@@ -171,7 +172,7 @@ export async function seatVelocityPlayer(
     identity,
     { id: providerRoundId, name: racerName(displayName) },
     scheduledStartAt,
-    { laps, solo: soloRoundId !== undefined, latestStartAt },
+    { laps, solo: soloRoundId !== undefined, practice, latestStartAt },
   );
   if (outcome.ok) return { identity, scheduledStartAt };
 

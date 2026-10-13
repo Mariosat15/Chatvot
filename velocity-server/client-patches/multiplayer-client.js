@@ -48,7 +48,7 @@ export class MultiplayerClient {
   try{const res=await fetch(this.base+'/input',{method:'POST',headers:{Authorization:'Bearer '+this.ticket,'Content-Type':'application/json'},body:JSON.stringify({seq:this.seq++,input:unsent.at(-1).input,frames:unsent.map(f=>encodeFrame(f.step,f.input))}),signal:AbortSignal.any([this.controller.signal,AbortSignal.timeout(5000)])});const value=await res.json().catch(()=>({}));
    if(res.ok){this.rtt=this.rtt*.8+(performance.now()-started)*.2;if(Number.isSafeInteger(value.inputStep)&&value.inputStep>this.inputStep)this.inputStep=value.inputStep;}else if(res.status!==409)throw Error(value.error||'Race input rejected');
   }catch(e){if(!this.closed)this.onStatus('unstable');}finally{this.sending--;}}
- select(shipId){return this.request('ship',{shipId});}ready(value=true){return this.request('ready',{ready:value});}
+ select(shipId){return this.request('ship',{shipId});}track(trackId){return this.request('track',{trackId});}ready(value=true){return this.request('ready',{ready:value});}
  async leave(){try{await this.request('leave');}finally{this.close();}}
  close(){this.closed=true;this.connected=false;clearInterval(this.timer);this.controller.abort();}
 }

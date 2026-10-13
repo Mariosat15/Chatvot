@@ -219,6 +219,10 @@ export function ProviderGameFrame({
       ref={stageRef}
       className={`relative flex flex-1 flex-col overflow-hidden ${NEON_STAGE_FRAME} ${
         fullscreen.pseudo ? "fixed inset-0 z-[200] h-[100dvh] rounded-none" : ""
+      } ${
+        // Reason (owner, 13 Oct 2026: "complete fullscreen" when the phone is turned): held
+        // sideways a phone has ~360px of height, so the bezel and border come off too.
+        fullscreen.phone && fullscreen.pseudo ? "landscape:border-0 landscape:p-0 landscape:shadow-none" : ""
       } [&:fullscreen]:rounded-none [&:fullscreen]:bg-[#060C1A]`}
       // Reason: pinned over a phone's whole window the stage meets the notch, the rounded corners
       // and the home indicator, so it pads by each side's safe-area inset (0 where there is none).
@@ -231,7 +235,12 @@ export function ProviderGameFrame({
         phone held sideways has about 360px of height and every pixel of bar comes off the game.
       */}
       <div
-        className={`flex items-center justify-between gap-3 px-2 ${fullscreen.phone ? "pb-1" : "pb-2"}`}
+        // Reason: pinned on a phone held sideways the bar is withheld so the game owns the whole
+        // screen. Turning the phone upright brings it back, which is the way out of full screen;
+        // every game also has its own Leave, which ends the frame.
+        className={`flex items-center justify-between gap-3 px-2 ${fullscreen.phone ? "pb-1" : "pb-2"} ${
+          fullscreen.phone && fullscreen.pseudo ? "landscape:hidden" : ""
+        }`}
       >
         <span className="truncate text-xs font-semibold uppercase tracking-wider text-cyan-200/70">
           {gameName}

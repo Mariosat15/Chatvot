@@ -67,6 +67,17 @@ describe("the game stage full screen control", () => {
     expect(hook).not.toMatch(/useState\(\s*\(\)\s*=>\s*window/);
   });
 
+  // Owner, 13 Oct 2026: "the game must go to fullscreen when turn complete fullscreen".
+  it("gives a phone held sideways the whole screen, and only a pinned phone", () => {
+    const frame = read(FRAME);
+    expect(frame).toMatch(
+      /fullscreen\.phone && fullscreen\.pseudo \? "landscape:border-0 landscape:p-0 landscape:shadow-none"/,
+    );
+    expect(frame).toMatch(/fullscreen\.phone && fullscreen\.pseudo \? "landscape:hidden"/);
+    // Never unconditional: a desktop or tablet stage keeps its bar and its exit control.
+    expect(frame.match(/landscape:hidden/g)).toHaveLength(1);
+  });
+
   it("fills the dynamic viewport and keeps clear of the notch when pinned", () => {
     const frame = read(FRAME);
     expect(frame).toMatch(/fullscreen\.pseudo \? "fixed inset-0 z-\[200\] h-\[100dvh\]/);
