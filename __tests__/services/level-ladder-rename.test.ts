@@ -715,7 +715,10 @@ describe("R90 - no screen holds its own list of rung names", () => {
       "components/trading/CompetitionEntryButton.tsx",
       "components/trading/CompetitionCard.tsx",
       "components/trading/lobby/TradingLobbySidebar.tsx",
-      "app/(root)/competitions/page-content.tsx",
+      // Reason: re-pointed 13 Oct 2026, claim unchanged. The /competitions arena rebuild
+      // (486874e0) moved the level tag out of `page-content.tsx` into the shared card
+      // presentation builder, so that is where the rung is named now.
+      "lib/competitions/build-competition-presentation.ts",
     ]) {
       const code = readCode(relative);
       // Named WITH its argument, never as a bare identifier - an import line alone
@@ -724,6 +727,14 @@ describe("R90 - no screen holds its own list of rung names", () => {
       expect(code).toMatch(/resolveLevelName\s*\(/);
       expect(code).not.toMatch(/LEVEL_NAMES|LEVEL_LABELS|LEVEL_TITLES/);
     }
+    // The list page no longer names a rung itself, but it must still hand the operator's
+    // ladder down and must not grow a local map - otherwise the builder falls back to
+    // "Level N" and the rename silently stops reaching the competitions list.
+    const listPage = readCode("app/(root)/competitions/page-content.tsx");
+    // Anchored on the object the arenas receive: the prop destructure also reads
+    // `levelLadder,` on its own line, so a bare line match passes a page that drops it here.
+    expect(listPage).toMatch(/const filterProps = \{[^}]*\blevelLadder,/);
+    expect(listPage).not.toMatch(/LEVEL_NAMES|LEVEL_LABELS|LEVEL_TITLES/);
   });
 
   /*

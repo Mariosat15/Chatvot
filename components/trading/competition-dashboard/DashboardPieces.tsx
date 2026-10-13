@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, ChevronLeft, Crown, TrendingUp, Trophy, type LucideIcon } from "lucide-react";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import type { RankStanding, RankedFigure } from "./dashboard-model";
 
 /*
@@ -231,7 +232,7 @@ export function DashboardActions({
       </Link>
       <Link
         href={primary.href}
-        className="flex items-center justify-center gap-3 rounded-2xl border-2 border-amber-200/70 bg-gradient-to-b from-[#FFE04A] to-[#F5B400] px-6 py-4 text-xl font-black text-[#1A1200] shadow-[0_0_30px_-6px_rgba(255,192,27,0.85)] transition-transform hover:scale-[1.01]"
+        className={`flex items-center justify-center gap-3 rounded-2xl border-2 border-amber-200/70 bg-gradient-to-b from-[#FFE04A] to-[#F5B400] px-6 py-4 text-xl font-black text-[#1A1200] shadow-[0_0_30px_-6px_rgba(255,192,27,0.85)] ${PRESS_EFFECT}`}
       >
         <Trophy className="h-6 w-6" />
         {primary.title}
