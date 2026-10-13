@@ -2,987 +2,844 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>ChartVolt — Regulatory Position Paper &amp; Defence Memorandum</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ChartVolt — Regulatory Defence Pack</title>
 <style>
   :root {
-    --navy: #0f2a43;
-    --navy-2: #16395c;
-    --gold: #b8912f;
-    --gold-light: #d9b96a;
-    --ink: #1c2733;
-    --muted: #5a6a7a;
-    --paper: #ffffff;
-    --parchment: #f7f4ec;
-    --green: #1d6b46;
-    --green-bg: #eef7f1;
-    --amber: #9a6b08;
-    --amber-bg: #fdf6e6;
-    --red: #8c2f39;
-    --red-bg: #faeef0;
-    --blue-bg: #eef3f9;
+    --navy: #0f2a43; --navy-2: #16395c; --gold: #b8912f; --gold-light: #d9b96a;
+    --ink: #1c2733; --muted: #5a6a7a; --parchment: #f7f4ec;
+    --green: #1d6b46; --green-bg: #eef7f1; --amber: #9a6b08; --amber-bg: #fdf6e6;
+    --red: #8c2f39; --red-bg: #faeef0; --blue-bg: #eef3f9; --line: #dde3e9;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: var(--paper); }
-  body {
-    font-family: Georgia, "Times New Roman", serif;
-    color: var(--ink);
-    font-size: 11.2pt;
-    line-height: 1.62;
-  }
-  @page { size: A4; margin: 0; }
-  .page {
-    width: 210mm;
-    min-height: 296mm;
-    padding: 22mm 20mm 20mm 20mm;
-    page-break-after: always;
-    position: relative;
-    background: var(--paper);
-  }
-  .page:last-child { page-break-after: auto; }
+  body { font-family: Georgia, "Times New Roman", serif; color: var(--ink); font-size: 10.8pt; line-height: 1.6; background: #e9edf1; }
+  .sans { font-family: "Segoe UI", Arial, sans-serif; }
 
-  /* ---------- COVER ---------- */
-  .cover {
-    background: linear-gradient(160deg, #0b2033 0%, #0f2a43 55%, #16395c 100%);
-    color: #eef2f6;
-    display: flex;
-    flex-direction: column;
-    padding: 30mm 24mm 24mm 24mm;
+  /* Screen: each section is a sheet. Print: normal page flow with page breaks. */
+  .sheet { background: #fff; max-width: 210mm; margin: 8mm auto; padding: 18mm 18mm 16mm; box-shadow: 0 1mm 5mm rgba(15,42,67,.12); }
+  @page { size: A4; margin: 17mm 17mm 19mm 17mm;
+    @bottom-left { content: "ChartVolt — Regulatory Defence Pack"; font: 7.5pt "Segoe UI", Arial, sans-serif; color: #8a97a5; }
+    @bottom-right { content: "Page " counter(page); font: 7.5pt "Segoe UI", Arial, sans-serif; color: #8a97a5; }
   }
-  .cover .rule { height: 2px; background: linear-gradient(90deg, var(--gold), rgba(184,145,47,0)); margin: 10mm 0 8mm 0; }
-  .cover .firmline {
-    font-family: "Segoe UI", Arial, sans-serif;
-    letter-spacing: 0.32em;
-    text-transform: uppercase;
-    font-size: 9pt;
-    color: var(--gold-light);
-  }
-  .cover h1 {
-    font-size: 30pt;
-    font-weight: normal;
-    line-height: 1.22;
-    margin-top: 6mm;
-    color: #ffffff;
-  }
-  .cover h2 {
-    font-size: 13.5pt;
-    font-weight: normal;
-    font-style: italic;
-    color: #c8d4df;
-    margin-top: 6mm;
-    line-height: 1.5;
-  }
-  .cover .meta {
-    margin-top: auto;
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 9.5pt;
-    color: #b9c6d2;
-    border-top: 1px solid rgba(217,185,106,0.45);
-    padding-top: 6mm;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3mm 10mm;
-  }
-  .cover .meta b { color: #ffffff; font-weight: 600; }
-  .cover .conf {
-    margin-top: 8mm;
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 8.5pt;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--gold-light);
-  }
-  .logochip {
-    background: #ffffff;
-    border-radius: 2.5mm;
-    padding: 4mm 6mm;
-    width: fit-content;
-    margin-bottom: 8mm;
-    box-shadow: 0 1mm 4mm rgba(0,0,0,0.28);
-  }
-  .logochip img { height: 10.5mm; display: block; }
-  .logoline { display: flex; align-items: center; gap: 4mm; }
-  .logoline img { height: 8mm; }
-
-  /* Q&A blocks (banks & acquirers section) */
-  .qa {
-    border: 0.8px solid #d7dde3;
-    border-left: 3.5px solid var(--navy-2);
-    border-radius: 2mm;
-    padding: 3.6mm 5mm;
-    margin: 3.2mm 0;
-    page-break-inside: avoid;
-  }
-  .qa .q {
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-weight: 700; font-size: 10pt;
-    color: var(--navy);
-    margin-bottom: 1.6mm;
-  }
-  .qa .q .qn { color: var(--gold); margin-right: 2mm; }
-  .qa .a { font-size: 10pt; text-align: justify; }
-
-  /* ---------- GENERIC ---------- */
-  .kicker {
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 8.5pt;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: var(--gold);
-    margin-bottom: 2mm;
-  }
-  h3.sec {
-    font-size: 16.5pt;
-    font-weight: normal;
-    color: var(--navy);
-    border-bottom: 2px solid var(--gold);
-    padding-bottom: 2.5mm;
-    margin-bottom: 6mm;
-  }
-  h4 {
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 11pt;
-    color: var(--navy);
-    margin: 6mm 0 2.5mm 0;
-  }
-  p { margin-bottom: 3.2mm; text-align: justify; }
-  .para-num {
-    color: var(--gold);
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 9pt;
-    font-weight: 700;
-    margin-right: 2mm;
-  }
-  ul.tight { margin: 0 0 3.5mm 6mm; }
-  ul.tight li { margin-bottom: 1.6mm; text-align: justify; }
-  .small { font-size: 9.2pt; color: var(--muted); }
-  .footer {
-    position: absolute;
-    bottom: 9mm; left: 20mm; right: 20mm;
-    display: flex; justify-content: space-between;
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 7.8pt; color: #8a97a5;
-    border-top: 0.5px solid #d7dde3;
-    padding-top: 2mm;
+  @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+  @media print {
+    body { background: #fff; }
+    .sheet { box-shadow: none; margin: 0; max-width: none; padding: 0; break-before: page; }
+    .sheet.cover { padding: 30mm 24mm 24mm; height: 297mm; break-before: auto; }
+    .noprint { display: none; }
   }
 
-  /* verdict / callout boxes */
-  .box {
-    border-radius: 2.5mm;
-    padding: 4.5mm 5.5mm;
-    margin: 4.5mm 0;
-    page-break-inside: avoid;
-    font-size: 10.6pt;
-  }
-  .box .box-title {
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-weight: 700;
-    font-size: 9pt;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    margin-bottom: 1.8mm;
-  }
-  .box.verdict { background: var(--green-bg); border-left: 3.5px solid var(--green); }
-  .box.verdict .box-title { color: var(--green); }
-  .box.caution { background: var(--amber-bg); border-left: 3.5px solid var(--amber); }
-  .box.caution .box-title { color: var(--amber); }
-  .box.principle { background: var(--blue-bg); border-left: 3.5px solid var(--navy-2); }
-  .box.principle .box-title { color: var(--navy-2); }
+  /* Cover */
+  .cover { background: linear-gradient(160deg, #0b2033 0%, #0f2a43 55%, #16395c 100%); color: #eef2f6; display: flex; flex-direction: column; min-height: 297mm; padding: 30mm 24mm 24mm; }
+  .cover .firmline { font-family: "Segoe UI", Arial, sans-serif; letter-spacing: .32em; text-transform: uppercase; font-size: 9pt; color: var(--gold-light); }
+  .cover .rule { height: 2px; background: linear-gradient(90deg, var(--gold), rgba(184,145,47,0)); margin: 10mm 0 8mm; }
+  .cover h1 { font-size: 30pt; font-weight: normal; line-height: 1.2; color: #fff; }
+  .cover h2 { font-size: 13pt; font-weight: normal; font-style: italic; color: #c8d4df; margin-top: 6mm; line-height: 1.5; }
+  .cover .audience { margin-top: 12mm; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .cover .audience div { border: 1px solid rgba(217,185,106,.45); border-radius: 2mm; padding: 3.5mm 4mm; font-family: "Segoe UI", Arial, sans-serif; font-size: 9pt; color: #dbe4ec; }
+  .cover .audience b { display: block; color: var(--gold-light); font-size: 8pt; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 1mm; }
+  .cover .meta { margin-top: auto; font-family: "Segoe UI", Arial, sans-serif; font-size: 9.5pt; color: #b9c6d2; border-top: 1px solid rgba(217,185,106,.45); padding-top: 6mm; display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 10mm; }
+  .cover .meta b { color: #fff; font-weight: 600; }
+  .cover .conf { margin-top: 8mm; font-family: "Segoe UI", Arial, sans-serif; font-size: 8.5pt; letter-spacing: .18em; text-transform: uppercase; color: var(--gold-light); }
 
-  /* tables */
-  table { width: 100%; border-collapse: collapse; margin: 4mm 0 5mm 0; page-break-inside: avoid; }
-  th {
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 8.6pt; letter-spacing: 0.06em; text-transform: uppercase;
-    background: var(--navy); color: #ffffff;
-    padding: 2.6mm 3mm; text-align: left; font-weight: 600;
-  }
-  td {
-    font-size: 9.6pt; padding: 2.6mm 3mm;
-    border-bottom: 0.6px solid #dde3e9; vertical-align: top;
-  }
+  /* Generic */
+  .kicker { font-family: "Segoe UI", Arial, sans-serif; font-size: 8.5pt; letter-spacing: .28em; text-transform: uppercase; color: var(--gold); margin-bottom: 2mm; }
+  h3.sec { font-size: 17pt; font-weight: normal; color: var(--navy); border-bottom: 2px solid var(--gold); padding-bottom: 2.5mm; margin-bottom: 5mm; break-after: avoid; }
+  h4 { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.8pt; color: var(--navy); margin: 5.5mm 0 2.2mm; break-after: avoid; }
+  p { margin-bottom: 3mm; text-align: justify; }
+  .pn { color: var(--gold); font-family: "Segoe UI", Arial, sans-serif; font-size: 8.8pt; font-weight: 700; margin-right: 2mm; }
+  ul.tight, ol.tight { margin: 0 0 3.5mm 6mm; }
+  ul.tight li, ol.tight li { margin-bottom: 1.5mm; text-align: justify; }
+  .small { font-size: 9pt; color: var(--muted); }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 8.6pt; background: #f1f4f7; padding: 0 1mm; border-radius: 1mm; color: #24425f; }
+
+  .box { border-radius: 2.5mm; padding: 4mm 5mm; margin: 4mm 0; break-inside: avoid; font-size: 10.4pt; }
+  .box .bt { font-family: "Segoe UI", Arial, sans-serif; font-weight: 700; font-size: 8.8pt; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 1.6mm; }
+  .box.verdict { background: var(--green-bg); border-left: 3.5px solid var(--green); } .box.verdict .bt { color: var(--green); }
+  .box.caution { background: var(--amber-bg); border-left: 3.5px solid var(--amber); } .box.caution .bt { color: var(--amber); }
+  .box.principle { background: var(--blue-bg); border-left: 3.5px solid var(--navy-2); } .box.principle .bt { color: var(--navy-2); }
+
+  table { width: 100%; border-collapse: collapse; margin: 3.5mm 0 5mm; break-inside: auto; }
+  tr { break-inside: avoid; }
+  th { font-family: "Segoe UI", Arial, sans-serif; font-size: 8.2pt; letter-spacing: .05em; text-transform: uppercase; background: var(--navy); color: #fff; padding: 2.4mm 2.8mm; text-align: left; font-weight: 600; vertical-align: bottom; }
+  td { font-size: 9.3pt; padding: 2.4mm 2.8mm; border-bottom: .6px solid var(--line); vertical-align: top; }
   tr:nth-child(even) td { background: #f7f9fb; }
-  .pill {
-    display: inline-block;
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 8pt; font-weight: 700;
-    padding: 0.8mm 2.6mm; border-radius: 4mm;
-    white-space: nowrap;
-  }
-  .pill.no  { background: var(--green-bg); color: var(--green); border: 1px solid #bcdccb; }
-  .pill.yes { background: var(--red-bg); color: var(--red); border: 1px solid #e6c2c7; }
+  .pill { display: inline-block; font-family: "Segoe UI", Arial, sans-serif; font-size: 7.8pt; font-weight: 700; padding: .7mm 2.4mm; border-radius: 4mm; white-space: nowrap; }
+  .pill.ok { background: var(--green-bg); color: var(--green); border: 1px solid #bcdccb; }
+  .pill.no { background: var(--green-bg); color: var(--green); border: 1px solid #bcdccb; }
   .pill.mid { background: var(--amber-bg); color: var(--amber); border: 1px solid #ecd9a8; }
 
-  /* diagrams */
-  .fig { margin: 5mm 0; page-break-inside: avoid; }
+  .fig { margin: 4.5mm 0; break-inside: avoid; }
   .fig svg { width: 100%; height: auto; display: block; }
-  .fig .cap {
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 8.6pt; color: var(--muted);
-    text-align: center; margin-top: 2mm;
-  }
+  .fig .cap { font-family: "Segoe UI", Arial, sans-serif; font-size: 8.4pt; color: var(--muted); text-align: center; margin-top: 2mm; }
   .fig .cap b { color: var(--navy); }
 
-  /* TOC */
-  .toc { margin-top: 6mm; }
-  .toc .row {
-    display: flex; align-items: baseline;
-    font-size: 11pt; margin-bottom: 3.4mm;
-  }
-  .toc .n {
-    font-family: "Segoe UI", Arial, sans-serif;
-    color: var(--gold); font-weight: 700; width: 12mm; font-size: 9.5pt;
-  }
+  .toc .row { display: flex; align-items: baseline; font-size: 10.8pt; margin-bottom: 3mm; }
+  .toc .n { font-family: "Segoe UI", Arial, sans-serif; color: var(--gold); font-weight: 700; width: 12mm; font-size: 9.5pt; }
   .toc .dots { flex: 1; border-bottom: 1px dotted #b9c3cc; margin: 0 2.5mm; }
-  .toc .pg { font-family: "Segoe UI", Arial, sans-serif; font-size: 9.5pt; color: var(--muted); }
+  .toc a { color: inherit; text-decoration: none; }
 
-  .quoteblock {
-    border-left: 3px solid var(--gold);
-    background: var(--parchment);
-    padding: 4.5mm 5.5mm;
-    margin: 4.5mm 0;
-    font-style: italic;
-    font-size: 10.6pt;
-    page-break-inside: avoid;
-  }
+  .qa { border: .8px solid #d7dde3; border-left: 3.5px solid var(--navy-2); border-radius: 2mm; padding: 3.2mm 4.6mm; margin: 3mm 0; break-inside: avoid; }
+  .qa .q { font-family: "Segoe UI", Arial, sans-serif; font-weight: 700; font-size: 9.8pt; color: var(--navy); margin-bottom: 1.4mm; }
+  .qa .q .qn { color: var(--gold); margin-right: 2mm; }
+  .qa .a { font-size: 9.8pt; text-align: justify; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .rulecard { border: .8px solid #d7dde3; border-top: 3px solid var(--gold); border-radius: 2mm; padding: 3.2mm 4mm; break-inside: avoid; font-size: 9.6pt; }
+  .rulecard b { font-family: "Segoe UI", Arial, sans-serif; color: var(--navy); display: block; margin-bottom: 1mm; font-size: 9.6pt; }
+  .sig { margin-top: 10mm; display: grid; grid-template-columns: 1fr 1fr; gap: 12mm; font-family: "Segoe UI", Arial, sans-serif; font-size: 9pt; color: var(--muted); }
+  .sig div { border-top: 1px solid #9aa6b2; padding-top: 2mm; }
 </style>
 </head>
 <body>
 
 <!-- ============================== COVER ============================== -->
-<div class="page cover">
-  <div class="firmline">Regulatory Position Paper</div>
+<section class="sheet cover">
+  <div class="firmline">Regulatory Defence Pack</div>
   <div class="rule"></div>
-  <h1>ChartVolt Platform<br/>Defence Memorandum on Licensing Status</h1>
-  <h2>Analysis of the platform under (i) MiFID&nbsp;II / ESMA financial-services frameworks and
-      (ii) EU member-state games-of-chance legislation, with particular reference to the payment
-      of monetary prizes to participants.</h2>
-  <div class="meta">
-    <div><b>Prepared for</b><br/>Management &amp; External Legal Counsel</div>
-    <div><b>Date</b><br/>11 August 2026</div>
-    <div><b>Subject platform</b><br/>ChartVolt — skill-based simulated trading tournaments</div>
-    <div><b>Status</b><br/>Draft for counsel review — not legal advice</div>
+  <h1>ChartVolt<br/>Statement of Regulatory Position<br/>and Supporting Evidence</h1>
+  <h2>Why ChartVolt's paid skill competitions, one-against-one challenges, simulated-trading
+      competitions and Volts ledger fall outside gambling, investment-services, electronic-money
+      and payment-institution licensing — and the controls that keep them there.</h2>
+  <div class="audience">
+    <div><b>For banks</b>Account opening, onboarding and periodic due diligence</div>
+    <div><b>For acquirers &amp; PSPs</b>Underwriting, MCC classification and scheme registration</div>
+    <div><b>For regulators</b>Perimeter enquiries in Cyprus and in each market served</div>
   </div>
-  <div class="conf">Privileged &amp; Confidential — Prepared in Contemplation of Legal Review</div>
-</div>
+  <div class="meta">
+    <div><b>Issuer</b><br/>ChartVolt</div>
+    <div><b>Date</b><br/>13 October 2026</div>
+    <div><b>Primary jurisdiction</b><br/>Republic of Cyprus, within the European Union</div>
+    <div><b>Basis</b><br/>Published legislation, regulatory guidance and the platform's source code</div>
+  </div>
+  <div class="conf">Confidential — Provided for Due-Diligence and Regulatory Purposes</div>
+</section>
 
-<!-- ============================== TOC + SCOPE ============================== -->
-<div class="page">
+<!-- ============================== CONTENTS + SCOPE ============================== -->
+<section class="sheet">
   <div class="kicker">Contents</div>
   <h3 class="sec">Table of Contents</h3>
   <div class="toc">
-    <div class="row"><span class="n">I</span> Introduction, Scope and Reservations <span class="dots"></span><span class="pg">2</span></div>
-    <div class="row"><span class="n">II</span> Executive Summary of Conclusions <span class="dots"></span><span class="pg">3</span></div>
-    <div class="row"><span class="n">III</span> Factual Background — How the Platform Operates <span class="dots"></span><span class="pg">4</span></div>
-    <div class="row"><span class="n">IV</span> Question 1 — Is a Financial-Services (MiFID II) Licence Required? <span class="dots"></span><span class="pg">6</span></div>
-    <div class="row"><span class="n">V</span> Question 2 — Is a Gambling Licence Required? <span class="dots"></span><span class="pg">8</span></div>
-    <div class="row"><span class="n">VI</span> The Payout Objection — Characterisation of Prize Money <span class="dots"></span><span class="pg">10</span></div>
-    <div class="row"><span class="n">VII</span> Regulatory Precedents and Authorities <span class="dots"></span><span class="pg">11</span></div>
-    <div class="row"><span class="n">VIII</span> Other Regulatory Perimeters — Payments, AML, Consumer, Data, Advertising, Tax <span class="dots"></span><span class="pg">12</span></div>
-    <div class="row"><span class="n">IX</span> Anticipated Questions from Banks, Acquirers and Payment Partners <span class="dots"></span><span class="pg">14</span></div>
-    <div class="row"><span class="n">X</span> Residual Risk Factors and Recommended Safeguards <span class="dots"></span><span class="pg">16</span></div>
-    <div class="row"><span class="n">XI</span> Concluding Statement of Position <span class="dots"></span><span class="pg">17</span></div>
+    <div class="row"><span class="n">1</span><a href="#s1">Purpose, Scope and Reservations</a><span class="dots"></span></div>
+    <div class="row"><span class="n">2</span><a href="#s2">Summary of Position</a><span class="dots"></span></div>
+    <div class="row"><span class="n">3</span><a href="#s3">The Platform as Operated</a><span class="dots"></span></div>
+    <div class="row"><span class="n">4</span><a href="#s4">Gambling and Betting — Skill, Not Chance</a><span class="dots"></span></div>
+    <div class="row"><span class="n">5</span><a href="#s5">Skill Evidence from Real Data</a><span class="dots"></span></div>
+    <div class="row"><span class="n">6</span><a href="#s6">Investment Services — MiFID II</a><span class="dots"></span></div>
+    <div class="row"><span class="n">7</span><a href="#s7">Electronic Money and Payment Services</a><span class="dots"></span></div>
+    <div class="row"><span class="n">8</span><a href="#s8">Game Masters — A Commission Paid by ChartVolt</a><span class="dots"></span></div>
+    <div class="row"><span class="n">9</span><a href="#s9">Anti-Money-Laundering and Financial-Crime Controls</a><span class="dots"></span></div>
+    <div class="row"><span class="n">10</span><a href="#s10">Published Fairness Rules and Consumer Protection</a><span class="dots"></span></div>
+    <div class="row"><span class="n">11</span><a href="#s11">Cross-Border Operation and Geo-Gating</a><span class="dots"></span></div>
+    <div class="row"><span class="n">12</span><a href="#s12">Banks, Acquirers and Payment Partners</a><span class="dots"></span></div>
+    <div class="row"><span class="n">13</span><a href="#s13">Evidence Index — Controls Enforced in Code</a><span class="dots"></span></div>
+    <div class="row"><span class="n">14</span><a href="#s14">Continuing Obligations and Monitoring</a><span class="dots"></span></div>
+    <div class="row"><span class="n">15</span><a href="#s15">Formal Statement of Position</a><span class="dots"></span></div>
+    <div class="row"><span class="n">—</span><a href="#refs">Legal and Regulatory References</a><span class="dots"></span></div>
   </div>
 
-  <div class="kicker" style="margin-top:12mm;">Section I</div>
-  <h3 class="sec">Introduction, Scope and Reservations</h3>
-  <p><span class="para-num">1.1</span>This memorandum sets out the regulatory position of the ChartVolt
-  platform (the “<b>Platform</b>”) in respect of two licensing questions that a competent authority may
-  raise: whether the Platform performs regulated investment services requiring authorisation under
-  Directive 2014/65/EU (“<b>MiFID II</b>”) or related ESMA-supervised frameworks; and whether the
-  Platform operates games of chance requiring a gambling licence under member-state law.</p>
-  <p><span class="para-num">1.2</span>The analysis is grounded in the Platform’s actual technical
-  implementation (verified at source-code level), the public positions of the European Securities and
-  Markets Authority (“<b>ESMA</b>”) and national competent authorities as at the date hereof, and the
-  established analytical tests applied to prize competitions in the European Union.</p>
-  <p><span class="para-num">1.3</span><b>Reservation.</b> This document is a structured position paper
-  prepared for review by licensed counsel in each jurisdiction of operation. It is not, and must not be
-  relied upon as, legal advice. Gambling law in particular is not harmonised at EU level and outcomes
-  differ by member state.</p>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
+  <div class="kicker" id="s1" style="margin-top:10mm;">Section 1</div>
+  <h3 class="sec">Purpose, Scope and Reservations</h3>
+  <p><span class="pn">1.1</span>This pack sets out ChartVolt's regulatory position and the evidence behind
+  it, in a form a bank, an acquirer, a payment service provider or a competent authority can test. It
+  addresses five perimeters: <b>gambling and betting</b>; <b>investment services</b> (MiFID&nbsp;II);
+  <b>electronic money</b> (EMD2); <b>payment services</b> (PSD2); and <b>anti-money-laundering</b>
+  (AMLD). For each it states the legal test, the facts of the platform that answer it, and the control in
+  the code that keeps those facts true.</p>
+  <p><span class="pn">1.2</span><b>Factual basis.</b> Every factual statement about the platform in this
+  pack was checked against ChartVolt's source code on 13 October 2026. Section 13 maps each control to
+  the place it is enforced so it can be demonstrated live on request.</p>
+  <p><span class="pn">1.3</span><b>Legal basis.</b> The legal analysis follows ChartVolt's Preliminary
+  Legal Opinion of 13 October 2026 and the instruments listed under References. Gambling law is not
+  harmonised in the European Union, so the conclusions on gambling apply market by market. This pack is
+  ChartVolt's statement of position; the formal opinion of Cyprus-qualified counsel, and of local counsel
+  in each further market, is obtained separately and supersedes this pack where they differ.</p>
+  <p><span class="pn">1.4</span><b>What "operated" means.</b> Where this pack describes a control as
+  operating in every live market, that is the configuration ChartVolt runs in production. Several
+  controls are switchable by an administrator; the switch, the default and the place of enforcement are
+  recorded in Section 13 so that the configuration can be verified rather than taken on trust.</p>
+</section>
 
-<!-- ============================== EXEC SUMMARY ============================== -->
-<div class="page">
-  <div class="kicker">Section II</div>
-  <h3 class="sec">Executive Summary of Conclusions</h3>
+<!-- ============================== SUMMARY ============================== -->
+<section class="sheet" id="s2">
+  <div class="kicker">Section 2</div>
+  <h3 class="sec">Summary of Position</h3>
+  <p><span class="pn">2.1</span>ChartVolt provides <b>skill-based competitive entertainment</b>. Players
+  pay a fixed entry fee in Volts to compete against other players in games of skill or in simulated
+  trading; a disclosed platform fee is deducted and the remainder is paid out as prizes by rank. ChartVolt
+  sets no odds, takes no side of any result, adds nothing to and takes nothing from a prize pool beyond its
+  fee, and earns the same whoever wins.</p>
 
-  <div class="box verdict">
-    <div class="box-title">Conclusion 1 — No MiFID II / financial-services licence is required</div>
-    No financial instrument is created, distributed or intermediated. No order is received, transmitted
-    or executed on any market. The Platform is not a counterparty to any position and has no economic
-    exposure to trading outcomes. Live market prices are consumed exclusively as <i>data</i> to score a
-    simulation. This is consistent with the Czech National Bank’s October 2024 position that platforms
-    remaining wholly within a simulated model do not require authorisation, and with ESMA’s current
-    supervisory posture (July 2026).
-  </div>
-
-  <div class="box verdict">
-    <div class="box-title">Conclusion 2 — No gambling licence is required (predominance-of-skill jurisdictions)</div>
-    Of the three cumulative elements of gambling — stake, prize, and chance — the element of chance is
-    not satisfied in the manner required: every participant competes on identical virtual capital and
-    identical market data at the same time, so external randomness is a <i>common-mode</i> input that
-    cannot differentiate participants. Ranking is determined by relative decision quality across a
-    mandatory series of decisions. The correct legal analogue is the fantasy-sports / esports / chess
-    tournament, not a game of chance.
-  </div>
+  <table>
+    <tr><th style="width:23%">Perimeter</th><th>The decisive facts</th><th style="width:20%">Position</th></tr>
+    <tr><td><b>Betting</b> (Law 37(I)/2019)</td><td>Players pay to perform an activity, not to predict an event. No odds, no bookmaker, no house exposure. The result is the player's own measured performance.</td><td><span class="pill ok">OUTSIDE</span></td></tr>
+    <tr><td><b>Games of chance</b> — Circuit Sprint, Volt Stack</td><td>Every entrant in a contest receives identical, deterministically generated content; no advantage can be bought; ranking by a published fixed score rule.</td><td><span class="pill ok">SKILL — OUTSIDE</span></td></tr>
+    <tr><td><b>Games of chance</b> — Volt Velocity</td><td>Identical track and pickups; no player-versus-player items; grid ordered by prior standing; published 30-second reconnection rule.</td><td><span class="pill ok">SKILL</span> <span class="pill mid">MARKET BY MARKET</span></td></tr>
+    <tr><td><b>Investment services</b> (MiFID&nbsp;II)</td><td>No financial instrument, no order leaves the platform, no client assets, no payout that tracks simulated profit.</td><td><span class="pill ok">OUTSIDE</span></td></tr>
+    <tr><td><b>Electronic money</b> (EMD2 Art.&nbsp;2(2))</td><td>Volts are issued and accepted by ChartVolt alone, for ChartVolt's own services. No third party accepts them; no user-to-user transfer exists.</td><td><span class="pill ok">OUTSIDE</span></td></tr>
+    <tr><td><b>Payment services</b> (PSD2)</td><td>Every movement of funds is executed by an authorised payment provider. Volts are a limited-network instrument (Art.&nbsp;3(k)); redemptions return to the payer's own original payment method. Art.&nbsp;37(2) volumes monitored.</td><td><span class="pill ok">EXCLUDED</span> <span class="pill mid">MONITORED</span></td></tr>
+    <tr><td><b>AML</b> (Directive 2015/849)</td><td>Not an obliged entity as a non-gambling, non-financial operator — yet full KYC, hold periods, refund-to-source, fraud and chargeback controls operate voluntarily.</td><td><span class="pill ok">CONTROLLED</span></td></tr>
+  </table>
 
   <div class="box principle">
-    <div class="box-title">The decisive structural fact</div>
-    Monetary outcomes on the Platform are a <b>step function of ordinal rank in a fixed, pre-published
-    prize pool</b>. A participant’s payout does not scale with the magnitude of simulated profit, with
-    price movement, or with any stake multiple. Maximum loss is capped at the entry fee; maximum gain is
-    capped at the published prize. This severs the payout from both (a) derivative-style market exposure
-    (MiFID II) and (b) stake-multiplied-by-chance mechanics (gambling law).
+    <div class="bt">The structural fact that answers every perimeter</div>
+    Money on ChartVolt moves in one closed shape only: <b>a player's entry fee into a contest's pool, and a
+    prize out of that pool by rank</b>. The payout is a step function of finishing position in a pool
+    published before entry — it does not scale with any odds, any price movement or any simulated profit.
+    A player's worst case is the fixed fee; their best case is the published prize. Volts cannot leave that
+    shape: they cannot be sent to another person, spent with another merchant, or withdrawn anywhere except
+    back to the payer's own payment method after identity checks.
   </div>
 
-  <div class="box caution">
-    <div class="box-title">Managed exposures (Section X)</div>
-    Four residual areas warrant counsel attention and product discipline: (1) short-duration head-to-head
-    challenges; (2) the e-money characterisation of the credits ledger; (3) outlier “any-chance”
-    jurisdictions; and (4) marketing terminology. None undermines the core position; each has a concrete
-    safeguard identified in Section X.
+  <div class="box verdict">
+    <div class="bt">Conclusion</div>
+    ChartVolt is a provider of skill-based competitive entertainment and simulated performance assessment.
+    It is not a betting operator, not a gambling operator in predominance-of-skill jurisdictions, not an
+    investment firm, not an electronic-money issuer and not a payment institution. Paid entry is offered only
+    in markets that have been individually reviewed, and is technically blocked elsewhere.
   </div>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
+</section>
 
-<!-- ============================== FACTS + DIAGRAM 1 ============================== -->
-<div class="page">
-  <div class="kicker">Section III</div>
-  <h3 class="sec">Factual Background — How the Platform Operates</h3>
-
-  <p><span class="para-num">3.1</span>The following facts are established at source-code level and are
-  capable of technical demonstration to any authority.</p>
-
+<!-- ============================== FACTS ============================== -->
+<section class="sheet" id="s3">
+  <div class="kicker">Section 3</div>
+  <h3 class="sec">The Platform as Operated</h3>
+  <p><span class="pn">3.1</span>The following facts are established at source-code level and can be
+  demonstrated to any authority.</p>
   <ul class="tight">
-    <li><b>(A) Deposits.</b> Users purchase credits (1 credit = €1) exclusively through licensed payment
-    institutions (Nuvei, Stripe, Paddle, Atlas). The Platform never receives funds outside regulated payment rails.</li>
-    <li><b>(B) Entry.</b> A fixed, pre-published entry fee in credits buys <i>access</i> to a tournament.
-    Entry fees accumulate into that tournament’s prize pool; the Platform’s revenue is a disclosed fee that
-    does not depend on any participant’s result.</li>
-    <li><b>(C) Identical starting conditions.</b> Every participant receives an <i>identical</i> virtual
-    balance (e.g. 10,000 units of notional capital) recorded on a participant ledger that is segregated from
-    the credits wallet and has no monetary value.</li>
-    <li><b>(D) Simulation only.</b> Participants make simulated trading decisions scored against live market
-    <i>data</i>. No order leaves the Platform; there is no broker, no venue connection, no execution, and no
-    acquisition of any instrument. The price feed is read-only.</li>
-    <li><b>(E) Rank-based prizes.</b> At tournament end, participants are ranked by performance metrics of the
-    virtual account (e.g. return, win rate, profit factor) subject to minimum-activity rules. Prizes are paid
-    from the prize pool strictly by ordinal rank according to a distribution table published before entry.</li>
-    <li><b>(F) Withdrawals.</b> Credits (including prizes) are withdrawable in EUR through the same licensed
-    payment institutions, subject to mandatory KYC, AML-relevant fraud monitoring, device fingerprinting and
-    duplicate-identity detection.</li>
+    <li><b>Buying Volts.</b> Players buy Volts at a published rate of <b>100 Volts = EUR&nbsp;1</b>, only
+    through authorised payment service providers (Nuvei, Stripe, Paddle and Atlas). ChartVolt never receives
+    funds outside regulated payment rails. Deposit and withdrawal fees are disclosed before payment.</li>
+    <li><b>Entering.</b> A fixed entry fee, published before entry, buys a seat in a <b>competition</b> (two
+    or more players) or a <b>1v1 challenge</b> (exactly two). There is no paid single-player format. A
+    competition below its minimum is cancelled and every fee refunded in full. Free practice is the only
+    one-player mode, with no prize and no ranking.</li>
+    <li><b>Identical conditions.</b> In a ranked contest every competitor receives the same content: the
+    games service refuses to create a ranked round without the contest's shared seed, and generates from it
+    the same puzzles, the same piece sequence or the same track. Simulated traders receive identical virtual
+    capital and the same live price feed.</li>
+    <li><b>Scoring.</b> Each title's score and its direction (higher wins, or fastest time wins) are fixed in
+    the catalogue and published. A game provider reports a score only; it never touches money and cannot
+    change how a game ranks.</li>
+    <li><b>Settlement.</b> ChartVolt's settlement engine deducts the disclosed platform fee, ranks the
+    players and pays prizes from the pool by the distribution table published before entry. Ties, players
+    with no result and disqualification follow rules published in the competition entry terms.</li>
+    <li><b>Redemption.</b> Volts can be redeemed for EUR only to the account holder, through the same
+    authorised providers, after identity verification and the controls in Section 9.</li>
+    <li><b>No transfers.</b> There is no feature by which one player can send, gift or sell Volts to another.</li>
   </ul>
 
   <div class="fig">
-    <svg viewBox="0 0 1120 640" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-      <!-- Real money loop panel -->
-      <rect x="10" y="10" width="545" height="620" rx="14" fill="#eef7f1" stroke="#1d6b46" stroke-width="2"/>
-      <text x="282" y="44" text-anchor="middle" font-size="19" font-weight="700" fill="#1d6b46">REAL MONEY LOOP</text>
-      <text x="282" y="66" text-anchor="middle" font-size="12.5" fill="#3c6b53">All flows via licensed payment institutions</text>
-
-      <rect x="60" y="90" width="440" height="58" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
-      <text x="280" y="115" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">User deposits EUR</text>
-      <text x="280" y="135" text-anchor="middle" font-size="11.5" fill="#5a6a7a">Nuvei · Stripe · Paddle · Atlas (licensed PSPs)</text>
-
-      <line x1="280" y1="148" x2="280" y2="182" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
-
-      <rect x="60" y="186" width="440" height="58" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
-      <text x="280" y="211" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Credits wallet (1 credit = €1)</text>
-      <text x="280" y="231" text-anchor="middle" font-size="11.5" fill="#5a6a7a">Withdrawable · KYC enforced</text>
-
-      <line x1="280" y1="244" x2="280" y2="278" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
-      <text x="292" y="266" font-size="11.5" fill="#1d6b46" font-weight="600">fixed entry fee</text>
-
-      <rect x="60" y="282" width="440" height="66" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
-      <text x="280" y="308" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Tournament prize pool</text>
-      <text x="280" y="328" text-anchor="middle" font-size="11.5" fill="#5a6a7a">Sum of entry fees · distribution table published pre-entry</text>
-
-      <line x1="180" y1="348" x2="180" y2="384" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
-      <text x="190" y="370" font-size="11.5" fill="#1d6b46" font-weight="600">prize by RANK only</text>
-      <line x1="400" y1="348" x2="400" y2="384" stroke="#9a6b08" stroke-width="2.2" marker-end="url(#aa)"/>
-      <text x="410" y="370" font-size="11.5" fill="#9a6b08" font-weight="600">platform fee (fixed)</text>
-
-      <rect x="60" y="388" width="240" height="54" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
-      <text x="180" y="411" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Winner credits</text>
-      <text x="180" y="429" text-anchor="middle" font-size="11" fill="#5a6a7a">back to wallet</text>
-
-      <rect x="320" y="388" width="180" height="54" rx="9" fill="#fdf6e6" stroke="#9a6b08" stroke-width="1.5"/>
-      <text x="410" y="411" text-anchor="middle" font-size="13.5" font-weight="600" fill="#7c5606">Platform revenue</text>
-      <text x="410" y="429" text-anchor="middle" font-size="11" fill="#9a6b08">outcome-independent</text>
-
-      <line x1="180" y1="442" x2="180" y2="478" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#ag)"/>
-      <rect x="60" y="482" width="240" height="54" rx="9" fill="#ffffff" stroke="#1d6b46" stroke-width="1.5"/>
-      <text x="180" y="505" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Withdrawal in EUR</text>
-      <text x="180" y="523" text-anchor="middle" font-size="11" fill="#5a6a7a">licensed PSP · KYC required</text>
-
-      <text x="282" y="590" text-anchor="middle" font-size="12.5" font-style="italic" fill="#3c6b53">Money is only ever: fee in → prize out, through regulated rails.</text>
-
-      <!-- Virtual loop panel -->
-      <rect x="575" y="10" width="535" height="620" rx="14" fill="#eef3f9" stroke="#16395c" stroke-width="2"/>
-      <text x="842" y="44" text-anchor="middle" font-size="19" font-weight="700" fill="#16395c">VIRTUAL LOOP</text>
-      <text x="842" y="66" text-anchor="middle" font-size="12.5" fill="#4a5f78">Simulation only — never convertible to money</text>
-
-      <rect x="625" y="90" width="440" height="66" rx="9" fill="#ffffff" stroke="#16395c" stroke-width="1.5"/>
-      <text x="845" y="116" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Identical virtual capital for every entrant</text>
-      <text x="845" y="136" text-anchor="middle" font-size="11.5" fill="#5a6a7a">e.g. 10,000 notional units — no monetary value</text>
-
-      <line x1="845" y1="156" x2="845" y2="190" stroke="#16395c" stroke-width="2.2" marker-end="url(#ab)"/>
-
-      <rect x="625" y="194" width="440" height="78" rx="9" fill="#ffffff" stroke="#16395c" stroke-width="1.5"/>
-      <text x="845" y="220" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Simulated decisions on live price DATA</text>
-      <text x="845" y="240" text-anchor="middle" font-size="11.5" fill="#5a6a7a">read-only feed · no orders · no broker · no venue</text>
-      <text x="845" y="258" text-anchor="middle" font-size="11.5" fill="#5a6a7a">no execution · no instrument acquired</text>
-
-      <line x1="845" y1="272" x2="845" y2="306" stroke="#16395c" stroke-width="2.2" marker-end="url(#ab)"/>
-
-      <rect x="625" y="310" width="440" height="66" rx="9" fill="#ffffff" stroke="#16395c" stroke-width="1.5"/>
-      <text x="845" y="336" text-anchor="middle" font-size="14.5" font-weight="600" fill="#12324a">Virtual performance = a SCORE</text>
-      <text x="845" y="356" text-anchor="middle" font-size="11.5" fill="#5a6a7a">return · win rate · profit factor · min-activity rules</text>
-
-      <line x1="845" y1="376" x2="845" y2="410" stroke="#16395c" stroke-width="2.2" marker-end="url(#ab)"/>
-
-      <rect x="625" y="414" width="440" height="66" rx="9" fill="#16395c"/>
-      <text x="845" y="440" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffffff">ORDINAL RANK vs other participants</text>
-      <text x="845" y="460" text-anchor="middle" font-size="11.5" fill="#c3d0de">1st · 2nd · 3rd — relative skill, identical conditions</text>
-
-      <text x="842" y="560" text-anchor="middle" font-size="12.5" font-style="italic" fill="#4a5f78">The score itself is never exchanged for money —</text>
-      <text x="842" y="580" text-anchor="middle" font-size="12.5" font-style="italic" fill="#4a5f78">only the rank maps to a pre-published prize.</text>
-
-      <!-- Cross-connections -->
-      <path d="M 500 315 C 560 315 560 123 625 123" fill="none" stroke="#b8912f" stroke-width="2.4" stroke-dasharray="7 5" marker-end="url(#ao)"/>
-      <text x="560" y="105" text-anchor="middle" font-size="11.5" font-weight="700" fill="#b8912f">entry grants access</text>
-
-      <path d="M 625 447 C 540 447 540 315 500 315" fill="none" stroke="#b8912f" stroke-width="2.4" stroke-dasharray="7 5" marker-end="url(#ao)"/>
-      <text x="562" y="475" text-anchor="middle" font-size="11.5" font-weight="700" fill="#b8912f">rank → prize share</text>
-
+    <svg viewBox="0 0 1120 520" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
       <defs>
-        <marker id="ag" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1d6b46"/></marker>
-        <marker id="ab" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#16395c"/></marker>
-        <marker id="aa" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#9a6b08"/></marker>
-        <marker id="ao" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#b8912f"/></marker>
+        <marker id="g" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1d6b46"/></marker>
+        <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#9a6b08"/></marker>
+        <marker id="b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#16395c"/></marker>
       </defs>
+      <rect x="10" y="10" width="640" height="500" rx="14" fill="#eef7f1" stroke="#1d6b46" stroke-width="2"/>
+      <text x="330" y="42" text-anchor="middle" font-size="18" font-weight="700" fill="#1d6b46">MONEY — ONE CLOSED SHAPE</text>
+      <rect x="40" y="62" width="270" height="62" rx="9" fill="#fff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="175" y="88" text-anchor="middle" font-size="14" font-weight="600" fill="#12324a">Player pays EUR</text>
+      <text x="175" y="108" text-anchor="middle" font-size="11" fill="#5a6a7a">Nuvei · Stripe · Paddle · Atlas</text>
+      <line x1="175" y1="124" x2="175" y2="156" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#g)"/>
+      <rect x="40" y="160" width="270" height="62" rx="9" fill="#fff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="175" y="186" text-anchor="middle" font-size="14" font-weight="600" fill="#12324a">Volts balance</text>
+      <text x="175" y="206" text-anchor="middle" font-size="11" fill="#5a6a7a">100 Volts = EUR 1 · no transfers</text>
+      <line x1="175" y1="222" x2="175" y2="256" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#g)"/>
+      <text x="186" y="244" font-size="11" fill="#1d6b46" font-weight="600">fixed entry fee</text>
+      <rect x="40" y="260" width="570" height="62" rx="9" fill="#fff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="325" y="286" text-anchor="middle" font-size="14" font-weight="600" fill="#12324a">Contest prize pool — 2 or more players</text>
+      <text x="325" y="306" text-anchor="middle" font-size="11" fill="#5a6a7a">sum of entry fees · prize table published before entry</text>
+      <line x1="175" y1="322" x2="175" y2="356" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#g)"/>
+      <text x="186" y="344" font-size="11" fill="#1d6b46" font-weight="600">prizes by rank only</text>
+      <line x1="470" y1="322" x2="470" y2="356" stroke="#9a6b08" stroke-width="2.2" marker-end="url(#a)"/>
+      <text x="481" y="344" font-size="11" fill="#9a6b08" font-weight="600">disclosed fee</text>
+      <rect x="40" y="360" width="270" height="56" rx="9" fill="#fff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="175" y="384" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Winners' Volts balances</text>
+      <text x="175" y="402" text-anchor="middle" font-size="11" fill="#5a6a7a">ranked by published score rule</text>
+      <rect x="350" y="360" width="260" height="56" rx="9" fill="#fdf6e6" stroke="#9a6b08" stroke-width="1.5"/>
+      <text x="480" y="384" text-anchor="middle" font-size="13.5" font-weight="600" fill="#7c5606">ChartVolt revenue</text>
+      <text x="480" y="402" text-anchor="middle" font-size="11" fill="#9a6b08">same whoever wins · GM commission paid from it</text>
+      <line x1="175" y1="416" x2="175" y2="446" stroke="#1d6b46" stroke-width="2.2" marker-end="url(#g)"/>
+      <rect x="40" y="450" width="570" height="48" rx="9" fill="#fff" stroke="#1d6b46" stroke-width="1.5"/>
+      <text x="325" y="470" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Redemption to the account holder only</text>
+      <text x="325" y="488" text-anchor="middle" font-size="11" fill="#5a6a7a">KYC · hold period · manual review · back to the original payment method</text>
+
+      <rect x="670" y="10" width="440" height="500" rx="14" fill="#eef3f9" stroke="#16395c" stroke-width="2"/>
+      <text x="890" y="42" text-anchor="middle" font-size="18" font-weight="700" fill="#16395c">PLAY — PRODUCES ONLY A SCORE</text>
+      <rect x="700" y="62" width="380" height="74" rx="9" fill="#fff" stroke="#16395c" stroke-width="1.5"/>
+      <text x="890" y="88" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Identical content from the contest seed</text>
+      <text x="890" y="108" text-anchor="middle" font-size="11" fill="#5a6a7a">same puzzles · same pieces · same track</text>
+      <text x="890" y="125" text-anchor="middle" font-size="11" fill="#5a6a7a">same capital and price feed for traders</text>
+      <line x1="890" y1="136" x2="890" y2="170" stroke="#16395c" stroke-width="2.2" marker-end="url(#b)"/>
+      <rect x="700" y="174" width="380" height="74" rx="9" fill="#fff" stroke="#16395c" stroke-width="1.5"/>
+      <text x="890" y="200" text-anchor="middle" font-size="13.5" font-weight="600" fill="#12324a">Each player's own decisions</text>
+      <text x="890" y="220" text-anchor="middle" font-size="11" fill="#5a6a7a">no paid hints, retries, time or easier content</text>
+      <text x="890" y="237" text-anchor="middle" font-size="11" fill="#5a6a7a">no orders reach any market</text>
+      <line x1="890" y1="248" x2="890" y2="282" stroke="#16395c" stroke-width="2.2" marker-end="url(#b)"/>
+      <rect x="700" y="286" width="380" height="60" rx="9" fill="#16395c"/>
+      <text x="890" y="312" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">A SCORE, ranked against the field</text>
+      <text x="890" y="332" text-anchor="middle" font-size="11" fill="#c3d0de">direction fixed per title in the catalogue</text>
+      <text x="890" y="400" text-anchor="middle" font-size="12" font-style="italic" fill="#4a5f78">The score is never exchanged for money.</text>
+      <text x="890" y="420" text-anchor="middle" font-size="12" font-style="italic" fill="#4a5f78">Only the finishing position maps to</text>
+      <text x="890" y="440" text-anchor="middle" font-size="12" font-style="italic" fill="#4a5f78">a prize published before entry.</text>
+      <path d="M 670 316 C 640 316 640 291 612 291" fill="none" stroke="#b8912f" stroke-width="2.4" stroke-dasharray="7 5" marker-end="url(#a)"/>
     </svg>
-    <div class="cap"><b>Figure 1.</b> The two segregated loops. The virtual loop produces only a score; the real-money loop only ever moves fee-in / prize-out through licensed payment institutions.</div>
+    <div class="cap"><b>Figure 1.</b> The money shape and the play shape. Play produces only a score; money moves only as fee-in and prize-out, through authorised payment providers.</div>
   </div>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
+
+  <h4>The current catalogue</h4>
+  <table>
+    <tr><th style="width:18%">Title</th><th>What the player does</th><th style="width:34%">How content is fixed</th><th style="width:12%">Category</th></tr>
+    <tr><td><b>Circuit Sprint</b></td><td>Solve as many connection puzzles as possible in a fixed time</td><td>Same seeded puzzle sequence for every competitor</td><td>A</td></tr>
+    <tr><td><b>Volt Stack</b></td><td>Falling-block puzzle</td><td>Same seeded piece sequence; "hold" only reorders two known pieces</td><td>A</td></tr>
+    <tr><td><b>Volt Velocity</b></td><td>Scheduled race; fastest time wins</td><td>Same track, pickup layout and hazards; no player-versus-player items</td><td>A (counsel confirmation per market)</td></tr>
+    <tr><td><b>Simulated trading</b></td><td>Trade on live prices with fictional capital</td><td>Same starting capital and price feed for every trader</td><td>C</td></tr>
+  </table>
+  <p class="small">Category A: deterministic or identical-content skill games. Category C: simulated trading,
+  assessed under competition and investment-services rules. Section 11 explains how categories govern
+  where paid entry is offered.</p>
+</section>
+
+<!-- ============================== GAMBLING ============================== -->
+<section class="sheet" id="s4">
+  <div class="kicker">Section 4</div>
+  <h3 class="sec">Gambling and Betting — Skill, Not Chance</h3>
+
+  <h4>4A. Cyprus: outside the definition of betting</h4>
+  <p><span class="pn">4.1</span>The Cyprus Betting Law, Law 37(I)/2019, regulates betting by reference to
+  wagers on events and outcomes at stated odds. ChartVolt differs on every element that makes an activity a
+  bet: the player pays to <i>perform</i> an activity, not to predict someone else's; there are no odds;
+  ChartVolt has no exposure to the result; and the result is the player's own measured performance.</p>
+  <p><span class="pn">4.2</span><b>Not a casino-type game.</b> The 2019 Law is generally understood to
+  prohibit online casino-type games. None of ChartVolt's formats is one: there is no random-number draw that
+  selects a winner, no card deal, no wheel, no reel and no house bank. Every title is a performance test in
+  which the player's input determines the score.</p>
+  <p><span class="pn">4.3</span><b>Peer-to-peer commission models.</b> A commission-based peer-to-peer
+  format is not automatically outside gambling law — Malta, for example, licenses peer-to-peer games of
+  chance. The answer is that the commission structure is not what ChartVolt relies on. The reliance is on the
+  absence of chance as the determinant of the winner, which Sections 4B–4D and 5 establish. A peer-to-peer
+  structure without chance is a skill tournament, which is how chess opens, esports tournaments and fantasy
+  leagues operate.</p>
+
+  <h4>4B. The three-element test</h4>
+  <div class="fig">
+    <svg viewBox="0 0 1120 300" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+      <rect x="20" y="20" width="330" height="220" rx="14" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
+      <circle cx="185" cy="72" r="30" fill="#8c2f39"/><text x="185" y="80" text-anchor="middle" font-size="21" font-weight="700" fill="#fff">1</text>
+      <text x="185" y="134" text-anchor="middle" font-size="17" font-weight="700" fill="#8c2f39">STAKE</text>
+      <text x="185" y="160" text-anchor="middle" font-size="12.5" fill="#6b3a41">Entry fee — fixed and capped</text>
+      <text x="185" y="210" text-anchor="middle" font-size="13" font-weight="700" fill="#8c2f39">PRESENT</text>
+      <rect x="395" y="20" width="330" height="220" rx="14" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
+      <circle cx="560" cy="72" r="30" fill="#8c2f39"/><text x="560" y="80" text-anchor="middle" font-size="21" font-weight="700" fill="#fff">2</text>
+      <text x="560" y="134" text-anchor="middle" font-size="17" font-weight="700" fill="#8c2f39">PRIZE</text>
+      <text x="560" y="160" text-anchor="middle" font-size="12.5" fill="#6b3a41">Pool — published before entry</text>
+      <text x="560" y="210" text-anchor="middle" font-size="13" font-weight="700" fill="#8c2f39">PRESENT</text>
+      <rect x="770" y="20" width="330" height="220" rx="14" fill="#eef7f1" stroke="#1d6b46" stroke-width="2.5"/>
+      <circle cx="935" cy="72" r="30" fill="#1d6b46"/><text x="935" y="80" text-anchor="middle" font-size="21" font-weight="700" fill="#fff">3</text>
+      <text x="935" y="134" text-anchor="middle" font-size="17" font-weight="700" fill="#1d6b46">CHANCE</text>
+      <text x="935" y="160" text-anchor="middle" font-size="12.5" fill="#2e5b44">Identical content; winner decided</text>
+      <text x="935" y="178" text-anchor="middle" font-size="12.5" fill="#2e5b44">by how each player performs</text>
+      <text x="935" y="210" text-anchor="middle" font-size="13" font-weight="700" fill="#1d6b46">NOT SATISFIED</text>
+      <text x="560" y="282" text-anchor="middle" font-size="14" font-weight="600" fill="#16395c">All three elements are required. The third is absent, so there is no game of chance.</text>
+    </svg>
+    <div class="cap"><b>Figure 2.</b> The cumulative stake–prize–chance test applied across EU member states.</div>
+  </div>
+  <p><span class="pn">4.4</span>The question in most jurisdictions is whether chance <i>materially decides
+  the winner</i>, not whether any uncertainty exists. The UK Gambling Commission's guidance (persuasive, not
+  binding in Cyprus) recognises that unpredictable elements a player must overcome can form part of a test of
+  skill. ChartVolt's answer is engineered rather than argued: <b>in a ranked contest every competitor faces
+  the same problem</b>, so whatever uncertainty the problem contains is common to all and cannot separate
+  them. The only differentiating input is how each player plays it.</p>
+
+  <h4>4C. Title by title</h4>
+  <table>
+    <tr><th style="width:18%">Title</th><th>Why the outcome is decided by skill</th><th style="width:30%">Enforcing control</th></tr>
+    <tr><td><b>Circuit Sprint</b></td><td>Puzzles are generated deterministically from the contest seed; every competitor solves the same sequence against the same clock. The score is the number solved.</td><td>Games service refuses a ranked round without the shared seed; publication refused for a title that cannot take one.</td></tr>
+    <tr><td><b>Volt Stack</b></td><td>Every competitor receives the same piece sequence. "Hold" only reorders two pieces the player can already see. Score is earned by placement and line clears.</td><td>Same seed requirement; no purchasable item affects play.</td></tr>
+    <tr><td><b>Volt Velocity</b></td><td>Same track, pickup layout and hazards. Every pickup affects only the pilot who collects it; missiles and seekers lock only onto towers; ships that touch bounce apart without damage. Fastest time wins.</td><td>Player-versus-player items removed in every room; grid by prior standing; published reconnection rule (4D).</td></tr>
+    <tr><td><b>Simulated trading</b></td><td>Every trader receives identical capital and the same live price feed at the same time. Price movement is common to all; ranking reflects selection, timing, sizing and risk management.</td><td>Ranking by published metrics with minimum-activity and disqualification rules.</td></tr>
+  </table>
+
+  <h4>4D. Volt Velocity — the live race, controlled</h4>
+  <p><span class="pn">4.5</span>A live race is the format a regulator is most likely to question, because
+  opponents share the track in real time. ChartVolt has removed each feature that could let something other
+  than the pilot's own driving decide the result:</p>
+  <ul class="tight">
+    <li><b>No player-versus-player items.</b> EMP, shockwave, mines, oil slick, cloak and the blaster are
+    removed. Shields, repairs, energy, overdrive, countermeasure and magnet affect only the collector.
+    Opponents cannot be harmed, slowed or displaced by another racer's pickup.</li>
+    <li><b>Starting grid by standing, not shuffle.</b> The grid is ordered by each racer's settled Volt
+    Velocity points from earlier competitions and challenges, highest first, then by time of entry. It is read
+    from the platform through a signed request before the countdown and cannot be changed during a race. If
+    the platform cannot be reached, entry order applies — never a random draw.</li>
+    <li><b>Published disconnection rule.</b> A disconnected ship stops while the clock runs. The racer has
+    30 seconds to reconnect; after that they are out with no score, and dropping out does not return the entry
+    fee. A race cancelled before it starts is refunded in full. If a fault on ChartVolt's side stops a race,
+    the contest's published rule for unfinished rounds applies. The rule appears in the game's rules, on the
+    start screen and on the Help page, so every racer accepts it before paying.</li>
+  </ul>
+  <div class="box caution">
+    <div class="bt">How paid races are offered</div>
+    Network quality is inherent to any live race; the disconnection rule makes its consequence known in
+    advance. Paid Volt Velocity races are enabled only in markets where local counsel has confirmed the
+    title's classification as a skill game. In any other market the title is offered free, through the same
+    market-by-market gate described in Section 11.
+  </div>
+
+  <h4>4E. Why the payment of prizes changes nothing</h4>
+  <p><span class="pn">4.6</span>Paying money is not itself a licensable activity; the question is what the
+  payment is. It is not investment proceeds (no instrument, no exposure, payout fixed per rank), and not
+  gambling winnings (no odds, no stake multiplier, no chance determinant). It is a <b>tournament prize</b>: a
+  fixed award from a pool published before entry, allocated by finishing position in a contest of skill.
+  ChartVolt's revenue is the same whoever wins, and the prize is funded entirely by the entrants — ChartVolt
+  carries no prize liability of its own and no exposure to any result.</p>
+</section>
+
+<!-- ============================== SKILL EVIDENCE ============================== -->
+<section class="sheet" id="s5">
+  <div class="kicker">Section 5</div>
+  <h3 class="sec">Skill Evidence from Real Data</h3>
+  <p><span class="pn">5.1</span>Regulators and acquirers ask the dominant-factor question in a measurable
+  form: <i>do skilled players demonstrably outperform unskilled players over repeated play?</i> ChartVolt
+  answers it from its own settled results. The administrative <b>Skill Evidence report</b> is computed from
+  the final leaderboard of every settled contest, per title, for any date range an examiner chooses, and is
+  exported as a dated PDF prepared for regulatory submission.</p>
+
+  <table>
+    <tr><th style="width:24%">Measure</th><th>What it tests</th><th style="width:32%">What skill looks like</th></tr>
+    <tr><td><b>Score stability</b></td><td>For players who entered the same title more than once, how closely each player's results agree from one contest to the next.</td><td>A strong positive correlation: good players stay good. Under pure chance, one contest says nothing about the next.</td></tr>
+    <tr><td><b>Experience and winning</b></td><td>Whether players with more contests behind them finish higher, grouped by experience band and measured by correlation.</td><td>Win rate and finishing position improve with experience. Under chance, experience has no effect.</td></tr>
+    <tr><td><b>Spread of winners</b></td><td>How many distinct players won, and how often the same players won again, compared with the number expected if each winner were drawn at random from the field.</td><td>Fewer distinct winners and more repeat winners than chance would produce.</td></tr>
+  </table>
+
+  <div class="box principle">
+    <div class="bt">Every figure is shown beside its chance baseline</div>
+    The report does not present a number on its own. Each measure is printed next to what the same field of
+    players would produce if winners were drawn at random — the expected number of distinct winners, and the
+    probability that any single player wins at least once — so an examiner can see the size of the departure
+    from chance, not merely its direction. A field dominated by one repeat winner is identified as such rather
+    than mistaken for randomness.
+  </div>
+
+  <p><span class="pn">5.2</span><b>Why this evidence is reliable.</b> It is drawn from production data the
+  platform already holds, not from a study commissioned for the purpose. It covers every settled contest in
+  the period, not a selection. It can be regenerated on demand for a later period, so the evidence keeps pace
+  with the catalogue, and it is reproducible: the same date range returns the same figures.</p>
+  <p><span class="pn">5.3</span><b>Supply to authorities and partners.</b> ChartVolt supplies the report
+  for each Category A title, and for simulated trading, on request, together with the underlying aggregate
+  counts. Individual players are not identified in the report.</p>
+</section>
 
 <!-- ============================== MIFID ============================== -->
-<div class="page">
-  <div class="kicker">Section IV</div>
-  <h3 class="sec">Question 1 — Is a Financial-Services (MiFID II) Licence Required?</h3>
-
-  <p><span class="para-num">4.1</span>MiFID II authorisation attaches to the performance of investment
-  services or activities <i>in relation to financial instruments</i> (Art. 4(1)(2) and Annex I).
-  Both limbs must be present. Neither is.</p>
-
+<section class="sheet" id="s6">
+  <div class="kicker">Section 6</div>
+  <h3 class="sec">Investment Services — MiFID II</h3>
+  <p><span class="pn">6.1</span>Investment-firm authorisation attaches to the performance of investment
+  services or activities <i>in relation to financial instruments</i> (Directive 2014/65/EU, Article 4(1)(2)
+  and Annex&nbsp;I). Both limbs must be present. Neither is.</p>
   <table>
-    <tr><th style="width:34%">MiFID II trigger</th><th>Platform reality (technically verifiable)</th><th style="width:13%">Engaged?</th></tr>
-    <tr><td>Financial instrument (transferable security, derivative, CFD — Annex I, Section C)</td>
-        <td>Virtual positions are database records with no contractual right to any asset, cash flow or settlement. They cannot be redeemed, transferred, assigned or settled.</td>
-        <td><span class="pill no">NO</span></td></tr>
-    <tr><td>Reception &amp; transmission / execution of orders</td>
-        <td>No order ever leaves the Platform. There is no broker connection, no trading venue membership, no execution infrastructure. Prices are consumed as read-only data.</td>
-        <td><span class="pill no">NO</span></td></tr>
-    <tr><td>Dealing on own account</td>
-        <td>The Platform is not a counterparty to any position and carries zero economic exposure to participants’ simulated results. Its fee is fixed and outcome-independent.</td>
-        <td><span class="pill no">NO</span></td></tr>
-    <tr><td>Portfolio management / investment advice</td>
-        <td>None offered; no personal recommendations; no discretionary management.</td>
-        <td><span class="pill no">NO</span></td></tr>
-    <tr><td>Safeguarding of instruments / client assets</td>
-        <td>Only EUR credits are held, moving exclusively through licensed payment institutions.</td>
-        <td><span class="pill no">NO</span></td></tr>
+    <tr><th style="width:32%">MiFID II trigger</th><th>The platform</th><th style="width:13%">Engaged?</th></tr>
+    <tr><td>Financial instrument (Annex I, Section C, including derivatives and CFDs)</td><td>Virtual positions are database records conferring no right to any asset, cash flow or settlement. They cannot be redeemed, transferred or settled.</td><td><span class="pill no">NO</span></td></tr>
+    <tr><td>Reception, transmission or execution of orders</td><td>No order ever leaves the platform. There is no broker connection, venue membership or execution infrastructure; prices are read-only data.</td><td><span class="pill no">NO</span></td></tr>
+    <tr><td>Dealing on own account</td><td>ChartVolt is never a counterparty to a position and has no exposure to any simulated result.</td><td><span class="pill no">NO</span></td></tr>
+    <tr><td>Portfolio management or investment advice</td><td>None offered; no personal recommendations.</td><td><span class="pill no">NO</span></td></tr>
+    <tr><td>Safekeeping of client financial instruments</td><td>None held. Only Volts exist, and funds move only through authorised payment providers.</td><td><span class="pill no">NO</span></td></tr>
   </table>
-
-  <h4>The economic-substance (CFD recharacterisation) test</h4>
-  <p><span class="para-num">4.2</span>ESMA’s public statement of 24 February 2026
-  (ESMA35-243228190-8024) directs firms and supervisors to assess the <i>economic substance</i> of novel
-  products against the CFD definition: does the arrangement confer leveraged monetary exposure to the
-  price movement of an underlying? Applied to the Platform, the answer is structurally negative:</p>
+  <h4>Economic substance</h4>
+  <p><span class="pn">6.2</span>Supervisors assess novel products by economic substance: does the
+  arrangement give the customer monetary exposure to the price movement of an underlying? It does not.</p>
   <ul class="tight">
-    <li>A CFD payout is <b>continuous in the price</b> of the underlying — twice the favourable movement
-    yields twice the money. A Platform payout is a <b>step function of ordinal rank</b> in a fixed pool:
-    first place receives the same published prize whether the winning virtual return was +0.5% or +50%.</li>
-    <li>Maximum loss is the entry fee, fixed before entry; it cannot be increased by any market movement.
-    There is no margining of money, no negative balance, no stake at market risk.</li>
-    <li>The counterparty to the participant’s monetary outcome is <b>the field of other entrants</b>
-    (via the pool), not the operator and not the market.</li>
+    <li>A CFD pays in proportion to the price move. A ChartVolt prize is a <b>step function of finishing
+    position</b>: first place receives the same published prize whether the winning simulated return was
+    0.5% or 50%.</li>
+    <li>The maximum loss is the entry fee, fixed before entry; no market movement can increase it. There is no
+    margin, no negative balance and no money at market risk.</li>
+    <li>The counterparty to each player's monetary outcome is the field of other entrants, through the pool —
+    not ChartVolt and not the market.</li>
+    <li>Simulated profit is never paid out, in whole or in part. There is no profit-split, and no pathway from
+    a competition to a live brokerage account.</li>
+  </ul>
+  <p><span class="pn">6.3</span><b>Regulatory posture.</b> The Czech National Bank stated in 2024 that
+  platforms operating wholly on simulated accounts do not require authorisation while they remain within the
+  simulated model. Belgium's FSMA (2024) and Italy's CONSOB (2024) criticised paid trading "challenges" as
+  consumer-protection matters without reclassifying them as investment services. Scrutiny in this sector has
+  centred on profit-split "prop firm" models and bridges to live trading; ChartVolt has neither.</p>
+  <div class="box verdict">
+    <div class="bt">Position</div>
+    ChartVolt performs no investment service in relation to any financial instrument and requires no MiFID II
+    authorisation. The maintenance conditions are permanent product rules: no order routing, no bridge to live
+    brokerage, and no payout that scales with simulated profit.
+  </div>
+</section>
+
+<!-- ============================== E-MONEY / PSD2 ============================== -->
+<section class="sheet" id="s7">
+  <div class="kicker">Section 7</div>
+  <h3 class="sec">Electronic Money and Payment Services</h3>
+
+  <h4>7A. Volts are not electronic money</h4>
+  <p><span class="pn">7.1</span>Under Article 2(2) of Directive 2009/110/EC, electronic money is monetary
+  value issued on receipt of funds <b>for the purpose of making payment transactions</b>, and <b>accepted by a
+  natural or legal person other than the issuer</b>. Both elements are cumulative. Volts fail the second
+  completely:</p>
+  <ul class="tight">
+    <li>Volts are issued by ChartVolt and accepted only by ChartVolt, for ChartVolt's own services —
+    contest entries and items in ChartVolt's own marketplace.</li>
+    <li>No merchant, partner or other player accepts Volts. There is no feature by which a player can send,
+    gift or sell Volts to anyone; the code contains no user-to-user transfer route.</li>
+    <li>A prize is not a payment from one player to another. Entrants each pay ChartVolt for a service; the
+    winner receives a prize from ChartVolt out of the pool, under ChartVolt's published terms.</li>
+    <li>Game Master commission is a payment by ChartVolt from its own fee under a written agreement
+    (Section 8), not acceptance of Volts by a third party in exchange for goods or services.</li>
+  </ul>
+  <p><span class="pn">7.2</span><b>Redemption does not create e-money.</b> Redeemability is a duty imposed on
+  e-money issuers; it is not what defines e-money. A prepaid balance that only its issuer accepts remains a
+  prepayment for the issuer's services whether or not the issuer refunds it. ChartVolt's redemption returns a
+  customer's own balance to that customer — no value reaches a third party at any point.</p>
+
+  <h4>7B. Payment services — no payment service performed by ChartVolt</h4>
+  <p><span class="pn">7.3</span>PSD2 (Directive (EU) 2015/2366) Annex&nbsp;I lists the regulated payment
+  services, among them operating payment accounts, executing payment transactions and money remittance.
+  Every movement of funds into and out of ChartVolt — purchase of Volts, redemption, refund — is executed by
+  an authorised payment service provider under its own licence. ChartVolt does not hold customer funds on
+  behalf of a payee, does not transmit funds to any third party and does not issue payment instruments.</p>
+  <p><span class="pn">7.4</span><b>Limited-network exclusion, Article 3(k).</b> PSD2 excludes instruments that
+  can be used only to acquire goods or services in the issuer's premises or within a limited network of
+  service providers under direct commercial agreement with the issuer. Volts fit its purpose exactly: they are
+  usable only on ChartVolt, for ChartVolt's services.</p>
+  <p><span class="pn">7.5</span><b>Redemption is a refund to source, not a remittance.</b> Money remittance
+  requires funds to be transmitted to a payee. When a ChartVolt customer redeems Volts, the payer and the payee
+  are the same verified person and, in every live market, the funds return to <b>the original payment method
+  that funded the account</b>. In substance the redemption is a refund of an unused prepayment — a familiar
+  consumer-protection feature — and it moves no value to anyone else. The controls around it (Section 9)
+  ensure it cannot be used as a store of value for third-party payments:</p>
+  <ul class="tight">
+    <li>identity verification (KYC) before any redemption, with duplicate-identity detection;</li>
+    <li>a minimum-deposit rule and a hold period after deposit, so funds cannot be paid in and immediately out;</li>
+    <li>redemption only to the original payment method, so value cannot be redirected to another person or account;</li>
+    <li>manual review of every withdrawal request, with per-request, daily and monthly limits and a cap on requests per day;</li>
+    <li>a disclosed withdrawal fee, which removes any incentive to use the balance as a transit account.</li>
   </ul>
 
-  <h4>Regulatory posture</h4>
-  <p><span class="para-num">4.3</span>The Czech National Bank stated in October 2024 that platforms
-  operating on demonstration/simulated accounts <b>do not require authorisation as regulated entities
-  provided they remain within the simulated model</b>. As at July 2026, ESMA is not engaged in
-  substantive discussions on regulating retail simulated-trading models (confirmed publicly by the
-  chair of ESMA’s Risk Standing Committee). The Platform sits <i>further</i> from the regulatory
-  perimeter than the profit-split “prop firm” models those statements addressed, because it pays
-  rank-based tournament prizes rather than a percentage of simulated profit.</p>
-
+  <h4>7C. Article 37(2) — monitored, with a notification route</h4>
+  <p><span class="pn">7.6</span>A provider relying on the limited-network exclusion must notify its competent
+  authority — in Cyprus, the Central Bank of Cyprus — if the total value of payment transactions under the
+  exclusion over the preceding 12 months exceeds EUR&nbsp;1&nbsp;million. ChartVolt monitors that figure on a
+  rolling 12-month basis from its financial ledger, which records every purchase of Volts and every redemption
+  with its amount and date. If the threshold is approached, ChartVolt will file the Article 37(2) notification
+  with the Central Bank of Cyprus and, if useful, use the pre-application exploratory stage the Central Bank
+  introduced on 3 August 2026 to settle the classification of Volts with the authority directly.</p>
   <div class="box verdict">
-    <div class="box-title">Position on Question 1</div>
-    The Platform performs no investment service in relation to any financial instrument. No MiFID II or
-    ESMA-supervised authorisation is required. The critical maintenance condition: the Platform must
-    remain wholly within the simulated model — no order routing, no bridge to live brokerage, and no
-    payout that scales with simulated profit.
+    <div class="bt">Position</div>
+    Volts are not electronic money, because no one other than ChartVolt accepts them. ChartVolt performs no
+    payment service, because authorised providers execute every transfer of funds, and redemptions return a
+    customer's own balance to their own original payment method. Volts fall within the limited-network
+    exclusion of Article 3(k) PSD2, and the Article 37(2) threshold is monitored with a defined notification route.
   </div>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
+</section>
 
-<!-- ============================== GAMBLING + DIAGRAM 2 ============================== -->
-<div class="page">
-  <div class="kicker">Section V</div>
-  <h3 class="sec">Question 2 — Is a Gambling Licence Required?</h3>
-
-  <p><span class="para-num">5.1</span>Across EU member states, gambling regulation attaches where three
-  elements are cumulatively present: a <b>stake</b>, a <b>prize</b>, and an outcome determined wholly or
-  predominantly by <b>chance</b>. The Platform concedes the first two. The defence rests — soundly — on
-  the third.</p>
-
-  <div class="fig">
-    <svg viewBox="0 0 1120 360" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-      <rect x="20" y="30" width="330" height="250" rx="14" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
-      <circle cx="185" cy="95" r="34" fill="#8c2f39"/>
-      <text x="185" y="103" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff">1</text>
-      <text x="185" y="160" text-anchor="middle" font-size="17" font-weight="700" fill="#8c2f39">STAKE</text>
-      <text x="185" y="188" text-anchor="middle" font-size="12.5" fill="#6b3a41">Entry fee — present</text>
-      <text x="185" y="208" text-anchor="middle" font-size="12.5" fill="#6b3a41">(fixed &amp; capped)</text>
-      <text x="185" y="252" text-anchor="middle" font-size="13" font-weight="700" fill="#8c2f39">CONCEDED</text>
-
-      <rect x="395" y="30" width="330" height="250" rx="14" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
-      <circle cx="560" cy="95" r="34" fill="#8c2f39"/>
-      <text x="560" y="103" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff">2</text>
-      <text x="560" y="160" text-anchor="middle" font-size="17" font-weight="700" fill="#8c2f39">PRIZE</text>
-      <text x="560" y="188" text-anchor="middle" font-size="12.5" fill="#6b3a41">Prize pool — present</text>
-      <text x="560" y="208" text-anchor="middle" font-size="12.5" fill="#6b3a41">(published pre-entry)</text>
-      <text x="560" y="252" text-anchor="middle" font-size="13" font-weight="700" fill="#8c2f39">CONCEDED</text>
-
-      <rect x="770" y="30" width="330" height="250" rx="14" fill="#eef7f1" stroke="#1d6b46" stroke-width="2.5"/>
-      <circle cx="935" cy="95" r="34" fill="#1d6b46"/>
-      <text x="935" y="103" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff">3</text>
-      <text x="935" y="160" text-anchor="middle" font-size="17" font-weight="700" fill="#1d6b46">CHANCE</text>
-      <text x="935" y="188" text-anchor="middle" font-size="12.5" fill="#2e5b44">Outcome determined by</text>
-      <text x="935" y="208" text-anchor="middle" font-size="12.5" fill="#2e5b44">relative skill — identical conditions</text>
-      <text x="935" y="252" text-anchor="middle" font-size="13" font-weight="700" fill="#1d6b46">NOT SATISFIED</text>
-
-      <text x="560" y="330" text-anchor="middle" font-size="14.5" font-weight="600" fill="#16395c">All three elements must be present. Element 3 fails → no game of chance.</text>
-    </svg>
-    <div class="cap"><b>Figure 2.</b> The cumulative three-element test for games of chance.</div>
-  </div>
-
-  <h4>Why chance does not determine the outcome</h4>
-  <p><span class="para-num">5.2</span><b>Randomness is common-mode, not differentiating.</b> In a game of
-  chance (roulette, lottery, card deals) randomness is applied <i>unequally</i> to participants and
-  directly selects the winner. On the Platform, every participant faces the <i>same</i> market data at the
-  <i>same</i> time with the <i>same</i> virtual capital. The exogenous uncertainty of markets moves
-  identically for all entrants; it therefore cannot rank them. The only differentiating input is each
-  participant’s decisions: instrument selection, timing, position sizing, leverage, stop-loss and
-  take-profit placement, and sustained risk management.</p>
-  <p><span class="para-num">5.3</span><b>Structural skill safeguards.</b> Tournament rules enforce a
-  minimum number of decisions (minimum-trade thresholds), apply disqualification standards, and rank by
-  sustained performance metrics (return, win rate, profit factor) across the contest period — a winner
-  must outperform the field across a series of decisions, not on a single random event.</p>
-  <p><span class="para-num">5.4</span><b>The correct analogues.</b> Chess opens, fantasy-sports leagues and
-  esports tournaments all combine entry fees, prize pools and substantial exogenous uncertainty, and are
-  treated across the EU as skill competitions falling outside games-of-chance licensing where skill
-  predominates. Poker is treated more strictly precisely because concealed randomised information (the
-  deal) is distributed <i>unequally</i> among players — a feature the Platform does not have: all
-  information is public and identical.</p>
-  <p><span class="para-num">5.5</span><b>The strictest EU regulator did not classify this model as
-  gambling.</b> Belgium — the only member state to ban retail CFDs outright — examined paid
-  simulated-trading challenges (FSMA, March 2024). The FSMA issued a consumer warning describing the
-  sector as a “shadow investment game”, but pursued no games-of-chance classification under the Belgian
-  Gaming Act and no licensing enforcement. Even at the most restrictive end of the EU spectrum, neither
-  regulatory hook was found to apply.</p>
-
-  <div class="box verdict">
-    <div class="box-title">Position on Question 2</div>
-    In predominance-of-skill jurisdictions the Platform operates lawful prize competitions, not games of
-    chance. The element of chance fails because identical conditions neutralise randomness as a ranking
-    factor; outcomes are determined by relative skill across a mandated series of decisions.
-  </div>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
-
-<!-- ============================== PAYOUT + DIAGRAM 3 ============================== -->
-<div class="page">
-  <div class="kicker">Section VI</div>
-  <h3 class="sec">The Payout Objection — Characterisation of Prize Money</h3>
-
-  <p><span class="para-num">6.1</span>The anticipated objection is: <i>“the operator pays participants
-  money determined by outcomes; therefore a licence is required.”</i> The objection conflates the act of
-  paying with the legal character of the payment. Paying money is not itself a licensable activity; the
-  question is always <b>what the payment is</b>. There are only three candidate characterisations, and
-  two fail on the Platform’s mechanics:</p>
-
-  <div class="fig">
-    <svg viewBox="0 0 1120 470" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
-      <rect x="330" y="20" width="460" height="64" rx="10" fill="#16395c"/>
-      <text x="560" y="47" text-anchor="middle" font-size="15.5" font-weight="700" fill="#ffffff">A participant receives money.</text>
-      <text x="560" y="68" text-anchor="middle" font-size="12.5" fill="#c3d0de">What is that payment, in law?</text>
-
-      <line x1="560" y1="84" x2="190" y2="140" stroke="#8a97a5" stroke-width="2" marker-end="url(#gray)"/>
-      <line x1="560" y1="84" x2="560" y2="140" stroke="#8a97a5" stroke-width="2" marker-end="url(#gray)"/>
-      <line x1="560" y1="84" x2="930" y2="140" stroke="#8a97a5" stroke-width="2" marker-end="url(#gray)"/>
-
-      <rect x="30" y="146" width="330" height="150" rx="12" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
-      <text x="195" y="176" text-anchor="middle" font-size="14.5" font-weight="700" fill="#8c2f39">Investment proceeds?</text>
-      <text x="195" y="204" text-anchor="middle" font-size="12" fill="#5c3a40">Requires an instrument held and</text>
-      <text x="195" y="223" text-anchor="middle" font-size="12" fill="#5c3a40">payout scaling with market movement.</text>
-      <text x="195" y="250" text-anchor="middle" font-size="12" fill="#5c3a40">Here: no instrument, no exposure,</text>
-      <text x="195" y="269" text-anchor="middle" font-size="12" fill="#5c3a40">payout fixed per rank.</text>
-
-      <rect x="395" y="146" width="330" height="150" rx="12" fill="#faeef0" stroke="#8c2f39" stroke-width="2"/>
-      <text x="560" y="176" text-anchor="middle" font-size="14.5" font-weight="700" fill="#8c2f39">Gambling winnings?</text>
-      <text x="560" y="204" text-anchor="middle" font-size="12" fill="#5c3a40">Requires outcome determined by</text>
-      <text x="560" y="223" text-anchor="middle" font-size="12" fill="#5c3a40">chance and stake-multiplied returns.</text>
-      <text x="560" y="250" text-anchor="middle" font-size="12" fill="#5c3a40">Here: identical conditions, skill ranking,</text>
-      <text x="560" y="269" text-anchor="middle" font-size="12" fill="#5c3a40">fixed pool, no odds, no multiplier.</text>
-
-      <rect x="760" y="146" width="330" height="150" rx="12" fill="#eef7f1" stroke="#1d6b46" stroke-width="2.5"/>
-      <text x="925" y="176" text-anchor="middle" font-size="14.5" font-weight="700" fill="#1d6b46">Tournament prize ✓</text>
-      <text x="925" y="204" text-anchor="middle" font-size="12" fill="#2e5b44">Fixed award from a pre-published</text>
-      <text x="925" y="223" text-anchor="middle" font-size="12" fill="#2e5b44">pool, allocated by ordinal rank in a</text>
-      <text x="925" y="242" text-anchor="middle" font-size="12" fill="#2e5b44">skill contest — the chess-open /</text>
-      <text x="925" y="261" text-anchor="middle" font-size="12" fill="#2e5b44">fantasy-league / esports model.</text>
-
-      <text x="195" y="330" text-anchor="middle" font-size="16" font-weight="800" fill="#8c2f39">FAILS</text>
-      <text x="560" y="330" text-anchor="middle" font-size="16" font-weight="800" fill="#8c2f39">FAILS</text>
-      <text x="925" y="330" text-anchor="middle" font-size="16" font-weight="800" fill="#1d6b46">HOLDS</text>
-
-      <rect x="230" y="370" width="660" height="72" rx="10" fill="#f7f4ec" stroke="#b8912f" stroke-width="2"/>
-      <text x="560" y="399" text-anchor="middle" font-size="13.5" font-weight="600" fill="#7c5606">Prize competitions with entry fees are lawful without a licence across the EU</text>
-      <text x="560" y="421" text-anchor="middle" font-size="13.5" font-weight="600" fill="#7c5606">where skill predominates — the payment of the prize changes nothing.</text>
-
-      <defs>
-        <marker id="gray" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#8a97a5"/></marker>
-      </defs>
-    </svg>
-    <div class="cap"><b>Figure 3.</b> Characterisation of the payout: two theories fail on the mechanics; the tournament-prize characterisation holds.</div>
-  </div>
-
-  <p><span class="para-num">6.2</span>Three further features reinforce the prize characterisation:
-  (i) the payer of last resort is economically the <i>field of entrants</i> (the pool), with the operator’s
-  fee fixed regardless of outcomes — the operator does not profit from participant losses on any position;
-  (ii) each participant’s worst case is the loss of a known fixed fee — there is no open-ended downside as
-  in leveraged trading, and no stake-times-odds mechanic as in betting; and (iii) the entire monetary
-  perimeter (deposit, prize, withdrawal) is executed by authorised payment institutions with mandatory KYC
-  and AML-relevant monitoring already in production.</p>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
-
-<!-- ============================== PRECEDENTS ============================== -->
-<div class="page">
-  <div class="kicker">Section VII</div>
-  <h3 class="sec">Regulatory Precedents and Authorities</h3>
-
+<!-- ============================== GAME MASTERS ============================== -->
+<section class="sheet" id="s8">
+  <div class="kicker">Section 8</div>
+  <h3 class="sec">Game Masters — A Commission Paid by ChartVolt</h3>
+  <p><span class="pn">8.1</span>Game Masters are independent partners who bring players to ChartVolt and may
+  run contests on it. They earn a share of the entry fees of players they refer. The legal character of that
+  payment is fixed by a written agreement, the <b>Game Master package terms</b>, which every Game Master
+  accepts before purchasing a package. ChartVolt records each acceptance.</p>
   <table>
-    <tr><th style="width:19%">Authority</th><th style="width:15%">Date</th><th>Position</th><th style="width:22%">Relevance to Platform</th></tr>
-    <tr>
-      <td><b>Czech National Bank</b> (CNB)</td><td>Oct 2024</td>
-      <td>Platforms operating on demo/simulated accounts do not require authorisation as regulated entities, provided they remain within the simulated model.</td>
-      <td>Direct support: the Platform is wholly simulated and — unlike the profit-split firms addressed — pays rank-based prizes.</td>
-    </tr>
-    <tr>
-      <td><b>ESMA</b></td><td>Feb 2026</td>
-      <td>Statement ESMA35-243228190-8024: supervisors assess economic substance of novel products against the CFD definition (leveraged monetary exposure to an underlying).</td>
-      <td>The Platform passes the substance test: rank-based step-function payout, no monetary market exposure, capped fee.</td>
-    </tr>
-    <tr>
-      <td><b>ESMA / CySEC</b> (chair, Risk Standing Committee)</td><td>Jul 2026</td>
-      <td>Retail simulated-trading is not an ESMA regulatory priority; no substantive discussions under way.</td>
-      <td>No pending EU framework contradicts the position; monitoring obligation noted.</td>
-    </tr>
-    <tr>
-      <td><b>Belgium — FSMA</b></td><td>Mar 2024</td>
-      <td>Consumer warning describing paid simulated-trading challenges as a “shadow investment game”; no licensing enforcement and no classification under the Belgian Gaming Act.</td>
-      <td>The strictest EU regulator found neither financial-licensing breach nor a games-of-chance classification.</td>
-    </tr>
-    <tr>
-      <td><b>Italy — CONSOB</b></td><td>Jul 2024</td>
-      <td>Public criticism of retail “challenge” models as “a type of finance video game”; consumer-protection framing, no licensing reclassification.</td>
-      <td>Confirms the perceived character of the activity as a game/competition, not an investment service.</td>
-    </tr>
-    <tr>
-      <td><b>Industry restructuring</b></td><td>2025</td>
-      <td>Leading simulated-trading operators restructured payouts and terminology (e.g. away from profit-split language) to remain clearly within the demo-model perimeter recognised by the CNB.</td>
-      <td>The Platform’s rank-based prize design already sits on the safe side of the line the industry moved toward.</td>
-    </tr>
+    <tr><th style="width:30%">Element of the agreement</th><th>Effect</th></tr>
+    <tr><td>Commission paid by ChartVolt</td><td>The commission is paid by ChartVolt <b>out of its own platform fee</b>, under the written agreement. It is never taken from a player, never deducted from a prize pool and never a payment by one player to another.</td></tr>
+    <tr><td>Package as a licence</td><td>A Game Master package is a licence to ChartVolt's tools, personal and non-transferable.</td></tr>
+    <tr><td>No score advantages</td><td>No Game Master tool, package or item improves any player's score or ranking in a paid contest, and no randomised rewards are offered.</td></tr>
+    <tr><td>Same controls on payout</td><td>Commission redemption passes through the same KYC, hold, refund-to-source and review controls as any other redemption.</td></tr>
   </table>
+  <p><span class="pn">8.2</span><b>Why this is a commercial payment by the issuer.</b> The commission is
+  ChartVolt's own revenue paid to its own commercial partner for a service rendered — introducing customers.
+  It is the same in character as an affiliate commission paid by any online merchant. Volts are the unit in
+  which the commission is booked, but no third party accepts Volts in exchange for goods or services; the
+  e-money element of third-party acceptance (Section 7A) is therefore not engaged.</p>
+  <p><span class="pn">8.3</span><b>Economic safeguard.</b> The commission is calculated from ChartVolt's fee,
+  so the platform never pays out more than it earns from a contest. A Game Master's permission to create
+  contests is governed separately and is restricted by game type.</p>
+</section>
 
+<!-- ============================== AML ============================== -->
+<section class="sheet" id="s9">
+  <div class="kicker">Section 9</div>
+  <h3 class="sec">Anti-Money-Laundering and Financial-Crime Controls</h3>
+  <p><span class="pn">9.1</span>ChartVolt is not an obliged entity under Directive (EU) 2015/849: it is
+  neither a credit or financial institution nor a provider of gambling services. It nevertheless operates a
+  complete financial-crime control set, because that is what its banking and payment partners require and
+  because the controls are what keep the facts in Sections 4–7 true.</p>
+  <h4>Withdrawal controls — operated in every live market</h4>
+  <table>
+    <tr><th style="width:28%">Control</th><th>What it does</th><th style="width:28%">Setting</th></tr>
+    <tr><td><b>Identity verification</b></td><td>KYC through Veriff must be approved before any redemption. Duplicate identity documents across accounts are detected and flagged.</td><td>Required</td></tr>
+    <tr><td><b>Minimum-deposit rule</b></td><td>An account must have funded itself before it can withdraw, so prizes cannot be farmed by unfunded accounts.</td><td>Required</td></tr>
+    <tr><td><b>Hold period after deposit</b></td><td>Funds cannot be withdrawn until a set period after the last deposit, closing the pay-in, pay-out pattern.</td><td>Applied</td></tr>
+    <tr><td><b>Refund to original payment method</b></td><td>Redemptions are paid only to the payment method that funded the account.</td><td>Required</td></tr>
+    <tr><td><b>Manual review</b></td><td>Every withdrawal request enters an administrator queue; automatic approval is off.</td><td>Manual</td></tr>
+    <tr><td><b>Limits</b></td><td>Minimum and maximum per request, daily and monthly caps, and a maximum number of requests per day.</td><td>Applied</td></tr>
+  </table>
+  <h4>Fraud and integrity controls — permanently on</h4>
+  <ul class="tight">
+    <li><b>Device fingerprinting and multi-account detection</b> link accounts operated from the same device or showing the same behaviour.</li>
+    <li><b>IP intelligence</b> detects VPNs, proxies, Tor and datacentre addresses at sensitive actions.</li>
+    <li><b>Suspicion scoring</b> combines signals into a risk score that raises alerts for review; restrictions are applied by an administrator and are recorded, reversible and notified to the player.</li>
+    <li><b>Collusion resistance.</b> The two-player minimum, identical content and the absence of any transfer between users leave no channel for passing value from one account to another through a contest.</li>
+    <li><b>Chargeback management</b> ingests payment-provider dispute notifications, restricts the account, assembles a case file (identity, device, IP history, entries and ledger) and reconciles the outcome.</li>
+    <li><b>Audit trail.</b> Every movement of Volts is a ledger entry with its reason; administrator actions are written to an audit log; acceptance of terms is recorded per user.</li>
+  </ul>
   <div class="box principle">
-    <div class="box-title">Distinguishing the Platform from “prop firm” models</div>
-    Regulatory friction in this sector has concentrated on models that (a) pay participants a percentage
-    of simulated profit — mimicking a derivative payoff — or (b) bridge successful participants into live
-    brokerage arrangements. The Platform does neither: prizes are fixed rank-based awards from a
-    peer-funded pool, and no pathway to real-market execution exists anywhere in the product.
+    <div class="bt">Why Volts offer little utility for laundering</div>
+    Value cannot move between users, so there is no layering channel. Value enters only by card or bank payment
+    through an authorised provider, after which it can leave only to the same verified person, to the same
+    payment method, after a hold and a manual review. Contest outcomes are decided by skill against identical
+    content, so a contest cannot be used to steer value to a chosen account.
   </div>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
+</section>
 
-<!-- ============================== OTHER REGULATORS ============================== -->
-<div class="page">
-  <div class="kicker">Section VIII</div>
-  <h3 class="sec">Other Regulatory Perimeters — Payments, AML, Consumer, Data, Advertising, Tax</h3>
-
-  <p><span class="para-num">8.1</span>Beyond the two principal licensing questions, five further
-  regulatory perimeters could be raised by an authority, bank or counterparty. Each is addressed below
-  with the Platform’s position and, where relevant, the safeguard already in production.</p>
-
-  <h4>A. Payment services and electronic money (PSD2 / EMD2)</h4>
-  <p><span class="para-num">8.2</span>The credits ledger (1 credit = €1, redeemable) is the Platform’s
-  most substantive secondary question. The position: the Platform does not <i>execute payment
-  transactions</i>, issue payment instruments, or acquire transactions — every movement of funds is
-  executed by authorised payment institutions (Nuvei, Stripe, Paddle, Atlas) under their own licences.
-  Credits function as (i) consideration for a service (tournament entry) and (ii) a prize ledger, not as
-  a means of payment to third parties: credits can be spent only <i>on the Platform itself</i> and
-  transferred to no other person or merchant. This materially distinguishes the ledger from e-money
-  issued “for the purpose of making payment transactions” to parties other than the issuer
-  (Art. 2(2) EMD2). Redemption flows back to the depositing customer via the original payment method
-  where possible.</p>
-  <div class="box caution">
-    <div class="box-title">Counsel action</div>
-    A payments-law opinion should be obtained to confirm the characterisation in each operating
-    jurisdiction, and to assess whether structural options (agent-of-payee arrangements, safeguarding
-    accounts, or an EMI partnership at scale) are warranted as the ledger grows.
+<!-- ============================== FAIRNESS ============================== -->
+<section class="sheet" id="s10">
+  <div class="kicker">Section 10</div>
+  <h3 class="sec">Published Fairness Rules and Consumer Protection</h3>
+  <p><span class="pn">10.1</span>The rules that make ChartVolt a skill platform are published to players in the
+  <b>competition entry terms</b>, which each player accepts before entering a paid contest. Each rule below is
+  also enforced in code (Section 13), so the published promise and the platform's behaviour cannot diverge.</p>
+  <div class="grid2">
+    <div class="rulecard"><b>Identical content for every entrant</b>Every competitor in a contest receives the same puzzles, pieces, track or price feed.</div>
+    <div class="rulecard"><b>Winners decided by skill</b>Results are ranked by each title's published score rule; the score direction is fixed per title.</div>
+    <div class="rulecard"><b>No paid advantages</b>Nothing sold improves a score or ranking in a paid contest — no hints, retries, extra time, skips or easier content.</div>
+    <div class="rulecard"><b>No mystery packs</b>No randomised or mystery items are sold, even cosmetic ones. Buyers see exactly what they get.</div>
+    <div class="rulecard"><b>Minimum two players</b>Every paid format has at least two players. A competition below its minimum is cancelled with full refunds.</div>
+    <div class="rulecard"><b>Refunds</b>Cancelled and failed contests are refunded in full. The contest states in advance what happens to a player who records no score.</div>
+    <div class="rulecard"><b>Disqualification</b>A player disqualified for breaking the rules receives no refund; the rules are published before entry.</div>
+    <div class="rulecard"><b>Simulated trading is simulated</b>No real instruments are bought and simulated profit is never paid out.</div>
   </div>
+  <h4>Consumer protection</h4>
+  <p><span class="pn">10.2</span>Entry fees, prize tables, the platform fee, the conversion rate and redemption
+  fees are disclosed before payment. A player's maximum loss in any contest is its entry fee. Contest refunds
+  are automatic, not discretionary. Purchases of Volts are invoiced with VAT through ChartVolt's invoicing
+  module. The 14-day right of withdrawal for digital services is handled by express consent to immediate
+  performance at entry, in line with the Consumer Rights Directive.</p>
+  <p><span class="pn">10.3</span><b>Advertising.</b> ChartVolt presents itself as skill tournaments with
+  published prizes. It does not advertise odds, "bonus bets" or earnings and investment returns, because each
+  would misdescribe the product.</p>
+  <p><span class="pn">10.4</span><b>Responsible play.</b> Every contest has a fixed, known cost; there is no
+  auto-entry and no stake that can be increased mid-contest. Free practice is offered, with no prize and no
+  ranking, so a player can build skill without paying. Player-set deposit limits and self-exclusion are being added to the
+  account settings as further protection.</p>
+</section>
 
-  <h4>B. Anti-money-laundering and counter-terrorist financing (AMLD)</h4>
-  <p><span class="para-num">8.3</span>The Platform is not an “obliged entity” under the AML Directives:
-  it is neither a credit/financial institution nor a “provider of gambling services” (per Sections IV–V).
-  Nevertheless the Platform <b>voluntarily operates a full AML-relevant control stack</b>, which is both a
-  defence-in-depth and the direct answer to bank due-diligence: mandatory KYC before any withdrawal;
-  duplicate-identity detection across KYC documents; device fingerprinting and multi-account detection;
-  IP intelligence (VPN / proxy / Tor / datacenter detection with configurable blocking); risk scoring
-  with automatic restriction; withdrawal routing back to the originating payment method; and a full,
-  reconciled transaction ledger. Closed-loop credits with capped entry fees and rank-based prizes offer
-  very limited layering utility to a money launderer — value cannot be transferred between users.</p>
-
-  <h4>C. Consumer protection (UCPD / Consumer Rights Directive)</h4>
-  <p><span class="para-num">8.4</span>Contest terms, entry fees, prize tables and eligibility rules are
-  published before entry; maximum loss is the entry fee; contests that fail to start (e.g. minimum
-  participants not reached) are automatically refunded in full — an implemented, audited flow, not a
-  policy promise. Marketing must avoid earnings claims and urgency mechanics; the terminology policy in
-  Section X applies. The 14-day withdrawal right for digital services is handled by express consent to
-  immediate performance at entry, with the statutory exception for contracts fully performed
-  (a completed tournament) — standard practice for paid online competitions.</p>
-
-  <h4>D. Data protection (GDPR)</h4>
-  <p><span class="para-num">8.5</span>The fraud-prevention stack (device fingerprinting, IP intelligence,
-  duplicate-KYC matching) processes personal data on the lawful basis of legitimate interest
-  (fraud prevention — Recital 47 GDPR expressly recognises it), and KYC on legal-obligation/contract
-  bases. Recommended hygiene: a documented DPIA covering the fingerprinting and IP-intelligence stack,
-  retention schedules for KYC artefacts, and processor agreements with the KYC and IP-intelligence
-  vendors. None of this affects licensing; it is raised because banks and regulators increasingly ask
-  for it in the same breath.</p>
-
-  <h4>E. Advertising standards and tax</h4>
-  <p><span class="para-num">8.6</span><b>Advertising:</b> the Platform must not advertise in the style of
-  gambling (odds, “win big”, bonus-bet mechanics) or of investment services (returns, income claims) —
-  both would invite the exact recharacterisations rebutted in Sections IV–VI. Positioning is
-  “skill tournament with published prizes”. <b>Tax:</b> the Platform’s revenue (its fee) is a standard
-  service supply subject to VAT — an invoicing and VAT module is already in production; prize money is in
-  general taxable in the hands of recipients under their domestic law, with no withholding obligation
-  asserted for the operator (to be confirmed per jurisdiction alongside the counsel review).</p>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
-
-<!-- ============================== BANKS & ACQUIRERS ============================== -->
-<div class="page">
-  <div class="kicker">Section IX</div>
-  <h3 class="sec">Anticipated Questions from Banks, Acquirers and Payment Partners</h3>
-
-  <p><span class="para-num">9.1</span>Acquirer underwriting applies the card schemes’ own classification
-  logic, which — like the legal analysis — turns on <i>mechanics</i>, not labels. The controlling
-  distinction in the Visa Merchant Data Standards is between <b>MCC 7995</b> (betting and
-  <i>games of chance</i> to win prizes of monetary value) and <b>MCC 5816</b> (Digital Goods — Games,
-  expressly including <i>skilled game wagering</i>, e.g. daily fantasy sports). Acquirers apply a
-  dominant-factor review: does skill or chance primarily determine the outcome, and do skilled
-  participants demonstrably outperform unskilled participants over repeated play?</p>
-
+<!-- ============================== CROSS-BORDER ============================== -->
+<section class="sheet" id="s11">
+  <div class="kicker">Section 11</div>
+  <h3 class="sec">Cross-Border Operation and Geo-Gating</h3>
+  <p><span class="pn">11.1</span>The European Commission treats gambling as unharmonised, so a Cyprus
+  conclusion does not by itself settle the position in Germany, France, Spain, Italy or elsewhere. Some member
+  states ask whether skill predominates; others weigh any material element of chance; some restrict paid skill
+  games with cash prizes specifically. ChartVolt therefore offers paid entry <b>only in markets it has
+  individually reviewed</b>.</p>
   <table>
-    <tr><th style="width:12%">MCC</th><th style="width:38%">Scheme description</th><th>Applicability to the Platform</th></tr>
-    <tr><td><b>7995</b></td><td>Betting, lottery, casino chips, wagers, games of chance for monetary prizes</td>
-        <td><span class="pill no">NOT APPLICABLE</span> — no chance-based wagering; no RNG determines outcomes; identical conditions with skill ranking (Section V)</td></tr>
-    <tr><td><b>5816</b></td><td>Digital Goods — Games; skilled game wagering (e.g. daily fantasy sports)</td>
-        <td><span class="pill mid">CLOSEST FIT</span> — entry-fee skill tournaments with monetary prizes; note this MCC sits on Visa’s high-integrity-risk list, so acquirer registration and enhanced monitoring may still apply</td></tr>
-    <tr><td><b>7994</b></td><td>Skill games merchants (region-dependent)</td>
-        <td><span class="pill mid">ALTERNATIVE</span> — usable in some regions unless any operating jurisdiction regulates the activity as gambling, in which case scheme rules force 7995 — hence the jurisdiction matrix and geo-blocking in Section X</td></tr>
-    <tr><td><b>6211</b></td><td>High-Integrity-Risk Financial Trading Platforms</td>
-        <td><span class="pill no">NOT APPLICABLE</span> — no financial trading of real value occurs; the trading is a simulation used solely for scoring (Section IV)</td></tr>
+    <tr><th style="width:12%">Category</th><th>Meaning</th><th style="width:26%">Titles</th><th style="width:30%">Treatment</th></tr>
+    <tr><td><b>A</b></td><td>Deterministic or identical-content skill games</td><td>Circuit Sprint, Volt Stack, Volt Velocity</td><td>Paid entry in reviewed markets; Volt Velocity where local counsel has confirmed it</td></tr>
+    <tr><td><b>C</b></td><td>Simulated trading</td><td>Trading competitions</td><td>Paid entry in reviewed markets, assessed under competition and investment rules</td></tr>
   </table>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q1</span>“Are you a gambling merchant?”</div>
-    <div class="a">No. The product is a skill-based tournament (Sections III &amp; V): identical starting
-    conditions, no RNG-determined outcomes, ranking by sustained decision quality, prizes by ordinal rank
-    from a pre-published pool. Skilled participants demonstrably outperform unskilled ones over repeated
-    play — leaderboard and per-participant performance histories are available as evidence. This
-    memorandum, and counsel opinions where obtained, are available for underwriting files.</div>
-  </div>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q2</span>“Are you a trading/CFD/prop-firm merchant? Those are restricted.”</div>
-    <div class="a">No. Distinguish on three facts: (i) no customer money is ever exposed to a market — the
-    trading is a simulation and the maximum loss is a fixed entry fee; (ii) no payout scales with simulated
-    profit (the profit-split feature that has drawn scrutiny to prop firms is absent — prizes are fixed by
-    rank); (iii) there is no brokerage bridge, order routing or instrument anywhere in the product. The
-    Czech National Bank’s October 2024 position confirms wholly simulated models sit outside authorisation.</div>
-  </div>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q3</span>“Where is your licence?”</div>
-    <div class="a">None is required: no financial instrument or investment service (Section IV) and no game
-    of chance (Section V). The same answer was reached even by Belgium’s FSMA — the strictest EU regulator
-    in this domain — which issued only a consumer warning and pursued no licensing action against
-    comparable simulated-trading models. Jurisdiction-specific counsel confirmations can be provided.</div>
-  </div>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q4</span>“What is your chargeback exposure and how do you manage it?”</div>
-    <div class="a">A dedicated chargeback-management system is in production: PSP dispute webhooks are
-    ingested automatically; the affected account is immediately restricted; a case file is opened with full
-    evidence (KYC identity, device fingerprint, IP history, session logs, the signed entry and the complete
-    credit ledger); representment evidence is generated; and won/lost outcomes reconcile automatically,
-    including credit clawback. Declined payments never credit the ledger (single-use payment sessions), and
-    deposits map 1:1 to auditable ledger entries.</div>
-  </div>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q5</span>“What are your AML / source-of-funds controls?”</div>
-    <div class="a">KYC is mandatory before any withdrawal; withdrawals route back to the originating payment
-    method where scheme rules allow (card refund to the depositing card); duplicate-identity detection runs
-    across KYC documents; device fingerprinting, multi-account detection and IP intelligence (VPN/proxy/Tor/
-    datacenter) gate entries; risk scoring can automatically restrict accounts. Credits are strictly
-    closed-loop — value cannot move between users, which removes the layering utility that attracts abuse
-    to wallet products.</div>
-  </div>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q6</span>“What exactly does the cardholder buy, and what do you pay out?”</div>
-    <div class="a">The cardholder buys platform credits used as fixed tournament entry fees (a service, VAT
-    invoiced). Payouts are (i) rank-based tournament prizes from pre-published pools and (ii) redemption of a
-    customer’s own unspent balance. Nothing else leaves the platform. Prize liability is always fully funded
-    by the pool of collected entry fees — there is no leverage, no float risk, and no open-ended liability.</div>
-  </div>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q7</span>“What is your refund policy?”</div>
-    <div class="a">Published and implemented in code: contests that do not start (e.g. minimum participants
-    not met) refund entry fees automatically and in full; cancelled contests refund all participants;
-    voluntary deposit refunds are supported through an admin flow with credit clawback and full
-    reconciliation. Refund and dispute data are available to the acquirer on request.</div>
-  </div>
-
-  <div class="qa">
-    <div class="q"><span class="qn">Q8</span>“Which MCC do you expect, and will you accept scheme registration?”</div>
-    <div class="a">The Platform presents as MCC 5816 (skilled game wagering) or the acquirer’s preferred
-    skill-competition classification, and accepts that scheme high-integrity-risk registration and
-    enhanced monitoring may apply to that category — a cost and monitoring matter, not a legality one. The
-    Platform will not accept classification under 7995, which would misstate the mechanics, and commits to
-    geo-restricting any jurisdiction whose law treats the activity as gambling so that scheme rules never
-    force a 7995 classification.</div>
-  </div>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
-
-<!-- ============================== RISKS ============================== -->
-<div class="page">
-  <div class="kicker">Section X</div>
-  <h3 class="sec">Residual Risk Factors and Recommended Safeguards</h3>
-
-  <p><span class="para-num">10.1</span>A credible defence anticipates the attack. The following exposures
-  are identified candidly, each with a concrete safeguard. None disturbs the core conclusions.</p>
-
-  <table>
-    <tr><th style="width:4%">#</th><th style="width:26%">Exposure</th><th style="width:12%">Severity</th><th>Safeguard</th></tr>
-    <tr>
-      <td>1</td>
-      <td>Short-duration head-to-head (1v1) challenges with minimal activity thresholds may be argued to resemble wagers.</td>
-      <td><span class="pill mid">MEDIUM</span></td>
-      <td>Enforce higher minimum-decision thresholds and minimum durations for 1v1 formats; present head-to-head play as a skill duel with full statistics.</td>
-    </tr>
-    <tr>
-      <td>2</td>
-      <td>Credits ledger (1:1 EUR, redeemable) may attract e-money (EMD2) analysis independent of both licences discussed.</td>
-      <td><span class="pill mid">MEDIUM</span></td>
-      <td>Obtain a payments-law opinion; all issuance/redemption already flows through authorised payment institutions; consider structural options (agent-of-payee, limited-network) with counsel.</td>
-    </tr>
-    <tr>
-      <td>3</td>
-      <td>A minority of jurisdictions apply an “any element of chance” test rather than predominance of skill.</td>
-      <td><span class="pill mid">MEDIUM</span></td>
-      <td>Jurisdiction-by-jurisdiction access controls (geo-restriction capability exists in the Platform’s IP-intelligence layer); maintain a jurisdiction matrix with counsel.</td>
-    </tr>
-    <tr>
-      <td>4</td>
-      <td>Marketing language (“bet”, “win big”, “jackpot”) could invite gambling characterisation regardless of mechanics.</td>
-      <td><span class="pill mid">LOW–MED</span></td>
-      <td>Terminology policy: compete, skill, rank, tournament, prize. Periodic marketing audit against the policy.</td>
-    </tr>
-    <tr>
-      <td>5</td>
-      <td>Any future bridge to real-market execution, or any payout scaling with simulated profit, would collapse both defences.</td>
-      <td><span class="pill yes">CRITICAL</span></td>
-      <td>Architectural red line: read-only price data; rank-based prizes only; no brokerage integration; product-governance sign-off required for any change touching the payout formula.</td>
-    </tr>
-  </table>
-
-  <div class="box caution">
-    <div class="box-title">Standing governance recommendation</div>
-    Maintain this memorandum as a living document. Any change to (i) prize distribution mechanics,
-    (ii) contest duration/minimum-activity rules, (iii) the credits ledger, or (iv) the introduction of new
-    game formats should be re-tested against Sections IV–VI before release. Pure games of chance introduced
-    as contest formats would reverse the Section V conclusion for those formats.
-  </div>
-  <div class="footer"><span>ChartVolt — Regulatory Defence Memorandum</span><span>Privileged &amp; Confidential</span></div>
-</div>
-
-<!-- ============================== CONCLUSION ============================== -->
-<div class="page">
-  <div class="kicker">Section XI</div>
-  <h3 class="sec">Concluding Statement of Position</h3>
-
-  <div class="quoteblock">
-    ChartVolt operates skill-based simulated-trading tournaments. Participants pay a fixed, capped entry
-    fee for access to a competition in which every participant receives an identical virtual balance and
-    identical live market data, and is ranked solely on the relative quality of their decisions. No
-    financial instrument is created; no order is executed on any market; the operator bears no exposure to
-    trading outcomes; and monetary prizes are fixed, rank-based awards from a transparent, pre-published
-    prize pool — not returns on investment, and not stakes multiplied by chance. All funds move exclusively
-    through licensed payment institutions with mandatory know-your-customer verification.
-    <br/><br/>
-    Accordingly, the Platform falls outside the scope of MiFID II and ESMA-supervised authorisation — no
-    instrument, no investment service, consistent with the Czech National Bank’s October 2024 position on
-    wholly simulated models and with ESMA’s current supervisory posture — and outside member-state
-    games-of-chance legislation in predominance-of-skill jurisdictions, consistent with the treatment of
-    fantasy-sports, esports and chess competitions, and with the absence of any gaming-law classification
-    of comparable models even by Belgium, the European Union’s most restrictive financial regulator in
-    this domain.
-  </div>
-
-  <h4>Conditions on which this position depends</h4>
+  <h4>How the gate works</h4>
   <ul class="tight">
-    <li>The Platform remains wholly within the simulated model — no order routing, no brokerage bridge.</li>
-    <li>Prizes remain fixed, rank-based awards from pre-published pools — never a function of simulated profit magnitude.</li>
-    <li>Entry fees remain fixed and capped; participants can never lose more than the fee.</li>
-    <li>All money movement remains within authorised payment institutions with KYC/AML controls.</li>
-    <li>Contest rules preserve the skill profile: identical starting conditions, minimum-activity thresholds, sustained-performance ranking.</li>
+    <li>An administrator maintains the list of restricted countries. Paid entry is blocked for those countries;
+    registration can be blocked as well.</li>
+    <li>The check uses <b>two independent signals</b>: the country of the network connection, supplied at the
+    edge of ChartVolt's infrastructure, and the country the player declared at registration. Either signal
+    falling in a restricted country blocks the action.</li>
+    <li>The gate is applied at <b>registration, competition entry, challenge creation and challenge
+    acceptance</b> — every point at which a paid commitment is made.</li>
+    <li>Connections whose country cannot be determined can be treated as restricted, and VPN and proxy
+    detection (Section 9) catches attempts to disguise location.</li>
   </ul>
-
-  <h4>Reservations</h4>
-  <p class="small">This memorandum is a regulatory position paper prepared from the Platform’s verified
-  technical implementation and publicly available regulatory statements as at 11 August 2026. It does not
-  constitute legal advice and does not create a lawyer–client relationship. Gambling law is not harmonised
-  in the European Union and member-state analysis is required before reliance in any specific jurisdiction.
-  The positions of ESMA and national competent authorities may change; the monitoring obligation described
-  in Section X applies.</p>
-
-  <div style="margin-top:14mm; border-top: 1px solid #d7dde3; padding-top:5mm; display:flex; justify-content:space-between; align-items:center;">
-    <div class="small">ChartVolt — Regulatory Defence Memorandum<br/>Version 1.1 — 11 August 2026</div>
-    <div class="small" style="text-align:right;">Prepared for review by licensed counsel<br/>Privileged &amp; Confidential</div>
+  <div class="box verdict">
+    <div class="bt">Position</div>
+    Paid competition is offered only where it has been reviewed and is technically blocked everywhere else. A
+    new market is opened by a deliberate decision recorded against a legal review, never by default.
   </div>
-</div>
+</section>
+
+<!-- ============================== BANKS ============================== -->
+<section class="sheet" id="s12">
+  <div class="kicker">Section 12</div>
+  <h3 class="sec">Banks, Acquirers and Payment Partners</h3>
+  <p><span class="pn">12.1</span>Card-scheme classification turns on mechanics, as the law does. The scheme
+  distinction is between <b>MCC 7995</b> (betting and games of chance for monetary prizes) and the
+  skill-game classifications, applied by a dominant-factor review: does skill or chance primarily decide the
+  outcome, and do skilled players outperform unskilled players over repeated play?</p>
+  <table>
+    <tr><th style="width:12%">MCC</th><th style="width:36%">Scheme description</th><th>Applicability</th></tr>
+    <tr><td><b>7995</b></td><td>Betting, lotteries, games of chance for monetary prizes</td><td><span class="pill no">NOT APPLICABLE</span> — no random draw decides a winner; identical content; skill ranking (Sections 4–5)</td></tr>
+    <tr><td><b>5816</b></td><td>Digital goods — games, including skilled-game competitions</td><td><span class="pill mid">CLOSEST FIT</span> — entry-fee skill tournaments; scheme registration and enhanced monitoring accepted</td></tr>
+    <tr><td><b>7994</b></td><td>Skill-game merchants (region-dependent)</td><td><span class="pill mid">ALTERNATIVE</span> — where the acquirer prefers it; geo-gating keeps any gambling-classified market out</td></tr>
+    <tr><td><b>6211</b></td><td>Financial trading platforms</td><td><span class="pill no">NOT APPLICABLE</span> — no real trading occurs (Section 6)</td></tr>
+  </table>
+
+  <div class="qa"><div class="q"><span class="qn">Q1</span>Are you a gambling merchant?</div>
+  <div class="a">No. Every competitor receives identical content, no random draw decides the winner, nothing
+  can be bought to improve a score, and prizes are paid by rank from a pool published before entry. The Skill
+  Evidence report (Section 5) shows from production data that results are stable for repeat players, improve
+  with experience and concentrate among fewer winners than chance would produce.</div></div>
+
+  <div class="qa"><div class="q"><span class="qn">Q2</span>Are you a trading, CFD or prop-firm merchant?</div>
+  <div class="a">No. No customer money is exposed to any market; the trading is a simulation and the most a
+  player can lose is a fixed entry fee. No payout tracks simulated profit, there is no profit-split, and no
+  order or account connects to a broker.</div></div>
+
+  <div class="qa"><div class="q"><span class="qn">Q3</span>Where is your licence?</div>
+  <div class="a">None is required: ChartVolt performs no investment service (Section 6), offers no game of
+  chance (Section 4), issues no electronic money and performs no payment service (Section 7). Paid entry is
+  restricted to markets individually reviewed (Section 11). Counsel opinions are supplied for underwriting
+  files on request.</div></div>
+
+  <div class="qa"><div class="q"><span class="qn">Q4</span>Is the Volts balance a stored-value or e-money product?</div>
+  <div class="a">No. Only ChartVolt accepts Volts, for its own services; they cannot be sent to another user
+  or spent with another merchant. A redemption returns the customer's own balance to the original payment
+  method, after KYC, a hold period and manual review. Volts fall within the PSD2 limited-network exclusion and
+  ChartVolt monitors the Article 37(2) threshold.</div></div>
+
+  <div class="qa"><div class="q"><span class="qn">Q5</span>What are your AML and source-of-funds controls?</div>
+  <div class="a">Funds enter only through authorised payment providers. KYC through Veriff is required
+  before any redemption, with duplicate-identity detection; a minimum-deposit rule and hold period apply;
+  redemptions go only to the original payment method; every withdrawal is manually reviewed against limits.
+  Device fingerprinting, multi-account detection, IP intelligence and suspicion scoring run continuously.</div></div>
+
+  <div class="qa"><div class="q"><span class="qn">Q6</span>What does the cardholder buy, and what do you pay out?</div>
+  <div class="a">The cardholder buys Volts, used for fixed contest entry fees and ChartVolt marketplace items
+  — a service, VAT-invoiced. Payouts are tournament prizes by rank from fully funded pools, and redemptions of
+  a customer's own balance to their own payment method. Prize liability is always covered by the entry fees
+  collected; ChartVolt carries no open-ended liability and no exposure to any result.</div></div>
+
+  <div class="qa"><div class="q"><span class="qn">Q7</span>How do you handle chargebacks and refunds?</div>
+  <div class="a">Dispute notifications from the payment provider are ingested automatically, the account is
+  restricted, and a case file with identity, device, IP, entry and ledger evidence is assembled for
+  representment; outcomes reconcile into the ledger. Contests that do not start or are cancelled refund
+  automatically in full. Declined payments never credit an account.</div></div>
+
+  <div class="qa"><div class="q"><span class="qn">Q8</span>Which countries do you serve?</div>
+  <div class="a">Paid entry is enabled only in individually reviewed markets and blocked elsewhere using the
+  network country and the declared country together, at registration, entry and challenge creation and
+  acceptance. ChartVolt will not open a market whose law would require a 7995 classification.</div></div>
+</section>
+
+<!-- ============================== EVIDENCE INDEX ============================== -->
+<section class="sheet" id="s13">
+  <div class="kicker">Section 13</div>
+  <h3 class="sec">Evidence Index — Controls Enforced in Code</h3>
+  <p><span class="pn">13.1</span>Each control relied on in this pack, where it is enforced, and how it can be
+  demonstrated. Paths are relative to ChartVolt's source repository.</p>
+  <table>
+    <tr><th style="width:26%">Control</th><th style="width:44%">Where enforced</th><th>Demonstration</th></tr>
+    <tr><td>Identical content in ranked rounds</td><td><code>games-service/src/rounds/create.ts</code>; publication gate in <code>lib/services/games/contest-preflight.ts</code></td><td>A ranked round without a seed is refused</td></tr>
+    <tr><td>Two-player minimum and automatic refund</td><td><code>contest-preflight.ts</code>; <code>cancelCompetitionAndRefund</code> in <code>lib/actions/trading/competition.actions.ts</code></td><td>Under-filled contest cancels and refunds</td></tr>
+    <tr><td>Score direction fixed per title</td><td><code>scoreDirection</code> on <code>database/models/games/provider-game.model.ts</code>; <code>score-direction.service.ts</code></td><td>Catalogue entry per title</td></tr>
+    <tr><td>Providers never touch money</td><td>Settlement in <code>lib/services/settlement/</code>; providers report scores through one ingestion function</td><td>Provider interface has no wallet access</td></tr>
+    <tr><td>Platform fee from the pool, no house side</td><td><code>settleFeesAndGameMasters</code> in <code>lib/services/settlement/fees.service.ts</code></td><td>Settlement ledger per contest</td></tr>
+    <tr><td>Volt Velocity: no player-versus-player items</td><td><code>games-service/src/games/volt-velocity/</code> (rules copy and item set)</td><td>Race rules and live race</td></tr>
+    <tr><td>Volt Velocity: grid by standing</td><td><code>orderGrid</code> in <code>games-service/src/games/volt-velocity/grid.ts</code></td><td>Grid order before countdown</td></tr>
+    <tr><td>Volt Velocity: 30-second reconnection rule</td><td><code>velocity-server/server/race-room.mjs</code></td><td>Disconnect test in the race server suite</td></tr>
+    <tr><td>Marketplace: no advantage, no random packs</td><td>Item categories in <code>database/models/marketplace/marketplace-item.model.ts</code> (indicator, strategy, cosmetic, Game Master)</td><td>No boost or randomised category exists</td></tr>
+    <tr><td>No user-to-user transfer</td><td>No transfer route in the player API</td><td>Code inspection</td></tr>
+    <tr><td>Conversion rate and fees</td><td><code>database/models/credit-conversion-settings.model.ts</code></td><td>Disclosed at purchase</td></tr>
+    <tr><td>Withdrawal controls</td><td><code>database/models/withdrawal-settings.model.ts</code>; <code>lib/services/withdrawal-validator.service.ts</code>; <code>lib/services/withdrawal/original-method-rule.ts</code></td><td>Administrator settings and pending-withdrawal queue</td></tr>
+    <tr><td>KYC and duplicate identity</td><td><code>lib/services/veriff.service.ts</code>; <code>lib/services/kyc-fraud-detection.service.ts</code></td><td>Verification record per user</td></tr>
+    <tr><td>Fraud stack</td><td><code>device-fingerprint.service.ts</code>, <code>ip-detection.service.ts</code>, <code>fraud/suspicion-scoring.service.ts</code></td><td>Fraud dashboard</td></tr>
+    <tr><td>Chargebacks</td><td><code>lib/services/security/chargeback-handler.ts</code></td><td>Case file per dispute</td></tr>
+    <tr><td>Geo-gate</td><td><code>database/models/geo-restriction-settings.model.ts</code>; <code>lib/services/geo/geo-restriction.service.ts</code>, called from registration, entry and both challenge routes</td><td>Blocked entry from a restricted country</td></tr>
+    <tr><td>Published terms and acceptance</td><td><code>lib/constants/competition-entry-terms-page.ts</code>; <code>lib/constants/gm-package-terms-page.ts</code>; acceptance recorded per user</td><td>Terms pages and acceptance records</td></tr>
+    <tr><td>Skill Evidence report</td><td><code>apps/admin/lib/services/games/skill-evidence.service.ts</code> and <code>skill-evidence-stats.ts</code></td><td>Dated regulator PDF for any period</td></tr>
+    <tr><td>Ledger and audit trail</td><td><code>database/models/trading/wallet-transaction.model.ts</code>; <code>database/models/audit-log.model.ts</code></td><td>Ledger export per account</td></tr>
+  </table>
+</section>
+
+<!-- ============================== CONTINUING ============================== -->
+<section class="sheet" id="s14">
+  <div class="kicker">Section 14</div>
+  <h3 class="sec">Continuing Obligations and Monitoring</h3>
+  <p><span class="pn">14.1</span>The position in this pack depends on facts ChartVolt controls. ChartVolt treats
+  the following as permanent operating commitments and reviews them on the schedule shown.</p>
+  <table>
+    <tr><th style="width:36%">Commitment</th><th>How it is kept</th><th style="width:16%">Review</th></tr>
+    <tr><td>No title enters paid play without identical content</td><td>Publication refused for any title that cannot take a contest seed</td><td>Each new title</td></tr>
+    <tr><td>No product sold improves a score in a paid contest; no randomised items</td><td>Published rule; marketplace categories; review of every new item type</td><td>Each new item type</td></tr>
+    <tr><td>Simulated trading stays simulated</td><td>No order routing, no brokerage bridge, no profit-based payout</td><td>Each trading release</td></tr>
+    <tr><td>Article 37(2) PSD2 threshold</td><td>Rolling 12-month total of purchases and redemptions from the financial ledger; notification to the Central Bank of Cyprus if approached</td><td>Monthly</td></tr>
+    <tr><td>Skill evidence</td><td>Skill Evidence report regenerated per title</td><td>Quarterly and on request</td></tr>
+    <tr><td>Market list</td><td>A market is added to paid entry only after a recorded legal review; restricted list maintained in the geo-gate</td><td>Each new market; annually</td></tr>
+    <tr><td>Withdrawal controls</td><td>KYC, hold period, refund to source, manual review and limits kept on in every live market</td><td>Quarterly</td></tr>
+    <tr><td>Responsible-play features</td><td>Player-set deposit limits and self-exclusion added to account settings</td><td>Until delivered</td></tr>
+  </table>
+  <div class="box caution">
+    <div class="bt">Counsel confirmations held on file</div>
+    The formal opinion of Cyprus-qualified counsel on the conclusions in Section 15, and local counsel's
+    confirmation for each market in which paid entry — and paid Volt Velocity races in particular — is
+    enabled. Each is supplied to banking and payment partners on request.
+  </div>
+</section>
+
+<!-- ============================== FORMAL STATEMENT ============================== -->
+<section class="sheet" id="s15">
+  <div class="kicker">Section 15</div>
+  <h3 class="sec">Formal Statement of Position</h3>
+  <p class="small">Re: Regulatory classification of ChartVolt's skill-competition and simulated-trading platform.</p>
+  <p><span class="pn">15.1</span><b>Investment services.</b> ChartVolt's simulated-trading competitions are not
+  investment services within Annex&nbsp;I Section A of Directive 2014/65/EU. Participants acquire no financial
+  instruments, place no executable orders, entrust no assets and receive no payment representing an investment
+  return; prizes are allocated by rank from a pool funded by entry fees.</p>
+  <p><span class="pn">15.2</span><b>Betting.</b> ChartVolt's competitions are not betting under Law
+  37(I)/2019: participants pay to perform an activity rather than to wager on an event, no odds are offered,
+  the operator has no exposure to the outcome, and prizes are determined by the participant's measured
+  performance.</p>
+  <p><span class="pn">15.3</span><b>Games of chance.</b> In every title offered for paid entry, each competitor
+  in a contest receives identical, deterministically generated content, no advantage can be purchased, and the
+  winner is decided by a published fixed score rule. The outcome is determined predominantly by skill, which
+  is supported by ChartVolt's own skill evidence. Volt Velocity races contain no player-versus-player items,
+  start from a grid ordered by prior standing and operate a published reconnection rule; they are offered for
+  paid entry where local counsel has confirmed that classification.</p>
+  <p><span class="pn">15.4</span><b>Electronic money and payment services.</b> Volts are issued and accepted
+  exclusively by ChartVolt for its own services and cannot be transferred between users. They do not meet the
+  third-party-acceptance element of Article 2(2) of Directive 2009/110/EC and fall within the limited-network
+  exclusion in Article 3(k) of Directive (EU) 2015/2366. Every transfer of funds is executed by an authorised
+  payment service provider; redemptions return a customer's own balance to their original payment method after
+  identity verification. Game Master commission is a commercial payment by ChartVolt from its own fee under a
+  written agreement. The Article 37(2) threshold is monitored.</p>
+  <p><span class="pn">15.5</span><b>Anti-money-laundering.</b> ChartVolt is not an obliged entity under
+  Directive (EU) 2015/849, and operates identity verification, refund-to-source, hold, review, fraud and
+  chargeback controls proportionate to a closed-loop platform with no transfers between users.</p>
+  <div class="box verdict">
+    <div class="bt">Overall</div>
+    ChartVolt is a provider of skill-based competitive entertainment and simulated performance assessment —
+    not of investment, betting, gambling, electronic-money or payment services. Paid entry is offered only in
+    individually reviewed markets, with the controls set out in this pack operating in each of them.
+  </div>
+  <div class="sig">
+    <div>For and on behalf of ChartVolt<br/>Name, title, date</div>
+    <div>Adopted by Cyprus counsel<br/>Name, firm, date</div>
+  </div>
+
+  <div class="kicker" id="refs" style="margin-top:12mm;">References</div>
+  <h3 class="sec">Legal and Regulatory References</h3>
+  <ul class="tight small">
+    <li>Cyprus Betting Law, Law 37(I)/2019.</li>
+    <li>Directive 2014/65/EU (MiFID II), Article 4(1)(2), Annex I Sections A and C.</li>
+    <li>Directive 2009/110/EC (EMD2), Article 2(2).</li>
+    <li>Directive (EU) 2015/2366 (PSD2), Annex I, Article 3(k), Article 37(2).</li>
+    <li>Directive (EU) 2015/849 (Anti-Money-Laundering Directive), as amended.</li>
+    <li>Directive 2011/83/EU (Consumer Rights Directive), Article 16(m) — digital content and services supplied with express consent.</li>
+    <li>Central Bank of Cyprus — licensing process changes for payment and e-money institutions, effective 3 August 2026.</li>
+    <li>Czech National Bank — public position on simulated-trading platforms (2024).</li>
+    <li>Financial Services and Markets Authority (Belgium) and CONSOB (Italy) — public statements on paid trading challenges (2024).</li>
+    <li>UK Gambling Commission — guidance on prize competitions and games of skill (persuasive only).</li>
+    <li>Malta Gaming Authority — skill games and peer-to-peer gaming framework (comparative only).</li>
+    <li>Card-scheme merchant classification standards — MCC 7995, 7994, 5816, 6211.</li>
+  </ul>
+</section>
 
 </body>
 </html>

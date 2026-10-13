@@ -15,8 +15,10 @@ const FALLBACK_ITEMS = [
   { id: "borders", name: "Profile Borders", description: "Decorate your profile with animated borders.", icon: "Shield", gameIcon: "/game-icons/Magic Shiled 3D.png", price: "From 75 Credits", enabled: true, order: 3 },
   { id: "effects", name: "Trading Effects", description: "Add visual flair to your trades with particle effects.", icon: "Zap", gameIcon: "/game-icons/lightning speel.png", price: "From 120 Credits", enabled: true, order: 4 },
   { id: "titles", name: "Custom Titles", description: "Equip exclusive titles next to your name.", icon: "Crown", gameIcon: "/game-icons/16. Crown.png", price: "From 200 Credits", enabled: true, order: 5 },
-  { id: "chest", name: "Mystery Chests", description: "Discover random cosmetics, XP boosts, and rare collectibles.", icon: "Gift", gameIcon: "/game-icons/chest 1.png", price: "From 30 Credits", enabled: true, order: 6 },
+  { id: "bundles", name: "Cosmetic Bundles", description: "Fixed sets of cosmetics. You always see exactly what is inside before you buy.", icon: "Gift", gameIcon: "/game-icons/chest 1.png", price: "From 30 Credits", enabled: true, order: 6 },
 ];
+// Reason: no randomised or mystery items may be advertised. Paying for a random
+// reward introduces the chance element the regulatory defence depends on being absent.
 
 // Lucide icon map for rendering dynamic icon names
 const lucideMap = new Map(
