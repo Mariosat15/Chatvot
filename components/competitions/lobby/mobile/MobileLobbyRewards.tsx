@@ -103,7 +103,11 @@ export function MobileLobbyRewards({
         <>
           <div
             className={`grid min-w-0 items-end gap-2 ${
-              podium.length === 1 ? "grid-cols-1" : podium.length === 2 ? "grid-cols-2" : "grid-cols-3"
+              podium.length === 1
+                ? "grid-cols-1"
+                : podium.length === 2
+                  ? "grid-cols-2"
+                  : "grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)]"
             }`}
           >
             {podium.map((row) => {
@@ -126,9 +130,11 @@ export function MobileLobbyRewards({
                   <span className={`mt-1.5 text-[13px] font-black uppercase ${style.text}`}>
                     {ordinal(row.rank)}
                   </span>
+                  {/* Reason (owner, 13 Oct 2026): the amount must always show in full - it wraps
+                      rather than truncating, and the winner's column is wider. */}
                   <span
-                    className={`mt-0.5 max-w-full truncate font-black tabular-nums text-white ${
-                      row.rank === 1 ? "text-[17px]" : "text-[14px]"
+                    className={`mt-0.5 max-w-full break-words font-black leading-tight tabular-nums text-white ${
+                      row.rank === 1 ? "text-[16px]" : "text-[13px]"
                     }`}
                   >
                     {amount(row.filled, row.netAmount)}

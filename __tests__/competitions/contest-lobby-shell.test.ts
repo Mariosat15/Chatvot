@@ -316,5 +316,7 @@ describe("phone run panel and tab row refinements (owner, 13 Oct 2026)", () => {
     expect(rewards).toContain("PODIUM_ORDER = [2, 1, 3]");
     expect(rewards).toContain("projectPrizeDistribution(competition)");
     expect(rewards).toContain("items-end");
+    // The amounts must never be cut off (owner, 13 Oct 2026).
+    expect(rewards).not.toContain("truncate");
   });
 });
