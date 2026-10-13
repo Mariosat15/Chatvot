@@ -1,0 +1,205 @@
+CHARTVOLT — COMPETITION LOBBY MOBILE REDESIGN
+Cursor implementation specification · October 2026
+
+> **BUILT 13 October 2026 (trading). Code-complete. Never verified by eye** (behind sign-in; no real-phone review yet).
+>
+> Dedicated tree at widths **under 769px** for `/competitions/[id]` **trading** contests. Desktop stays in `DesktopTradingLobby` (`hidden min-[769px]:block`). Phone tree: `components/competitions/lobby/mobile/` (`MobileCompetitionLobby` + section modules). Same loaders, entry rules, neon graphics, Volts formatting. Tabs swap content (Overview stacks About + Battle Plan full-width). Provider phone detail not in this slice.
+>
+> **Guarded by:** `__tests__/competitions/contest-lobby-shell.test.ts`.
+
+Task: Build a dedicated mobile Competition Lobby / Competition Details page from the existing desktop page, matching the visual system and engineering approach of `ChartVolt_Competition_Arena_Mobile_Cursor_Guide_v2(2).md`.
+Inputs: (1) Screenshot of the existing desktop lobby, headed “Galactic Trader: Mission to the Stars!”; (2) the Competition Arena mobile guide as design/architecture reference. The screenshot is a desktop content/identity reference, not a layout to shrink. The screenshot's figures, labels, and competition are examples, not hardcoded content. This guide is a proposed mobile structure, not a claim that all described modules already exist in code.
+---
+1. Non-negotiable objective
+DO NOT shrink, scale, squeeze, or stack the desktop columns blindly. Create a real, native-feeling mobile competition lobby. Preserve desktop unchanged, and reuse existing real APIs, rules, registration/payment flows, timers, game-specific competition configuration, rankings, GM requirements, and backend permissions. No dummy numbers or invented business logic.
+A user should immediately know: What competition is this? When does it start? What can I win? What is the entry cost? Can I enter? What do I do next? The remaining information must be discoverable without crowding the first screen.
+Use a single readable vertical flow. The desktop's narrow right sidebar must NOT become a narrow floating sidebar inside mobile. All sections should use the full available width, with internal layout rethought for phones.
+2. Mobile page visual order — exact requirement
+Existing ChartVolt mobile app header (logo / notifications / menu) — reuse, do not duplicate.
+Compact Back to Competitions control.
+Lobby hero with game/competition art, title, category and status badges, short description.
+Competition essentials — prize pool, entry fee, participants, time/duration in readable 2×2 tiles.
+Entry / eligibility panel — user-specific eligibility, cost, balance/funding, one clear state-based primary CTA. Place this ABOVE long explanatory sections.
+Start/end countdown — compact full-width countdown when relevant; do not display a second contradictory timer elsewhere.
+Section tabs — Overview, Game/Competition Rules, Trading Rules (when applicable), Risk Management (when applicable). Prefer existing backend tab configuration; do not show irrelevant tabs for a game competition.
+Selected tab content: Overview defaults to About This Competition + game/scoring features + Battle Plan. Present in separate vertical blocks, NOT two squeezed side-by-side columns.
+Leaderboard — full-width compact top standings preview with a View All action and meaningful empty state.
+Schedule (UTC) — start/end time with dates and timezone; optional local time display clearly labeled.
+Difficulty — actual configured difficulty, segmented meter/description if data supports it.
+Prizes / Who Will Win — prize pool and top placements, with clear descriptions and consistent Volts values.
+Optional secondary details — full rules, fairness/terms, host/GM info, details/FAQ, only if supported by existing page.
+ChartVolt mobile bottom navigation, if used by the existing app shell, with bottom padding so it never covers page content.
+Do not render all rule tab panels simultaneously. Only the selected tab's body is visible. Do not force users to scroll down past a large rules essay before they can enter.
+3. Issues with simply porting the desktop design
+Desktop hero is very wide with text overlaid on art; on a phone it would crop the title, overlap the logo, and squeeze the description.
+Four desktop metric cards displayed in one row would produce clipped labels, numbers, and icons.
+Desktop center content and right sidebar are distinct columns; shrinking both makes the CTA and registration conditions unreadable.
+The desktop Overview contains About and Battle Plan side by side; they must be distinct full-width panels on mobile.
+A desktop leaderboard/table cannot retain desktop columns at 360px.
+Wide tab labels (Trading Rules, Risk Management) need touch/swipe and should not be forced into tiny widths.
+Four-box countdown, schedules, difficulty, and winner cards need hierarchy rather than a compressed stack of desktop widgets.
+A bottom browser/nav overlay can hide the Reserve Spot/Join action unless content and safe-area spacing are correctly handled.
+Failure condition: tiny text, ellipsized primary title, values such as `966...`, broken labels like `DURA...`, clipped descriptions, horizontal page scrolling, or entry buttons hidden behind a dock.
+4. Breakpoints & containment
+Use a dedicated mobile layout at widths < 769px. Leave the existing desktop UI at ≥ 769px. Test 320 (stress), 360, 375, 390, 393, 412, 430, and a tablet width around 768px, in both normal and enlarged text where feasible.
+Never use `transform: scale()`, fixed desktop pixel widths, or `white-space: nowrap` on long content. Apply `min-width: 0` on flex/grid children, `max-width: 100%` on media, `overflow-wrap: anywhere` only as a last resort for exceptional content, and `overflow-x: hidden` only after removing the actual cause of overflow. No global horizontal scrollbar.
+Mobile page gutter: 14–16px; section spacing: 16–24px; card padding: 14–18px; radius: 16–20px. Primary controls at least 44px high; CTA 48–56px. Keep readable typography; never reduce text size to hide a broken layout.
+5. Hero: design an actual mobile composition
+On desktop the screenshot shows the “Galactic Trader: Mission to the Stars!” header, over a large game/trading-art banner. Rebuild as:
+Full-width wide-but-shallow art strip, responsive height roughly 120–170px, using existing hero/artwork and a dark gradient overlay. Do not put a paragraph across detailed logo artwork.
+Below the art strip (or in a separate opaque legible area within the hero), show category (TRADING/GAME), competition status (UPCOMING/LIVE/COMPLETED etc.), and full competition title.
+Competition title uses 20–24px bold, allowing 2–3 natural lines when needed. Do not truncate the competition title. Allow card height to expand. Subtitle/description may be clamped to 2–3 lines with a `Read more` expansion.
+Keep official ChartVolt game/logo art legible; select intelligent `object-position` or use a separate logo when supplied.
+Use existing approved transparent category ribbons (`TRADING` green, `GAME` gold) where visually appropriate, but position them so they do not cover the title, action or artwork focal point. A category ribbon is not a competition status indicator.
+Cancelled/refunded competitions may use the supplied red corner ribbon and explicit text, using existing rules.
+6. Four essential metrics — separate 2×2 mobile grid
+The desktop reference has four top panels corresponding to Prize Pool, Entry Fee, Players, and a timing/duration panel. Convert to two columns with 2 rows, not 4 side-by-side cards.
+Each metric tile: icon + clear label + prominent unclipped value + optional small subtext. Suggested min-height 92–108px, gap 9–10px. Use real backend data and ChartVolt icons. Format the currency correctly as Volts, not EUR. If fee is sponsored show FREE / GM pays as appropriate. Player count must be displayed fully as `0 / 50` or corresponding actual values.
+For timing, clearly separate starts in, ends in, duration and scheduled dates: do not label a start countdown as duration. If any metric is unavailable, omit it or show an explicit neutral state rather than fabricated zeros.
+7. Entry & participation panel — prioritized
+Move the desktop right-column registration/entry widget to a full-width actionable card immediately after essentials. It should contain only the decision-critical information: user's participation state, applicable fee/funding, available balance if needed, GM/private access information, remaining places where relevant, eligibility and concise warning/terms, then a prominent full-width CTA.
+Examples of CTA labels only when existing backend logic permits: `Reserve Spot`, `Join Now`, `Join Competition`, `Already In`, `Join GM to Enter`, `View Results`, `Competition Full`, `Registration Closed`, `Add Volts`, `View Details`, `Not Eligible`.
+Eligibility and registration must be resolved server-side, never inferred from the appearance of a button. Preserve terms confirmation, GM accepted-referral requirements, private/public participation rules, registration windows, sponsored entries, balance checks, capacity, cancellation/refund rules, and existing idempotent join/payment flow. Disable duplicate submissions while pending; show appropriate progress and API error messages; reflect updated state after success.
+Do not introduce a sticky CTA by default if it competes with the app's bottom navigation. If a sticky action is used, it must be a single synced instance, have adequate safe-area spacing, and never obscure content.
+8. Countdown & schedule
+A compact mobile countdown can show four legible units (days/hours/minutes/seconds) in a single full-width panel, or a concise textual countdown on very narrow screens. Label explicitly `Starts In` or `Ends In`. Use the existing authoritative schedule and a shared time source; avoid one interval per widget. Update efficiently and handle clock skew / server time in the existing architecture. On status change, update status + CTA + countdown together. Completed/cancelled should not show a live start timer.
+Schedule card below tabs/leaderboard shows Start (UTC) and End (UTC) as two stacked rows (optional local user time, labeled). Do not truncate timestamps. Use consistent date/time formatting and respect the existing stored schedule.
+9. Tabs: keep rich functionality without clutter
+On screenshot the tabs are `Overview`, `... Rules`, `Trading Rules`, and `Risk Management` (some labels are difficult to read at screenshot resolution). Inspect the actual app's existing tab names/content before changing them. Do not silently rename, remove or create unsupported tabs. Render as a horizontal touch-scroll row with active cyan/glowing underline, visible scroll affordance or small arrows. `scroll-snap` may be used. Accessible `role=tablist`, selected tab, keyboard support.
+Rules text: separate paragraphs, subheadings, concise lists, 14–15px body, comfortable line-height, never tiny desktop text. Longer material can use accordions, but must remain available and accessible. Tabs swap content instead of stacking four long rule pages.
+10. Overview: restructure the desktop middle region
+The screenshot's About This Competition panel and Battle Plan panel are side by side on desktop. On mobile:
+About This Competition: full-width card containing description and any supported summary features. The example appears to contain strategy/feature subcards such as a forex-related item and highest-win-rate item. Convert those to 2-column compact tiles only if text fits; otherwise one column. Feature labels/values must be preserved from real configuration.
+Battle Plan: separate full-width card below About, with readable vertical timeline/steps. The screenshot shows four numbered stages (e.g. join, trade, climb ranks, top prize). These are visual examples: take the actual production text and rules. Use vertical connectors, 28–34px circular stage markers, headings and 2–3 line descriptions. Do NOT place steps in a four-column strip.
+For other competition/game types (Circuit Sprint, Volt Stack, Volt Velocity, trading), overview content must derive from the existing game metadata/configuration; do not hardcode trading-specific Battle Plan prose into every lobby.
+11. Leaderboard
+The desktop shows a large leaderboard region, currently in an empty state. On mobile use a single full-width card after the selected Overview content. Show heading + `View All` if a full leaderboard exists, then top 3–5 players only with rank, avatar, player name, score and a clear label for the scoring unit. Display user's rank if meaningful and provided. No horizontal table overflow. Keep long usernames to one/two lines with safe layout, not truncated essential numerical values.
+If no entries, show a concise friendly empty state (`No rankings yet` / proper backend-specific reason) with a suitable trophy icon. Never fabricate participants, positions, results or scores.
+12. Difficulty & game-specific details
+Desktop screenshot shows a Difficulty card. Mobile: full-width compact card using real difficulty label and visual range/meter if available. Do not invent a numeric percentage from a label such as `Skilled Trader`. Different games may have different difficulty fields; hide truly inapplicable data. For trading, retain leverage/asset/scoring/risk information in proper rules/details sections; for games, render board size, scoring, rounds, mode, laps or track only when configured.
+13. Winner prizes / rewards
+The screenshot shows `Who will win?` / winners rewards in a narrow right column. Make it full width on mobile. Show a strong prize pool header in Volts, followed by 1st, 2nd, 3rd (or actual configured placements), with distinct gold/silver/bronze markers and all rewards readable. Preserve dynamic redistribution rules, eligibility, disqualification/no-score behavior and accurate backend prize logic. Do not promise prize amounts based on example artwork or assume every competition pays exactly three winners. If no winner has been determined, show the configured potential reward breakdown, not pretend results are final.
+14. Preserve all competition states & GM logic
+Account for: upcoming/reservable, live, ending soon, completed, already entered, full, registration closed, cancelled/refunded, public/private, GM-only, invite-only, insufficient balance, sponsored/free GM-funded, not eligible, and any existing backend states. The mobile view is only a new presentation layer. It must not alter prize, scoring, commission, affiliate, eligibility, balance, refund or game-launch business logic. For private GM entry, show the correct prerequisite and route through the existing Join GM + terms flow; never bypass backend checks.
+15. Shared data & recommended architecture
+Use the desktop lobby's existing data hooks/requests and normalized state. Inspect the current repository names first; the names below are design suggestions, not an instruction to create duplicate services.
+```tsx
+function CompetitionLobbyPage() {
+  const lobby = useExistingCompetitionLobbyData(); // adapt to actual project hook
+  return (
+    <>
+      <div className="hidden min-[769px]:block">
+        <DesktopCompetitionLobby lobby={lobby} />
+      </div>
+      <div className="min-[769px]:hidden min-w-0">
+        <MobileCompetitionLobby lobby={lobby} />
+      </div>
+    </>
+  );
+}
+```
+Suggested mobile UI components:
+```text
+components/competitions/lobby/mobile/
+  MobileCompetitionLobby.tsx
+  MobileLobbyHero.tsx
+  MobileLobbyMetrics.tsx
+  MobileLobbyEntryPanel.tsx
+  MobileLobbyCountdown.tsx
+  MobileLobbyTabs.tsx
+  MobileLobbyOverview.tsx
+  MobileLobbyBattlePlan.tsx
+  MobileLobbyLeaderboard.tsx
+  MobileLobbySchedule.tsx
+  MobileLobbyDifficulty.tsx
+  MobileLobbyRewards.tsx
+  MobileLobbySkeleton.tsx
+  MobileLobbyError.tsx
+```
+Share existing backend fetching, data transformations, category/artwork resolution, countdown engine, eligibility/CTA derivation, join/reserve actions, terms, GM actions, leaderboard scores, time formatting and prize calculation. Do not build parallel inconsistent mobile-only business logic or duplicate API requests for two hidden views. Prefer CSS breakpoint rendering but avoid mounting expensive duplicate queries/components unnecessarily.
+16. ChartVolt design system
+Use the actual provided ChartVolt background and transparent neon icon assets; do not create a new unrelated page theme. Dark navy glass surfaces, restrained cyan border/blue glow, gold for money/CTA, purple for awards, green for live/success, amber for pending, red for cancelled/warning. The existing glossy neon CTA style remains; use it with readable text and adequate padding. Important surfaces glow; every text tile should not.
+Suggested type sizes: title 20–24px, section heading 16–18px, body 13–15px, stat value 18–23px, stat label 11–13px, CTA 15–17px. Respect accessible contrast and line-height. Keep darkened background behind textual content; the dramatic neon stadium environment is atmospheric, not a competing text background.
+Avoid fixed heights for text-bearing cards. Use `height: auto`, grid/flex min-width rules, and dynamic growth. The user must be able to read titles and complete key values without tapping extra controls.
+17. Mobile reference wireframe (STRUCTURE, not literal art)
+```text
+┌──────────────────────────────────────┐
+│ Existing ChartVolt mobile app header │
+├──────────────────────────────────────┤
+│ ← Back to Competitions               │
+│ [         REAL GAME HERO ART      ]  │
+│ [TRADING] [STARTING SOON]             │
+│ Galactic Trader: Mission to          │
+│ the Stars!                           │
+│ Short introduction · Read more       │
+├──────────────────────────────────────┤
+│ [ PRIZE POOL ]  [ ENTRY FEE ]         │
+│ [ PLAYERS    ]  [ STARTS IN / TIME ]  │
+├──────────────────────────────────────┤
+│ YOUR ENTRY                           │
+│ Fee / eligibility / Volts / GM info  │
+│ [        RESERVE SPOT →          ]    │
+├──────────────────────────────────────┤
+│ STARTS IN     02d 00h 52m 47s        │
+├──────────────────────────────────────┤
+│ Overview | Rules | Trading ...  →    │
+├──────────────────────────────────────┤
+│ ABOUT THIS COMPETITION               │
+│ Readable summary, optional features  │
+├──────────────────────────────────────┤
+│ BATTLE PLAN                          │
+│ ① Join In                            │
+│ │                                    │
+│ ② Trade / Play                       │
+│ │                                    │
+│ ③ Climb the Ranks                    │
+│ │                                    │
+│ ④ Take the Prize                     │
+├──────────────────────────────────────┤
+│ LEADERBOARD            View All →    │
+│ Top players / meaningful empty state │
+├──────────────────────────────────────┤
+│ SCHEDULE (UTC)                       │
+│ Start: complete date + time          │
+│ End:   complete date + time          │
+├──────────────────────────────────────┤
+│ DIFFICULTY                           │
+│ Current label and visual indicator   │
+├──────────────────────────────────────┤
+│ WHO WILL WIN?                        │
+│ Prize information / place breakdown  │
+├──────────────────────────────────────┤
+│ [ existing mobile navigation ]       │
+└──────────────────────────────────────┘
+```
+At 360px all those sections fit within the viewport width; the user scrolls vertically rather than cramming things horizontally. Only the tab strip is horizontally scrollable.
+18. Safe area, browser overlays, and accessibility
+Avoid nesting a new full-height scroll container inside Safari's existing page scroll. On iPhone Safari, toolbars expand/collapse; sticky UI must not overlap the action or interfere with scroll. Reuse the app shell's safe-area inset handling rather than double-applying it. If navigation is fixed, content bottom spacing must account for both nav height and `env(safe-area-inset-bottom)`. Scroll-to-tab anchors require `scroll-margin-top` when a fixed header is present.
+Accessible headings, `aria-live` for important state changes (not every ticking second), clear focus rings, reduced-motion support, 44px targets, real button/links, keyboard-operable tabs, alt text and sufficient contrast.
+19. Loading, empty, errors, and performance
+Use section-accurate skeletons for hero, metric tiles, action area and details. If leaderboard data is empty, show a purposeful empty state without hiding registration. If one noncritical module fails, show inline Retry instead of crashing the entire lobby. Never show a false `Reserve Spot` CTA while eligibility is unresolved. Use optimized mobile images and priority-load the visible hero; lazy-load sections and imagery below the fold. Cache where existing architecture supports it. Avoid constant re-rendering of every panel due to a per-second countdown.
+20. Acceptance checklist — Cursor must verify, not merely claim
+[ ] Desktop lobby visually and functionally unchanged.
+[ ] Dedicated mobile structure for widths under 769px.
+[ ] Existing ChartVolt mobile navigation/header reused correctly.
+[ ] Competition title fully readable; no `Galactic Trader: Mission to ...` cutoff.
+[ ] Actual lobby hero image/logo looks good on a phone; no stretched art.
+[ ] Four KPI values legible in a 2×2 grid; zero clipped labels or digits.
+[ ] Entry fee, eligibility, GM terms and real user balance correct.
+[ ] Primary action clearly visible and state-based; no fake successful joins.
+[ ] Countdown says STARTS/ENDS correctly; no contradictory timer.
+[ ] Rules tabs work on touch and show complete original content.
+[ ] About and Battle Plan are full-width readable vertical modules.
+[ ] Leaderboard works, including no-participants state and full leaderboard link.
+[ ] Schedule start/end full dates, UTC labels and countdown match backend.
+[ ] Difficulty label reflects actual data (no invented score).
+[ ] Winners/rewards reflect true configured prize rules in Volts.
+[ ] GAME/TRADING and CANCELLED/REFUNDED ribbon assets do not obscure text.
+[ ] Same template works with trading + all game competition types.
+[ ] Loading/error/empty states work without layout jumps.
+[ ] 320/360/375/390/393/412/430/768px visually tested.
+[ ] iPhone Safari tested with browser bars expanded and collapsed.
+[ ] No x-axis page scrolling, overflow, squeezed tags or overlapping CTAs.
+[ ] Minimum 44px touch targets, readable text, accessible tab navigation.
+[ ] Existing mobile bottom navigation never blocks the final content.
+FINAL CURSOR INSTRUCTION: Do not stop after making the page technically responsive. Visually compare screenshots of 360px and 390px mobile builds against this hierarchy. If the hero title, every metric, tab text, CTA and prize placement cannot be read without clipping, the redesign is not complete. The final result must look as intentionally designed as the ChartVolt mobile Dashboard and Performance pages, not like the desktop Competition Lobby squeezed into a phone.

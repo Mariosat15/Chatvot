@@ -13,7 +13,7 @@ import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.acti
 import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
 import LiveContestRefresher from "@/components/competitions/LiveContestRefresher";
 import { DesktopTradingLobby } from "@/components/competitions/detail/DesktopTradingLobby";
-import { MobileTradingLobby } from "@/components/competitions/detail/mobile/MobileTradingLobby";
+import { MobileCompetitionLobby } from "@/components/competitions/lobby/mobile/MobileCompetitionLobby";
 import { buildTradingLobbySections } from "@/components/trading/lobby/trading-lobby-accordions";
 import { buildTradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
@@ -373,8 +373,9 @@ const CompetitionDetailsPage = async ({
       Spec order for trading: Leaderboard first → optional live dashboard →
       Overview/Rules/Scoring/Assets tabs. Overview+How-it-works live inside the tabs.
 
-      Sections + overview are built ONCE here and handed to both trees. Both md:hidden and
-      hidden md:block stay mounted, so building inside each tree would double every rule card.
+      Sections + overview are built ONCE here and handed to both trees. Both
+      min-[769px]:hidden and hidden min-[769px]:block stay mounted, so building inside each
+      tree would double every rule card.
     */
     const lobbySections = buildTradingLobbySections({
       competition,
@@ -409,11 +410,11 @@ const CompetitionDetailsPage = async ({
         <LiveContestRefresher active={competition.status === "active"} />
 
         {/*
-          Dedicated phone tree below md — not a stacked copy of the desktop columns
-          (player-mobile-ui). Same loaders, entry rules and graphics; different layout.
+          Dedicated phone lobby below 769px (Complobyymobile) — not squeezed desktop
+          columns. Same loaders, entry rules and graphics; different layout.
         */}
-        <div className="md:hidden">
-          <MobileTradingLobby
+        <div className="min-[769px]:hidden min-w-0">
+          <MobileCompetitionLobby
             competition={competition}
             leaderboard={leaderboard}
             creditSymbol={creditSymbol}
@@ -437,7 +438,7 @@ const CompetitionDetailsPage = async ({
             overview={lobbyOverview}
           />
         </div>
-        <div className="hidden md:block">
+        <div className="hidden min-[769px]:block">
           <DesktopTradingLobby
             competition={competition}
             leaderboard={leaderboard}

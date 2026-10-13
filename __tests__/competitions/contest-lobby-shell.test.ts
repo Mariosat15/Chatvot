@@ -47,13 +47,13 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     "components/competitions/detail/DesktopTradingLobby.tsx",
   );
   const mobileTrading = readCode(
-    "components/competitions/detail/mobile/MobileTradingLobby.tsx",
+    "components/competitions/lobby/mobile/MobileCompetitionLobby.tsx",
   );
   const tradingSummary = readCode(
     "components/trading/lobby/TradingLobbySummary.tsx",
   );
   const mobileStats = readCode(
-    "components/competitions/detail/mobile/MobileTradingStats.tsx",
+    "components/competitions/lobby/mobile/MobileLobbyMetrics.tsx",
   );
   const tradingTabs = readCode(
     "components/competitions/detail/TradingDetailTabs.tsx",
@@ -86,13 +86,13 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
 
   it("mounts both lobbies on CompetitionDetailShell", () => {
     expect(gameLobby).toContain("<CompetitionDetailShell");
-    // Flipped 12 Oct 2026: trading desktop composition moved into DesktopTradingLobby;
-    // the page mounts that behind `hidden md:block` and a separate phone tree below `md`.
+    // Flipped 13 Oct 2026 (Complobyymobile): phone tree is MobileCompetitionLobby under
+    // lobby/mobile/; breakpoint is 769px (min-[769px]), not Tailwind `md`.
     expect(desktopTrading).toContain("<CompetitionDetailShell");
     expect(tradingPage).toContain("<DesktopTradingLobby");
-    expect(tradingPage).toContain("<MobileTradingLobby");
-    expect(tradingPage).toContain('className="md:hidden"');
-    expect(tradingPage).toContain('className="hidden md:block"');
+    expect(tradingPage).toContain("<MobileCompetitionLobby");
+    expect(tradingPage).toContain('className="min-[769px]:hidden min-w-0"');
+    expect(tradingPage).toContain('className="hidden min-[769px]:block"');
   });
 
   it("phone trading lobby is a dedicated tree, not a squeezed desktop shell", () => {
@@ -100,10 +100,20 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(mobileTrading).not.toContain("lg:grid-cols-[minmax(0,2fr)");
     expect(mobileTrading).toContain("max-w-[430px]");
     expect(mobileTrading).toContain("env(safe-area-inset-bottom)");
+    expect(mobileTrading).toContain("<MobileLobbyTabs");
+    // Battle Plan is stacked inside the Overview tab body, not beside About.
+    const mobileTabs = readCode(
+      "components/competitions/lobby/mobile/MobileLobbyTabs.tsx",
+    );
+    expect(mobileTabs).toContain("<MobileLobbyOverview");
+    expect(mobileTabs).toContain("<MobileLobbyBattlePlan");
     expect(mobileStats).toContain('size="lg"');
     expect(mobileStats).not.toContain('size="showcase"');
     expect(mobileStats).toContain("COMPETITION_ICON.entryFee");
     expect(mobileStats).toContain("COMPETITION_ICON.volts");
+    // Reason: fundingMode check must stay local — free-private-entry imports mongoose (R58).
+    expect(mobileStats).not.toContain("free-private-entry");
+    expect(mobileStats).toContain('fundingMode === "gm_funded"');
   });
 
   it("puts summary StatCards outside the hero on both kinds", () => {

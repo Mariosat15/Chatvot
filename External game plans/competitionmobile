@@ -10,22 +10,22 @@
 
 # Competition DETAIL lobby — phone layout (trading)
 
-> **BUILT 12 October 2026. Code-complete. Never verified by eye** (behind sign-in; no real-phone review yet).
+> **BUILT 13 October 2026 per `Complobyymobile`. Code-complete. Never verified by eye** (behind sign-in; no real-phone review yet).
 >
-> Dedicated tree below `md` for `/competitions/[id]` **trading** contests. Desktop stays in `DesktopTradingLobby` (`hidden md:block`); the phone tree must **not** shrink the two-column shell.
+> Dedicated tree at widths **under 769px** for `/competitions/[id]` **trading** contests. Desktop stays in `DesktopTradingLobby` (`hidden min-[769px]:block`); the phone tree must **not** shrink the two-column shell.
 >
-> **Where it lives:** `components/competitions/detail/mobile/` (`MobileTradingLobby`, `MobileTradingStats`, `MobileTradingInfo`). Wired from `app/(root)/competitions/[id]/page.tsx` with `md:hidden` / `hidden md:block`. Overview copy and rule sections are built **once** on the page and handed to both trees.
+> **Where it lives:** `components/competitions/lobby/mobile/` (`MobileCompetitionLobby`, `MobileLobbyHero`, `MobileLobbyMetrics`, `MobileLobbyEntryPanel`, `MobileLobbyCountdown`, `MobileLobbyTabs`, `MobileLobbyOverview`, `MobileLobbyBattlePlan`, `MobileLobbyLeaderboard`, `MobileLobbySchedule`, `MobileLobbyDifficulty`, `MobileLobbyRewards`, skeleton/error). Wired from `app/(root)/competitions/[id]/page.tsx` with `min-[769px]:hidden` / `hidden min-[769px]:block`. Overview copy and rule sections are built **once** on the page and handed to both trees.
 >
 > | Brief part | Built as |
 > |---|---|
-> | Header — artwork, title, description, status | `TradingLobbyHero` + status pills (same data as desktop) |
-> | Statistics — prize, entry, players, timing | `MobileTradingStats` — 2×2 `lg` cards (never desktop `showcase`); Entry fee uses `COMPETITION_ICON.entryFee` |
-> | Registration | `CompetitionEntryButton` (Reserve Spot / Join Now; same eligibility / GM rules) |
-> | Countdown | `LiveCountdown` in a neon panel |
-> | Overview / Battle plan / rules | `MobileTradingInfo` accordion; Forex overview tile uses `COMPETITION_ICON.candles` |
-> | Leaderboard | Compact `CompetitionLeaderboard` (paged) + optional live dashboard |
-> | Schedule + difficulty | Schedule (UTC) rows + difficulty bar in the phone stack |
-> | Winner rewards | Shared `PrizeTable` |
+> | Header — artwork, title, description, status | `MobileLobbyHero` (shallow art + Read more) |
+> | Statistics — prize, entry, players, timing | `MobileLobbyMetrics` — 2×2 `lg` cards; Volts; FREE when GM-funded |
+> | Registration | `MobileLobbyEntryPanel` → `CompetitionEntryButton` |
+> | Countdown | `MobileLobbyCountdown` → `LiveCountdown` |
+> | Overview / Battle plan / rules | `MobileLobbyTabs` (swap); Overview stacks About + Battle Plan full-width |
+> | Leaderboard | Top 5 + View all → `CompetitionLeaderboard` |
+> | Schedule + difficulty | `MobileLobbySchedule` + `MobileLobbyDifficulty` |
+> | Winner rewards | `MobileLobbyRewards` → shared `PrizeTable` |
 >
 > **Rules kept:** phone never imports `CompetitionDetailShell`’s two-column grid; same loaders, entry rules, neon graphics; safe-area padding; target width 360–430px (`max-w-[430px]`).
 >
@@ -33,6 +33,12 @@
 >
 > **Guarded by:** `__tests__/competitions/contest-lobby-shell.test.ts` (+ provider-play-ui page/sections hand-off).
 >
+> Older `components/competitions/detail/mobile/` tree is superseded by `lobby/mobile/` (Complobyymobile).
+
+---
+
+## Arena list — reference table (list page, not detail)
+
 > | Reference part | Built as |
 > |---|---|
 > | Header: back button, "Competition Arena" with subtitle | `MobileArenaHeader`. The back button links to `/dashboard`; the title comes from the shared `splitArenaTitle` |
@@ -51,7 +57,7 @@
 >
 > **Guarded by:** `__tests__/competitions/competition-arena-mobile.test.ts`.
 
-## Brief
+## Brief (arena list)
 
 Rebuild `/competitions` on phones (360–430px) to match the owner's Mobile UI Guide image. Follow `.cursor/rules/player-mobile-ui.mdc`:
 - give the phone its own tree below `md`;

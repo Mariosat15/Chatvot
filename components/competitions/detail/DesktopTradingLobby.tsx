@@ -17,9 +17,10 @@ import { NeonPill } from "@/components/neon/Buttons";
 /**
  * Desktop trading competition detail (md and up).
  *
- * Reason: the phone tree is a separate layout (`mobile/MobileTradingLobby`), not a shrunk
- * copy of this shell. Keeping this file as the desktop-only composition stops mobile edits
- * from rewriting the two-column page.
+ * Reason: the phone tree is a separate layout
+ * (`components/competitions/lobby/mobile/MobileCompetitionLobby`), not a shrunk copy of
+ * this shell. Keeping this file as the desktop-only composition stops mobile edits from
+ * rewriting the two-column page.
  */
 
 export type DesktopTradingLobbyProps = {

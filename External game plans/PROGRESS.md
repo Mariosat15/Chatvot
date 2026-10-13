@@ -991,6 +991,8 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+- **13 Oct 2026 - COMPETITION LOBBY MOBILE PER `Complobyymobile`.** Owner guide: dedicated phone lobby for `/competitions/[id]` trading contests — **not** squeezed desktop columns, breakpoint under 769px. Tree: `components/competitions/lobby/mobile/` (`MobileCompetitionLobby` + Hero / Metrics 2×2 / Entry / Countdown / Tabs with Overview+Battle Plan stacked / Leaderboard top-5+View all / Schedule / Difficulty / Rewards). Page wires `min-[769px]:hidden` + `hidden min-[769px]:block`; desktop `DesktopTradingLobby` unchanged; sections+overview still built once. Metrics avoids `free-private-entry` mongoose import (fundingMode check local). Docs: `Complobyymobile` BUILT, `competitionmobile` DETAIL amended. Guards flipped in `contest-lobby-shell.test.ts`. Provider phone detail still not in this slice. **Never verified by eye.**
+
 Newest at the top.
 
 - **12 Oct 2026 - Arena ASSETS / ENTRY FEE icons.** Competitions hub cards mapped both tiles to `COMPETITION_ICON.volts`. ASSETS now uses owner candles art (`icon-candles.png`); ENTRY FEE uses the red wallet-up art (`icon-entry-fee.png`) via `COMPETITION_ICON.candles` / `.entryFee` in `game-definitions.ts` and `build-competition-presentation.ts`. No money logic changed. **Never verified by eye.**
