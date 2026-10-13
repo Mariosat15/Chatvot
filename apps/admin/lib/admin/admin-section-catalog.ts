@@ -33,6 +33,7 @@ export const ADMIN_SECTION_LABELS: Readonly<Record<string, string>> = {
   "round-inspector": "Round Inspector",
   "provider-health": "Provider Health",
   "game-performance": "Game Performance",
+  "skill-evidence": "Skill Evidence",
   // User Management
   users: "Users",
   badges: "Badges & XP",
@@ -49,6 +50,7 @@ export const ADMIN_SECTION_LABELS: Readonly<Record<string, string>> = {
   "kyc-settings": "KYC Settings",
   "kyc-history": "KYC History",
   fraud: "Fraud Detection",
+  "geo-restrictions": "Country Restrictions",
   // Operations
   "price-health": "Price Feed Health",
   incidents: "Incident Management",
@@ -129,6 +131,7 @@ export const ADMIN_SECTION_GROUPS: Readonly<Record<string, readonly string[]>> =
     "round-inspector",
     "provider-health",
     "game-performance",
+    "skill-evidence",
   ],
   "User Management": [
     "users",
@@ -144,7 +147,7 @@ export const ADMIN_SECTION_GROUPS: Readonly<Record<string, readonly string[]>> =
     "withdrawals",
     "pending-withdrawals",
   ],
-  Security: ["kyc-settings", "kyc-history", "fraud"],
+  Security: ["kyc-settings", "kyc-history", "fraud", "geo-restrictions"],
   Operations: ["price-health", "incidents"],
   Messaging: ["messaging", "messaging-settings"],
   Help: ["wiki", "tutorials"],

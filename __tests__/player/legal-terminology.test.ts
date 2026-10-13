@@ -49,6 +49,8 @@ describe("X8 pass 11 legal surfaces stay off the terminology pack", () => {
         ACTION_TERM_SLUGS.GM_AFFILIATION,
         // Free Private Competitions: consent recorded per funded competition.
         ACTION_TERM_SLUGS.FREE_PRIVATE,
+        // Game Master package purchase: commission paid by ChartVolt from its own fee.
+        ACTION_TERM_SLUGS.GM_PACKAGE,
         ACTION_TERM_SLUGS.MARKETPLACE,
         ACTION_TERM_SLUGS.WITHDRAWAL,
       ].sort(),

@@ -23,6 +23,7 @@ import {
   ensureUsernameIndex,
 } from "@/lib/services/username.service";
 import { validateUsername } from "@/lib/utils/username";
+import { checkGeoAccess } from "@/lib/services/geo/geo-restriction.service";
 import type { Db } from "mongodb";
 
 /** Undoes a sign-up whose profile could not be saved (only ever a username race). */
@@ -121,6 +122,13 @@ export const signUpWithEmail = async ({
     } catch (originErr) {
       console.warn("⚠️ Origin check skipped due to error:", originErr);
       // Fail-open: don't block sign-ups if header access fails
+    }
+
+    // Reason: restricted markets (legal opinion s9 item 7). Both the network country and
+    // the declared one are checked, because the form hiding a country is not a control.
+    const geo = await checkGeoAccess("register", { declaredCountry: country });
+    if (!geo.allowed) {
+      return { success: false, error: geo.message, code: geo.code };
     }
 
     // SECURITY: Validate registration with comprehensive checks

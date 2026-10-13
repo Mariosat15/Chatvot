@@ -94,6 +94,8 @@ import GamesWorkspaceSection from "@/components/admin/games/GamesWorkspaceSectio
 import RoundInspectorSection from "@/components/admin/games/RoundInspectorSection";
 import ProviderHealthSection from "@/components/admin/games/ProviderHealthSection";
 import GamePerformanceSection from "@/components/admin/games/GamePerformanceSection";
+import SkillEvidenceSection from "@/components/admin/games/SkillEvidenceSection";
+import GeoRestrictionsSection from "@/components/admin/GeoRestrictionsSection";
 import PendingPaymentsSection from "@/components/admin/PendingPaymentsSection";
 import FailedDepositsSection from "@/components/admin/FailedDepositsSection";
 import FraudMonitoringSection from "@/components/admin/FraudMonitoringSection";
@@ -386,6 +388,14 @@ const menuGroups: MenuGroup[] = [
         color: "text-cyan-400",
         bgColor: "bg-cyan-500/10 hover:bg-cyan-500/20",
       },
+      // Skill evidence per title from settled contests (legal opinion s9 item 4).
+      {
+        id: "skill-evidence",
+        label: "Skill Evidence",
+        icon: <BarChart3 className="h-5 w-5" />,
+        color: "text-emerald-400",
+        bgColor: "bg-emerald-500/10 hover:bg-emerald-500/20",
+      },
     ],
   },
   // User Management
@@ -503,6 +513,13 @@ const menuGroups: MenuGroup[] = [
         icon: <AlertTriangle className="h-5 w-5" />,
         color: "text-red-400",
         bgColor: "bg-red-500/10 hover:bg-red-500/20",
+      },
+      {
+        id: "geo-restrictions",
+        label: "Country Restrictions",
+        icon: <Globe className="h-5 w-5" />,
+        color: "text-orange-400",
+        bgColor: "bg-orange-500/10 hover:bg-orange-500/20",
       },
     ],
   },
@@ -1147,6 +1164,8 @@ export default function AdminDashboard({
         return <KYCSettingsSection key={currentRefreshKey} />;
       case "kyc-history":
         return <KYCHistorySection key={currentRefreshKey} />;
+      case "geo-restrictions":
+        return <GeoRestrictionsSection key={currentRefreshKey} />;
       case "fraud":
         return <FraudMonitoringSection key={currentRefreshKey} />;
       case "badges":
@@ -1210,6 +1229,8 @@ export default function AdminDashboard({
         return <ProviderHealthSection key={currentRefreshKey} />;
       case "game-performance":
         return <GamePerformanceSection key={currentRefreshKey} />;
+      case "skill-evidence":
+        return <SkillEvidenceSection key={currentRefreshKey} />;
       case "server-monitor":
         return <ServerMonitorSection key={currentRefreshKey} />;
       case "server-fleet":

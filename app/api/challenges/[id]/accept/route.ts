@@ -15,6 +15,7 @@ import { isUnclaimedOpenChallenge } from "@/lib/utils/open-challenge";
 import { randomBytes } from "crypto";
 import BlockedUser from "@/database/models/messaging/blocked-user.model";
 import { getPublicName } from "@/lib/utils/user-lookup";
+import { checkGeoAccess } from "@/lib/services/geo/geo-restriction.service";
 
 // POST - Accept a challenge
 export async function POST(
@@ -89,6 +90,16 @@ export async function POST(
         { error: "Challenge not found" },
         { status: 404 },
       );
+    }
+
+    // Reason: paid play only in reviewed markets (legal opinion s9 item 7). Before every
+    // wallet read so a refusal cannot leave a partial debit.
+    if ((challenge.entryFee || 0) > 0) {
+      const geo = await checkGeoAccess("paid_entry", { userId: session.user.id });
+      if (!geo.allowed) {
+        await dbSession.abortTransaction();
+        return NextResponse.json({ error: geo.message }, { status: 403 });
+      }
     }
 
     const claimable = isUnclaimedOpenChallenge(challenge);

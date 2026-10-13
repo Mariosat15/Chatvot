@@ -1061,7 +1061,11 @@ export default function MarketplaceContent() {
 
       {/* Action Terms Dialog — shown before marketplace purchases */}
       <ActionTermsDialog
-        slug={ACTION_TERM_SLUGS.MARKETPLACE}
+        slug={
+          pendingPurchaseItem?.category === "gamemaster"
+            ? ACTION_TERM_SLUGS.GM_PACKAGE
+            : ACTION_TERM_SLUGS.MARKETPLACE
+        }
         open={showTerms}
         onAccept={proceedWithPurchase}
         onDecline={() => {

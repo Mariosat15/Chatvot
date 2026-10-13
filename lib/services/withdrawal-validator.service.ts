@@ -37,6 +37,10 @@ import {
   type RateLimitResult,
 } from "@/lib/utils/rate-limiter";
 import { sanitizeAmount } from "@/lib/utils/sanitize";
+import {
+  ORIGINAL_METHOD_REQUIRED_MESSAGE,
+  originalMethodBlocksPayout,
+} from "@/lib/services/withdrawal/original-method-rule";
 import { evaluateTwoFactorGate } from "@/lib/services/two-factor-gate.service";
 
 /**
@@ -142,6 +146,7 @@ export type WithdrawalFailureCode =
   | "ACTIVE_COMPETITIONS"
   | "ACTIVE_CHALLENGES"
   | "METHOD_DISABLED"
+  | "ORIGINAL_METHOD_REQUIRED"
   | "TWO_FACTOR_REQUIRED"
   | "TWO_FACTOR_NOT_ENABLED"
   | "TWO_FACTOR_INVALID";
@@ -713,6 +718,34 @@ export async function validateWithdrawal(
       "Bank withdrawals are currently disabled. Please use your card.",
       rateLimitHeaders,
     );
+  }
+
+  // Refund to original payment method (closed loop). Checked here, not only in the UI,
+  // because both withdrawal routes share this validator.
+  if (settings.requireOriginalPaymentMethod === true && isBankCategory) {
+    const lastDepositForMethod = await WalletTransaction.findOne({
+      userId,
+      transactionType: "deposit",
+      status: "completed",
+    })
+      .sort({ createdAt: -1 })
+      .select("paymentMethod")
+      .lean<{ paymentMethod?: string }>();
+    if (
+      originalMethodBlocksPayout({
+        required: settings.requireOriginalPaymentMethod,
+        hasDeposit: !!lastDepositForMethod,
+        lastDepositPaymentMethod: lastDepositForMethod?.paymentMethod,
+        payoutCategory,
+      })
+    ) {
+      return fail(
+        403,
+        "ORIGINAL_METHOD_REQUIRED",
+        ORIGINAL_METHOD_REQUIRED_MESSAGE,
+        rateLimitHeaders,
+      );
+    }
   }
 
   // NOTE: `settings.allowedPayoutMethods` is intentionally NOT enforced

@@ -135,6 +135,7 @@ interface WithdrawalSettings {
   // Nuvei Automatic Processing
   nuveiWithdrawalEnabled: boolean;
   nuveiPreferCardRefund: boolean;
+  requireOriginalPaymentMethod?: boolean;
 
   // Manual Mode with Payment Processor
   usePaymentProcessorForManual: boolean;
@@ -1010,6 +1011,34 @@ export default function WithdrawalSettingsSection() {
                     be able to withdraw.
                   </p>
                 </div>
+              </div>
+            )}
+
+          {/* Refund to original payment method (closed loop) - enforced by the shared withdrawal validator */}
+          <div className="mt-4 flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div>
+              <p className="font-medium text-white">
+                Refund to Original Payment Method
+              </p>
+              <p className="text-xs text-gray-400">
+                Card-funded deposits can only be withdrawn back to the card.
+                Bank-funded deposits may still be paid by bank transfer.
+              </p>
+            </div>
+            <Switch
+              checked={settings.requireOriginalPaymentMethod ?? false}
+              onCheckedChange={(checked) =>
+                updateSetting("requireOriginalPaymentMethod", checked)
+              }
+            />
+          </div>
+          {settings.requireOriginalPaymentMethod &&
+            !settings.cardWithdrawalsEnabled && (
+              <div className="mt-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <p className="text-xs text-amber-300">
+                  Card payouts are off, so players who deposited by card cannot
+                  withdraw at all while this is on.
+                </p>
               </div>
             )}
 

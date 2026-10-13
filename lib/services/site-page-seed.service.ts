@@ -60,6 +60,57 @@ export function withMissingSystemPages(saved: DefaultPage[]): DefaultPage[] {
   return missing.length > 0 ? [...saved, ...missing] : saved;
 }
 
+type StoredSection = { id?: string; type?: string; title?: string; content?: string; order?: number };
+
+function sectionsKey(sections: StoredSection[] | undefined): string {
+  return JSON.stringify(
+    (sections ?? [])
+      .map((s) => [s.id ?? "", s.type ?? "", s.title ?? "", s.content ?? "", s.order ?? 0])
+      .sort((a, b) => Number(a[4]) - Number(b[4])),
+  );
+}
+
+/**
+ * Whether a stored system page is still an earlier built-in wording, untouched, and so may be
+ * replaced by the current one.
+ * Reason: the seed never overwrites a page, so a built-in wording change (the fairness rules
+ * in the competition entry terms) would otherwise reach no existing database. Matching the
+ * old text exactly is what keeps an operator's own wording safe - an edited page never matches.
+ */
+export function upgradeableSystemPage(
+  page: DefaultPage,
+  stored: { sections?: StoredSection[]; isSystem?: boolean },
+): boolean {
+  if (!page.isSystem || stored.isSystem === false) return false;
+  const previous = page.replacesUneditedSections ?? [];
+  if (previous.length === 0) return false;
+  const storedKey = sectionsKey(stored.sections);
+  if (storedKey === sectionsKey(page.sections)) return false;
+  return previous.some((old) => sectionsKey(old) === storedKey);
+}
+
+async function upgradeUneditedSystemPages(source: DefaultPage[]): Promise<number> {
+  let upgraded = 0;
+  for (const page of source) {
+    if (!page.replacesUneditedSections?.length) continue;
+    const stored = await SitePage.findOne({ slug: page.slug })
+      .select("sections isSystem")
+      .lean<{ sections?: StoredSection[]; isSystem?: boolean }>();
+    if (!stored || !upgradeableSystemPage(page, stored)) continue;
+    await SitePage.updateOne(
+      { slug: page.slug },
+      {
+        $set: {
+          sections: page.sections,
+          ...(typeof page.version === "string" && page.version ? { version: page.version } : {}),
+        },
+      },
+    );
+    upgraded++;
+  }
+  return upgraded;
+}
+
 /**
  * Seed default site pages to database.
  * Prefers saved defaults from data/defaults/pages.json,
@@ -102,6 +153,11 @@ export async function seedSitePages(): Promise<void> {
           await SitePage.create(toSeedDoc(page));
           added++;
         }
+      }
+
+      const upgraded = await upgradeUneditedSystemPages(ALL_DEFAULT_PAGES);
+      if (upgraded > 0) {
+        console.log(`🔄 Site pages sync: ${upgraded} unedited built-in page(s) upgraded`);
       }
 
       if (added > 0) {

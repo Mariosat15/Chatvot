@@ -22,6 +22,7 @@ import {
   interpolateTermsText,
 } from "@/lib/services/gamemaster/gm-terms-rules";
 import { FREE_PRIVATE_TERMS_SLUG } from "@/lib/services/gamemaster/free-private-terms-rules";
+import { GM_PACKAGE_TERMS_SLUG } from "@/lib/constants/gm-package-terms-page";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface TermsSection {
@@ -483,4 +484,6 @@ export const ACTION_TERM_SLUGS = {
   // Recorded consent per Game Master-funded competition; the server ignores the browser's
   // Game Master id and takes it from the competition.
   FREE_PRIVATE: FREE_PRIVATE_TERMS_SLUG,
+  // Buying a Game Master package: the commission is a payment by ChartVolt from its own fee.
+  GM_PACKAGE: GM_PACKAGE_TERMS_SLUG,
 } as const;

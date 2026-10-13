@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { signUpWithEmail } from "@/lib/actions/auth.actions";
 import { useDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
+import { useRegistrationGeo } from "@/hooks/useRegistrationGeo";
 import {
   PASSWORD_REQUIREMENTS,
   passwordMeetsRequirements,
@@ -28,6 +29,7 @@ export function useSignUpForm() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsError, setTermsError] = useState<string | undefined>();
   const formStartTime = useRef(Date.now());
+  const registrationGeo = useRegistrationGeo();
 
   // Reason: GM referral must survive the sign-up → sign-in hop.
   // Read from the URL once and keep in memory.
@@ -143,5 +145,6 @@ export function useSignUpForm() {
     setTermsError,
     onSubmit,
     referralCode,
+    registrationGeo,
   };
 }

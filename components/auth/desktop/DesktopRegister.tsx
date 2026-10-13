@@ -32,6 +32,7 @@ export default function DesktopRegister() {
     setTermsError,
     onSubmit,
     referralCode,
+    registrationGeo,
   } = useSignUpForm();
 
   const {
@@ -55,6 +56,12 @@ export default function DesktopRegister() {
           Join thousands of traders and gamers competing on ChartVolt.
         </p>
       </div>
+
+      {!registrationGeo.registrationAllowed && (
+        <div role="alert" className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+          {registrationGeo.message}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="relative space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -178,6 +185,7 @@ export default function DesktopRegister() {
               control as any
             }
             error={errors.country}
+            excludeCodes={registrationGeo.restrictedCountries}
             required
           />
 

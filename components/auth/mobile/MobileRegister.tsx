@@ -38,6 +38,7 @@ export default function MobileRegister() {
     setTermsError,
     onSubmit,
     referralCode,
+    registrationGeo,
   } = useSignUpForm();
 
   const {
@@ -65,6 +66,11 @@ export default function MobileRegister() {
         title="Create Your Player Account"
         description="Set up your profile, choose what you want to compete in, and get ready to play."
       >
+        {!registrationGeo.registrationAllowed && (
+          <div role="alert" className="mb-3 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+            {registrationGeo.message}
+          </div>
+        )}
         <form
           onSubmit={handleSubmit(onSubmit)}
           className="relative space-y-3.5"
@@ -207,6 +213,7 @@ export default function MobileRegister() {
                     control as any
                   }
                   error={errors.country}
+                  excludeCodes={registrationGeo.restrictedCountries}
                   required
                 />
               </div>

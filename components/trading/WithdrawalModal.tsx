@@ -156,7 +156,11 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
         (m: WithdrawalMethod) => m.type === "original_method",
       );
 
-      if (defaultBankAccount) {
+      // Reason: the admin's "prefer refund to original card" setting puts the card first;
+      // it was saved and shown in admin but read by no player screen.
+      if (data.preferOriginalMethod && originalMethod) {
+        setSelectedMethodId(originalMethod.id);
+      } else if (defaultBankAccount) {
         setSelectedMethodId(defaultBankAccount.id);
       } else if (originalMethod) {
         setSelectedMethodId(originalMethod.id);

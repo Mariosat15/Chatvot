@@ -24,6 +24,8 @@ export type ContestEntryFailureCode =
   | "provider_unavailable"
   | "own_contest"
   | "private_not_affiliated"
+  // Paid play refused in a restricted market (legal opinion s9 item 7).
+  | "geo_restricted"
   // Free Private (Game Master-funded) competitions.
   | "free_private_terms_required"
   | "free_private_terms_unavailable"

@@ -66,6 +66,7 @@ import {
 import { getPrivateContestMembership } from "./gamemaster/private-contest-membership.service";
 import { resolveCompetitionVisibility } from "./gamemaster/competition-visibility";
 import { canEnterPrivateContest } from "./gamemaster/visible-contests";
+import { checkGeoAccess } from "./geo/geo-restriction.service";
 
 export type {
   ContestEntryActor,
@@ -250,6 +251,18 @@ export async function enterContest(
       // Reason: a Game Master-funded seat is paid from the contest's reserve, never from the
       // player's wallet, so the player gains no spendable credit and spends none.
       const funded = isFundedContest(competition);
+
+      // Reason: paid play only in reviewed markets (legal opinion s9 item 7). A funded seat
+      // still plays for withdrawable prizes, so it counts as paid. After the seat check so a
+      // seated player keeps their idempotent success; before any wallet read so a refusal
+      // cannot debit. Free contests stay open to everybody.
+      if (!actor.trusted && (funded || entryFee > 0)) {
+        const geo = await checkGeoAccess("paid_entry", { userId: actor.userId });
+        if (!geo.allowed) {
+          await session.abortTransaction();
+          return fail("geo_restricted", geo.message);
+        }
+      }
 
       if (funded) {
         const fundedFailure = await payFundedEntry(competition, actor, session);

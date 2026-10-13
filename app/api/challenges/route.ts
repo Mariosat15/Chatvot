@@ -31,6 +31,7 @@ import { CHALLENGE_ROUND_START_POLICY } from "@/lib/services/games/challenge-rou
 import { resolveAcceptDeadline } from "@/lib/services/challenges/accept-deadline";
 import type { RoundStartPolicy } from "@/lib/services/games/round-types";
 import BlockedUser from "@/database/models/messaging/blocked-user.model";
+import { checkGeoAccess } from "@/lib/services/geo/geo-restriction.service";
 import {
   getRateLimitHeaders,
   RateLimiters,
@@ -308,6 +309,13 @@ export async function POST(request: NextRequest) {
           entryGate.reason || "Entry is not allowed at this time.",
           403,
         );
+      }
+
+      // Reason: paid play only in reviewed markets (legal opinion s9 item 7). Before any
+      // wallet read, like every guard above.
+      if ((entryFee ?? settings.minEntryFee) > 0) {
+        const geo = await checkGeoAccess("paid_entry", { userId: challengerId });
+        if (!geo.allowed) return errorResponse(geo.message, 403);
       }
     }
 

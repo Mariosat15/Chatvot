@@ -28,19 +28,27 @@ type CountrySelectProps = {
   control: Control<any>;
   error?: FieldError;
   required?: boolean;
+  /** ISO alpha-2 codes to leave out, e.g. markets where registration is restricted. */
+  excludeCodes?: readonly string[];
 };
 
 const CountrySelect = ({
   value,
   onChange,
+  excludeCodes,
 }: {
   value: string;
   onChange: (value: string) => void;
+  excludeCodes?: readonly string[];
 }) => {
   const [open, setOpen] = useState(false);
 
-  // Get country options with flags
-  const countries = countryList().getData();
+  // Reason: hiding a restricted country is a convenience only; signUpWithEmail refuses
+  // a restricted declared country whatever the form sent.
+  const excluded = new Set((excludeCodes ?? []).map((c) => c.toUpperCase()));
+  const countries = countryList()
+    .getData()
+    .filter((c) => !excluded.has(c.value.toUpperCase()));
 
   // Helper function to get flag emoji
   const getFlagEmoji = (countryCode: string) => {
@@ -121,6 +129,7 @@ export const CountrySelectField = ({
   control,
   error,
   required = false,
+  excludeCodes,
 }: CountrySelectProps) => {
   return (
     <div className="space-y-2">
@@ -134,7 +143,11 @@ export const CountrySelectField = ({
           required: required ? `Please select ${label.toLowerCase()}` : false,
         }}
         render={({ field }) => (
-          <CountrySelect value={field.value} onChange={field.onChange} />
+          <CountrySelect
+            value={field.value}
+            onChange={field.onChange}
+            excludeCodes={excludeCodes}
+          />
         )}
       />
       {error && <p className="text-sm text-red-500">{error.message}</p>}

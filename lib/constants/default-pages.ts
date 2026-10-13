@@ -20,6 +20,8 @@
 
 import { GM_AFFILIATION_TERMS_PAGE } from "./gm-affiliation-terms-page";
 import { FREE_PRIVATE_TERMS_PAGE } from "./free-private-terms-page";
+import { COMPETITION_ENTRY_TERMS_PAGE } from "./competition-entry-terms-page";
+import { GM_PACKAGE_TERMS_PAGE } from "./gm-package-terms-page";
 
 export type DefaultPageCategory = "page" | "action_terms";
 
@@ -55,6 +57,12 @@ export interface DefaultPage {
    * consent to wording that has no version and may have been withdrawn by the operator.
    */
   requiresLivePage?: boolean;
+  /**
+   * Earlier built-in wordings of this page. A stored page whose sections still match one of
+   * them exactly was never edited, so the seed may upgrade it to `sections`. A page an
+   * operator has reworded never matches and is left alone (R11).
+   */
+  replacesUneditedSections?: DefaultPageSection[][];
   seoTitle: string;
   seoDescription: string;
   sections: DefaultPageSection[];
@@ -561,46 +569,6 @@ const ACTION_TERMS_MARKETPLACE: DefaultPage = {
   ],
 };
 
-const ACTION_TERMS_COMPETITION: DefaultPage = {
-  slug: "terms-competition-entry",
-  title: "Competition Entry Terms",
-  subtitle: "Please read and accept before entering this competition.",
-  isSystem: true,
-  category: "action_terms",
-  seoTitle: "",
-  seoDescription: "",
-  sections: [
-    {
-      id: "ace-1",
-      type: "heading",
-      title: "Competition Entry Agreement",
-      content: "",
-      order: 0,
-    },
-    {
-      id: "ace-2",
-      type: "paragraph",
-      content:
-        "By entering this competition, you acknowledge and agree to the following terms. Competitions involve simulated trading with virtual capital. Entry fees are non-refundable once the competition begins.",
-      order: 1,
-    },
-    {
-      id: "ace-3",
-      type: "list",
-      content:
-        "Entry fees are deducted from your credit wallet and are non-refundable once the competition starts\nAll trading within competitions is simulated — no real financial instruments are traded\nThe platform reserves the right to disqualify participants for rule violations, collusion, or exploitation\nPrize distribution follows the competition rules defined at the time of creation\nMargin calls and liquidation may apply — resulting in disqualification and loss of entry fee\nResults and rankings are final as determined by the platform's scoring system",
-      order: 2,
-    },
-    {
-      id: "ace-4",
-      type: "paragraph",
-      content:
-        "By clicking 'I Accept', you agree to the competition rules, accept the risk of losing your entry fee, and acknowledge that results are final.",
-      order: 3,
-    },
-  ],
-};
-
 const ACTION_TERMS_CHALLENGE: DefaultPage = {
   slug: "terms-challenge",
   title: "Challenge Terms",
@@ -650,10 +618,11 @@ export const DEFAULT_ACTION_TERMS: DefaultPage[] = [
   ACTION_TERMS_CREDIT_PURCHASE,
   ACTION_TERMS_WITHDRAWAL,
   ACTION_TERMS_MARKETPLACE,
-  ACTION_TERMS_COMPETITION,
+  COMPETITION_ENTRY_TERMS_PAGE,
   ACTION_TERMS_CHALLENGE,
   GM_AFFILIATION_TERMS_PAGE,
   FREE_PRIVATE_TERMS_PAGE,
+  GM_PACKAGE_TERMS_PAGE,
 ];
 
 /** All default pages combined (for backward compatibility with seed logic) */

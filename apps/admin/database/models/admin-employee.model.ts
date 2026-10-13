@@ -41,6 +41,9 @@ export const ADMIN_SECTIONS = [
   // and `financial`. Putting revenue behind a games section would be a silent widening of who
   // can read it, which is the trap `12` s1.1 records about merging sections.
   "game-performance",
+  // Skill evidence per title for counsel and regulators (legal opinion s9 item 4). Its own
+  // grant because it is regulatory evidence rather than catalogue operations. Add-only.
+  "skill-evidence",
   // The round inspector (X6). A separate grant from `game-providers` on purpose: registering a
   // provider is a configuration job, while voiding a player's round is a decision about that
   // player's contest, and the two are not the same trust.
@@ -76,6 +79,7 @@ export const ADMIN_SECTIONS = [
   "kyc-settings",
   "kyc-history",
   "fraud",
+  "geo-restrictions",
   // Operations
   "price-health",
   "incidents",

@@ -72,6 +72,9 @@ export interface IWithdrawalSettings extends Document {
   // transfer. Not enforced server-side — users retain the right to pick any
   // allowed method.
   nuveiPreferCardRefund: boolean;
+  // Closed loop: when true, a card-funded deposit can only be withdrawn back to a card.
+  // Enforced server-side by lib/services/withdrawal/original-method-rule.ts.
+  requireOriginalPaymentMethod: boolean;
 
   // Manual Mode with Payment Processor
   // When enabled in manual mode: User requests → Nuvei (PENDING) → Admin approves → Nuvei processes payment
@@ -293,6 +296,10 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
     nuveiWithdrawalEnabled: {
       type: Boolean,
       default: false, // Disabled by default, admin must enable
+    },
+    requireOriginalPaymentMethod: {
+      type: Boolean,
+      default: false, // Off keeps existing behaviour until an admin switches it on
     },
     nuveiPreferCardRefund: {
       type: Boolean,

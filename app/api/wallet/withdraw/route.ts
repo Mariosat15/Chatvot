@@ -16,6 +16,10 @@ import KYCSettings from "@/database/models/kyc-settings.model";
 import { sanitizeUserNote } from "@/lib/utils/sanitize";
 import { createSecurityLogger } from "@/lib/utils/security-logger";
 import {
+  ORIGINAL_METHOD_REQUIRED_MESSAGE,
+  originalMethodBlocksPayout,
+} from "@/lib/services/withdrawal/original-method-rule";
+import {
   validateWithdrawal,
   notifyAdminsOfWithdrawal,
   type PayoutCategory,
@@ -237,10 +241,26 @@ export async function GET() {
       );
     }
 
+    // Refund to original payment method: the validator refuses a bank payout of card-funded
+    // money, so the selector must not offer one.
+    const originalMethodEnforced = originalMethodBlocksPayout({
+      required: withdrawalSettings.requireOriginalPaymentMethod,
+      hasDeposit: !!lastDeposit,
+      lastDepositPaymentMethod: lastDeposit?.paymentMethod,
+      payoutCategory: "bank_transfer",
+    });
+    if (originalMethodEnforced) {
+      filteredWithdrawalMethods = filteredWithdrawalMethods.filter(
+        (m) => m.type !== "bank_account",
+      );
+    }
+
     // Update warning if no methods available
     if (filteredWithdrawalMethods.length === 0 && eligibility.eligible) {
       eligibility.warnings = eligibility.warnings || [];
-      if (manualPayoutMode) {
+      if (originalMethodEnforced) {
+        eligibility.warnings.push(ORIGINAL_METHOD_REQUIRED_MESSAGE);
+      } else if (manualPayoutMode) {
         eligibility.warnings.push(
           "Withdrawals are processed by bank transfer. Please add a bank account with your full details (IBAN, BIC/SWIFT, bank name and address) in your wallet settings.",
         );
@@ -298,6 +318,9 @@ export async function GET() {
       // Withdrawal method settings
       bankWithdrawalsEnabled,
       cardWithdrawalsEnabled,
+      // Admin "prefer refund to original card": the modal selects the card first.
+      preferOriginalMethod: withdrawalSettings.nuveiPreferCardRefund === true,
+      originalMethodEnforced,
       // Automatic withdrawal enabled (only when routing actually resolves to
       // an enabled Nuvei fast-path — respects the master switch + provider).
       nuveiEnabled:

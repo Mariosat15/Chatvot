@@ -47,6 +47,7 @@ const STATUS_BY_CODE: Record<ContestEntryFailureCode, number> = {
   provider_unavailable: 503,
   own_contest: 403,
   private_not_affiliated: 403,
+  geo_restricted: 403,
   free_private_terms_required: 403,
   free_private_terms_unavailable: 409,
   free_private_unfunded: 409,
