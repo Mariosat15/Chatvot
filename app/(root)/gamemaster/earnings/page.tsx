@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import {
-  ArrowLeft,
   TrendingUp,
   Calendar,
   Filter,
@@ -19,6 +17,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { GmContestKindBadge } from "@/components/gamemaster/GmContestKindBadge";
 import type { GmContestKind } from "@/lib/utils/gm-contest-kind";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 interface Earning {
   _id: string;
@@ -170,13 +169,7 @@ export default function GMEarningsPage() {
       {/* Header */}
       <div className="border-b border-gray-800 bg-gradient-to-r from-emerald-500/10 to-green-500/10">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <Link
-            href="/gamemaster"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors min-h-[44px]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Link>
+          <div className="mb-3 sm:mb-4"><NeonBackLink href="/gamemaster" label="Dashboard" /></div>
 
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-500/20 flex items-center justify-center flex-shrink-0">

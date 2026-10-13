@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Crown,
   Trophy,
-  ArrowLeft,
   FileText,
   DollarSign,
   Calendar,
@@ -55,6 +53,7 @@ import {
   NO_GAME_MASTER_DEFAULTS,
   type GameMasterDefaultsLookup,
 } from "@/components/gamemaster/competition-defaults-lookup";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 interface GMSubscription {
   limits: {
@@ -887,13 +886,7 @@ export default function GMCreateCompetitionContent({
       {/* Header */}
       <div className="border-b border-gray-800 bg-gradient-to-r from-yellow-500/10 to-amber-500/10">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <Link
-            href="/gamemaster"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors min-h-[44px]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Link>
+          <div className="mb-3 sm:mb-4"><NeonBackLink href="/gamemaster" label="Dashboard" /></div>
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">

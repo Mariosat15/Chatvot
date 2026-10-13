@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
+import { ArrowLeft, type LucideIcon } from "lucide-react";
 import { PRESS_EFFECT } from "@/components/ui/press-effect";
 
 /**
@@ -136,7 +136,24 @@ export function NeonButton({
   );
 }
 
-/** The sheet's small `Back to Competitions` / `View Details` pill. */
+const PILL_CLASSES = `inline-flex items-center gap-2 rounded-lg border border-[#1B2540] bg-[#0A0F1F]/80 px-3 py-2 text-xs font-medium text-gray-300 hover:border-[#2A3766] hover:text-gray-100 ${PRESS_EFFECT}`;
+
+/**
+ * THE back button - one look on every page, phone and desktop (owner, 13 Oct 2026: "make
+ * sure that in all pages the back buttons are the same"). The arrow and the "Back to ..."
+ * wording are fixed here so a call site can only choose where it goes; `min-h-[40px]` keeps
+ * the tap target comfortable on a phone without changing the pill's look.
+ */
+export function NeonBackLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className={`${PILL_CLASSES} min-h-[40px] max-w-full`}>
+      <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span className="truncate">Back to {label}</span>
+    </Link>
+  );
+}
+
+/** The sheet's small `View Details` / `Results` pill. Back links use `NeonBackLink`. */
 export function NeonPill({
   href,
   icon: Icon,
@@ -147,10 +164,7 @@ export function NeonPill({
   label: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={`inline-flex items-center gap-2 rounded-lg border border-[#1B2540] bg-[#0A0F1F]/80 px-3 py-2 text-xs font-medium text-gray-300 hover:border-[#2A3766] hover:text-gray-100 ${PRESS_EFFECT}`}
-    >
+    <Link href={href} className={PILL_CLASSES}>
       <Icon className="h-3.5 w-3.5" />
       {label}
     </Link>

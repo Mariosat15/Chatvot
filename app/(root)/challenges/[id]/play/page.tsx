@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Gift } from "lucide-react";
+import { Gift } from "lucide-react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
@@ -25,6 +25,7 @@ import { resolveProviderBanner } from "@/components/neon/banners";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { Button } from "@/components/ui/button";
 import ChallengeTradingWorkspace from "@/components/trading/ChallengeTradingWorkspace";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 /**
  * Where a player plays a provider-game 1v1 challenge - the challenge-side sibling of
@@ -101,13 +102,7 @@ export default async function ChallengePlayPage({
 
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <Link
-          href={`/challenges/${challengeId}`}
-          className="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to the challenge
-        </Link>
+        <div className="mb-6"><NeonBackLink href={`/challenges/${challengeId}`} label="the challenge" /></div>
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
           <h1 className="font-semibold text-amber-300">You cannot play this yet</h1>
           <p className="mt-2 text-sm text-amber-200/80">{outcome.error}</p>

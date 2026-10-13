@@ -15,7 +15,6 @@ import { connectToDatabase } from "@/database/mongoose";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
-  ArrowLeft,
   ChevronRight,
   Eye,
   LayoutDashboard,
@@ -28,6 +27,7 @@ import { getGamePresentation } from "@/lib/services/games/game-presentation.serv
 import { findUnscoredRefund } from "@/lib/services/settlement/unscored-refund";
 import AppSettingsModel from "@/database/models/app-settings.model";
 import { canViewContest } from "@/lib/services/gamemaster/private-contest-access.service";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 /*
   The two row shapes this page reduces over, named rather than annotated `any` at each call
@@ -127,16 +127,7 @@ const CompetitionResultsPage = async ({
     return (
       <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20 p-3 sm:gap-6 sm:p-4 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-          <Link href="/competitions">
-            <Button
-              variant="ghost"
-              className="min-h-[44px] w-fit gap-2 text-gray-400 hover:text-gray-100"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Competitions</span>
-              <span className="sm:hidden">Back</span>
-            </Button>
-          </Link>
+          <NeonBackLink href="/competitions" label="Competitions" />
           {/*
             THE QUERY STRING IS THE WHOLE POINT OF THIS LINK, and it was missing. Without it
             the lobby redirects a participant of a completed contest straight back here, so
@@ -281,16 +272,7 @@ const CompetitionResultsPage = async ({
     <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20 overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
-        <Link href="/competitions">
-          <Button
-            variant="ghost"
-            className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to Competitions</span>
-            <span className="sm:hidden">Back</span>
-          </Button>
-        </Link>
+        <NeonBackLink href="/competitions" label="Competitions" />
         <Link href={competitionDetailsHref(competitionId)}>
           <Button
             variant="outline"

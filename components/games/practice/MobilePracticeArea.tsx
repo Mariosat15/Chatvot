@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { GraduationCap, Loader2, Play } from "lucide-react";
 import type { GameScoreType } from "@/lib/utils/format-game-score";
 import type { PracticeRoundView } from "../practice-state";
 import { PRACTICE_FEATURES } from "./practice-features";
 import { MobilePracticeHistory } from "./MobilePracticeHistory";
+import { NeonBackLink } from "@/components/neon/Buttons";
 import "./mobile-practice.css";
 
 interface MobilePracticeAreaProps {
@@ -97,9 +97,9 @@ export function MobilePracticeArea({
         busy={historyBusy}
       />
 
-      <Link href={`/games/${slug}`} className="m-practice__back">
-        ← Back to {gameName}
-      </Link>
+      <div className="m-practice__back">
+        <NeonBackLink href={`/games/${slug}`} label={gameName} />
+      </div>
     </div>
   );
 }

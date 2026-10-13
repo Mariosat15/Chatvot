@@ -2,9 +2,6 @@
 
 import {
   Trophy,
-  TrendingUp,
-  TrendingDown,
-  Target,
   AlertCircle,
   Crown,
   Medal,
@@ -23,7 +20,6 @@ import {
 } from "@/lib/services/win-probability.service";
 import {
   getRankingConfig,
-  getMetricIcon,
 } from "@/lib/services/ranking-config.service";
 
 interface WinPotentialCardProps {
@@ -55,7 +51,6 @@ export default function WinPotentialCard({
 
   // Calculate gap to leader
   const gap = winData.gapToLeader;
-  const gapAbs = Math.abs(gap);
   const isLeading = winData.currentRank === 1;
 
   // Color schemes based on ranking method
@@ -219,9 +214,10 @@ export default function WinPotentialCard({
             {rankingConfig.fullName}
           </span>
         </div>
-        <div className="group relative">
+        {/* Reason: focus-within lets a tap open it on phones, where hover never fires. */}
+        <div className="group relative" tabIndex={0} aria-label={rankingConfig.description}>
           <Info className="h-3.5 w-3.5 text-gray-500 hover:text-gray-300 cursor-help" />
-          <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-lg">
+          <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-gray-800 border border-gray-700 rounded-lg text-xs text-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-all z-50 shadow-lg">
             {rankingConfig.description}
           </div>
         </div>
@@ -352,7 +348,7 @@ export default function WinPotentialCard({
             <div className="flex items-center justify-center gap-2">
               <Crown className="h-4 w-4 text-emerald-400" />
               <span className="text-sm font-semibold text-emerald-400">
-                You're leading in {rankingConfig.name}! 🎯
+                You&apos;re leading in {rankingConfig.name}! 🎯
               </span>
             </div>
             {winData.gapToNextRank !== null && allParticipants.length > 1 && (

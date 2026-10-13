@@ -170,7 +170,7 @@ export function MobileLobbyRewards({
           <div className="mt-3.5 flex flex-col items-center gap-1.5 text-center">
             <p className={`text-[12px] font-semibold ${allFilled ? "text-emerald-300" : "text-amber-300"}`}>
               {allFilled
-                ? `${joined} of ${prizePositions} paid positions filled`
+                ? `${Math.min(joined, prizePositions)} of ${prizePositions} paid positions filled`
                 : `${joined} of ${prizePositions} filled - ${unclaimedPercentage}% still to share`}
             </p>
             <div className="h-1.5 w-3/4 overflow-hidden rounded-full bg-white/10">

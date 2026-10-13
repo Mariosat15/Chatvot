@@ -569,18 +569,11 @@
   cursor: not-allowed;
 }
 
+/* Wraps the shared NeonBackLink pill; layout only (owner, 13 Oct 2026). */
 .practice-back {
   display: block;
   margin: 32px auto 0;
   text-align: center;
-  color: #13dfff;
-  font-size: 14px;
-  text-decoration: none;
-  text-shadow: 0 0 10px rgba(19, 223, 255, 0.35);
-}
-
-.practice-back:hover {
-  color: #7fefff;
 }
 
 .practice-unavailable {

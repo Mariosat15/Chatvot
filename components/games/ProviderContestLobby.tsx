@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Clock,
   Gamepad2,
   Link2,
@@ -26,7 +25,7 @@ import {
 import { ArenaLiveProvider } from "@/components/games/arena/ArenaLiveStandings";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { resolveProviderBanner } from "@/components/neon/banners";
-import { NeonPill } from "@/components/neon/Buttons";
+import { NeonBackLink, NeonPill } from "@/components/neon/Buttons";
 import {
   NeonNote,
   NeonPanel,
@@ -472,11 +471,7 @@ export default async function ProviderContestLobby({
       <CompetitionDetailShell
         nav={
           <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-            <NeonPill
-              href="/competitions"
-              icon={ArrowLeft}
-              label={`Back to ${terms.contests}`}
-            />
+            <NeonBackLink href="/competitions" label={terms.contests} />
             <div className="hidden sm:block">
               <UTCClock />
             </div>

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
   Users,
   Search,
   Calendar,
@@ -30,6 +29,7 @@ import {
 } from "@/components/gamemaster/GmReferralBadges";
 import SendTermsButton from "@/components/gamemaster/SendTermsButton";
 import AwaitingTermsList from "@/components/gamemaster/AwaitingTermsList";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 const KIND_FILTERS = [
   { value: "all", label: "All" },
@@ -121,13 +121,7 @@ export default function GMReferralsPage() {
       {/* Header */}
       <div className="border-b border-gray-800 bg-gradient-to-r from-blue-500/10 to-cyan-500/10">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <Link
-            href="/gamemaster"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors min-h-[44px]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
-          </Link>
+          <div className="mb-3 sm:mb-4"><NeonBackLink href="/gamemaster" label="Dashboard" /></div>
 
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 flex items-center justify-center flex-shrink-0">

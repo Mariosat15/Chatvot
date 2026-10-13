@@ -280,7 +280,9 @@ describe("the arena hero stays one thin banner", () => {
       the assertion is in both directions, because deleting the link as well would take the
       contest's name off the screen altogether.
     */
-    expect(readCode(LAYOUT)).toMatch(/Back to \{competitionName\}/);
+    // Re-pointed 13 Oct 2026, claim unchanged: the link is the shared NeonBackLink, which
+    // renders "Back to {label}".
+    expect(readCode(LAYOUT)).toMatch(/<NeonBackLink[^>]*label=\{competitionName\}/);
     expect(readCode(IDENTITY)).not.toMatch(/contestName/);
   });
 });

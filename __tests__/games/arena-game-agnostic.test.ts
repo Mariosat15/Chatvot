@@ -116,8 +116,13 @@ describe("the stripper reaches the words a player reads", () => {
       was reading a file that no longer contains it - and a canary that fails says nothing about
       the stripper. `Back to Competitions` is the layout's own copy and cannot move without the
       layout's own back link moving with it.
+
+      RE-POINTED AGAIN ON 13 OCTOBER 2026, CLAIM UNCHANGED: every back link became the shared
+      `NeonBackLink`, so its words now live in `components/neon/Buttons.tsx` and the layout holds
+      no copy of its own. The survival half reads that file; the stripping halves stay here.
     */
-    expect(layout).toContain("Back to");
+    const backLink = playerFacingText(read("components/neon/Buttons.tsx"));
+    expect(backLink).toContain("Back to");
     // A layout class, gone.
     expect(layout).not.toContain("grid-cols");
     // The layout file's comments argue about the board at length; none of it survives.

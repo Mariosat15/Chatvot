@@ -1,4 +1,4 @@
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { COMPETITIONS_ARENA_BG } from "@/lib/competitions/game-definitions";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import type { DifficultyLevel } from "@/lib/utils/competition-difficulty";
@@ -6,7 +6,7 @@ import type { TitleLevel } from "@/lib/constants/levels";
 import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
 import type { TradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
-import { NeonPill } from "@/components/neon/Buttons";
+import { NeonBackLink, NeonPill } from "@/components/neon/Buttons";
 import { resolveLevelName } from "@/lib/utils/level-title";
 import { resolveTradingBanner } from "@/components/neon/banners";
 import { MobileLobbyHero } from "./MobileLobbyHero";
@@ -195,7 +195,7 @@ export function MobileCompetitionLobby({
         }}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <NeonPill href="/competitions" icon={ArrowLeft} label="Competitions" />
+          <NeonBackLink href="/competitions" label="Competitions" />
           {isCompleted && isUserIn ? (
             <NeonPill
               href={`/competitions/${competitionId}/results`}

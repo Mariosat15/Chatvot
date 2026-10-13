@@ -3,7 +3,6 @@ import {
   DollarSign,
   Calendar,
   TrendingUp,
-  ArrowLeft,
   Target,
   Shield,
   AlertTriangle,
@@ -32,6 +31,7 @@ import {
 } from "@/lib/utils/open-challenge";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 interface ChallengePageProps {
   params: Promise<{ id: string }>;
@@ -206,16 +206,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
 
         {/* Header with Back Button and UTC Clock */}
         <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
-          <Link href="/challenges">
-            <Button
-              variant="ghost"
-              className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Back to Challenges</span>
-              <span className="sm:hidden">Back</span>
-            </Button>
-          </Link>
+          <NeonBackLink href="/challenges" label="Challenges" />
           <UTCClock />
         </div>
 

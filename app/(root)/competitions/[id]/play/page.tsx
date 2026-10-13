@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
@@ -27,6 +26,7 @@ import { resolveProviderBanner } from "@/components/neon/banners";
 import { Button } from "@/components/ui/button";
 import CompetitionTradingWorkspace from "@/components/trading/CompetitionTradingWorkspace";
 import { canViewContestById } from "@/lib/services/gamemaster/private-contest-access.service";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 /**
  * Where a player actually plays — the `/play` dispatcher for every contest.
@@ -111,13 +111,7 @@ export default async function PlayPage({ params, searchParams }: PlayPageProps) 
 
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
-        <Link
-          href={`/competitions/${competitionId}`}
-          className="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to the competition
-        </Link>
+        <div className="mb-6"><NeonBackLink href={`/competitions/${competitionId}`} label="the competition" /></div>
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6">
           <h1 className="font-semibold text-amber-300">You cannot play this yet</h1>
           <p className="mt-2 text-sm text-amber-200/80">{outcome.error}</p>

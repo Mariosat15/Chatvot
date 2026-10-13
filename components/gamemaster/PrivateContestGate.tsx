@@ -10,6 +10,7 @@ import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { privateContestInvitation } from "@/lib/utils/private-contest-card-copy";
 import type { PrivateContestGate as GateFacts } from "@/lib/services/gamemaster/private-contest-gate.service";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 const GENERIC_ERROR = "Something went wrong. Please contact support.";
 
@@ -131,9 +132,7 @@ export default function PrivateContestGate({
           )}
         </div>
       </div>
-      <Link href="/competitions" className="text-sm text-gray-400 hover:text-gray-200">
-        Back to competitions
-      </Link>
+      <NeonBackLink href="/competitions" label="Competitions" />
 
       {dialogOpen && gate.gameMasterUserId && (
         <ActionTermsDialog

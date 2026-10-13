@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   CheckCircle2,
   Clock,
   Clock3,
@@ -23,7 +22,7 @@ import GameRulesPanel from "@/components/games/GameRulesPanel";
 import ProviderClientWarmup from "@/components/games/ProviderClientWarmup";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { resolveProviderBanner } from "@/components/neon/banners";
-import { NeonPill } from "@/components/neon/Buttons";
+import { NeonBackLink, NeonPill } from "@/components/neon/Buttons";
 import {
   NeonCountPill,
   NeonNote,
@@ -287,11 +286,7 @@ export default async function ProviderChallengeLobby({
         <ProviderClientWarmup gameCode={challenge?.gameConfig?.gameCode} />
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <NeonPill
-          href="/challenges"
-          icon={ArrowLeft}
-          label={`Back to ${terms.challenges}`}
-        />
+        <NeonBackLink href="/challenges" label={terms.challenges} />
         <div className="hidden sm:block">
           <UTCClock />
         </div>

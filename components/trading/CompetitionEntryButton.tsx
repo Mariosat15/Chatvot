@@ -47,8 +47,10 @@ import {
   contestNotInTitle,
 } from "@/components/competitions/lobby/contest-lobby-copy";
 
+// Reason: label stacked above the amount and centred, so Entry Fee and Your Balance read
+// the same whatever their length - a short fee used to sit beside its label (owner, 13 Oct 2026).
 const MOBILE_FACT_ROW =
-  "flex min-w-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 px-3 py-2.5";
+  "flex min-w-0 flex-col items-center justify-center gap-0.5 px-3 py-2.5 text-center";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {

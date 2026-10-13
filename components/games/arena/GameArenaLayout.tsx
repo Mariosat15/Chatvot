@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { NEON_PANEL_LIT } from "@/components/neon/tokens";
 import { NeonGridBackdrop } from "@/components/neon/Cards";
 import type { NeonHeroBanner } from "@/components/neon/Hero";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { ArenaIdentity } from "./ArenaIdentity";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 /**
  * The arena: the game's identity across the top, the board in the middle, standings on one
@@ -128,13 +127,7 @@ export function GameArenaLayout({
       */}
       <NeonGridBackdrop />
 
-      <Link
-        href={backHref}
-        className="mb-4 inline-flex items-center gap-2 text-sm text-gray-400 transition-colors hover:text-gray-200"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to {competitionName}
-      </Link>
+      <div className="mb-4"><NeonBackLink href={backHref} label={competitionName} /></div>
 
       {/*
         THE HERO IS ONE THIN BANNER AND ITS HEIGHT IS FIXED (owner instruction, 11 September

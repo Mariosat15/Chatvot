@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { GraduationCap, Loader2, Play } from "lucide-react";
 import { PracticeRecentList } from "../PracticeRecentList";
 import type { GameScoreType } from "@/lib/utils/format-game-score";
 import type { PracticeRoundView } from "../practice-state";
 import { PRACTICE_FEATURES } from "./practice-features";
+import { NeonBackLink } from "@/components/neon/Buttons";
 
 interface DesktopPracticeLobbyProps {
   slug: string;
@@ -101,9 +101,9 @@ export function DesktopPracticeLobby({
         busy={historyBusy}
       />
 
-      <Link href={`/games/${slug}`} className="practice-back">
-        ← Back to the game page
-      </Link>
+      <div className="practice-back">
+        <NeonBackLink href={`/games/${slug}`} label="the game page" />
+      </div>
     </div>
   );
 }

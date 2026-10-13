@@ -1,4 +1,4 @@
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import CompetitionLeaderboard from "@/components/trading/CompetitionLeaderboard";
 import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
@@ -12,7 +12,7 @@ import type { TradingOverviewCopy } from "@/components/competitions/lobby/tradin
 import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
 import { TradingDetailTabs } from "@/components/competitions/detail/TradingDetailTabs";
 import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
-import { NeonPill } from "@/components/neon/Buttons";
+import { NeonBackLink, NeonPill } from "@/components/neon/Buttons";
 
 /**
  * Desktop trading competition detail (md and up).
@@ -65,11 +65,7 @@ export function DesktopTradingLobby({
       nav={
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
           <div className="flex flex-wrap items-center gap-2">
-            <NeonPill
-              href="/competitions"
-              icon={ArrowLeft}
-              label="Back to Competitions"
-            />
+            <NeonBackLink href="/competitions" label="Competitions" />
             {isCompleted && isUserIn && (
               <NeonPill
                 href={`/competitions/${competitionId}/results`}

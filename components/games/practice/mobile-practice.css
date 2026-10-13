@@ -567,14 +567,6 @@
   justify-content: center;
   min-height: 48px;
   margin-top: 20px;
-  color: #13dfff;
-  font-size: 14px;
-  text-decoration: none;
-  text-shadow: 0 0 8px rgba(19, 223, 255, 0.3);
-}
-
-.m-practice__back:active {
-  color: #7fefff;
 }
 
 @media (max-width: 360px) {
