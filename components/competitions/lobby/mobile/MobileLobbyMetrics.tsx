@@ -129,13 +129,13 @@ function Tile({
   sub: ReactNode;
 }) {
   return (
-    <div className="flex h-full min-h-[92px] min-w-0 items-start gap-2.5 rounded-2xl border border-white/[0.07] bg-[#0A1024]/85 p-3">
+    <div className="flex h-full min-h-[92px] min-w-0 flex-col items-center gap-1.5 rounded-2xl border border-white/[0.07] bg-[#0A1024]/85 p-3 text-center">
       <span
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${TONE_BOX.get(tone) ?? ""}`}
       >
         <MobileIcon src={iconSrc} className="h-6 w-6" />
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 w-full">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
           {label}
         </p>

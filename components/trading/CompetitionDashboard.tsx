@@ -338,20 +338,25 @@ export default function CompetitionDashboard({
   );
 
   if (layout === "mobile") {
+    // Reason (owner, 13 Oct 2026): on a phone the lobby hero and the schedule tab already show
+    // the contest's name and dates, so the run summary drops both; and the "Starting Soon" pill
+    // squeezed the WARMING UP heading into a truncation, so it is omitted while upcoming.
+    const mobileSummaryRows = summaryRows.filter((row) => row.key !== "competition" && row.key !== "when");
+    const mobileTiles = tiles.map((tile) => (tile.key === "open" ? { ...tile, label: "Positions" } : tile));
     return (
       <div className="space-y-3">
         {banners}
         <MobileRunPanel
           title={header.title}
           subtitle={header.subtitle}
-          status={<StatusPill status={competitionStatus} />}
+          status={competitionStatus === "upcoming" ? null : <StatusPill status={competitionStatus} />}
           figure={figure}
           caption={caption}
           rank={stats.currentRank}
           total={total}
           standing={standing}
-          tiles={tiles}
-          summaryRows={summaryRows}
+          tiles={mobileTiles}
+          summaryRows={mobileSummaryRows}
           breakdownRows={breakdownRows}
           back={back}
           primary={primary}

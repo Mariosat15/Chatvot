@@ -109,14 +109,16 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(mobileTrading).not.toContain("<MobileLobbyTabs");
     expect(mobileTrading).not.toContain("MobileLobbyChips");
     expect(mobileTrading).toContain("<MobileLobbyPages");
-    // Overview and Battle plan share ONE page, side by side like the mock.
+    // Reason (flipped 13 Oct 2026, owner): "About this competition" was removed from the phone,
+    // so the Overview page is the Battle plan alone at full width - no half-width split.
     const overviewPage = mobileTrading.slice(
       mobileTrading.indexOf('id: "overview"'),
       mobileTrading.indexOf('id: "leaderboard"'),
     );
     expect(overviewPage.length).toBeGreaterThan(0);
-    expect(overviewPage).toContain("grid-cols-2");
-    expect(overviewPage).toContain("<MobileLobbyOverview");
+    expect(overviewPage).not.toContain("grid-cols-2");
+    expect(overviewPage).not.toContain("<MobileLobbyOverview");
+    expect(mobileTrading).not.toContain("MobileLobbyOverview");
     expect(overviewPage).toContain("<MobileLobbyBattlePlan");
     // Difficulty, Trading rules and Risk share ONE page.
     const rulesPage = mobileTrading.slice(
@@ -277,5 +279,42 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     const entry = readCode("components/trading/CompetitionEntryButton.tsx");
     expect(entry).toContain("LobbyJoinArtworkButton");
     expect(entry).toContain('variant={isUpcoming ? "reserve" : "join"}');
+  });
+});
+
+describe("phone run panel and tab row refinements (owner, 13 Oct 2026)", () => {
+  it("drops the title and schedule rows, renames Positions, and hides Starting Soon on mobile only", () => {
+    const dashboard = readCode("components/trading/CompetitionDashboard.tsx");
+    const mobile = dashboard.slice(dashboard.indexOf('if (layout === "mobile")'));
+    expect(mobile.length).toBeGreaterThan(0);
+    expect(mobile).toMatch(/row\.key !== "competition" && row\.key !== "when"/);
+    expect(mobile).toMatch(/tile\.key === "open" \? \{ \.\.\.tile, label: "Positions" \}/);
+    expect(mobile).toMatch(/competitionStatus === "upcoming" \? null : <StatusPill/);
+    // Desktop keeps its own labels.
+    expect(dashboard).toContain('"Open positions"');
+  });
+
+  it("labels the second run view Score, and the header no longer truncates", () => {
+    const panel = readCode("components/trading/competition-dashboard/MobileRunPanel.tsx");
+    expect(panel).toContain('label="Score"');
+    expect(panel).not.toContain('label="Score breakdown"');
+    const header = panel.slice(panel.indexOf("<h2"), panel.indexOf("</h2>"));
+    expect(header.length).toBeGreaterThan(0);
+    expect(header).not.toContain("truncate");
+  });
+
+  it("puts a scroll arrow at each end of the tab row", () => {
+    const pages = readCode("components/competitions/lobby/mobile/MobileLobbyPages.tsx");
+    expect(pages).toContain('<ScrollArrow direction="left"');
+    expect(pages).toContain('<ScrollArrow direction="right"');
+    expect(pages.indexOf('direction="left"')).toBeLessThan(pages.indexOf('role="tablist"'));
+    expect(pages.indexOf('role="tablist"')).toBeLessThan(pages.indexOf('direction="right"'));
+  });
+
+  it("orders the prize podium 2nd, 1st, 3rd from the shared projection", () => {
+    const rewards = readCode("components/competitions/lobby/mobile/MobileLobbyRewards.tsx");
+    expect(rewards).toContain("PODIUM_ORDER = [2, 1, 3]");
+    expect(rewards).toContain("projectPrizeDistribution(competition)");
+    expect(rewards).toContain("items-end");
   });
 });

@@ -66,7 +66,7 @@ export function MobileLobbyDifficulty({
         <span className={`font-bold ${tone}`}>{difficultyData.score}/100</span>
         <span>Harder</span>
       </div>
-      <p className="mt-3 text-[12px] leading-relaxed text-gray-400">
+      <p className="mt-3 text-center text-[12px] leading-relaxed text-gray-400">
         {DIFFICULTY_COPY.get(difficultyData.level) ??
           "A fair fight - not too easy, not too hard."}
       </p>

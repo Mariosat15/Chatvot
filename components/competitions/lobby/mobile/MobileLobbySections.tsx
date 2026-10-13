@@ -12,9 +12,9 @@ import { MOBILE_CARD_SHELL } from "./MobileLobbyCard";
 export function MobileSectionCard({ section }: { section: NeonAccordionSection }) {
   return (
     <section className={MOBILE_CARD_SHELL}>
-      <h2 className="flex min-h-12 min-w-0 items-center gap-2.5 px-4 py-3 text-[15px] font-bold text-white">
+      <h2 className="flex min-h-12 min-w-0 items-center justify-center gap-2.5 px-4 py-3 text-center text-[15px] font-bold text-white">
         <span className="shrink-0">{section.icon}</span>
-        <span className="min-w-0 truncate">{section.title}</span>
+        <span className="min-w-0 break-words">{section.title}</span>
       </h2>
       <div className="min-w-0 border-t border-white/[0.06] p-3 text-[14px] leading-relaxed text-gray-200 [&_p]:break-words">
         {section.content}

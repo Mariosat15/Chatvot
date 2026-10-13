@@ -33,6 +33,7 @@ type RowsView = "summary" | "breakdown";
 export interface MobileRunPanelProps {
   title: [string, string];
   subtitle: string;
+  /** Omitted (null) while upcoming, so the WARMING UP heading is never squeezed. */
   status: ReactNode;
   figure: RankedFigure;
   caption: string;
@@ -70,29 +71,29 @@ export function MobileRunPanel({
 
   return (
     <section className={`${CARD} space-y-3 p-4`} aria-label="Your run">
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 flex-col items-center text-center">
         {/* eslint-disable-next-line @next/next/no-img-element -- static neon artwork */}
         <img
           src={COMPETITION_ICON.trophyGold}
           alt=""
           draggable={false}
-          className="h-12 w-12 shrink-0 object-contain"
+          className="h-12 w-12 shrink-0 object-contain drop-shadow-[0_0_14px_rgba(255,200,40,0.35)]"
         />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[17px] font-black leading-tight">
-            <span className="text-white">{title[0]} </span>
-            <span className="text-cyan-300">{title[1]}</span>
-          </h2>
-          <p className="truncate text-[12px] text-gray-400">{subtitle}</p>
-        </div>
-        <div className="shrink-0 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-[10px]">{status}</div>
+        <h2 className="mt-1.5 text-[19px] font-black uppercase leading-tight tracking-wide">
+          <span className="text-white">{title[0]} </span>
+          <span className="text-cyan-300">{title[1]}</span>
+        </h2>
+        <p className="mt-1 max-w-[300px] text-[12px] leading-snug text-gray-400 break-words">{subtitle}</p>
+        {status ? (
+          <div className="mt-2 [&>span]:px-2.5 [&>span]:py-0.5 [&>span]:text-[10px]">{status}</div>
+        ) : null}
       </div>
 
-      <div className="grid min-w-0 grid-cols-2 overflow-hidden rounded-xl border border-sky-400/25 bg-[#0B1A3A]/70">
+      <div className="grid min-w-0 grid-cols-2 overflow-hidden rounded-xl border border-sky-400/25 bg-[#0B1A3A]/70 text-center">
         <div className="min-w-0 p-3">
           <p className="truncate text-[10px] font-bold uppercase tracking-wider text-gray-400">{figure.label}</p>
           <p
-            className={`mt-0.5 truncate text-[22px] font-black tabular-nums ${
+            className={`mt-1 truncate text-[22px] font-black leading-none tabular-nums ${
               figure.tone === "loss" ? "text-rose-400" : "text-[#FFD72D]"
             }`}
           >
@@ -100,29 +101,29 @@ export function MobileRunPanel({
           </p>
         </div>
         <div className="min-w-0 border-l border-sky-400/20 p-3">
-          <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+          <p className="flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
             <Crown className="h-3 w-3 shrink-0 text-amber-300" aria-hidden />
             Rank
           </p>
-          <p className="mt-0.5 truncate text-[22px] font-black tabular-nums text-white">
+          <p className="mt-1 truncate text-[22px] font-black leading-none tabular-nums text-white">
             {rank ? `#${rank}` : "-"}
             <span className="ml-1 text-[13px] font-bold text-gray-400">/ {total || "-"}</span>
           </p>
-          <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
+          <div className="mx-auto mt-2 h-1 w-4/5 overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-300"
               style={{ width: `${standing.progress}%` }}
             />
           </div>
         </div>
-        <p className="col-span-2 min-w-0 border-t border-sky-400/20 px-3 py-2 text-[11px] text-gray-300 break-words">
+        <p className="col-span-2 min-w-0 border-t border-sky-400/20 px-3 py-2 text-[11px] leading-snug text-gray-300 break-words">
           {caption}
-          <span className={`block font-semibold ${lineTone}`}>{standing.line}</span>
+          <span className={`mt-0.5 block font-semibold ${lineTone}`}>{standing.line}</span>
         </p>
       </div>
 
       <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-gray-300">
+        <h3 className="mb-2 flex items-center justify-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-gray-300">
           <BarChart3 className="h-4 w-4 text-sky-400" aria-hidden />
           How you&apos;re trading
         </h3>
@@ -133,7 +134,7 @@ export function MobileRunPanel({
             return (
               <div
                 key={tile.key}
-                className={`flex min-w-0 items-center gap-2.5 rounded-xl border border-white/[0.07] bg-black/20 p-2.5 ${
+                className={`flex min-w-0 flex-col items-center rounded-xl border border-white/[0.07] bg-black/20 px-2 py-2.5 text-center ${
                   lastOdd ? "col-span-2" : ""
                 }`}
               >
@@ -144,15 +145,13 @@ export function MobileRunPanel({
                 >
                   <Icon className="h-4 w-4" aria-hidden />
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                    {tile.label}
-                  </span>
-                  <span className={`block truncate text-[15px] font-black tabular-nums ${tile.valueTone ?? "text-white"}`}>
-                    {tile.value}
-                  </span>
-                  <span className="block truncate text-[10px] text-gray-500">{tile.caption}</span>
+                <span className="mt-1.5 block max-w-full truncate text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                  {tile.label}
                 </span>
+                <span className={`block max-w-full truncate text-[16px] font-black leading-tight tabular-nums ${tile.valueTone ?? "text-white"}`}>
+                  {tile.value}
+                </span>
+                <span className="block max-w-full truncate text-[10px] text-gray-500">{tile.caption}</span>
               </div>
             );
           })}
@@ -162,7 +161,7 @@ export function MobileRunPanel({
       <div className="min-w-0 rounded-xl border border-white/[0.07] bg-black/20 p-2.5">
         <div role="tablist" aria-label="Run details" className="grid grid-cols-2 gap-1 rounded-lg bg-black/30 p-1">
           <ViewTab id="summary" label="Run summary" icon={<ClipboardList className="h-3.5 w-3.5" />} view={view} onSelect={setView} />
-          <ViewTab id="breakdown" label="Score breakdown" icon={<BarChart3 className="h-3.5 w-3.5" />} view={view} onSelect={setView} />
+          <ViewTab id="breakdown" label="Score" icon={<BarChart3 className="h-3.5 w-3.5" />} view={view} onSelect={setView} />
         </div>
         <ul className="mt-2 divide-y divide-white/[0.06]">
           {rows.map((row) => {
@@ -205,7 +204,7 @@ export function MobileRunPanel({
         </Link>
       </div>
 
-      <p className="flex items-center justify-end gap-1 text-[10px] text-gray-500">
+      <p className="flex items-center justify-center gap-1 text-[10px] text-gray-500">
         <RefreshCw className="h-3 w-3" aria-hidden />
         Updated {updatedLabel}
       </p>

@@ -14,7 +14,7 @@ export const MOBILE_CARD_SHELL =
 
 export const MOBILE_CARD = `${MOBILE_CARD_SHELL} p-4`;
 
-/** Half-width cards that share a row (Overview tab: About beside Battle plan). */
+/** Tighter padding for cards that share a row. */
 export const MOBILE_CARD_COMPACT = `${MOBILE_CARD_SHELL} p-3`;
 
 export function MobileLobbyCard({
@@ -35,10 +35,12 @@ export function MobileLobbyCard({
   return (
     <section id={id} className={`scroll-mt-4 ${MOBILE_CARD} ${className}`}>
       {title ? (
-        <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
-          <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-bold text-white">
+        // Reason (owner, 13 Oct 2026): every phone card heading is centred, with its chip on the
+        // line below, so headings line up down the page whatever their length.
+        <div className="mb-3 flex min-w-0 flex-col items-center gap-1.5 text-center">
+          <h2 className="flex min-w-0 max-w-full items-center justify-center gap-2 text-[15px] font-bold text-white">
             {iconSrc ? <MobileIcon src={iconSrc} className="h-6 w-6" /> : null}
-            <span className="min-w-0 truncate">{title}</span>
+            <span className="min-w-0 break-words">{title}</span>
           </h2>
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>

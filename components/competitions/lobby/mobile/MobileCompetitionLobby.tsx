@@ -13,7 +13,6 @@ import { MobileLobbyHero } from "./MobileLobbyHero";
 import { MobileLobbyMetrics } from "./MobileLobbyMetrics";
 import { MobileLobbyEntryPanel } from "./MobileLobbyEntryPanel";
 import { MobileLobbyPages, type MobileLobbyPage } from "./MobileLobbyPages";
-import { MobileLobbyOverview } from "./MobileLobbyOverview";
 import { MobileLobbyBattlePlan } from "./MobileLobbyBattlePlan";
 import { MobileSectionCard } from "./MobileLobbySections";
 import { MobileLobbyLeaderboard } from "./MobileLobbyLeaderboard";
@@ -31,7 +30,7 @@ import { MobileLobbyCard } from "./MobileLobbyCard";
  *
  * Top to bottom: hero, four equal tiles, the entry card, the player's own run when they are
  * in, then ONE row of tabs where each tab is a small page (owner, 13 Oct 2026):
- *   Overview    - About this competition beside the Battle plan (merged, as in the mock)
+ *   Overview    - the Battle plan (About this competition removed, owner 13 Oct 2026)
  *   Assets      - eligible assets
  *   Leaderboard - top traders
  *   Schedule    - start and end in UTC
@@ -98,12 +97,6 @@ export function MobileCompetitionLobby({
   sections,
   overview,
 }: MobileCompetitionLobbyProps) {
-  const about =
-    typeof competition.description === "string" &&
-    competition.description.trim().length > 0
-      ? competition.description.trim()
-      : "Compete for the prize pool. Check the Rules tab for how this contest works.";
-
   const assetSections = sections.filter((s) => s.id === ASSETS_SECTION_ID);
   const ruleSections = sections.filter((s) => s.id !== ASSETS_SECTION_ID);
 
@@ -123,12 +116,9 @@ export function MobileCompetitionLobby({
     {
       id: "overview",
       label: "Overview",
-      content: (
-        <div className="grid min-w-0 grid-cols-2 gap-2.5">
-          <MobileLobbyOverview about={about} overview={overview} />
-          <MobileLobbyBattlePlan overview={overview} />
-        </div>
-      ),
+      // Reason (owner, 13 Oct 2026): "About this competition" was dropped from the phone - the
+      // hero already carries the description - so Overview is the Battle plan at full width.
+      content: <MobileLobbyBattlePlan overview={overview} />,
     },
     ...(assetSections.length > 0
       ? [

@@ -27,12 +27,12 @@ export function MobileLobbySchedule({
 
 function DatePill({ label, value, dot }: { label: string; value: string; dot: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-white/[0.07] bg-black/25 px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+    <div className="min-w-0 rounded-xl border border-white/[0.07] bg-black/25 px-3 py-3 text-center">
+      <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden />
         {label}
       </div>
-      <div className="mt-1 break-words text-[12px] font-semibold tabular-nums text-white">
+      <div className="mt-1 break-words text-[13px] font-semibold leading-snug tabular-nums text-white">
         {value}
       </div>
     </div>
