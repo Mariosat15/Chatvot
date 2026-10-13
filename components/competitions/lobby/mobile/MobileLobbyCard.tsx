@@ -14,6 +14,9 @@ export const MOBILE_CARD_SHELL =
 
 export const MOBILE_CARD = `${MOBILE_CARD_SHELL} p-4`;
 
+/** Half-width cards that share a row (Overview tab: About beside Battle plan). */
+export const MOBILE_CARD_COMPACT = `${MOBILE_CARD_SHELL} p-3`;
+
 export function MobileLobbyCard({
   id,
   iconSrc,

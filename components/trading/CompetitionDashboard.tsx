@@ -25,6 +25,7 @@ import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { RANKING_LABELS } from "@/components/trading/lobby/trading-lobby-labels";
 import { DashboardBanners } from "./competition-dashboard/DashboardBanners";
+import { MobileRunPanel } from "./competition-dashboard/MobileRunPanel";
 import {
   DASH_CARD,
   DashboardActions,
@@ -76,6 +77,13 @@ interface CompetitionDashboardProps {
   entryFee?: number;
   /** The page's credit symbol; the settings symbol is the fallback. */
   creditSymbol?: string;
+  /**
+   * `"mobile"` draws the phone panel from the SAME computed figures; desktop is the default
+   * and its markup is untouched. The desktop panel cannot fit 390px (13 Oct 2026).
+   */
+  layout?: "desktop" | "mobile";
+  /** Where "View Leaderboard" points; the phone lobby opens its Leaderboard tab instead. */
+  leaderboardHref?: string;
 }
 
 const LEADERBOARD_ANCHOR = "#competition-leaderboard";
@@ -137,6 +145,8 @@ export default function CompetitionDashboard({
   rankingMethod,
   entryFee,
   creditSymbol,
+  layout = "desktop",
+  leaderboardHref = LEADERBOARD_ANCHOR,
 }: CompetitionDashboardProps) {
   const { settings } = useAppSettings();
   const symbol = creditSymbol ?? settings?.credits?.symbol;
@@ -302,7 +312,7 @@ export default function CompetitionDashboard({
     : { href: "/dashboard?tab=performance", title: "Full Performance", subtitle: "Career stats and contest history" };
   const primary = isCompleted
     ? { href: `/competitions/${competitionId}/results`, title: "View Results" }
-    : { href: LEADERBOARD_ANCHOR, title: "View Leaderboard" };
+    : { href: leaderboardHref, title: "View Leaderboard" };
 
   const backdrop = sparkline ? (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
@@ -314,6 +324,42 @@ export default function CompetitionDashboard({
     `Capital ${formatCash(stats.currentCapital)}`,
     figure.label === "Total P&L" ? `${formatPercent(stats.pnlPercentage, true)} return` : `P&L ${formatCash(stats.pnl, true)}`,
   ].join(" · ");
+
+  const banners = (
+    <DashboardBanners
+      isDisqualified={isLiquidated}
+      isLiquidated={isLiquidated}
+      isAtRisk={isAtRisk}
+      isActive={isActive}
+      rules={competitionRules}
+      totalTrades={stats.totalTrades}
+      winRate={winRate}
+    />
+  );
+
+  if (layout === "mobile") {
+    return (
+      <div className="space-y-3">
+        {banners}
+        <MobileRunPanel
+          title={header.title}
+          subtitle={header.subtitle}
+          status={<StatusPill status={competitionStatus} />}
+          figure={figure}
+          caption={caption}
+          rank={stats.currentRank}
+          total={total}
+          standing={standing}
+          tiles={tiles}
+          summaryRows={summaryRows}
+          breakdownRows={breakdownRows}
+          back={back}
+          primary={primary}
+          updatedLabel={lastUpdate.toLocaleTimeString()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

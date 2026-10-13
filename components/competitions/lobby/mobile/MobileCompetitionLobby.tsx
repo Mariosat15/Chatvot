@@ -12,10 +12,10 @@ import { resolveTradingBanner } from "@/components/neon/banners";
 import { MobileLobbyHero } from "./MobileLobbyHero";
 import { MobileLobbyMetrics } from "./MobileLobbyMetrics";
 import { MobileLobbyEntryPanel } from "./MobileLobbyEntryPanel";
-import { MobileLobbyChips, type MobileLobbyChip } from "./MobileLobbyChips";
+import { MobileLobbyPages, type MobileLobbyPage } from "./MobileLobbyPages";
 import { MobileLobbyOverview } from "./MobileLobbyOverview";
 import { MobileLobbyBattlePlan } from "./MobileLobbyBattlePlan";
-import { MobileLobbySections, mobileSectionAnchor } from "./MobileLobbySections";
+import { MobileSectionCard } from "./MobileLobbySections";
 import { MobileLobbyLeaderboard } from "./MobileLobbyLeaderboard";
 import { MobileLobbySchedule } from "./MobileLobbySchedule";
 import { MobileLobbyDifficulty } from "./MobileLobbyDifficulty";
@@ -24,22 +24,25 @@ import { MobileLobbyCard } from "./MobileLobbyCard";
 
 /**
  * Dedicated phone Competition Lobby (Complobyymobile, rebuilt to the 13 Oct 2026 mobile
- * fix guide).
+ * fix guide, third pass).
  *
  * Breakpoint: widths under 769px via the page wrapper. Never imports the desktop
  * two-column shell. Same loaders, entry rules and prize logic as desktop.
  *
- * ONE VERTICAL FLOW: hero, four equal tiles, the entry card, a row of jump chips, then
- * every block one after another. Nothing is hidden behind a tab, so nothing can be cut
- * off by a strip that is wider than the phone - the chips only scroll to a block.
+ * Top to bottom: hero, four equal tiles, the entry card, the player's own run when they are
+ * in, then ONE row of tabs where each tab is a small page (owner, 13 Oct 2026):
+ *   Overview    - About this competition beside the Battle plan (merged, as in the mock)
+ *   Assets      - eligible assets
+ *   Leaderboard - top traders
+ *   Schedule    - start and end in UTC
+ *   Rules       - Difficulty, level requirement, Trading rules and Risk management (merged)
+ *   Prizes      - the prize table
  */
 
-/** Short chip labels; anything unlisted uses the section's own title. */
-const CHIP_LABELS = new Map<string, string>([
-  ["eligible-assets", "Assets"],
-  ["trading-rules", "Rules"],
-  ["risk-management", "Risk"],
-]);
+/** The run panel's "View Leaderboard" opens this tab (`MobileLobbyPages` reads the hash). */
+const LEADERBOARD_PAGE_HASH = "#lobby-page-leaderboard";
+
+const ASSETS_SECTION_ID = "eligible-assets";
 
 export type MobileCompetitionLobbyProps = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -99,19 +102,89 @@ export function MobileCompetitionLobby({
     typeof competition.description === "string" &&
     competition.description.trim().length > 0
       ? competition.description.trim()
-      : "Compete for the prize pool. Check the rules below for how this contest works.";
+      : "Compete for the prize pool. Check the Rules tab for how this contest works.";
 
-  const chips: MobileLobbyChip[] = [
-    { id: "lobby-overview", label: "Overview" },
-    { id: "lobby-battle-plan", label: "Battle Plan" },
-    { id: "competition-leaderboard-mobile", label: "Leaderboard" },
-    { id: "lobby-schedule", label: "Schedule" },
-    { id: "lobby-difficulty", label: "Difficulty" },
-    { id: "lobby-prizes", label: "Prizes" },
-    ...sections.map((s) => ({
-      id: mobileSectionAnchor(s.id),
-      label: CHIP_LABELS.get(s.id) ?? s.title,
-    })),
+  const assetSections = sections.filter((s) => s.id === ASSETS_SECTION_ID);
+  const ruleSections = sections.filter((s) => s.id !== ASSETS_SECTION_ID);
+
+  const levelRequirement = competition.levelRequirement?.enabled
+    ? (() => {
+        const min = Number(competition.levelRequirement.minLevel);
+        const max = competition.levelRequirement.maxLevel
+          ? Number(competition.levelRequirement.maxLevel)
+          : null;
+        return max
+          ? `${resolveLevelName(min, levelLadder)} to ${resolveLevelName(max, levelLadder)}`
+          : `${resolveLevelName(min, levelLadder)} or higher`;
+      })()
+    : null;
+
+  const pages: MobileLobbyPage[] = [
+    {
+      id: "overview",
+      label: "Overview",
+      content: (
+        <div className="grid min-w-0 grid-cols-2 gap-2.5">
+          <MobileLobbyOverview about={about} overview={overview} />
+          <MobileLobbyBattlePlan overview={overview} />
+        </div>
+      ),
+    },
+    ...(assetSections.length > 0
+      ? [
+          {
+            id: "assets",
+            label: "Assets",
+            content: assetSections.map((s) => <MobileSectionCard key={s.id} section={s} />),
+          },
+        ]
+      : []),
+    {
+      id: "leaderboard",
+      label: "Leaderboard",
+      content: (
+        <MobileLobbyLeaderboard
+          leaderboard={leaderboard}
+          userParticipantId={userParticipant?._id}
+          prizeDistribution={competition.prizeDistribution}
+          minimumTrades={competition.rules?.minimumTrades || 0}
+          competitionStatus={competition.status}
+          playersLabel="traders"
+        />
+      ),
+    },
+    {
+      id: "schedule",
+      label: "Schedule",
+      content: (
+        <MobileLobbySchedule
+          startLabel={formatUTCDate(new Date(competition.startTime))}
+          endLabel={formatUTCDate(new Date(competition.endTime))}
+        />
+      ),
+    },
+    {
+      id: "rules",
+      label: "Rules",
+      content: (
+        <>
+          <MobileLobbyDifficulty difficultyData={difficultyData} />
+          {levelRequirement ? (
+            <MobileLobbyCard iconSrc={NEON_ICON("crown")} title="Level requirement">
+              <p className="text-sm font-medium text-gray-100 break-words">{levelRequirement}</p>
+            </MobileLobbyCard>
+          ) : null}
+          {ruleSections.map((s) => (
+            <MobileSectionCard key={s.id} section={s} />
+          ))}
+        </>
+      ),
+    },
+    {
+      id: "prizes",
+      label: "Prizes",
+      content: <MobileLobbyRewards competition={competition} creditSymbol={creditSymbol} />,
+    },
   ];
 
   return (
@@ -132,11 +205,7 @@ export function MobileCompetitionLobby({
         }}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <NeonPill
-            href="/competitions"
-            icon={ArrowLeft}
-            label="Competitions"
-          />
+          <NeonPill href="/competitions" icon={ArrowLeft} label="Competitions" />
           {isCompleted && isUserIn ? (
             <NeonPill
               href={`/competitions/${competitionId}/results`}
@@ -180,23 +249,10 @@ export function MobileCompetitionLobby({
           show={!isCompleted || isUserIn}
         />
 
-        <MobileLobbyChips chips={chips} />
-
-        <MobileLobbyOverview id="lobby-overview" about={about} overview={overview} />
-
-        <MobileLobbyBattlePlan id="lobby-battle-plan" overview={overview} />
-
-        <MobileLobbyLeaderboard
-          leaderboard={leaderboard}
-          userParticipantId={userParticipant?._id}
-          prizeDistribution={competition.prizeDistribution}
-          minimumTrades={competition.rules?.minimumTrades || 0}
-          competitionStatus={competition.status}
-          playersLabel="traders"
-        />
-
         {isUserIn && userParticipant ? (
           <CompetitionDashboard
+            layout="mobile"
+            leaderboardHref={LEADERBOARD_PAGE_HASH}
             competitionId={competitionId}
             initialParticipant={{
               _id: userParticipant._id.toString(),
@@ -243,35 +299,7 @@ export function MobileCompetitionLobby({
           />
         ) : null}
 
-        <MobileLobbySchedule
-          startLabel={formatUTCDate(new Date(competition.startTime))}
-          endLabel={formatUTCDate(new Date(competition.endTime))}
-        />
-
-        <MobileLobbyDifficulty difficultyData={difficultyData} />
-
-        {competition.levelRequirement?.enabled ? (
-          <MobileLobbyCard iconSrc={NEON_ICON("crown")} title="Level requirement">
-            <p className="text-sm font-medium text-gray-100 break-words">
-              {(() => {
-                const min = Number(competition.levelRequirement.minLevel);
-                const max = competition.levelRequirement.maxLevel
-                  ? Number(competition.levelRequirement.maxLevel)
-                  : null;
-                return max
-                  ? `${resolveLevelName(min, levelLadder)} to ${resolveLevelName(max, levelLadder)}`
-                  : `${resolveLevelName(min, levelLadder)} or higher`;
-              })()}
-            </p>
-          </MobileLobbyCard>
-        ) : null}
-
-        <MobileLobbyRewards
-          competition={competition}
-          creditSymbol={creditSymbol}
-        />
-
-        <MobileLobbySections sections={sections} openIds={["eligible-assets"]} />
+        <MobileLobbyPages pages={pages} />
       </div>
     </div>
   );

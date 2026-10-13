@@ -101,13 +101,42 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(mobileTrading).toContain("max-w-[430px]");
     expect(mobileTrading).toContain("env(safe-area-inset-bottom)");
     // Flipped 13 Oct 2026 (mobile fix guide), not deleted: the swipe tab strip was wider
-    // than the phone and hid every block but one, so the page is now ONE vertical flow -
-    // jump chips that only scroll, then every block in order. A tab strip must not return.
+    // than the phone and hid every block but one, so the page became one vertical flow with
+    // jump chips. Flipped AGAIN 13 Oct 2026 (third pass), on the owner's correction: the
+    // chips wrapped out of line and left every block stacked below, so the menu is now ONE
+    // row of compact tabs (MobileLobbyPages) where each tab is a small page. The original
+    // objection still holds - the old swipe strip must not return.
     expect(mobileTrading).not.toContain("<MobileLobbyTabs");
-    expect(mobileTrading).toContain("<MobileLobbyChips");
-    expect(mobileTrading).toContain("<MobileLobbyOverview");
-    expect(mobileTrading).toContain("<MobileLobbyBattlePlan");
-    expect(mobileTrading).toContain("<MobileLobbySections");
+    expect(mobileTrading).not.toContain("MobileLobbyChips");
+    expect(mobileTrading).toContain("<MobileLobbyPages");
+    // Overview and Battle plan share ONE page, side by side like the mock.
+    const overviewPage = mobileTrading.slice(
+      mobileTrading.indexOf('id: "overview"'),
+      mobileTrading.indexOf('id: "leaderboard"'),
+    );
+    expect(overviewPage.length).toBeGreaterThan(0);
+    expect(overviewPage).toContain("grid-cols-2");
+    expect(overviewPage).toContain("<MobileLobbyOverview");
+    expect(overviewPage).toContain("<MobileLobbyBattlePlan");
+    // Difficulty, Trading rules and Risk share ONE page.
+    const rulesPage = mobileTrading.slice(
+      mobileTrading.indexOf('id: "rules"'),
+      mobileTrading.indexOf('id: "prizes"'),
+    );
+    expect(rulesPage.length).toBeGreaterThan(0);
+    expect(rulesPage).toContain("<MobileLobbyDifficulty");
+    expect(rulesPage).toContain("ruleSections.map");
+    expect(mobileTrading).not.toContain('label: "Battle Plan"');
+    expect(mobileTrading).not.toContain('label: "Difficulty"');
+    // The run panel is the phone layout of the shared dashboard, never the desktop one
+    // (230px trophy, five-across tiles - the clipped "image 2", 13 Oct 2026).
+    expect(mobileTrading).toContain('layout="mobile"');
+    const runPanel = readCode(
+      "components/trading/competition-dashboard/MobileRunPanel.tsx",
+    );
+    expect(runPanel).not.toContain("grid-cols-5");
+    expect(runPanel).not.toMatch(/text-(4xl|5xl)/);
+    expect(runPanel).not.toContain("hover:scale-");
     // The phone leaderboard must not wrap the 760px desktop table (the cut-off).
     const mobileBoard = readCode(
       "components/competitions/lobby/mobile/MobileLobbyLeaderboard.tsx",

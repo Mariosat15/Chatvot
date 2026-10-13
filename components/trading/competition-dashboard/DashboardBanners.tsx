@@ -71,7 +71,7 @@ export function DashboardBanners({
             </div>
             <div className="space-y-2">
               {needsMoreTrades && (
-                <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-gray-900/50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-gray-900/50 p-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-orange-400" />
                     <span className="text-sm text-gray-300">Minimum Trades Required</span>
@@ -87,7 +87,7 @@ export function DashboardBanners({
                 </div>
               )}
               {belowWinRate && (
-                <div className="flex items-center justify-between rounded-lg border border-yellow-500/30 bg-gray-900/50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-yellow-500/30 bg-gray-900/50 p-3">
                   <div className="flex items-center gap-2">
                     <Target className="h-4 w-4 text-yellow-400" />
                     <span className="text-sm text-gray-300">Minimum Win Rate Required</span>
@@ -116,7 +116,7 @@ export function DashboardBanners({
   if (isActive && rules && (minimumTrades > 0 || minimumWinRate > 0)) {
     return (
       <div className="rounded-xl border border-green-500/30 bg-gradient-to-r from-green-900/20 via-emerald-900/20 to-green-900/20 p-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <CheckCircle className="h-5 w-5 text-green-400" />
           <span className="text-sm font-medium text-green-400">
             ✅ You meet all qualification requirements! Keep trading to improve your rank.
