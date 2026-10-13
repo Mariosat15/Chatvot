@@ -6,6 +6,7 @@ import {
   type SettledContest,
   type SkillEvidence,
 } from "./skill-evidence-stats";
+import type { EvidenceRange } from "../../admin/skill-evidence-range";
 
 /**
  * Skill evidence per game title, read from SETTLED results only.
@@ -64,13 +65,26 @@ export function toSettledContest(doc: {
   };
 }
 
-export async function getSkillEvidence(): Promise<TitleSkillEvidence[]> {
+/**
+ * Filter on the day each contest ENDED, the date a regulator would cite for it. A contest
+ * straddling the start of the period belongs to the period it finished in.
+ */
+export function rangeFilter(range: EvidenceRange): Record<string, unknown> {
+  if (!range.from && !range.to) return {};
+  const endTime: Record<string, Date> = {};
+  if (range.from) endTime.$gte = range.from;
+  if (range.to) endTime.$lte = range.to;
+  return { endTime };
+}
+
+export async function getSkillEvidence(range: EvidenceRange = {}): Promise<TitleSkillEvidence[]> {
   await connectToDatabase();
 
   const docs = await Competition.find({
     status: "completed",
     gameType: "provider",
     "finalLeaderboard.0": { $exists: true },
+    ...rangeFilter(range),
   })
     .sort({ endTime: -1 })
     .limit(MAX_CONTESTS_READ)

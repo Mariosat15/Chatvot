@@ -172,8 +172,10 @@ describe("admin wiring", () => {
   it("the dashboard renders the screen and the screen reads the route", () => {
     const dash = read("apps/admin/components/admin/AdminDashboard.tsx");
     expect(dash).toMatch(/case "skill-evidence":\s*return <SkillEvidenceSection/);
+    // The date filter turned the URL into a template; the claim (the screen reads this
+    // route) is unchanged, only the spelling moved.
     expect(read("apps/admin/components/admin/games/SkillEvidenceSection.tsx")).toContain(
-      'fetch("/api/games/skill-evidence"',
+      "fetch(`/api/games/skill-evidence?",
     );
   });
 

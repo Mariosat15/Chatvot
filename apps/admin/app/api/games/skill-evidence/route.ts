@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { parseEvidenceRange } from "@/lib/admin/skill-evidence-range";
 import { guardSection } from "@/lib/admin/section-route-guard";
 import { getSkillEvidence } from "@/lib/services/games/skill-evidence.service";
 import { MIN_PAIRS_FOR_EVIDENCE } from "@/lib/services/games/skill-evidence-stats";
@@ -14,15 +15,21 @@ import { MIN_PAIRS_FOR_EVIDENCE } from "@/lib/services/games/skill-evidence-stat
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const guard = await guardSection("skill-evidence");
   if (!guard.ok) return guard.response;
 
+  const params = request.nextUrl.searchParams;
+  const parsed = parseEvidenceRange(params.get("from"), params.get("to"));
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+
   try {
-    const titles = await getSkillEvidence();
+    const titles = await getSkillEvidence(parsed.range);
     return NextResponse.json({
       success: true,
       titles,
+      from: parsed.from,
+      to: parsed.to,
       minPairs: MIN_PAIRS_FOR_EVIDENCE,
       generatedAt: new Date().toISOString(),
     });

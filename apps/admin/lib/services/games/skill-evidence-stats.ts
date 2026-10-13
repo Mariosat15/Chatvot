@@ -53,6 +53,8 @@ export interface SkillEvidence {
     repeatWinners: number;
     /** Expected number of players winning twice or more if every result were a lottery. */
     expectedRepeatWinnersByChance: number;
+    /** Expected number of different winners under a lottery. Far fewer means wins concentrate. */
+    expectedDistinctWinnersByChance: number;
     topWinnerShare: number | null;
   };
   /** Below this, a correlation is noise. The screen shows the figure but labels it. */
@@ -126,6 +128,13 @@ function probabilityAtLeastTwo(ps: number[]): number {
   return Math.max(0, 1 - none - exactlyOne);
 }
 
+/** P(at least one success) for independent trials with the given probabilities. */
+function probabilityAtLeastOne(ps: number[]): number {
+  let none = 1;
+  for (const p of ps) none *= 1 - p;
+  return 1 - none;
+}
+
 export function computeSkillEvidence(input: SettledContest[]): SkillEvidence {
   const contests = input
     .filter((c) => c.entries.length >= 2)
@@ -183,7 +192,11 @@ export function computeSkillEvidence(input: SettledContest[]): SkillEvidence {
   }
 
   let expectedRepeatWinnersByChance = 0;
-  for (const ps of winChances.values()) expectedRepeatWinnersByChance += probabilityAtLeastTwo(ps);
+  let expectedDistinctWinnersByChance = 0;
+  for (const ps of winChances.values()) {
+    expectedRepeatWinnersByChance += probabilityAtLeastTwo(ps);
+    expectedDistinctWinnersByChance += probabilityAtLeastOne(ps);
+  }
 
   const winCounts = [...winsByPlayer.values()].sort((a, b) => b - a);
   const topN = Math.max(1, Math.ceil(winCounts.length * 0.1));
@@ -213,6 +226,7 @@ export function computeSkillEvidence(input: SettledContest[]): SkillEvidence {
       distinctWinners: winCounts.length,
       repeatWinners: winCounts.filter((w) => w >= 2).length,
       expectedRepeatWinnersByChance: Math.round(expectedRepeatWinnersByChance * 100) / 100,
+      expectedDistinctWinnersByChance: Math.round(expectedDistinctWinnersByChance * 100) / 100,
       topWinnerShare: wins ? topWins / wins : null,
     },
     sufficient: stabilityX.length >= MIN_PAIRS_FOR_EVIDENCE,
