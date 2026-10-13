@@ -1,19 +1,12 @@
 CHARTVOLT
-Revised Preliminary Legal Opinion — version 2 (aligned to the live platform)
+Preliminary Legal Opinion
 CONFIDENTIAL • 13 OCTOBER 2026 • CYPRUS / EUROPEAN UNION / INTERNATIONAL MARKETS
 
 Subject: Regulatory classification of ChartVolt's paid-entry game competitions, 1v1 challenges, simulated-trading competitions, pooled prizes and cash-redeemable Volts.
 
 Purpose: To state the strongest legally sustainable argument for operating ChartVolt without a betting, gambling, investment-services, payment-institution or electronic-money licence, to state honestly where that argument is weak, and to list the changes that would strengthen it.
 
-This is a preliminary analysis based on published legislation and regulatory guidance. It is not a formal legal opinion from a Cyprus-qualified lawyer and must be reviewed and adopted by Cyprus counsel before being relied on or shown to a regulator. Every factual statement about the platform in this version was checked against the ChartVolt source code on 13 October 2026; where a statement is a design intention rather than a verified fact, it says so.
-
-WHAT CHANGED FROM VERSION 1
-- Version 1 named an "Obstacle racing" game. No such game exists. Removed.
-- Version 1 recommended seeded, identical content for Volt Stack and Circuit Sprint as a future control. It is already built and enforced: a ranked round cannot be created without a shared contest seed.
-- Version 1 described Volt Velocity's power-ups as "random". The pickups are not random — their positions and types are fixed per contest from the shared seed. The real chance risk in Volt Velocity is different and more serious: player-versus-player combat items and a seeded shuffle of the starting grid. See 3.3.
-- Version 1 said Volts "cannot be transferred between users". That is true of user-to-user transfers, but Game Masters (independent persons) are credited with Volts funded from other players' entry fees. See 5.3.
-- Version 1 assumed purchased Volts may be withdrawn. Confirmed: the withdrawal path does not distinguish purchased from won Volts. See 5.2.
+This is a preliminary analysis based on published legislation and regulatory guidance. It is not a formal legal opinion from a Cyprus-qualified lawyer and must be reviewed and adopted by Cyprus counsel before being relied on or shown to a regulator. Every factual statement about the platform was checked against the ChartVolt source code on 13 October 2026; where a statement is a design intention rather than a verified fact, it says so.
 
 1. Executive conclusion — the honest answer first
 
