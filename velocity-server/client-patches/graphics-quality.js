@@ -9,7 +9,7 @@ const originals=new WeakMap(),scaled=new WeakMap();
 export function applyGraphicsQuality(view,options){
  const clouds={low:10,medium:20,high:36}[options.clouds]||20;
  view.cloudVolume.material.uniforms.steps.value=clouds;view.cloudVolume.visible=options.clouds!=='low'&&!['jungle','volcano','alpine','coast','desert'].includes(view.environment.type);
- view.cloudDetails.forEach((s,i)=>s.visible=options.clouds!=='low'||i%2===0);
+ /* CHARTVOLT PATCH (14 Oct 2026, owner: still heavy on mobiles): cloud cards are large overlapping transparent sprites - pure overdraw - so a phone keeps one in four rather than one in two. */view.cloudDetails.forEach((s,i)=>s.visible=options.clouds!=='low'||i%(options.release?4:2)===0);
  const shadow=Math.min(view.renderer.capabilities.maxTextureSize,{off:0,low:1024,medium:2048,high:4096}[options.shadows]??2048);
  view.renderer.shadowMap.enabled=shadow>0;view.sun.castShadow=shadow>0;
  if(shadow&&view.sun.shadow.mapSize.x!==shadow){view.sun.shadow.map?.dispose();view.sun.shadow.map=null;view.sun.shadow.mapSize.setScalar(shadow);}

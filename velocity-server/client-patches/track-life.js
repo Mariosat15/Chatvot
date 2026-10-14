@@ -10,10 +10,13 @@
 import * as T from 'three';
 import {HALF_WIDTH} from './track.js';
 import {rng} from './tracks.js';
+import {PHONE, PHONE_BUDGET} from './phone-budget.js';
 
-const LIGHT_SPACING = 10;
-const FLAG_SPACING = 80;
-const DRONES = 10;
+// CHARTVOLT PATCH (14 Oct 2026, owner: still heavy on mobiles): half the chaser lights and pennants,
+// four drones, a third of the motes and no aurora on a phone. Rendering only - the race never reads these.
+const LIGHT_SPACING = PHONE ? 20 : 10;
+const FLAG_SPACING = PHONE ? 160 : 80;
+const DRONES = PHONE ? PHONE_BUDGET.drones : 10;
 const MOTE_BOX = new T.Vector3(260, 70, 260);
 
 // Weather per scenery type. Unknown types fall back to neon motes in the circuit's accent colour.
@@ -47,7 +50,9 @@ function phases(geometry, count) {
 
 function finish(view, mesh, count) {
   mesh.frustumCulled = false;
-  mesh.userData.environmentFullCount = count;
+  // Reason (14 Oct 2026): no environmentFullCount here. graphics-quality cuts such meshes to 60% by
+  // truncating the instance list, and these instances are laid out in lap order - so low textures left
+  // the last 40% of every lap with no chaser lights or pennants. Thinning is done by spacing instead.
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   view.scene.add(mesh);
@@ -129,10 +134,11 @@ function updateDrones(view, t) {
 
 function buildMotes(view, colors, random) {
   const style = MOTES[view.environment.type] || {color: colors.accent.getHex(), drift: [0, 1.2, 0], size: .28, sway: 2, opacity: .7, count: 1400};
-  const seeds = new Float32Array(style.count * 3);
+  const count = Math.ceil(style.count * (PHONE ? PHONE_BUDGET.moteShare : 1));
+  const seeds = new Float32Array(count * 3);
   for (let i = 0; i < seeds.length; i++) seeds[i] = random();
   const geo = new T.BufferGeometry();
-  geo.setAttribute('position', new T.BufferAttribute(new Float32Array(style.count * 3), 3));
+  geo.setAttribute('position', new T.BufferAttribute(new Float32Array(count * 3), 3));
   geo.setAttribute('aSeed', new T.BufferAttribute(seeds, 3));
   const mat = new T.ShaderMaterial({
     transparent: true, depthWrite: false, blending: T.AdditiveBlending, toneMapped: false, fog: false,
@@ -146,14 +152,14 @@ vec4 mv=modelViewMatrix*vec4(p,1.);gl_PointSize=min(48.,uSize*(.6+aSeed.z)*300./
   });
   const points = new T.Points(geo, mat);
   points.frustumCulled = false;
-  points.userData.moteCount = style.count;
+  points.userData.moteCount = count;
   view.trackMotes = points;
   view.scene.add(points);
 }
 
 // Aurora curtains, only for environments that set aurora:true. Placed far out around the course.
 function buildAurora(view) {
-  if (!view.environment.aurora) return;
+  if (!view.environment.aurora || PHONE) return;
   const pts = Array.from({length: 40}, (_, i) => view.track.frame(view.track.length * i / 40).p);
   const center = pts.reduce((a, p) => a.add(p), new T.Vector3()).multiplyScalar(1 / pts.length);
   const mat = new T.ShaderMaterial({
@@ -184,7 +190,7 @@ export function buildTrackLife(view) {
   buildDrones(view, colors, random);
   buildMotes(view, colors, random);
   buildAurora(view);
-  view.environmentStats.trackLife = {lights: Math.floor(view.track.length / LIGHT_SPACING) * 2, drones: DRONES, motes: view.trackMotes.userData.moteCount, aurora: Boolean(view.environment.aurora)};
+  view.environmentStats.trackLife = {lights: Math.floor(view.track.length / LIGHT_SPACING) * 2, drones: DRONES, motes: view.trackMotes.userData.moteCount, aurora: Boolean(view.environment.aurora) && !PHONE};
 }
 
 export function updateTrackLife(view, t) {

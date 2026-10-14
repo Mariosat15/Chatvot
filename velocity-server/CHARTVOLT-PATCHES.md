@@ -378,3 +378,43 @@ The owner pasted a browser console log. What each line was:
 - Tests: `tests/chartvolt-start-warmup.test.mjs` (4). velocity-server 116/116, games-service
   velocity 19/19, practice host 16/16. Deploy: pull + `pm2 restart chartvolt-games` (client only).
   **Never verified by eye.**
+
+## 14 Oct 2026 - lighter on phones, sound after an app switch, callouts between the buttons (owner)
+
+"Still a bit heavy for mobiles ... when go out and come in the game ... the music and sound stops
+... put [the wordings] between the buttons so is not in the way of view."
+
+**Lighter.** A phone is `matchMedia('(pointer:coarse)')`. The new `phone-budget.js` holds that answer
+and all the numbers used below. Every cut is rendering only. Anything skipped still consumes its
+random draws, and every skipped tower keeps its plot. That means the scenery that remains, the race
+seed, the simulation and the driving geometry are identical on every device.
+- No shadow map on any phone tier (`main.js`). Only the engine glow is kept of the four local point
+  lights (`scene.js`). There is no clearcoat on tower glass or hover-taxis.
+- `architecture.js`: every third main tower is dropped, and at most 12 back-skyline towers are built.
+- `living-world.js` (new copy): 30 of the 120 hover-taxis are kept, and they move within 450 m.
+  `traffic-kit.js` (new copy): taxi meshes use 40% of the segments. `spectators.js` (new copy): the
+  crowd animates within 350 m.
+- `track-life.js`: barrier lights are half as dense, as are flags. There are 4 drones instead of 10,
+  35% of the motes, and no aurora. It **no longer sets `environmentFullCount`**. That setting let
+  `graphics-quality.js` keep the first 60% of each instanced mesh, and those meshes are laid out in
+  lap order, so the low setting removed the last 40% of the lap rather than thinning it.
+  `graphics-quality.js`: on release builds, low clouds keep one in four.
+
+**Sound.** Nothing woke the audio when the player returned to the page. Practice and competition
+races are multiplayer, and in multiplayer hiding the page never suspended the audio either. iOS then
+leaves the context `interrupted`, and `RaceAudio.update()` only plays while the context is
+`running`. Now a multiplayer race suspends its audio when hidden. `visibilitychange`, `pageshow` and
+`focus` call `audio.wake()`, and so does the next tap or key press. If a resume failed or the context
+is `interrupted`/`closed`, that tap builds a new context (`rebuild()`), because iOS creates a context
+only inside a gesture. `unlock()` waits at most 800 ms for `resume()`, which on iOS can never settle,
+and before this fix that could hang the solo Resume button. A solo race the player paused stays
+silent until they press Resume.
+
+**Callouts.** On phones, FINAL LAP, sector and position messages and the pickup flash are fixed to
+the bottom. In landscape they sit in the gap between the ←/→ and BRAKE/ACCEL buttons. In portrait
+they sit just above the controls (`root/cv-hud.css`). The corner hint and the warning chip stay small
+at top centre.
+
+Tests: `tests/chartvolt-mobile-lighten.test.mjs` (10), including one that a skipped taxi consumes
+exactly the draws a kept one makes. velocity-server 126/126, games-service velocity 19/19. Deploy:
+pull + `pm2 restart chartvolt-games` (client only). **Never verified by eye or ear on a phone.**

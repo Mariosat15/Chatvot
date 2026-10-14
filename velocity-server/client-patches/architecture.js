@@ -4,6 +4,7 @@ import {BUILDING_STYLES,buildingStyleIndex,facadeOffset} from './building-styles
 import * as T from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {rng} from './tracks.js';
+import {PHONE,PHONE_BUDGET} from './phone-budget.js';
 const UP=new T.Vector3(0,1,0),GROUND=-105;
 function archSign(){const c=document.createElement('canvas');c.width=1024;c.height=128;const x=c.getContext('2d');x.fillStyle='#061929';x.fillRect(0,0,1024,128);x.strokeStyle='#78eaff';x.lineWidth=4;x.strokeRect(4,4,1016,120);x.fillStyle='#c9faff';x.shadowColor='#2cbfff';x.shadowBlur=15;x.textAlign='center';x.font='italic 700 62px Arial';x.fillText('ϟ VOLT VELOCITY',512,84);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;return new T.MeshBasicMaterial({map:t,toneMapped:false});}
 
@@ -15,7 +16,7 @@ export class Parts{
 }
 export function glassMaterial(color,night,fm,clock,styleIndex=0){
  const maps=fm.styles[styleIndex],style=maps.style;
- const mat=new T.MeshPhysicalMaterial({color:0xffffff,map:maps.albedo,normalMap:maps.normal,normalScale:new T.Vector2(.32,.32),roughnessMap:maps.roughness,roughness:.82,metalness:style.metalness,clearcoat:.38,clearcoatRoughness:.28,specularIntensity:.6,envMapIntensity:1.05,emissive:0xffffff,emissiveMap:maps.emission,emissiveIntensity:night?.9:.14});
+ const mat=new T.MeshPhysicalMaterial({color:0xffffff,map:maps.albedo,normalMap:maps.normal,normalScale:new T.Vector2(.32,.32),roughnessMap:maps.roughness,roughness:.82,metalness:style.metalness,clearcoat:PHONE?0:.38,clearcoatRoughness:.28,specularIntensity:.6,envMapIntensity:1.05,emissive:0xffffff,emissiveMap:maps.emission,emissiveIntensity:night?.9:.14});
  // Continuous world-scaled UVs preserve hardware derivatives and mip filtering.
  // The old fragment hash magnified interpolation roundoff into changing rooms.
  mat.onBeforeCompile=s=>{s.uniforms.facadePitch={value:new T.Vector2(...style.windowPitch)};s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nattribute vec3 instanceDimensions;attribute vec2 instanceFacade;uniform vec2 facadePitch;').replace('#include <uv_vertex>',`#include <uv_vertex>
@@ -45,7 +46,7 @@ vec2 scaleUV=vec2(mix(instanceDimensions.x,instanceDimensions.z,step(.5,abs(norm
  const light=new T.MeshBasicMaterial({color:new T.Color(0x65deff).multiplyScalar(2)}),warm=new T.MeshBasicMaterial({color:new T.Color(0xffc084).multiplyScalar(1.5)});light.userData.noShadow=warm.userData.noShadow=true;
  const billboards=new T.MeshBasicMaterial({map:signTexture(),toneMapped:false});billboards.userData.noShadow=true;
  const vegetation=new T.MeshStandardMaterial({color:0x29482f,roughness:.9});const gantrySign=archSign();
- const placements=[];let foundations=0,piers=0;
+ const placements=[];let foundations=0,piers=0;/* CHARTVOLT PATCH (14 Oct 2026, owner: less buildings on mobile): a tower a phone skips still reserves its plot, so a later tower cannot move into the gap and every survivor stands where it does on desktop. */const reserved=[];let backPlaced=0;
  const beam=(a,b,width,depth,mat=concrete)=>{const delta=b.clone().sub(a);parts.add(mat,a.clone().add(b).multiplyScalar(.5),[width,delta.length(),depth],new T.Quaternion().setFromUnitVectors(UP,delta.normalize()),false);};
  // Continuous structural deck with vertical side walls, rather than two floating sheets.
  for(const side of [-1,1]){
@@ -87,12 +88,12 @@ vec2 scaleUV=vec2(mix(instanceDimensions.x,instanceDimensions.z,step(.5,abs(norm
  const natural=['jungle','volcano','alpine','coast','desert','canyon'].includes(p.type);const count=natural?0:night?56:62;
  for(let i=0;i<count;i++){const d=(i+random()*.5)*track.length/count,f=track.frame(d),side=i%2?1:-1,offset=70+random()*140,w=30+random()*32,depth=28+random()*29;
   const lateral=new T.Vector3(f.right.x,0,f.right.z).normalize(),center=f.p.clone().addScaledVector(lateral,side*offset),radius=Math.hypot(w,depth)*.5+28;
-  if(!clearOfGrandstands(view.grandstands,center.x,center.z,Math.hypot(w,depth)*.5+10)||road.some(v=>Math.hypot(v.x-center.x,v.z-center.z)<radius)||placements.some(v=>Math.hypot(v.x-center.x,v.z-center.z)<radius+35))continue;
+  if(!clearOfGrandstands(view.grandstands,center.x,center.z,Math.hypot(w,depth)*.5+10)||road.some(v=>Math.hypot(v.x-center.x,v.z-center.z)<radius)||placements.concat(reserved).some(v=>Math.hypot(v.x-center.x,v.z-center.z)<radius+35))continue;
   // Buildings start at the same terrain elevation, never at a banked track offset.
-  const height=135+random()*150+(i%13===0?65:0);tower(center.x,center.z,w,depth,height,Math.atan2(f.forward.x,f.forward.z)+(side<0?Math.PI:0),i);
+  const height=135+random()*150+(i%13===0?65:0);if(PHONE&&i%PHONE_BUDGET.towerStride===PHONE_BUDGET.towerStride-1){reserved.push({x:center.x,z:center.z});continue;}tower(center.x,center.z,w,depth,height,Math.atan2(f.forward.x,f.forward.z)+(side<0?Math.PI:0),i);
  }
  // A second, lower skyline supplies depth without large repeating foreground blocks.
- for(let i=0;i<(natural?0:36);i++){const a=random()*Math.PI*2,r=190+random()*1050,cx=Math.cos(a)*r,cz=Math.sin(a)*r,w=22+random()*25;if(road.some(v=>Math.hypot(v.x-cx,v.z-cz)<w+55)||placements.some(v=>Math.hypot(v.x-cx,v.z-cz)<w+38))continue;tower(cx,cz,w,w*.82,65+random()*190,a,i+130);}
+ for(let i=0;i<(natural?0:36);i++){const a=random()*Math.PI*2,r=190+random()*1050,cx=Math.cos(a)*r,cz=Math.sin(a)*r,w=22+random()*25;if(road.some(v=>Math.hypot(v.x-cx,v.z-cz)<w+55)||placements.concat(reserved).some(v=>Math.hypot(v.x-cx,v.z-cz)<w+38))continue;const backHeight=65+random()*190;if(PHONE&&backPlaced>=PHONE_BUDGET.backTowers){reserved.push({x:cx,z:cz});continue;}backPlaced++;tower(cx,cz,w,w*.82,backHeight,a,i+130);}
  // Eight engineered segmented checkpoint arches, open at road level.
  for(let i=0;i<8;i++){const f=track.frame(80+i*track.length/8),q=new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(f.right,f.up,f.forward.clone().negate()));const local=(x,y)=>f.p.clone().addScaledVector(f.right,x).addScaledVector(f.up,y);
   const sign=new T.Mesh(new T.PlaneGeometry(13,1.65),gantrySign);sign.position.copy(local(0,18.3)).addScaledVector(f.forward,-1.9);sign.quaternion.copy(q);scene.add(sign);

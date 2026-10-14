@@ -6,6 +6,7 @@ import manifest from '../assets/audio/manifest.json';
 import {SoundRack,SFX_NAMES} from './sound-rack.js';
 /* CHARTVOLT PATCH (28 Sep 2026): MP3 only - the OGG copies doubled the bundle's music for no audible gain. */const fallbacks=[afterburnFallback,canopyFallback,ignitionFallback,horizonFallback],sources=fallbacks;
 export const SOUNDTRACK=manifest.tracks.map((t,i)=>({...t,url:sources[i],fallback:fallbacks[i]}));
+const RESUME_WAIT_MS=800,WAKE_GRACE_MS=600;
 const clamp=x=>Math.max(0,Math.min(1,Number.isFinite(x)?x:0));
 export class RaceAudio {
   constructor(){this.musicVolume=.75;this.sfxVolume=.9;this.muted=false;this.musicMuted=false;this.sfxMuted=false;this.tick=0;this.playing=false;this.cache=new Map();this.musicVoices=new Set();this.selection='auto';this.trackId='orbital';this.seed=0;this.request=0;this.effects={};this.status='locked';this.last={};}
@@ -20,7 +21,8 @@ export class RaceAudio {
     }
     // Resume inside the user's gesture before decoding. A source loops on the
     // audio thread, independent of render frames or JavaScript timers.
-    await this.ctx.resume();if(!this.prepared)this.prepare().catch(e=>{this.status='music unavailable';console.warn('Soundtrack could not be decoded',e);});
+    /* CHARTVOLT PATCH (14 Oct 2026, owner: sound stops after switching apps on mobile): iOS can leave resume() pending for ever on a context it interrupted, and the solo Resume button awaits this - so the race itself never resumed. The wait is bounded; wake() recovers the sound separately. */
+    await Promise.race([this.ctx.resume(),new Promise(r=>setTimeout(r,RESUME_WAIT_MS))]).catch(()=>{});if(!this.prepared)this.prepare().catch(e=>{this.status='music unavailable';console.warn('Soundtrack could not be decoded',e);});
   }
   selected(){if(this.selection!=='auto')return SOUNDTRACK.find(t=>t.id===this.selection)||SOUNDTRACK[0];const id=this.trackId;return SOUNDTRACK[/volcano|reactor|foundry|solar/.test(id)?2:/jungle|coast/.test(id)?1:/orbital|asteroid|eclipse|frozen|alpine/.test(id)?3:0];}
   begin(trackId,seed=0){this.stopMusic();this.trackId=trackId;this.seed=seed;this.last={};this.finishPlayed=false;this.playing=false;this.rack?.silence();this.tick=0;this.prepare().catch(()=>{});}
@@ -53,6 +55,15 @@ export class RaceAudio {
   combat(e,self,distance=0){const local=e.source===self||e.target===self,range=Math.abs(distance);if(!local&&range>180)return;this.effect(e.type,{...e,volume:local?1:.55*(1-range/180),pan:Math.max(-.7,Math.min(.7,(e.lane||0)/18))});}
   finish(){if(this.finishPlayed)return;this.finishPlayed=true;this.playing=false;this.rack?.silence();if(!this.ctx)return;const c=this.ctx,t=c.currentTime;this.effect('finish');if(this.current){const voice=this.current;voice.gain.gain.cancelScheduledValues(t);voice.gain.gain.setTargetAtTime(0,t,.12);voice.source.stop(t+.6);this.current=null;}const request=++this.request;clearTimeout(this.finishTimer);this.finishTimer=setTimeout(()=>{if(request===this.request&&!this.playing)this.pause();},2200);}
   pause(){if(this.ctx?.state==='running')this.ctx.suspend();}
+  /* CHARTVOLT PATCH (14 Oct 2026, owner: "when ... the user go to other app ... and then come back to the race on mobile the music and sound stops"): update() does nothing unless the context is running, so a context the phone suspended or interrupted in the background stayed silent for the rest of the race. wake() is called on return and on every tap. iOS only honours resume() inside a gesture and sometimes not even then, so a context still not running a moment after a gesture is marked stalled, and the next gesture replaces it - creating a context is allowed inside a gesture where resuming the old one was not. */
+  wake(fromGesture=false){
+    const c=this.ctx;if(!c||c.state==='running'){this.stalled=false;return;}
+    if(fromGesture&&(this.stalled||c.state==='closed'||c.state==='interrupted')){this.rebuild();return;}
+    if(c.state!=='closed')c.resume().catch(()=>{});
+    clearTimeout(this.wakeTimer);this.wakeTimer=setTimeout(()=>{if(this.ctx===c&&c.state!=='running')this.stalled=true;},WAKE_GRACE_MS);
+  }
+  // Reason: must run synchronously inside the gesture, which is why unlock()'s context creation and resume() precede its first await.
+  rebuild(){const old=this.ctx;clearTimeout(this.wakeTimer);this.stalled=false;this.stopMusic();this.cache.clear();this.rack?.dispose();this.rack=null;this.ctx=null;try{old?.close().catch(()=>{});}catch{}this.unlock().catch(()=>{});}
   applyLevels(){if(!this.ctx)return;const t=this.ctx.currentTime;this.music.gain.setTargetAtTime(this.musicMuted?0:this.musicVolume,t,.025);this.fx.gain.setTargetAtTime(this.sfxMuted?0:this.sfxVolume,t,.025);this.master.gain.setTargetAtTime(this.muted?0:.94,t,.025);}
   levels(music,sfx){this.musicVolume=clamp(music);this.sfxVolume=clamp(sfx);this.applyLevels();}
   muteBus(bus,value){if(bus==='music')this.musicMuted=Boolean(value);if(bus==='sfx')this.sfxMuted=Boolean(value);this.applyLevels();}

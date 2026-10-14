@@ -11,6 +11,7 @@ import {updateVolcanicFX} from './volcanic-fx.js';
 import {buildTunnel,updateTunnelLighting} from './tunnel.js';
 import {updateLivingWorld} from './living-world.js';
 import {updateTrackLife} from './track-life.js';
+import {PHONE} from './phone-budget.js';
 import * as T from 'three';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
 import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
@@ -50,7 +51,7 @@ export class RaceScene{
     this.materials={road:new T.MeshPhysicalMaterial({color:0x202d40,roughness:.69,metalness:.25}),side:new T.MeshStandardMaterial({color:0x111b2b,roughness:.52,metalness:.6}),stripe:new T.MeshStandardMaterial({color:0xd9ecb0,roughness:.8}),white:new T.MeshBasicMaterial({color:0xa5bace}),cyan:new T.MeshBasicMaterial({color:new T.Color(0x5fe6ee).multiplyScalar(2.2)}),pink:new T.MeshBasicMaterial({color:new T.Color(0xed53b8).multiplyScalar(2.1)})};
     this.materials.cyan.color.setHex(track.definition.color).multiplyScalar(1.6);this.materials.pink.color.setHex(track.definition.accent).multiplyScalar(1.6);
     setupEnvironment(this);this.buildRoad();this.buildWorld();this.buildDetails();this.ship=createShip(0);this.scene.add(this.ship);this.shipIndex=0;this.remoteShips=new Map();this.visualTime=0;this.explosions=new ShipExplosions(this.scene);
-    this.buildTheme();buildEnvironmentProps(this);buildSkillGates(this);buildRacingGuide(this);/* CHARTVOLT PATCH (13 Oct 2026): 4 point lights, not 8 - slots 4-7 were never lit, yet every lit material paid for all eight on every pixel. */this.localLights=Array.from({length:4},()=>{const light=new T.PointLight(0x5cdeff,0,28,2);this.scene.add(light);return light;});this.composer=new EffectComposer(this.renderer);this.composer.addPass(new RenderPass(this.scene,this.camera));this.bloom=new UnrealBloomPass(new T.Vector2(960,540),.38,.38,1.35);this.composer.addPass(this.bloom);this.composer.addPass(new OutputPass());this.fxaa=new ShaderPass(FXAAShader);this.composer.addPass(this.fxaa);this.resize();this.prewarmShips();
+    this.buildTheme();buildEnvironmentProps(this);buildSkillGates(this);buildRacingGuide(this);/* CHARTVOLT PATCH (13 Oct 2026): 4 point lights, not 8 - slots 4-7 were never lit, yet every lit material paid for all eight on every pixel. *//* CHARTVOLT PATCH (14 Oct 2026, owner: reduce lights on mobile): every point light in the scene is paid for in every lit pixel's shader. A phone keeps only the engine glow (index 3) in the scene; the pickup lights still exist so the code driving them is unchanged, they simply light nothing. */this.localLights=Array.from({length:4},(_,i)=>{const light=new T.PointLight(0x5cdeff,0,28,2);if(!PHONE||i===3)this.scene.add(light);return light;});this.composer=new EffectComposer(this.renderer);this.composer.addPass(new RenderPass(this.scene,this.camera));this.bloom=new UnrealBloomPass(new T.Vector2(960,540),.38,.38,1.35);this.composer.addPass(this.bloom);this.composer.addPass(new OutputPass());this.fxaa=new ShaderPass(FXAAShader);this.composer.addPass(this.fxaa);this.resize();this.prewarmShips();
   }
   // CHARTVOLT PATCH (13 Oct 2026): rival ships are pooled. Building one mid-race (procedural hull,
   // livery, label, first GPU upload) was the half-second freeze players saw whenever a rival joined
