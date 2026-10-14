@@ -250,6 +250,19 @@ code change), the hangar swipe carousel, and the track picker / Shuffle report. 
 `pm2 restart chartvolt-games` (client fingerprint changes). **Never verified by eye** — the automated
 browser has no WebGL, so the game would not render for a check.
 
+### Phone ship carousel, track picker diagnosis, sharper hangar text (14 Oct 2026, owner)
+
+| Change | Where |
+|---|---|
+| **Ship carousel on phones** (brief s25, "Mobile must NOT show 8 ships at once"): below 600px wide or 500px tall the 8-button strip is hidden and replaced by `‹ 01 / 08 NAME ›`, one dot per ship in its paint colour, and a horizontal swipe across the hangar (over 40px, clearly more horizontal than vertical, touch/pen only, never starting on a button or input). Every route calls `select()`, so the multiplayer ready lock and the server's authoritative ship still apply; the arrows dim when the ship buttons are disabled. Desktop keeps the 4x2 grid. Spec's separate "SELECT SHIP" button skipped deliberately: selection is immediate and ENTER CIRCUIT is the ready action | `root/index.html` (`.cv-carousel`, `#shipDots`), `main.js` (boot + `select`), `root/chartvolt.css` |
+| **Hangar text on phones**: the 9-10px thin monospace labels are 11-12px system sans, semi-bold; the ship and dock panels drop `backdrop-filter` for a solid panel, because small text over GPU blur renders soft on phones | `root/chartvolt.css` |
+| **Track picker / Shuffle**: the whole chain (games-service `practice` → `trackChoice` → race-room `changeTrack` → POST `/race/.../track`) is correct in the repo. The live fault is almost certainly the deploy: the `track` endpoint was added to `deploy/nginx.conf` and `next.config.ts` on 13 Oct, and a proxy without it answers with an HTML 404. The client now shows that as "Could not change circuit (... HTTP 404)" instead of a JSON parse error, and solo Shuffle always lands on a different circuit | `multiplayer-client.js` (`request`), `main.js` (`pickTrack`) |
+
+**Deploy for the track fix:** pull; copy `deploy/nginx.conf` into place, `sudo nginx -t`, reload nginx;
+rebuild Next; `pm2 restart chartvolt-velocity chartvolt-games`. If Shuffle then shows an HTTP status,
+that status names the layer still missing the route. The circuit buttons only appear in **practice**
+(solo) rooms by design. **Never verified by eye.**
+
 The lighten step is **not idempotent**: it deletes the 4k originals it shrinks, so a second rebuild
 over the same `%TEMP%\vvfull` fails with `Input file is missing: ...rock_3_diff_4k.webp`. Pass
 `--fresh` when that happens.

@@ -141,14 +141,32 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:c
   #hangar .cv-step-head{margin:0 0 6px}
   #hangar .cv-track-card{grid-template-columns:70px minmax(0,1fr);gap:10px;padding:9px}
   #hangar .cv-intro #trackName{font-size:15px}
-  #hangar .cv-intro .track-choice button{min-height:36px;padding:0 8px;font-size:10px}
+  #hangar .cv-intro .track-choice button{min-height:36px;padding:0 8px}
 }
+/* Ship carousel (owner's HUD spec s25): desktop keeps the 4x2 grid; phones get ‹ name › plus dots and swipe. */
+#hangar .cv-carousel,#hangar .cv-dots,#hangar .cv-browse-swipe{display:none}
 @media (max-width:600px),(max-height:500px){
-  #hangar .cv-fleet .ship-picker{display:grid;grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:104px;
-    overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:3px 2px 2px}
-  #hangar .cv-fleet .ship-picker::-webkit-scrollbar{display:none}
-  #hangar .ship-picker button{scroll-snap-align:start;min-height:54px}
+  #hangar.cv-hangar{touch-action:pan-y}
+  #hangar .cv-fleet .ship-picker,#hangar .cv-browse-keys{display:none}
+  #hangar .cv-browse-swipe{display:inline}
+  #hangar .cv-carousel{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:8px;margin:6px 0 0}
+  #hangar .cv-carousel>div{display:grid;justify-items:center;gap:2px;min-width:0}
+  #hangar .cv-carousel small{font:600 11px/1 system-ui,sans-serif;letter-spacing:.14em;color:var(--muted)}
+  #hangar .cv-carousel b{font:800 18px/1.1 system-ui,sans-serif;letter-spacing:.06em;color:#e8fbff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  #hangar .cv-carousel button{min-height:48px;border:1px solid #9fe8ff55;border-radius:10px;background:#0b1a2acc;color:#9fe8ff;font:700 26px/1 system-ui,sans-serif;cursor:pointer}
+  #hangar .cv-carousel button:active{background:#13304acc}
+  #hangar .cv-fleet:has([data-ship]:disabled) .cv-carousel button{opacity:.35;pointer-events:none}
+  #hangar .cv-dots{display:flex;justify-content:center;gap:7px;margin:8px 0 0}
+  #hangar .cv-dots i{width:7px;height:7px;border-radius:50%;background:#ffffff33;transition:transform .15s,background .15s}
+  #hangar .cv-dots i.on{background:var(--paint,#9fe8ff);transform:scale(1.35)}
   #hangar .cv-launch #play{min-height:52px;font-size:14px}
+  /* Reason: 9-10px thin monospace over backdrop-filter glass renders soft on phone GPUs; the owner reported it as blurry. Larger, heavier type on a solid panel. */
+  #hangar .cv-ship,#hangar .cv-dock{backdrop-filter:none;-webkit-backdrop-filter:none;background-color:#07111ef2}
+  #hangar .cv-label,#hangar .cv-step-head,#hangar .cv-intro #trackMeta,#hangar .cv-track-locked,#hangar #trackStatus{font:600 11px/1.35 system-ui,sans-serif;letter-spacing:.08em}
+  #hangar .cv-intro .track-choice button{font:700 12px/1 system-ui,sans-serif;letter-spacing:.06em}
+  #hangar #shipStats span{font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.06em}
+  #hangar #shipStats strong{font-size:14px}
+  #hangar{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 }
 
 /* Phone landscape / very short windows. */
@@ -163,7 +181,7 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:c
   #hangar .cv-track-card{grid-template-columns:58px minmax(0,1fr);gap:9px;padding:7px 9px}
   #hangar .cv-intro #trackName{font-size:14px}
   #hangar .cv-intro #environmentName{display:none}
-  #hangar .cv-intro .track-choice button{min-height:34px;padding:0 8px;font-size:10px}
+  #hangar .cv-intro .track-choice button{min-height:34px;padding:0 8px}
   #hangar .cv-intro .rule{margin:0 0 6px}
   #hangar .cv-ship{padding:8px 12px}
   #hangar .cv-ship #shipName{font-size:17px}
