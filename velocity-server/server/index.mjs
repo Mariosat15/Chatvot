@@ -7,6 +7,17 @@ import {RaceRoom} from './race-room.mjs';
 import {verifyTicket} from './tickets.mjs';
 import {raceEnvironment} from './env.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+/**
+ * CHARTVOLT PATCH (14 Oct 2026, owner: smoother on a weak connection). One snapshot write, shared by the
+ * first message and the 10 Hz broadcast so both advance the connection's event cursor the same way.
+ *
+ * Reason for SNAPSHOT_BACKLOG_BYTES: a snapshot replaces the one before it, so on a link that cannot keep up,
+ * queueing every one only makes each arrive later than the last. While more than this is still waiting to
+ * leave, that player's broadcast is skipped and the next one carries the freshest state - and, through the
+ * cursor, every event the skipped ones would have carried.
+ */
+export const SNAPSHOT_BACKLOG_BYTES=16*1024;
+export function send(room,p,now){const c=p.connection,s=room.snapshot(p.id,now,c.eventCursor);for(const e of s.combat.events)if(e.id>c.eventCursor)c.eventCursor=e.id;c.res.write('data: '+JSON.stringify(s)+'\n\n');}
 function equal(a,b){const x=Buffer.from(a||''),y=Buffer.from(b||'');return x.length===y.length&&timingSafeEqual(x,y);}
 // CHARTVOLT PATCH: defaults come from games-service/.env (see env.mjs), not RACE_* / PORT / HOST.
 export async function createRaceServer({secret=raceEnvironment(process.env,root).secret,adminKey=raceEnvironment(process.env,root).adminKey,origins=raceEnvironment(process.env,root).origins,dataDir=raceEnvironment(process.env,root).dataDir}={}){
@@ -52,8 +63,8 @@ export async function createRaceServer({secret=raceEnvironment(process.env,root)
     if(!room.mayEnter(p)){json(409,{error:'Race entry has closed'});return;}
     // Reason: `no-transform` stops every gzip layer on the path (Next.js's rewrite proxy compresses all responses, Cloudflare too) from holding snapshots back until a chunk fills.
     res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});res.flushHeaders();
-    const old=p.connection;p.connection={res,exp:claims.exp};if(old)old.res.end();room.join(id,now);
-    res.write('data: '+JSON.stringify(room.snapshot(id,now))+'\n\n');
+    const old=p.connection;p.connection={res,exp:claims.exp,eventCursor:0};if(old)old.res.end();room.join(id,now);
+    send(room,p,now);
     res.on('close',()=>{if(p.connection?.res===res){p.connection=null;room.disconnect(id,Date.now());}});return;
    }
    if(req.method==='POST'&&action==='input'){if(!p.connected||p.dnf||p.finishTimeMs!=null||room.isClosed()){await body();json(200,{accepted:false,ack:p.lastSeq,reason:'inactive'});return;}const ok=room.input(id,await body(),now);json(ok?200:409,{accepted:ok,ack:p.lastSeq,ackStep:p.ackStep,inputStep:p.queuedStep,serverTime:now});return;}
@@ -66,7 +77,7 @@ export async function createRaceServer({secret=raceEnvironment(process.env,root)
  });
  server.requestTimeout=10000;server.headersTimeout=10000;
  let broadcastAt=0;
- const timer=setInterval(()=>{const now=Date.now();for(const [id,room]of rooms){room.advance(now);if(room.isClosed())void archive(room);if(now-broadcastAt>=100)for(const p of room.players.values())if(p.connection){const {res,exp}=p.connection;if(exp*1000<=now||res.writableLength>256*1024){res.end();continue;}res.write('data: '+JSON.stringify(room.snapshot(p.id,now))+'\n\n');}if((room.status==='lobby'&&now>room.lobbyExpiresAt())||(room.isClosed()&&saved.has(id)&&now-room.finishedAt>600000)){for(const p of room.players.values())p.connection?.res.end();rooms.delete(id);}}if(now-broadcastAt>=100)broadcastAt=now;},1000/60);
+ const timer=setInterval(()=>{const now=Date.now();for(const [id,room]of rooms){room.advance(now);if(room.isClosed())void archive(room);if(now-broadcastAt>=100)for(const p of room.players.values())if(p.connection){const {res,exp}=p.connection;if(exp*1000<=now||res.writableLength>256*1024){res.end();continue;}if(res.writableLength>SNAPSHOT_BACKLOG_BYTES)continue;send(room,p,now);}if((room.status==='lobby'&&now>room.lobbyExpiresAt())||(room.isClosed()&&saved.has(id)&&now-room.finishedAt>600000)){for(const p of room.players.values())p.connection?.res.end();rooms.delete(id);}}if(now-broadcastAt>=100)broadcastAt=now;},1000/60);
  return{server,rooms,close:async()=>{clearInterval(timer);for(const room of rooms.values())for(const p of room.players.values())p.connection?.res.end();await new Promise(r=>server.close(r));}};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){const app=await createRaceServer();const {port,host}=raceEnvironment(process.env,root);app.server.listen(port,host,()=>console.log(`Volt Velocity authoritative race service listening on ${host}:${port}`));for(const signal of ['SIGTERM','SIGINT'])process.on(signal,async()=>{await app.close();process.exit(0)});}

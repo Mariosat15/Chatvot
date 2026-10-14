@@ -440,3 +440,18 @@ Tests: `tests/chartvolt-mobile-menu.test.mjs` (5) and `tests/chartvolt-disconnec
 ## Rival ships smooth on a phone network (14 Oct 2026)
 
 Owner: "the other ships look clunky, forward and back instantly". Rivals are drawn ahead of their last report by the report's age. That age was measured from when the snapshot **arrived**, so phone-network jitter went straight into the drawing: a late snapshot projected a rival too far, and the next one pulled it back about 15 m at race speed. `multiplayer-client.js` `noteClock()` now measures the age from the server's own `tick`, against an offset that settles on the fastest arrival path and ignores spikes. `scene.js` `updateOpponents()` also never draws a forward-moving rival going backwards outside a real reset (respawn, rejoin, lap wrap). Tests: `tests/chartvolt-rival-clock.test.mjs` (3). With the old timing, the late-snapshot test reports a 0.150 s backward jump. Deploy: pull + `pm2 restart chartvolt-games` (client only). **Never verified by eye on a phone.**
+
+## Lighter updates on a weak connection, and a second graphics fallback (14 Oct 2026)
+
+Owner: smaller, less frequent updates on a weak connection, and let the game lower its own graphics when a phone slows down.
+
+**Network.** Each 10 Hz update measured about 10 KB with eight pilots, and 40% of it was combat events repeated for their whole three-second window (each event was sent about 30 times). Three changes take the average to **about 5.5 KB**, so a bit under half:
+- Each connection keeps an event cursor (`server/index.mjs` `send()`), so an event travels once. A new or reconnected connection starts at 0 and gets the whole window. The client already deduplicated by id, so nothing changes on its side.
+- Rivals' and standings' positions are rounded on the wire only: centimetres, and 0.0001 rad for heading (`server/wire-precision.mjs`). The simulation, the result and the player's own `self` are never rounded.
+- A connection that still has more than 16 KB waiting to leave skips that broadcast. A snapshot replaces the one before it, so on a slow link queueing all of them just makes each one arrive later. The next update carries the freshest state, and the cursor brings the events the skipped updates would have carried. The 256 KB disconnect is unchanged.
+
+**Not a WebSocket.** The suggestion was a WebSocket. It was not built: the race feed passes through the Next rewrite, nginx and Cloudflare, and swapping transport across three proxy layers is a deploy risk. Trimming the existing stream gets the bandwidth saving without that risk.
+
+**Graphics.** When frames still run long after `dynamicScale` reaches its floor, `scene.js` calls `client-patches/frame-shed.js` `shedNextEffect()`. It turns off one extra at a time, in this order: glow, then clouds, then distant facade detail (`detailRange` down to 140). It waits three seconds before judging again, never restores anything automatically, and is rendering only. Seed, track and physics are untouched. A player's own Settings change still applies.
+
+Tests: `tests/chartvolt-wire-budget.test.mjs` (6), 6 probes red. velocity-server 149/149, games-service velocity 20/20. Deploy: pull, `pm2 restart chartvolt-games` **and** restart the race server (server code changed). **Never verified by eye on a phone or on a weak connection.**

@@ -1,5 +1,7 @@
 import {resolveContact} from './ship-contact.mjs';
 import {stepSlipstream} from './power-effects.mjs';
+import {centimetres} from './wire-precision.mjs';
+const roundEvent=e=>({...e,distance:centimetres(e.distance),lane:centimetres(e.lane)});
 /**
  * CHARTVOLT PATCH (13 Oct 2026, owner, after the legal opinion): replaces the vendor's PlayerCombat.
  *
@@ -37,5 +39,12 @@ export class RaceFeed {
   stepSlipstream(this,racers);
  }
  /** The `combat` key is kept for client compatibility; everything that described a rival's weapon is now always empty. */
- snapshot(){return{lockTarget:null,bolts:[],missiles:[],mines:[],slicks:[],unavailablePickups:[],events:this.events.filter(e=>this.room.tick-e.tick<180),stats:{},incoming:false,combatVersion:2,skillOnly:true};}
+ /**
+  * CHARTVOLT PATCH (14 Oct 2026, owner: smoother on a weak connection): `after` is the last event id this
+  * connection was already sent. An event used to ride in every snapshot for its whole three-second window -
+  * thirty copies of each, about 40% of every message. The stream is TCP and the client skips ids it has
+  * already drawn (`e.id<=lastCombatEvent`), so each event now travels once; a new connection starts at 0
+  * and still receives the full window.
+  */
+ snapshot(after=0){return{lockTarget:null,bolts:[],missiles:[],mines:[],slicks:[],unavailablePickups:[],events:this.events.filter(e=>this.room.tick-e.tick<180&&e.id>after).map(roundEvent),stats:{},incoming:false,combatVersion:2,skillOnly:true};}
 }
