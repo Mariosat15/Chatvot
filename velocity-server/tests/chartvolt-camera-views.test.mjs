@@ -17,8 +17,8 @@ const html = read('root/index.html');
 const hud = strip(read('root/cv-hud.css'));
 const preset = {back: 24, up: 8.2, fov: 62, boostBack: 4, boostFov: 7};
 
-test('four views, and an unknown or prototype id falls back to the chase view', () => {
-  assert.deepEqual(Object.keys(CAMERA_VIEWS), ['chase', 'close', 'cockpit', 'high']);
+test('five views, and an unknown or prototype id falls back to the chase view', () => {
+  assert.deepEqual(Object.keys(CAMERA_VIEWS), ['chase', 'close', 'interior', 'cockpit', 'high']);
   for (const bad of ['__proto__', 'constructor', 'toString', '', null, undefined, 3]) assert.equal(resolveCameraView(bad), 'chase');
   assert.equal(nextCameraView('high'), 'chase');
   assert.equal(nextCameraView('chase'), 'close');

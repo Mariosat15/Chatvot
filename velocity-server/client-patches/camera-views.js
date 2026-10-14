@@ -7,7 +7,11 @@
 export const CAMERA_VIEWS = Object.freeze({
   chase:   Object.freeze({label: 'Chase',       back: 1,    up: 1,    shipPull: .32, fovAdd: 0}),
   close:   Object.freeze({label: 'Close chase', back: .58,  up: .55,  shipPull: .16, fovAdd: 4}),
-  cockpit: Object.freeze({label: 'Cockpit',     cockpit: true, fov: 76}),
+  /* CHARTVOLT PATCH (14 Oct 2026, owner: "add another camera inside the cockpit ... design interior as well"):
+   * 'interior' sits inside the hull behind a modelled dashboard and canopy frame (cockpit-interior.js); the
+   * older above-canopy view keeps its id so a saved choice still resolves, and is relabelled so the two differ. */
+  interior: Object.freeze({label: 'Inside cockpit', cockpit: true, interior: true, fov: 80}),
+  cockpit: Object.freeze({label: 'Roof cam',    cockpit: true, fov: 76}),
   high:    Object.freeze({label: 'High view',   back: 1.3,  up: 2.4,  shipPull: .55, fovAdd: -4}),
 });
 export const DEFAULT_CAMERA_VIEW = 'chase';
@@ -27,7 +31,7 @@ export function nextCameraView(id) {
 /** Chase-style offsets for one view, scaled from the per-layout preset so phones keep their own framing. */
 export function chaseCamera(id, preset, boosting) {
   const v = CAMERA_VIEWS[resolveCameraView(id)];
-  if (v.cockpit) return {cockpit: true, fov: v.fov + (boosting ? preset.boostFov : 0)};
+  if (v.cockpit) return {cockpit: true, interior: v.interior === true, fov: v.fov + (boosting ? preset.boostFov : 0)};
   return {
     cockpit: false,
     back: preset.back * v.back + (boosting ? preset.boostBack * v.back : 0),
@@ -44,4 +48,14 @@ export function cockpitEye(bounds) {
   if (!min || !max || ![min.y, min.z, max.y, max.z].every(Number.isFinite)) return {x: 0, y: 1.4, z: -0.6};
   const centreZ = (min.z + max.z) / 2;
   return {x: 0, y: max.y + 0.18, z: centreZ + (min.z - centreZ) * 0.2};
+}
+
+/** The pilot's eye inside the hull: about two thirds of the way up and just ahead of centre.
+ *  Reason: the hull is hidden for this view's render (scene.js), so the eye may sit inside it; the interior
+ *  geometry, not the hull, is what frames the road. */
+export function interiorEye(bounds) {
+  const min = bounds?.min, max = bounds?.max;
+  if (!min || !max || ![min.y, min.z, max.y, max.z].every(Number.isFinite)) return {x: 0, y: 0.9, z: -0.3};
+  const centreZ = (min.z + max.z) / 2;
+  return {x: 0, y: min.y + (max.y - min.y) * 0.62, z: centreZ + (min.z - centreZ) * 0.1};
 }
