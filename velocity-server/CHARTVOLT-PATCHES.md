@@ -348,3 +348,33 @@ to practice screen randomly in mobile ... when start still clunky ... find why t
   replaced by the room's), which is the remaining start-time peak.
 - Tests: `tests/chartvolt-phone-memory.test.mjs` (3), `__tests__/admin/practice-round-exit.test.ts`
   (+2). velocity-server 112/112, games-service velocity 19/19. **Not verified by eye.**
+
+## 14 Oct 2026 - the 1.4-second frame at race start (owner console log)
+
+The owner pasted a browser console log. What each line was:
+
+- **`'requestAnimationFrame' handler took 1407ms` - a real defect, fixed.** `RaceScene.render()`
+  calls `warmShips()` on its first frame, which links every shader and uploads textures. `nextRace`
+  hid the loading screen before that frame, so every race start froze on a frame the player could
+  see. The solo boot had the same freeze. The new `warmScene()` in `main.js` does this before the
+  loading screen is hidden. It links the shaders with `compileAsync`, which uses parallel shader
+  compilation where the browser supports it, with the pooled ships shown so their shaders are
+  included. It then runs `warmShips()` and draws one frame to upload the textures. The solo boot
+  calls it before its first animation frame.
+- **`PCFSoftShadowMap has been removed` - fixed.** three.js 0.186 already replaced it with
+  `PCFShadowMap` and printed a warning, so `scene.js` now asks for `PCFShadowMap` directly. The
+  picture is identical.
+- **`POST .../input 409` - expected.** Inputs are pipelined, up to four requests in flight. When a
+  newer request overtakes an older one, the server answers the older one 409, and the client
+  ignores it. Chrome still prints every non-2xx response in red.
+- **`texImage3D: FLIP_Y or PREMULTIPLY_ALPHA isn't allowed` - not from our code.** The only 3D
+  texture is the cloud noise in `cloud-city.js`. It keeps three.js's defaults (`flipY` and
+  `premultiplyAlpha` both false), and three sets both flags from the texture on every upload.
+  Left alone.
+- **`TSS: Caught suspicious full screen spamming`, MetaMask, `MaxListenersExceededWarning`,
+  `ObjectMultiplex` - browser extensions.** All three places that request full screen do so only
+  from a click or tap (`hud-layout.js`, `mobile-immersive.js` once per race on touch devices,
+  `use-stage-fullscreen.ts`).
+- Tests: `tests/chartvolt-start-warmup.test.mjs` (4). velocity-server 116/116, games-service
+  velocity 19/19, practice host 16/16. Deploy: pull + `pm2 restart chartvolt-games` (client only).
+  **Never verified by eye.**
