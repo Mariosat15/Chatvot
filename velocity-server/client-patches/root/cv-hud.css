@@ -57,6 +57,11 @@ html body[data-state][data-mode] #hud.cv-hud{
 .cv-lapbar{height:3px;border-radius:2px;background:rgba(143,185,201,.18);overflow:hidden}
 .cv-lapbar i{display:block;height:100%;background:var(--cv-cyan)}
 .cv-hull{display:flex;align-items:center;gap:8px}
+/* Vendor race-assist.js calls hullLabel.closest('.integrity') and crashes boot without it; neutralise the vendor panel styling that class carries. */
+html body .cv-hull.integrity{position:static;left:auto;top:auto;bottom:auto;width:auto;height:auto;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
+html body .cv-hull.integrity small{font-size:var(--cv-label);letter-spacing:.08em}
+html body .cv-hull.integrity.critical #hull{background:#ff806e}
+html body .cv-hull.integrity.critical #hullLabel{color:#ff806e}
 .cv-hull b{font-size:var(--cv-sub);min-width:4ch;text-align:right}
 .cv-hull .cv-meter i{background:linear-gradient(90deg,#28e0a9,var(--cv-cyan))}
 .cv-race-foot{display:flex;justify-content:space-between;gap:6px;font-size:var(--cv-label);color:var(--cv-dim);letter-spacing:.08em}

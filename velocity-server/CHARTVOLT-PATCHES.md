@@ -223,6 +223,14 @@ games-service deploy together. **Never verified by eye.**
 
 ### The HUD is recomposed per device, not scaled (14 Oct 2026, owner)
 
+> **Boot crash fixed the same day.** The vendor's `race-assist.js` (not in this repo) calls
+> `el('hullLabel').closest('.integrity').classList`. The recomposed markup dropped that class, so the client
+> threw on boot and every player was left on "Joining the grid…". The hull block carries `integrity` again
+> with the vendor panel styling neutralised in `cv-hud.css`. The rebuild now runs
+> `tools/games/velocity-dom-contract.mjs` after the patches are applied, and refuses to build if any
+> non-optional `el()`/`$()` lookup or `.closest()` in the vendor scripts no longer matches `index.html`. No
+> vendor test boots the HUD, which is why the suite stayed green.
+
 Owner brief: `External game plans/design-reference/velocity fix`. Mechanics, physics and the server are
 untouched; only the presentation layer changed. **This supersedes the "HUD that cannot overlap" pass
 above**: the measured collision layout and the `--cv-hud` scale are gone.

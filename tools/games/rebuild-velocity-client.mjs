@@ -16,6 +16,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { execFileSync } from "node:child_process";
 import { applyRoadTransforms } from "./velocity-road-transforms.mjs";
+import { checkDomContract } from "./velocity-dom-contract.mjs";
 
 const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, "$1")), "../..");
 const args = process.argv.slice(2);
@@ -64,6 +65,8 @@ copyDir(path.join(patches, "root"), tree);
 fs.renameSync(path.join(tree, "landscape-manifest.json"), path.join(tree, "assets/landscape/manifest.json"));
 const widened = await applyRoadTransforms({ repo, zip, tree });
 console.log(`🔄 Patches applied (${widened} vendor files widened for the road)`);
+const domProblems = checkDomContract(tree);
+if (domProblems.length) throw new Error(`Markup no longer matches the client's lookups:\n  ${domProblems.join("\n  ")}`);
 
 run("node", ["tools/chartvolt-lighten.mjs"]);
 if (!fs.existsSync(path.join(tree, "node_modules/esbuild")))
