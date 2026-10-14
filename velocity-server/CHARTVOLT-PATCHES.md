@@ -436,3 +436,7 @@ Owner: rotating the phone with the menu open exits the game, the menu cannot scr
 - The `409` responses on `/input` in the console are out-of-order requests that the server refuses on purpose. They are harmless.
 
 Tests: `tests/chartvolt-mobile-menu.test.mjs` (5) and `tests/chartvolt-disconnect-grace.test.mjs` (3). The vendor reconnect assertion in `multiplayer.test.mjs` was flipped from "DNF at 36 s" to "not DNF at 36 s, DNF after 66 s". velocity-server 140/140. Deploy: pull, then `pm2 restart chartvolt-games` and restart the velocity race server. **Never verified by eye or ear on a phone.**
+
+## Rival ships smooth on a phone network (14 Oct 2026)
+
+Owner: "the other ships look clunky, forward and back instantly". Rivals are drawn ahead of their last report by the report's age. That age was measured from when the snapshot **arrived**, so phone-network jitter went straight into the drawing: a late snapshot projected a rival too far, and the next one pulled it back about 15 m at race speed. `multiplayer-client.js` `noteClock()` now measures the age from the server's own `tick`, against an offset that settles on the fastest arrival path and ignores spikes. `scene.js` `updateOpponents()` also never draws a forward-moving rival going backwards outside a real reset (respawn, rejoin, lap wrap). Tests: `tests/chartvolt-rival-clock.test.mjs` (3). With the old timing, the late-snapshot test reports a 0.150 s backward jump. Deploy: pull + `pm2 restart chartvolt-games` (client only). **Never verified by eye on a phone.**

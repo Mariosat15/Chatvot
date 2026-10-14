@@ -20,7 +20,7 @@ export class MultiplayerClient {
  async stream(){let attempt=0;while(!this.closed){try{
    this.onStatus(attempt?'reconnecting':'connecting');this.streamController=new AbortController();this.lastSnapshot=performance.now();const res=await fetch(this.base+'/events',{headers:{Authorization:'Bearer '+this.ticket},signal:AbortSignal.any([this.controller.signal,this.streamController.signal])});if(!res.ok){const e=Error('Race connection rejected ('+res.status+')');e.terminal=[401,403,404,409].includes(res.status);throw e;}
    const reader=res.body.getReader(),decoder=new TextDecoder();let pending='';this.connected=true;attempt=0;this.onStatus('connected');
-   while(!this.closed){const {done,value}=await reader.read();if(done)break;pending+=decoder.decode(value,{stream:true});if(pending.length>2e6)throw Error('Invalid race stream');let end;while((end=pending.indexOf('\n\n'))>=0){const block=pending.slice(0,end);pending=pending.slice(end+2);if(!block.startsWith('data: '))continue;const s=JSON.parse(block.slice(6));if(s.protocol!==PROTOCOL_VERSION||s.playerId!==this.playerId)throw Error('Invalid race snapshot');this.lastSnapshot=performance.now();this.onStatus('connected');this.racing=s.status==='racing'&&s.self.state==='racing';this.seq=Math.max(this.seq,s.ack+1);this.acknowledge(s);this.onSnapshot(s);}}
+   while(!this.closed){const {done,value}=await reader.read();if(done)break;pending+=decoder.decode(value,{stream:true});if(pending.length>2e6)throw Error('Invalid race stream');let end;while((end=pending.indexOf('\n\n'))>=0){const block=pending.slice(0,end);pending=pending.slice(end+2);if(!block.startsWith('data: '))continue;const s=JSON.parse(block.slice(6));if(s.protocol!==PROTOCOL_VERSION||s.playerId!==this.playerId)throw Error('Invalid race snapshot');this.lastSnapshot=performance.now();this.noteClock(s);this.onStatus('connected');this.racing=s.status==='racing'&&s.self.state==='racing';this.seq=Math.max(this.seq,s.ack+1);this.acknowledge(s);this.onSnapshot(s);}}
   }catch(e){if(this.closed)break;if(e.terminal){this.onStatus('rejected');this.close();return;}}
   if(this.closed)break;this.connected=false;this.latest=EMPTY_INPUT;this.pendingFire=false;this.onStatus('reconnecting');await new Promise(r=>setTimeout(r,Math.min(3000,500*++attempt)));
  }}
@@ -34,7 +34,20 @@ export class MultiplayerClient {
  /** CHARTVOLT PATCH. Frames the given snapshot has not applied yet, oldest first. */
  pendingFrames(ackStep){return this.frames.filter(f=>f.step>ackStep);}
  /** CHARTVOLT PATCH. How far to draw other ships ahead of their last reported position, in seconds. */
- leadSeconds(){return Math.min(.35,Math.max(0,(performance.now()-this.lastSnapshot)/1000+this.rtt/2000));}
+ leadSeconds(){if(this.clockOffset==null)return Math.min(.35,Math.max(0,(performance.now()-this.lastSnapshot)/1000+this.rtt/2000));const age=(performance.now()-this.clockOffset)/1000-this.clockTick/60;return Math.min(.35,Math.max(0,age+this.leadRtt/2000));}
+ /**
+  * CHARTVOLT PATCH (14 Oct 2026, owner: "the other ships look clunky, forward and back instantly").
+  * Rivals are drawn ahead of their last report by the report's age. Measured from ARRIVAL, that age
+  * carries all of a phone network's jitter: a late snapshot projects a rival too far, the next one
+  * pulls it back. Measured from the server's own step counter it advances exactly with real time.
+  * The offset follows a faster arrival quickly and a slower one slowly, so it settles on the
+  * quickest path and ignores the spikes.
+  */
+ noteClock(s){if(!Number.isSafeInteger(s?.tick))return;const sample=performance.now()-s.tick*1000/60;
+  // Reason: a new race restarts the tick, and a long stall is a reconnection rather than jitter.
+  if(this.clockOffset==null||s.tick<this.clockTick||Math.abs(sample-this.clockOffset)>1000){this.clockOffset=sample;this.leadRtt=this.rtt;}
+  else this.clockOffset+=(sample-this.clockOffset)*(sample<this.clockOffset?.3:.02);
+  this.clockTick=s.tick;this.leadRtt=this.leadRtt*.95+this.rtt*.05;}
  // Reason: only a SNAPSHOT may retire history. An input response reports a newer ack than the
  // snapshot the game is about to reconcile against, and retiring on it loses frames to replay.
  acknowledge(s){if(!this.framed)return;if(Number.isSafeInteger(s.inputStep)&&s.inputStep>this.inputStep)this.inputStep=s.inputStep;if(Number.isSafeInteger(s.ackStep)&&s.ackStep>this.ackStep){this.ackStep=s.ackStep;const i=this.frames.findIndex(f=>f.step>this.ackStep);this.frames=i<0?[]:this.frames.slice(i);}}
