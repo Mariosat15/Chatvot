@@ -40,6 +40,41 @@ const FINISH_PULL_GAP_MS = 500;
 const LIVE_ROW_POLL_MS = 2000;
 const LIVE_ROW_POLL_LIMIT = 30;
 
+interface LiveRoundMemo {
+  roundId: string;
+  launchUrl: string;
+}
+
+// Reason (14 Oct 2026, owner: "shoot me out of the game back to practice screen randomly in
+// mobile"): when a phone browser kills the tab under memory pressure it reloads the page with
+// no pagehide, and the host remounted idle while the round was still live. The tab's own
+// sessionStorage remembers the round so the reload resumes it instead.
+function liveRoundKey(slug: string): string {
+  return `cv-practice-live:${slug}`;
+}
+
+function rememberLiveRound(slug: string, memo: LiveRoundMemo | null): void {
+  try {
+    if (memo) sessionStorage.setItem(liveRoundKey(slug), JSON.stringify(memo));
+    else sessionStorage.removeItem(liveRoundKey(slug));
+  } catch {
+    /* Storage refused (private mode): a crash then simply returns to the lobby, as before. */
+  }
+}
+
+function recallLiveRound(slug: string): LiveRoundMemo | null {
+  try {
+    const raw = sessionStorage.getItem(liveRoundKey(slug));
+    if (!raw) return null;
+    const memo = JSON.parse(raw) as Partial<LiveRoundMemo>;
+    return typeof memo.roundId === "string" && typeof memo.launchUrl === "string"
+      ? { roundId: memo.roundId, launchUrl: memo.launchUrl }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -128,12 +163,34 @@ export function PracticeRoundHost({
   }, [idle, hasLiveRow, refreshRounds]);
 
   useEffect(() => {
+    // Resume a round the browser reloaded out from under us (see rememberLiveRound). Only a
+    // round the server still lists as live is resumed; anything else is forgotten.
+    const memo = recallLiveRound(slug);
+    if (!memo) return;
+    const stillLive = initialRounds.some((row) => row.roundId === memo.roundId && row.isLive);
+    if (!stillLive) {
+      rememberLiveRound(slug, null);
+      return;
+    }
+    liveRoundId.current = memo.roundId;
+    setPhase({ name: "playing", launchUrl: memo.launchUrl, roundId: memo.roundId });
+    // Mount only: initialRounds is the server's view at the moment of the reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     // Reason: React's unmount cleanup does not run when the player closes the tab.
     // Only void a round that has NOT been scored - voiding a finished practice wipe the
     // result the list exists to show.
-    const endIfLiveUnscored = () => {
+    const endIfLiveUnscored = (event?: Event) => {
+      // Reason (14 Oct 2026): a pagehide with `persisted` is the page going into the
+      // back/forward cache (phone app switch, swipe back) and it may well come back with the
+      // game still mounted - voiding there killed a race the player then returned to.
+      if (event && "persisted" in event && (event as PageTransitionEvent).persisted) return;
       const id = liveRoundId.current;
       if (!id) return;
+      // A deliberate close or reload is not a crash, so it must not resume afterwards.
+      rememberLiveRound(slug, null);
       if (scoredRoundId.current === id || finishingRoundId.current === id) return;
       endRound(id);
     };
@@ -144,7 +201,7 @@ export function PracticeRoundHost({
       window.removeEventListener("beforeunload", endIfLiveUnscored);
       endIfLiveUnscored();
     };
-  }, [endRound]);
+  }, [endRound, slug]);
 
   const launch = useCallback(async () => {
     setRefusal(null);
@@ -160,12 +217,13 @@ export function PracticeRoundHost({
         return;
       }
       liveRoundId.current = data.roundId;
+      rememberLiveRound(slug, { roundId: data.roundId, launchUrl: data.launchUrl });
       setPhase({ name: "playing", launchUrl: data.launchUrl, roundId: data.roundId });
     } catch {
       setRefusal("Something went wrong. Please contact support.");
       setPhase({ name: "idle" });
     }
-  }, [endpoint]);
+  }, [endpoint, slug]);
 
   const handleFinished = useCallback(
     async (roundId: string) => {
@@ -208,6 +266,7 @@ export function PracticeRoundHost({
 
   const handleExit = useCallback(
     (roundId: string) => {
+      rememberLiveRound(slug, null);
       const goIdleAfterResult = async () => {
         // Reason: Velocity exits while the finish pull may still be retrying.
         for (let i = 0; i < 24 && finishingRoundId.current === roundId; i++) {
@@ -265,7 +324,7 @@ export function PracticeRoundHost({
       );
       setPhase({ name: "idle" });
     },
-    [endRound, endpoint, refreshRounds],
+    [endRound, endpoint, refreshRounds, slug],
   );
 
   const forgetRound = useCallback(

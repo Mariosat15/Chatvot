@@ -324,3 +324,27 @@ nginx `/race/` (player endpoints only).
   so tapping it did nothing. On a phone it stays enabled and opens the settings dialog (which holds
   LEAVE RACE); a live race is still never paused. Desktop keeps the disabled button.
 - **Not verified by eye.**
+## 14 Oct 2026 - phones kicked back to the practice screen; clunky start
+
+Owner: "the game while playing or when I press play in practice shoots me out of the game back
+to practice screen randomly in mobile ... when start still clunky ... find why the game crashes".
+
+- **Cause of the "kick":** the practice page only returns to idle on the frame's `exit` or when
+  it remounts. A phone browser killing the tab for memory reloads it with no `pagehide`, so the
+  page remounted idle while the race was still running. The memory came from the sharper-render
+  patch (490dea8b, same day): it lifted every iPhone to the mid tier, and mid loaded **2048
+  textures** - four times the memory of 1024 - undoing the 13 Oct iOS fix.
+- **Fix 1** (`client-patches/main.js`): phones default to 1024 textures unless they measured as
+  high, which an iPhone never does (Safari reports no `deviceMemory`). The resolution caps stay,
+  because `PHONE_PIXEL_BUDGET` in `scene.js` already bounds the canvas. Settings can still raise it.
+- **Fix 2** (`main.js` `nextRace`): `graphics()` ran twice on every race start, walking every
+  material and redrawing the phone's downscaled textures twice while the new scene allocated.
+  One call after bloom is chosen gives the same result.
+- **Fix 3** (`components/games/PracticeRoundHost.tsx`): a `pagehide` with `persisted` (app switch,
+  swipe back into the back/forward cache) no longer voids the round, and the tab's
+  `sessionStorage` remembers `{roundId, launchUrl}` so a reload after a crash resumes a round the
+  server still lists as live. Exit and a deliberate close/reload forget it.
+- **Not done:** joining a room still rebuilds the whole scene once (the hangar's solo track is
+  replaced by the room's), which is the remaining start-time peak.
+- Tests: `tests/chartvolt-phone-memory.test.mjs` (3), `__tests__/admin/practice-round-exit.test.ts`
+  (+2). velocity-server 112/112, games-service velocity 19/19. **Not verified by eye.**

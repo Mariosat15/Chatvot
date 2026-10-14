@@ -26,6 +26,32 @@ describe("practice rounds end when the player leaves", () => {
     expect(code).toMatch(/method:\s*["']DELETE["']/);
   });
 
+  it("does not void a round when the page only goes into the back/forward cache", () => {
+    // Reason (14 Oct 2026, owner: phones kicked back to the practice screen): a persisted
+    // pagehide is an app switch or swipe-back the page can return from with the game mounted.
+    const code = read("components/games/PracticeRoundHost.tsx");
+    const start = code.indexOf("const endIfLiveUnscored");
+    const persisted = code.indexOf(".persisted) return;", start);
+    const voids = code.indexOf("endRound(id);", start);
+    expect(start).toBeGreaterThan(0);
+    expect(persisted).toBeGreaterThan(start);
+    expect(voids).toBeGreaterThan(persisted);
+  });
+
+  it("resumes a still-live round after the browser reloads the tab", () => {
+    // Reason (14 Oct 2026): a phone killing the tab reloads it with no pagehide, which
+    // remounted the host idle while the race was still running.
+    const code = read("components/games/PracticeRoundHost.tsx");
+    expect(code).toMatch(/sessionStorage\.setItem\(liveRoundKey\(slug\)/);
+    expect(code).toMatch(/rememberLiveRound\(slug, \{ roundId: data\.roundId, launchUrl: data\.launchUrl \}\)/);
+    expect(code).toMatch(/row\.roundId === memo\.roundId && row\.isLive/);
+    // Exit and a deliberate close forget it, so neither resumes afterwards.
+    const exit = code.slice(code.indexOf("const handleExit"), code.indexOf("const goIdleAfterResult"));
+    expect(exit).toMatch(/rememberLiveRound\(slug, null\)/);
+    const close = code.slice(code.indexOf("const endIfLiveUnscored"), code.indexOf("endRound(id);"));
+    expect(close).toMatch(/rememberLiveRound\(slug, null\)/);
+  });
+
   it("pulls the score on finished and keeps the iframe open until exit", () => {
     // Reason: voiding on finished tore the Circuit result screen down before the player
     // could read it, and wiped the score from the recent list (owner, 6 Oct 2026).
