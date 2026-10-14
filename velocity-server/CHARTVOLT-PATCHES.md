@@ -502,3 +502,14 @@ Owner: "add another camera inside the cockpit... you need to design interior as 
 **Phone strip** (`root/cv-hud.css`, phones in portrait and landscape, race only). The logo is hidden. The position/speed card becomes a slim 24 px pill fixed in the top centre, with standings and speed on one row and its heading removed. In portrait the lap card is pushed down 30 px so they do not touch, and in landscape the top-right cards leave room for the two utility buttons. Checked in headless screenshots at 390x844 and 844x390.
 
 Tests: `tests/chartvolt-cockpit-interior.test.mjs` (8); `chartvolt-camera-views` now expects five views. 17 probes each turned exactly one test red. velocity-server 176/176, games-service velocity 20/20. Deploy: pull, rebuild the client, `pm2 restart chartvolt-games`. The race server is unchanged. **The phone strip was seen in headless screenshots only. The inside-cockpit view was never verified by eye.**
+
+
+## Rivals no longer stutter at the green light (14 Oct 2026)
+
+Owner: "when start still other ships clunky like back and forth".
+
+**Cause.** Rivals are drawn ahead of their last report by the report's age, measured on the server's tick counter (`noteClock` / `leadSeconds` in `client-patches/multiplayer-client.js`). The server's tick stands still through the lobby and the countdown, because `RaceRoom.step` only runs once racing. So the client "learned" a clock from snapshots whose tick never moved, and it drifted by up to a second. At the green light every rival was projected by the full 0.35 s cap instead of about 0.06 s, which is half the round trip, and the excess took more than four seconds to bleed away. Each new snapshot then pulled the projection back. The "never slide backwards" rule in `scene.js` turned that into a stop-and-surge: the back-and-forth.
+
+**Fix.** `noteClock` ignores any snapshot whose `status` is not `racing` and drops the anchor, so the first racing snapshot re-anchors from scratch. Measured with a 10 s countdown: the lead at the start went from 0.350 s to 0.060 s and stays there. This is presentation only; the server and the simulation are unchanged.
+
+Tests: `tests/chartvolt-rival-start.test.mjs` (2). Two probes turned it red: removing the guard failed 2 tests, and keeping the anchor through the countdown failed 1. velocity-server 178/178. Deploy: pull, rebuild the client, `pm2 restart chartvolt-games`. **Never verified by eye in a live multiplayer race.**

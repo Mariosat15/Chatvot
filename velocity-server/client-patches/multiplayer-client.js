@@ -43,7 +43,13 @@ export class MultiplayerClient {
   * The offset follows a faster arrival quickly and a slower one slowly, so it settles on the
   * quickest path and ignores the spikes.
   */
- noteClock(s){if(!Number.isSafeInteger(s?.tick))return;const sample=performance.now()-s.tick*1000/60;
+ noteClock(s){if(!Number.isSafeInteger(s?.tick))return;
+  // Reason (owner, 14 Oct 2026: "when start still other ships clunky like back and forth"): the server's tick
+  // stands still through the lobby and countdown, so learning the clock then drifted it by up to a second and
+  // every rival was over-projected by the full 0.35 s cap for seconds after the green light. Only a running
+  // race may anchor it; the first racing snapshot re-anchors from scratch.
+  if(s.status!=null&&s.status!=='racing'){this.clockOffset=null;return;}
+  const sample=performance.now()-s.tick*1000/60;
   // Reason: a new race restarts the tick, and a long stall is a reconnection rather than jitter.
   if(this.clockOffset==null||s.tick<this.clockTick||Math.abs(sample-this.clockOffset)>1000){this.clockOffset=sample;this.leadRtt=this.rtt;}
   else this.clockOffset+=(sample-this.clockOffset)*(sample<this.clockOffset?.3:.02);
