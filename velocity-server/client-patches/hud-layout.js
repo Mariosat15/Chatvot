@@ -127,7 +127,7 @@ function installPauseCard() {
   for (const b of document.querySelectorAll('[data-settings]')) b.addEventListener('click', () => {
     $('settings')?.click();
     const key = b.dataset.settings;
-    const el = key === 'camera' ? $('reduced')?.closest('label') : dialog?.querySelectorAll('h3')[target[key]];
+    const el = key === 'camera' ? ($('cameraView') || $('reduced'))?.closest('label') : dialog?.querySelectorAll('h3')[target[key]];
     requestAnimationFrame(() => el?.scrollIntoView({ block: 'start' }));
   });
   const leave = $('leaveRace');

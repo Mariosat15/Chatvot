@@ -309,8 +309,16 @@ html body[data-state][data-mode] .cv-map>small,html body[data-state][data-mode] 
    On a phone, the race callouts (FINAL LAP, sector and position messages) and the pickup flash leave the middle
    of the road for the bottom gap between the steering buttons and BRAKE/ACCEL. That gap is too narrow in
    portrait, so there they sit just above the control zone. */
+/* Owner, 14 Oct 2026 (second pass, "move these kind of wording to the place the red box is"): the coach line
+   (STRAIGHT · BOOST AVAILABLE), the hull warning and the combat feed leave the top centre too. The zone sits on
+   the floor of the gap, newest line at the bottom; the callout and pickup flash stack above it. */
+html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] .cv-tc{position:fixed;left:50%;top:auto;transform:translateX(-50%);
+  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * .04);padding-top:0;margin:0;
+  flex-direction:column-reverse;justify-content:flex-start;gap:3px;z-index:15;pointer-events:none;
+  max-width:max(120px,calc(100vw - var(--cv-pedal) * 4.9 - 48px))}
+html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning,#combatFeed){max-width:100%}
 html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] #callout{position:fixed;top:auto;left:50%;transform:translateX(-50%);
-  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * .42);width:auto;
+  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * .52);width:auto;
   max-width:max(120px,calc(100vw - var(--cv-pedal) * 4.9 - 48px));z-index:15;pointer-events:none;
   font-size:clamp(11px,1.7vw,14px);letter-spacing:.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 3px rgba(0,0,0,.85)}
 html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] #pickupFlash{position:fixed;top:auto;left:50%;

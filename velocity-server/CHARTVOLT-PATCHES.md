@@ -455,3 +455,23 @@ Owner: smaller, less frequent updates on a weak connection, and let the game low
 **Graphics.** When frames still run long after `dynamicScale` reaches its floor, `scene.js` calls `client-patches/frame-shed.js` `shedNextEffect()`. It turns off one extra at a time, in this order: glow, then clouds, then distant facade detail (`detailRange` down to 140). It waits three seconds before judging again, never restores anything automatically, and is rendering only. Seed, track and physics are untouched. A player's own Settings change still applies.
 
 Tests: `tests/chartvolt-wire-budget.test.mjs` (6), 6 probes red. velocity-server 149/149, games-service velocity 20/20. Deploy: pull, `pm2 restart chartvolt-games` **and** restart the race server (server code changed). **Never verified by eye on a phone or on a weak connection.**
+
+## Race messages in the bottom gap, four camera views, and rivals no longer boost when you do (14 Oct 2026)
+
+Owner: move the in-race wording to the gap between the steering and pedal buttons; add a cockpit view, a closer chase view and one more of our choosing; and "when user use boost all ships boost as well... check it the same happens with other powerups".
+
+**Boost.** No rival actually boosted. Only the player's own exhaust flames were ever animated: every rival's flames stayed exactly as they were built. On top of that, the player's boost pulls the camera back and widens the field of view, so the whole field appears to surge. Bots boost on straights, which is exactly where the coach line says BOOST AVAILABLE, so the two coincided. Rival flames now follow that rival's own `boosting` and `speed` from the snapshot (`client-patches/ship-exhaust.js`, one rule for both the player and the rivals). The camera surge on your own boost is kept on purpose: it is how a boost feels.
+
+**Other power-ups checked.** Nothing is shared between pilots. The server simulates each pilot separately and slipstream is per racer. The shield bubble is drawn per ship, cloak is not in any room, and overdrive and magnet have no visual on other ships. Nothing else needed changing.
+
+**Cameras** (`client-patches/camera-views.js`). Settings, then Display, then Camera view, or press **C** on a keyboard to cycle. The choice is saved in `localStorage` (`cv-camera-view`). A refused storage or an unknown id falls back to Chase.
+- **Chase**: the old camera, unchanged.
+- **Close chase**: about 58% of the distance, lower, and aimed further ahead so the road in front stays in frame.
+- **Cockpit**: the eye just above the hull, ahead of centre. It follows the ship with no smoothing lag, so the view is locked to the hull.
+- **High view**: above and behind, for reading corners early.
+
+Rendering only: seed, track and physics are untouched.
+
+**Messages.** On a phone in landscape, the `.cv-tc` stack (corner coach line, hull warning, combat feed) is fixed to the floor of the gap between the buttons. It is never wider than the gap and never takes a touch. The callout moves up one line above it. Portrait is unchanged.
+
+Tests: `tests/chartvolt-camera-views.test.mjs` (8), 10 probes each turned exactly 1 test red. velocity-server 157/157, games-service velocity 20/20. Deploy: pull, rebuild the client, `pm2 restart chartvolt-games`. No race-server code changed. **Never verified by eye.**

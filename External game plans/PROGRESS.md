@@ -993,6 +993,13 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 14 Oct 2026 - Volt Velocity: race messages in the bottom gap, four camera views, rivals no longer boost when you do
+
+- **The boost report was a drawing fault, not a game fault.** No rival boosted when the player did. Rival exhaust flames were simply never animated, and the player's own boost camera pull made the whole field look like it surged. Rival flames now follow each rival's own boost state. The other power-ups were checked and nothing is shared between pilots.
+- **Cameras:** Chase (unchanged), Close chase, Cockpit and High view, in Settings -> Display or with the C key, saved per browser.
+- **Phone landscape:** the coach line, hull warning and combat feed now sit in the bottom gap between the buttons.
+- Details: `velocity-server/CHARTVOLT-PATCHES.md`. 8 new tests, 10 probes, 157/157 and 20/20 passing. Deploy: pull, rebuild the client, `pm2 restart chartvolt-games`. **Never verified by eye.**
+
 - **14 Oct 2026 - VOLT VELOCITY LIGHTER ON A WEAK CONNECTION AND A SLOW PHONE.** Each race update dropped from about 10 KB to about 5.5 KB. Combat events are now sent once per connection by cursor instead of about 30 times, rival positions are rounded on the wire only, and a connection with an update still queued skips a broadcast rather than stacking stale ones. Once resolution is at its floor, a second fallback drops glow, then clouds, then distant detail. Rendering only. No WebSocket, deliberately, because the feed crosses three proxy layers. Details in `velocity-server/CHARTVOLT-PATCHES.md`. Tests 149/149 plus velocity 20/20, 6 probes red. Deploy needs the race server restarted as well as `chartvolt-games`. **Never verified by eye.**
 
 - **14 Oct 2026 - VOLT VELOCITY RIVAL SHIPS JERK FORWARD AND BACK (owner: "the other ships look clunky forward and back instantly").** Cause: rivals were projected ahead by the age of the last snapshot measured from its *arrival*, so mobile-network jitter made every late snapshot pull a rival back about 15 m. The age is now measured from the server tick against a jitter-filtered clock offset (`multiplayer-client.js` `noteClock`), and a forward-moving rival is never drawn moving backwards outside a real reset (`scene.js`). `tests/chartvolt-rival-clock.test.mjs` (3; the old code reports a 0.150 s backward jump). Client only: pull + `pm2 restart chartvolt-games`. **Never verified by eye.**
