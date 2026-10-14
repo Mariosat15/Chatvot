@@ -248,6 +248,11 @@ html[data-layout=tablet] .cv-race{width:clamp(190px,24vw,220px)}
 html body[data-mode=multiplayer][data-state=hangar] #hud{opacity:1}
 html body[data-mode=multiplayer][data-state=hangar] #hud :is(.cv-tl,.cv-tc,.cv-bl,.cv-map,.cv-speed,.cv-energy){display:none}
 body[data-state=hangar] #hud .cv-pace:not(:has(#liveStandings:not(.hidden))){display:none}
+/* Owner, 14 Oct 2026 ("RACE LOBBY" card on top of the ship panel): in the hangar the lobby card leaves
+   the top-right zone, which is the ship panel's column, for the empty centre above the ship. */
+html body[data-mode=multiplayer][data-state=hangar] #hud .cv-pace{position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(var(--cv-hangar-top,110px) + 8px);width:min(300px,28vw);max-height:calc(100dvh - var(--cv-hangar-top,110px) - 300px);overflow:auto}
+@media (max-width:900px){html body[data-mode=multiplayer][data-state=hangar] #hud .cv-pace{display:none}}
 
 /* ---------- Pause: dark, blurred, one centre card ---------- */
 html body[data-state] #paused.cv-pause{background:rgba(1,6,12,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
@@ -260,6 +265,21 @@ html body[data-state] #paused.cv-pause{background:rgba(1,6,12,.68);-webkit-backd
 .cv-pause-grid button[hidden]{display:none}
 #pauseLeave{min-height:44px;border-radius:8px;border:1px solid #ff94867a;background:#291721;color:#ffd4ce;font-weight:700;letter-spacing:.08em;cursor:pointer}
 #pauseLeave.hidden{display:none}
+
+/* ---------- Owner, 14 Oct 2026: "the joystick is not working" ----------
+   .cv-controls is pointer-events:none so the HUD never blocks the road, and only <button>s turned it
+   back on. The analog pad is a <div>, so it inherited none and never received a pointerdown. */
+html body[data-state][data-mode] .cv-steer #steeringPad{pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* ---------- Owner, 14 Oct 2026: "too much info, repeating" - the race HUD is the target's two cards ----------
+   Left: LAP, TIME, BEST, HULL. Right: POSITION, SPEED. Checkpoint/sector line, the standings list, the
+   style meter and the minimap captions are gone during a race (results still report all of them); the
+   card's BOOST bar is withheld where the BOOST button already shows the same energy as a ring. */
+html body[data-state][data-mode] .cv-race :is(.cv-race-foot,.cv-lapbar){display:none}
+html body[data-state][data-mode] .cv-tc .cv-skill{display:none}
+html body[data-state]:not([data-state=hangar])[data-mode] .cv-pace #raceOrder{display:none}
+html[data-touch="1"] body[data-state][data-mode] .cv-pace .cv-energy{display:none}
+html body[data-state][data-mode] .cv-map>small,html body[data-state][data-mode] .cv-map-toggle span{display:none}
 
 @media (prefers-reduced-motion:reduce){
   .cv-boost[data-ready=ready]{animation:none;box-shadow:0 0 0 2px rgba(89,216,255,.6)}

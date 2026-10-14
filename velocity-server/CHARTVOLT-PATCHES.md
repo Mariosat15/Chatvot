@@ -263,6 +263,19 @@ rebuild Next; `pm2 restart chartvolt-velocity chartvolt-games`. If Shuffle then 
 that status names the layer still missing the route. The circuit buttons only appear in **practice**
 (solo) rooms by design. **Never verified by eye.**
 
+### Joystick, HUD duplicates, desktop lobby card (14 Oct 2026, owner)
+
+| Change | Where |
+|---|---|
+| **Phone joystick did nothing**: `#steeringPad` is a plain div inside `.cv-controls`, which sets `pointer-events:none` so the road stays tappable, and the pad inherited it, so no touch ever reached the steering handler. The pad now opts back in, with `touch-action:none` so a drag steers rather than scrolls | `root/cv-hud.css` |
+| **TIME and TOTAL showed the same number**: `#best` printed the race total, which equals the lap time on lap one. It is now the best completed lap (`—` until one exists), labelled BEST | `main.js` (`put('best', ...)`), `root/index.html` |
+| **Duplicates removed in a race**: the lap bar and race footer (repeat LAP), the standings list in the right card (repeats POSITION), the skill chip, the minimap captions, and on touch the energy row; the idle speed caption reads SPEED, not "HOLD W / ↑ TO ACCELERATE". Left card LAP/TIME/BEST/HULL, right card POSITION/SPEED, icons top right, key strip at the foot | `root/cv-hud.css`, `main.js` |
+| **Desktop hangar: RACE LOBBY card overlapped the ship panel**: in a multiplayer hangar it is pinned in the empty centre column (capped at 300px / 28vw, scrolls inside itself) and hidden at 900px and below, where the side panels already hold the same facts. Long circuit names wrap to two lines instead of being cut off | `root/cv-hud.css`, `root/chartvolt.css` |
+
+The platform half of the same report (page chrome hidden on game screens, the pinned phone stage
+escaping its ancestors) is in `components/Header.tsx`, `components/AnnouncementBanner.tsx`,
+`lib/utils/game-play-route.ts` and `components/games/use-stage-fullscreen.ts`. **Never verified by eye.**
+
 The lighten step is **not idempotent**: it deletes the 4k originals it shrinks, so a second rebuild
 over the same `%TEMP%\vvfull` fails with `Input file is missing: ...rock_3_diff_4k.webp`. Pass
 `--fresh` when that happens.

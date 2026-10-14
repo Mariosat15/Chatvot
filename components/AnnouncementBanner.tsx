@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Clock,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { isGamePlayRoute } from "@/lib/utils/game-play-route";
 
 interface Announcement {
   _id: string;
@@ -112,6 +114,7 @@ function setDismissed(ids: Set<string>) {
 }
 
 export default function AnnouncementBanner() {
+  const pathname = usePathname();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [dismissed, setDismissedState] = useState<Set<string>>(new Set());
 
@@ -146,7 +149,7 @@ export default function AnnouncementBanner() {
   );
 
   const visible = announcements.filter((a) => !dismissed.has(a._id));
-  if (visible.length === 0) return null;
+  if (visible.length === 0 || isGamePlayRoute(pathname)) return null;
 
   return (
     <div className="space-y-2 mb-3">

@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense } from "react";
+import { usePathname } from "next/navigation";
 import NavItems from "@/components/NavItems";
+import { isGamePlayRoute } from "@/lib/utils/game-play-route";
 
 /**
  * Overview dashboard tab strip — desktop only.
@@ -15,6 +17,8 @@ import NavItems from "@/components/NavItems";
  * Phones use the sidebar drawer for navigation.
  */
 const Header = ({ user: _user }: { user: User }) => {
+  const pathname = usePathname();
+  if (isGamePlayRoute(pathname)) return null;
   return (
     <header className="sticky top-16 lg:top-0 z-40 hidden border-b border-[#1B2540]/80 bg-[#050B18]/90 backdrop-blur-md md:block">
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-center px-3 sm:px-4 lg:px-6">

@@ -59,6 +59,25 @@ export function useStageFullscreen(stageRef: RefObject<HTMLElement | null>) {
     document.body.style.overflow = "hidden";
     html.style.overflow = "hidden";
     html.style.overscrollBehavior = "none";
+    // Reason (owner, 14 Oct 2026: the logo bar and the tab strip still sat above the "pinned" game
+    // on a phone, and the page could not be scrolled to reach anything): `position: fixed` is only
+    // relative to the window while no ancestor has a transform, filter, backdrop-filter, contain or
+    // will-change, and a z-index ancestor traps z-[9999] inside its own stacking context. The arena
+    // panels use backdrop blur, so the pinned stage was a fixed box inside a panel, under the page
+    // chrome, with scrolling locked. Every ancestor is neutralised while pinned and restored after.
+    const neutralised: Array<[HTMLElement, string]> = [];
+    for (let el = stageRef.current?.parentElement; el && el !== document.body; el = el.parentElement) {
+      neutralised.push([el, el.style.cssText]);
+      el.style.setProperty("transform", "none", "important");
+      el.style.setProperty("filter", "none", "important");
+      el.style.setProperty("backdrop-filter", "none", "important");
+      el.style.setProperty("-webkit-backdrop-filter", "none", "important");
+      el.style.setProperty("contain", "none", "important");
+      el.style.setProperty("will-change", "auto", "important");
+      el.style.setProperty("z-index", "auto", "important");
+      el.style.setProperty("isolation", "auto", "important");
+    }
+    html.dataset.gamePinned = "true";
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setPseudo(false);
     };
@@ -67,9 +86,11 @@ export function useStageFullscreen(stageRef: RefObject<HTMLElement | null>) {
       document.body.style.overflow = previous;
       html.style.overflow = previousHtml;
       html.style.overscrollBehavior = previousOverscroll;
+      for (const [el, css] of neutralised) el.style.cssText = css;
+      delete html.dataset.gamePinned;
       window.removeEventListener("keydown", onKey);
     };
-  }, [pseudo]);
+  }, [pseudo, stageRef]);
 
   const enter = useCallback(async () => {
     const stage = stageRef.current;
