@@ -215,9 +215,15 @@ html[data-touch="0"] .cv-controls :is(.cv-boost,.cv-steer,.cv-pedals){display:no
 html[data-touch="0"] .cv-item{justify-self:center}
 
 /* Touch layouts share one grid: ITEM above-left, BOOST above-right, STEER bottom-left, pedals bottom-right. */
-html[data-touch="1"] .cv-controls{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"item . boost" "steer . pedals";
+/* Owner, 14 Oct 2026 (portrait, BOOST and the pedals cut off on the right): the item chip shared
+   the steer column, which is `auto`, so a long name like COUNTERMEASURE READY widened that column
+   and pushed the pedals off the screen. The chip now spans into the flexible middle column, and an
+   item spanning a flexible track does not grow the auto tracks it touches. */
+html[data-touch="1"] .cv-controls{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"item item boost" "steer . pedals";
   align-items:end;row-gap:10px}
-html[data-touch="1"] body[data-hand=left] .cv-controls{grid-template-areas:"boost . item" "pedals . steer"}
+html[data-touch="1"] body[data-hand=left] .cv-controls{grid-template-areas:"boost item item" "pedals . steer"}
+html[data-touch="1"] .cv-item{min-width:0;max-width:100%;overflow:hidden}
+html[data-touch="1"] .cv-item b{overflow:hidden;text-overflow:ellipsis}
 html[data-touch="1"] body[data-hand=left] :is(.cv-item,.cv-steer){justify-self:end}
 html[data-touch="1"] body[data-hand=left] :is(.cv-boost,.cv-pedals){justify-self:start}
 html[data-layout=desktop],html[data-layout=tablet]{--cv-steer-w:clamp(150px,14vw,200px);--cv-steer-h:96px;--cv-pedal:clamp(76px,7vw,96px)}
@@ -242,6 +248,24 @@ html[data-layout=landscape] .cv-tr{padding-top:0;padding-right:calc(var(--cv-uti
 html[data-layout=landscape] body:not([data-state=hangar]) .cv-brand{opacity:.35}
 html[data-layout=portrait] body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning){max-width:calc(100vw - 32px)}
 html[data-layout=portrait] .cv-tc{grid-column:1/-1;grid-row:2;align-self:start;padding-top:0}
+/* Owner, 14 Oct 2026 ("the wordings in mobile take too much space ... make them not disturb the
+   view, like transparent back"): on a phone every in-race message is one short see-through line -
+   no glow, no blur, a thin border - so the track stays readable behind it. The text is unchanged. */
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning){
+  font-size:10.5px;line-height:1.25;letter-spacing:.08em;padding:3px 9px;border-radius:999px;min-height:0;
+  background:rgba(3,12,24,.32);border:1px solid rgba(143,185,201,.18);box-shadow:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none;text-shadow:0 1px 2px rgba(0,0,0,.85);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(78vw,340px)}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] .cv-tc #warning{background:rgba(40,8,12,.34);border-color:rgba(255,120,110,.28)}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] #callout{font-size:clamp(13px,4vw,18px);letter-spacing:.1em;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-item{min-height:30px;padding:3px 10px;gap:5px;background:rgba(3,12,24,.32);
+  border-color:rgba(143,185,201,.2);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-item b{font-size:10.5px;letter-spacing:.08em;text-shadow:0 1px 2px rgba(0,0,0,.85)}
+/* The key letter (E) means nothing on a touch screen; the chip itself is the button. */
+html[data-touch="1"] .cv-item small{display:none}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] #pickupFlash{font-size:10.5px;letter-spacing:.1em;gap:6px;padding:3px 10px 3px 3px;
+  background:rgba(3,12,24,.35);box-shadow:none;text-shadow:0 1px 2px rgba(0,0,0,.85);top:16%}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] #pickupFlash b{width:20px;height:20px;font-size:11px}
 html[data-layout=tablet] .cv-race{width:clamp(190px,24vw,220px)}
 
 /* ---------- Multiplayer lobby: the hangar shows the standings card and nothing else ---------- */

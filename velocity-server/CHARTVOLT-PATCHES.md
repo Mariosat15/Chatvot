@@ -276,6 +276,19 @@ The platform half of the same report (page chrome hidden on game screens, the pi
 escaping its ancestors) is in `components/Header.tsx`, `components/AnnouncementBanner.tsx`,
 `lib/utils/game-play-route.ts` and `components/games/use-stage-fullscreen.ts`. **Never verified by eye.**
 
+### Phone hangar, quiet callouts, start wobble, sharpness, full screen after app switch (14 Oct 2026, owner)
+
+| Change | Where |
+|---|---|
+| **Phone hangar hid the ship**: the camera centres the ship on screen, and in landscape (`aspect > 1.2`) shifts it right of centre. Portrait stacked title, step heads, name, description, trade-offs and personal best over the stage row; landscape put the ship panel on the right (over the ship) and the dock across the bottom. Portrait now keeps a slim circuit card, a guaranteed `24dvh` stage, the four stats in one row and a compact dock; landscape stacks circuit, stats and dock in a left column (max 300px) and leaves the right side as the stage. The carousel already names the ship, so the panel's name block is hidden on phones | `root/chartvolt.css` |
+| **Phone callouts too big**: the item chip, `#cornerHint`, `#warning`, `#callout` and the pickup banner are smaller (about 10.5px) on a translucent background with no glow; the chip hides its key letter on touch | `root/cv-hud.css` |
+| **BOOST and pedals cut off in portrait**: the item chip shared the auto-width steer column and widened it. The chip now sits in a row of its own above steer and boost (`"item item boost" "steer . pedals"`, mirrored for left-handed) and cannot grow past its cell | `root/cv-hud.css` |
+| **Ship rocks back and forth for a second after the start**: countdown snapshots still in flight when the local clock reaches zero were restoring the predicted racing ship to the grid. `reconcile` ignores a countdown snapshot under 1.5s once the client is racing | `main.js` |
+| **Blurry graphics, poor frame rate**: iPhones were measured as the low tier (1.25x pixel ratio, FXAA over that). An iPhone is now at least mid tier, caps are 2 / 1.75 / 1.5, bloom is off on every phone and, with bloom off, the frame is drawn straight to the screen instead of through three full-screen composer passes | `main.js`, `scene.js` |
+| **Full screen lost after another app**: the browser drops real full screen on an app switch and the once-per-race request was already spent. It is re-armed on `visibilitychange` / `pageshow`, the pause screen counts as driving so the Resume tap wins it back, and the layout re-measures and scrolls to the top after rotation, return or a full-screen change (several passes, since phone browsers report the new size late). The platform's pinned stage does the same scroll-to-top | `mobile-immersive.js`, `hud-layout.js`, `components/games/use-stage-fullscreen.ts` |
+
+**Never verified by eye.**
+
 The lighten step is **not idempotent**: it deletes the 4k originals it shrinks, so a second rebuild
 over the same `%TEMP%\vvfull` fails with `Input file is missing: ...rock_3_diff_4k.webp`. Pass
 `--fresh` when that happens.

@@ -168,6 +168,25 @@ export function initHudLayout() {
   };
   addEventListener('resize', schedule);
   globalThis.visualViewport?.addEventListener('resize', schedule);
+  // Reason (owner, 14 Oct 2026: after rotating, or coming back from another app, the controls
+  // were cut off on the right): iOS reports the old window size at the moment it fires these
+  // events and settles a few hundred milliseconds later, sometimes with no further resize event.
+  // Re-measure a few times while it settles; the renderer skips a size it already has, so the
+  // repeated resize events cost nothing once the size is right.
+  let settleTimers = [];
+  const settle = () => {
+    if (document.visibilityState === 'hidden') return;
+    for (const t of settleTimers) clearTimeout(t);
+    settleTimers = [0, 150, 400, 900].map(ms => setTimeout(() => {
+      if (document.body.dataset.state !== 'hangar') scrollTo(0, 0);
+      applyLayout();
+      dispatchEvent(new Event('resize'));
+    }, ms));
+  };
+  addEventListener('orientationchange', settle);
+  addEventListener('pageshow', settle);
+  document.addEventListener('visibilitychange', settle);
+  document.addEventListener('fullscreenchange', settle);
   // main.js rewrites body attributes every frame with unchanged values; react to real changes only.
   let lastState = '', lastTouch = '';
   new MutationObserver(() => {

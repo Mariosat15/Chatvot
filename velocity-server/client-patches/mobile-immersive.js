@@ -16,7 +16,8 @@
 // Nothing here touches the simulation, inputs or scoring - it is presentation only.
 
 const coarse = typeof matchMedia === 'function' && matchMedia('(pointer:coarse)').matches;
-const DRIVING = new Set(['racing', 'countdown']);
+// 'paused' is included so the tap on Resume after returning from another app can win full screen back.
+const DRIVING = new Set(['racing', 'countdown', 'paused']);
 
 function canRequest() {
   const root = document.documentElement;
@@ -36,6 +37,13 @@ export function installMobileImmersive() {
     if (state === 'countdown') askedThisRace = false;
     lastState = state;
   }).observe(document.body, { attributes: true, attributeFilter: ['data-state'] });
+
+  // Reason (owner, 14 Oct 2026: after visiting another app "the full screen is messed up"): leaving
+  // the browser ends real full screen, and the once-per-race budget had already been spent, so the
+  // game stayed windowed until the next race. Coming back re-arms exactly one more request.
+  const rearm = () => { if (document.visibilityState === 'visible') askedThisRace = false; };
+  document.addEventListener('visibilitychange', rearm);
+  addEventListener('pageshow', rearm);
 
   // A browser only grants full screen inside a user gesture, so ask from the player's own tap.
   document.addEventListener('pointerup', () => {

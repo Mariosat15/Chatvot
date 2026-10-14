@@ -82,7 +82,24 @@ export function useStageFullscreen(stageRef: RefObject<HTMLElement | null>) {
       if (event.key === "Escape") setPseudo(false);
     };
     window.addEventListener("keydown", onKey);
+    // Reason (owner, 14 Oct 2026: back from another app, or after rotating, the game "is not full
+    // screen anymore"): iOS restores the page with the visual viewport scrolled or zoomed and the
+    // browser bars expanded, so the pinned stage sat part-way down the window. Snap back to the top
+    // while the browser settles; the lock above stops it drifting again.
+    let timers: number[] = [];
+    const repin = () => {
+      if (document.visibilityState === "hidden") return;
+      for (const t of timers) window.clearTimeout(t);
+      timers = [0, 200, 600].map((ms) => window.setTimeout(() => window.scrollTo(0, 0), ms));
+    };
+    window.addEventListener("orientationchange", repin);
+    window.addEventListener("pageshow", repin);
+    document.addEventListener("visibilitychange", repin);
     return () => {
+      for (const t of timers) window.clearTimeout(t);
+      window.removeEventListener("orientationchange", repin);
+      window.removeEventListener("pageshow", repin);
+      document.removeEventListener("visibilitychange", repin);
       document.body.style.overflow = previous;
       html.style.overflow = previousHtml;
       html.style.overscrollBehavior = previousOverscroll;

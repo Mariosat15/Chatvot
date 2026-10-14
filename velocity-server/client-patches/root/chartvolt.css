@@ -129,23 +129,27 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:c
   html body[data-state=hangar][data-mode] #liveStandings{top:auto;bottom:auto;opacity:1;pointer-events:auto}
 }
 
-/* Phone portrait: one column; ships become a swipe strip. */
+/* Phone portrait: one column; ships become a swipe strip.
+   CHARTVOLT PATCH (14 Oct 2026, owner: "The menu is squeezed i cant see the ships on mobile").
+   Reason: the camera centres the ship on screen, and the stacked title, step heads, ship name,
+   description, trade-offs and personal best left the "stage" row with no height, so the stats
+   panel sat on top of the ship. The carousel already names the ship, so the panel keeps only
+   the four stats in one row and the stage is guaranteed a quarter of the screen. */
 @media (max-width:600px){
   html body[data-state=hangar]{--cv-hangar-top:max(74px,calc(12px + 44px + 14px))}
-  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;
-    grid-template-areas:"intro" "stage" "ship" "dock";gap:10px;padding:var(--cv-hangar-top,74px) 12px 12px}
-  #hangar .cv-intro .eyebrow{display:none}
-  #hangar .cv-intro h1{font-size:28px;margin:0 0 8px}
-  #hangar .cv-ship{padding:10px 12px;max-height:34dvh}
-  #hangar .cv-ship #shipName{font-size:19px}
-  #hangar .cv-ship #shipDescription{display:none}
-  #hangar .cv-dock{padding:10px;gap:10px}
-  #hangar .cv-keys{display:none}
-  #hangar .cv-intro .rule{display:none}
-  #hangar .cv-step-head{margin:0 0 6px}
-  #hangar .cv-track-card{grid-template-columns:70px minmax(0,1fr);gap:10px;padding:9px}
-  #hangar .cv-intro #trackName{font-size:15px}
-  #hangar .cv-intro .track-choice button{min-height:36px;padding:0 8px}
+  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(24dvh,1fr) auto auto;
+    grid-template-areas:"intro" "stage" "ship" "dock";gap:8px;padding:var(--cv-hangar-top,74px) 10px max(10px,env(safe-area-inset-bottom))}
+  #hangar .cv-intro :is(.eyebrow,h1,.rule,.cv-step-head,#environmentName),
+  #hangar .cv-ship :is(.selection,#shipDescription,#shipTradeoffs,.personal-best),
+  #hangar .cv-keys,#hangar .cv-dock .cv-label{display:none}
+  #hangar .cv-step{margin:0}
+  #hangar .cv-ship{padding:8px 10px;max-height:none;overflow:visible}
+  #hangar .cv-ship #shipStats{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 8px;margin:0}
+  #hangar .cv-dock{padding:8px 10px;gap:6px}
+  #hangar .cv-track-card{grid-template-columns:44px minmax(0,1fr);gap:8px;padding:6px 8px}
+  #hangar .cv-intro #trackName{font-size:13px;-webkit-line-clamp:1}
+  #hangar .cv-intro .track-choice{gap:6px}
+  #hangar .cv-intro .track-choice button{min-height:32px;padding:0 6px}
 }
 /* Ship carousel (owner's HUD spec s25): desktop keeps the 4x2 grid; phones get ‹ name › plus dots and swipe. */
 #hangar .cv-carousel,#hangar .cv-dots,#hangar .cv-browse-swipe{display:none}
@@ -173,24 +177,39 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:c
   #hangar{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 }
 
-/* Phone landscape / very short windows. */
+/* Phone landscape / very short windows.
+   CHARTVOLT PATCH (14 Oct 2026, owner: the ship panel overlapped the circuit card, the dock covered
+   the bottom and there was no room for the 3D ship). Reason: in a wide viewport scene.js shifts the
+   orbit target so the ship renders right of centre - exactly under the old right-hand ship panel and
+   above the full-width dock. Everything now stacks in one left column and the right side is the stage. */
 @media (max-height:500px){
-  html body[data-state=hangar]{--cv-hangar-top:max(58px,calc(8px + 44px + 10px))}
-  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;
-    grid-template-areas:"intro ship" "dock dock";gap:8px 14px;padding:var(--cv-hangar-top,58px) 14px 10px}
-  #hangar .cv-intro .eyebrow,#hangar .cv-ship #shipDescription,#hangar .cv-keys,#hangar .cv-label span{display:none}
-  #hangar .cv-intro h1{font-size:24px;margin:0 0 6px}
-  #hangar .cv-intro h1 em{display:inline}
-  #hangar .cv-step-head{display:none}
-  #hangar .cv-track-card{grid-template-columns:58px minmax(0,1fr);gap:9px;padding:7px 9px}
-  #hangar .cv-intro #trackName{font-size:14px}
-  #hangar .cv-intro #environmentName{display:none}
-  #hangar .cv-intro .track-choice button{min-height:34px;padding:0 8px}
-  #hangar .cv-intro .rule{margin:0 0 6px}
-  #hangar .cv-ship{padding:8px 12px}
-  #hangar .cv-ship #shipName{font-size:17px}
-  #hangar .cv-dock{grid-template-columns:minmax(0,1fr) 200px;padding:8px 10px}
+  html body[data-state=hangar]{--cv-hangar-top:max(52px,calc(8px + 44px))}
+  html #hangar.cv-hangar{grid-template-columns:min(300px,44vw) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"intro stage" "ship stage" "dock stage";gap:6px 14px;
+    padding:var(--cv-hangar-top,52px) 14px max(8px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+  #hangar .cv-intro :is(.eyebrow,h1,.rule,.cv-step-head,#environmentName),
+  #hangar .cv-ship :is(.selection,#shipDescription,#shipTradeoffs,.personal-best),
+  #hangar .cv-keys,#hangar .cv-dock .cv-label{display:none}
+  #hangar .cv-step{margin:0}
+  #hangar .cv-track-card{grid-template-columns:44px minmax(0,1fr);gap:8px;padding:6px 8px}
+  #hangar .cv-intro #trackName{font-size:13px;-webkit-line-clamp:1}
+  #hangar .cv-intro .track-choice{gap:6px}
+  #hangar .cv-intro .track-choice button{min-height:30px;padding:0 6px}
+  #hangar .cv-ship{align-self:start;padding:7px 10px}
+  #hangar .cv-ship #shipStats{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;margin:0}
+  #hangar .cv-dock{grid-template-columns:minmax(0,1fr);padding:6px 8px;gap:6px}
 }
+/* Phone hangar, both orientations: tighter stats and carousel (after the carousel block so these win). */
+@media (max-width:600px),(max-height:500px){
+  #hangar #shipStats span{font-size:9.5px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #hangar #shipStats strong{font-size:12.5px}
+  #hangar .cv-carousel{grid-template-columns:40px minmax(0,1fr) 40px;margin:0}
+  #hangar .cv-carousel button{min-height:40px;font-size:22px}
+  #hangar .cv-carousel b{font-size:16px}
+  #hangar .cv-dots{margin:4px 0 0}
+  #hangar .cv-launch #play{min-height:44px}
+}
+@media (max-height:500px){#hangar .cv-launch #play{min-height:40px}}
 
 /* ---------- Power-up pickup: banner + equipment-slot pulse ---------- */
 #pickupFlash{position:absolute;left:50%;top:22%;z-index:30;display:flex;align-items:center;gap:12px;padding:8px 22px 8px 8px;
