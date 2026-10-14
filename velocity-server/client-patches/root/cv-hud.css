@@ -322,7 +322,30 @@ html[data-touch="1"][data-layout=portrait] body[data-state][data-mode] #callout{
 html[data-touch="1"][data-layout=portrait] body[data-state][data-mode] #pickupFlash{position:fixed;top:auto;left:50%;
   bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * 1.18 + 112px);z-index:15;pointer-events:none}
 
+/* ---------- Owner, 14 Oct 2026: "no way to scroll the menu ... no way to go out of the menu" ----------
+   The menu scrolls inside the screen (touch-controls.js no longer cancels its touchmove), and a close
+   button stays pinned to its top so leaving never depends on reaching DONE at the bottom. */
+html body #settingsDialog[open]{max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 16px);
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+#settingsDialog>form{position:relative}
+#settingsDialog .cv-dialog-close{position:sticky;top:0;float:right;z-index:2;width:40px;height:40px;margin:-8px -8px 0 8px;padding:0;
+  display:grid;place-items:center;border-radius:10px;border:1px solid var(--cv-edge,#6acbdf55);background:#172d42;color:#fff;
+  font-size:18px;line-height:1;cursor:pointer}
+
+/* ---------- Owner, 14 Oct 2026: "the wording must be a bit elevated so it is not in the view" ----------
+   On a phone in portrait the corner coach line (STRAIGHT · BOOST AVAILABLE, CORNER AHEAD) and the race
+   warning hug the underside of the top cards instead of sitting a grid gap lower, over the road. */
+html[data-layout=portrait] .cv-tc{margin-top:calc(var(--cv-pad) * -1 - 2px);gap:4px}
+
+/* ---------- Owner, 14 Oct 2026: "the buttons don't have press animation and take time" ----------
+   touch-action:manipulation removes the browser's double-tap-zoom wait before a click fires; :active
+   gives the finger an immediate visible answer. */
+#settingsDialog button,#settingsDialog select,#paused button,.cv-u,#hangar button,#results button{touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;transition:transform .08s ease,filter .08s ease}
+#settingsDialog button:active,#paused button:active,.cv-u:active,#hangar button:active,#results button:active{transform:scale(.95);filter:brightness(1.25)}
+
 @media (prefers-reduced-motion:reduce){
+  #settingsDialog button,#paused button,.cv-u,#hangar button,#results button{transition:none}
   .cv-boost[data-ready=ready]{animation:none;box-shadow:0 0 0 2px rgba(89,216,255,.6)}
   .cv-meter i,.cv-clock #networkStatus{transition:none}
 }

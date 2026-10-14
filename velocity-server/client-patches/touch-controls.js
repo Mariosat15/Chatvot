@@ -7,8 +7,13 @@ export function createTouchControls({root,pointers,canDrive,queueFire}){
  // included. Reason: the vendor saved the mode on every load, so each computer that ever played holds
  // a stored 'buttons' it never chose; the setting moves to a new key, and only a touch device's old
  // value (which the player may have picked) is carried over.
- const MODE_KEY='cv-touch-mode-2';
- try{setting.value=localStorage.getItem(MODE_KEY)||(matchMedia('(any-pointer:coarse)').matches&&localStorage.getItem('cv-touch-mode'))||'analog';hand.value=localStorage.getItem('cv-control-hand')||'right';}catch{setting.value='analog';}
+ // CHARTVOLT PATCH (14 Oct 2026, owner: "in mobile by default have the left/right buttons"): a touch
+ // device now defaults to the steering buttons; a computer keeps the analog default. The key moves again
+ // for the same reason as before - every phone that played since 28 Sep holds a stored 'analog' it never
+ // chose - so a player who picks a mode from now on keeps it.
+ const MODE_KEY='cv-touch-mode-3';
+ const defaultMode=()=>matchMedia('(any-pointer:coarse)').matches?'buttons':'analog';
+ try{setting.value=localStorage.getItem(MODE_KEY)||defaultMode();hand.value=localStorage.getItem('cv-control-hand')||'right';}catch{setting.value=defaultMode();}
  const apply=()=>{resetAll();document.body.dataset.controls=setting.value;document.body.dataset.hand=hand.value;document.body.dataset.controlSize=size.value;try{localStorage.setItem(MODE_KEY,setting.value);localStorage.setItem('cv-control-hand',hand.value);localStorage.setItem('cv-control-size',size.value);}catch{}};
  setting.addEventListener('change',apply);hand.addEventListener('change',apply);size.addEventListener('change',apply);
  function clear(){analog=0;stickPointer=null;pad.classList.remove('pressed');knob.style.transform='translate(-50%,-50%)';}
@@ -34,7 +39,9 @@ export function createTouchControls({root,pointers,canDrive,queueFire}){
  });
  root.addEventListener('contextmenu',event=>event.preventDefault());
  /* CHARTVOLT PATCH (13 Oct 2026, owner: "view must be uninterrupted ... when scroll to end while play game the game crashes"): during a race no touch may scroll or rubber-band anything - inside this frame or, through scroll chaining, the page hosting it. The hangar keeps its scrolling lists. */
- document.addEventListener('touchmove',event=>{const state=document.body.dataset.state;if(state&&state!=='hangar'&&event.cancelable)event.preventDefault();},{passive:false});
+ // CHARTVOLT PATCH (14 Oct 2026, owner: "no way to scroll the menu"): an open dialog (settings, pause
+ // menu) is the one thing that must still scroll mid-race, or its lower items and its exits are unreachable.
+ document.addEventListener('touchmove',event=>{const state=document.body.dataset.state;if(event.target?.closest?.('dialog[open]'))return;if(state&&state!=='hangar'&&event.cancelable)event.preventDefault();},{passive:false});
  // Safari/embedded browsers can cancel the touch gesture before forwarding a
  // final PointerEvent. Release every action when that gesture is cancelled.
  root.addEventListener('touchcancel',resetAll,{passive:true});

@@ -10,6 +10,8 @@ import {gridSlot,GRID_SLOTS} from '../src/start-grid.js';
 import {POWER_TUNING} from '../src/power-tuning.js';
 import {AiPilot,aiRoster,MAX_AI_PILOTS,AI_ID_PREFIX} from './ai-pilot.mjs';
 export const MAX_RACERS=GRID_SLOTS;
+/** CHARTVOLT PATCH. How long a disconnected pilot keeps their place before being retired (DNF). */
+export const DISCONNECT_GRACE_MS=60000;
 /**
  * CHARTVOLT PATCH. Upper bound on step frames waiting to be applied (~167 ms). A burst after a
  * network stall would otherwise make this player run late for the rest of the race; beyond the
@@ -189,7 +191,10 @@ export class RaceRoom {
  }
  step(now){this.tick++;this.raceElapsed+=1/60;const previous=new Map([...this.players.values()].map(p=>[p.id,{distance:p.sim.distance,lateral:p.sim.lateral}]));for(const p of this.players.values()){
   if(!p.active||p.dnf||p.finishTimeMs!=null)continue;
-  if(!p.connected&&now-p.disconnectedAt>30000){p.dnf=true;p.sim.finish('disconnected');continue;}
+  // Reason (14 Oct 2026, owner: rotating a phone mid-race "exits the game"): a phone that loses its
+  // graphics context reloads the whole frame and rejoins, which on a slow device took longer than the
+  // old 30s grace, so the pilot was retired as disconnected while still reconnecting.
+  if(!p.connected&&now-p.disconnectedAt>DISCONNECT_GRACE_MS){p.dnf=true;p.sim.finish('disconnected');continue;}
   // CHARTVOLT PATCH: one queued frame per physics step; with none waiting the vendor hold-then-release rule applies.
   let control;if(p.bot)control=p.ai.control(p.sim);else if(p.frameQueue.length){const f=p.frameQueue.shift();p.lastInput=f.input;p.ackStep=f.step;control=f.input;}else control=now-p.lastInputAt>250?EMPTY_INPUT:p.lastInput;
   p.sim.update(1/60,control);

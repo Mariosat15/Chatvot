@@ -421,3 +421,18 @@ pull + `pm2 restart chartvolt-games` (client only). **Never verified by eye or e
 ## AI pilots in practice (14 Oct 2026)
 
 `server/ai-pilot.mjs` (new) and `server/race-room.mjs`. A practice room (`trackChoice`) may be created with `aiPilots` (0-15). It fills that many `ai-*` seats driven by a seeded controller that sends the same inputs a browser would, so a bot follows the same physics and rules as a player. Personalities differ in pace (80-94% of the corner limit), reaction time, racing line, apex, wobble, gate and pickup hunting, boost timing and the odd mistake. A bot thinks only every 5-11 steps and allocates nothing per step. A room without `trackChoice` refuses `aiPilots`, so bots never reach a competition, a challenge or a paid room. Tests: `tests/chartvolt-ai-pilots.test.mjs` (6), 132/132 overall. **Never verified by eye.**
+
+## Phone menu, rotation and sound (14 Oct 2026)
+
+Owner: rotating the phone with the menu open exits the game, the menu cannot scroll, there is no way out of it, sound does not return, the left/right buttons should be the default, the coach hint sits too low, and the buttons have no press feedback.
+
+- **Scroll:** the race's `touchmove` lock in `touch-controls.js` now ignores touches inside an open `<dialog>`. `#settingsDialog[open]` is capped to the safe viewport and scrolls (`root/cv-hud.css`).
+- **Way out:** a sticky close button at the top of the settings dialog (`root/index.html`, `.cv-dialog-close`).
+- **Default steering:** on a coarse pointer the default is `buttons`, under a new storage key `cv-touch-mode-3`, so every phone starts on the buttons once. A player who then picks analog keeps it.
+- **Sound:** closing the menu in a live race calls `audio.wake(false)`, because `resume()` has no paused state to act on there. A frame reloaded mid-race has no audio context at all, so the first tap in a live race creates one (`audio.begin` + `unlock`) instead of waking nothing (`main.js` `wakeAudio`).
+- **Rotation:** `webglcontextlost` now schedules a reload after 2.5 s even if `webglcontextrestored` never arrives. The race server's reconnect grace rose from 30 s to `DISCONNECT_GRACE_MS` = 60 s (`server/race-room.mjs`), so a slow reload rejoins instead of being retired as a DNF. This is a mitigation of the most likely cause. **The crash itself was not reproduced.**
+- **Hint:** in portrait the top-centre column (`.cv-tc`) is pulled up by one pad.
+- **Press feedback:** the buttons in the menu, pause, hangar and results get `touch-action:manipulation`, which removes the tap delay, and an `:active` scale. Reduced motion turns the transition off.
+- The `409` responses on `/input` in the console are out-of-order requests that the server refuses on purpose. They are harmless.
+
+Tests: `tests/chartvolt-mobile-menu.test.mjs` (5) and `tests/chartvolt-disconnect-grace.test.mjs` (3). The vendor reconnect assertion in `multiplayer.test.mjs` was flipped from "DNF at 36 s" to "not DNF at 36 s, DNF after 66 s". velocity-server 140/140. Deploy: pull, then `pm2 restart chartvolt-games` and restart the velocity race server. **Never verified by eye or ear on a phone.**

@@ -44,7 +44,10 @@ test('returning to the page wakes the sound in multiplayer, and a paused solo ra
   const pause = main.slice(main.indexOf('function pause(){'), main.indexOf('async function resume('));
   const mp = pause.slice(0, pause.indexOf('return;}'));
   assert.match(mp, /audio\.pause\(\)/, 'a live race suspends its sound when hidden');
-  assert.match(main, /const wakeAudio=gesture=>\{if\(!multiplayer&&sim\.state==='paused'\)return;audio\.wake\(gesture\);\}/);
+  assert.match(main, /const wakeAudio=gesture=>\{if\(!multiplayer&&sim\.state==='paused'\)return;[\s\S]{0,200}?return;\}audio\.wake\(gesture\);\}/);
+  // 14 Oct 2026: a frame reloaded mid-race has no audio context; the first tap must create one, not wake nothing.
+  assert.match(main, /if\(gesture&&multiplayer&&!audio\.ctx&&\['racing','countdown'\]\.includes\(sim\.state\)\)\{audio\.begin\(config\.trackId,config\.seed\);audio\.unlock\(\)/);
+  assert.match(main, /dataset\.resume==='true'\)resume\(\);if\(multiplayer\)audio\.wake\(false\);/, 'closing the menu wakes a live race\'s sound');
   assert.match(main, /if\(document\.hidden\)pause\(\);else wakeAudio\(false\);/);
   assert.match(main, /addEventListener\('pageshow',\(\)=>wakeAudio\(false\)\)/);
   assert.match(main, /\['pointerdown','touchend','keydown'\]\)addEventListener\(type,\(\)=>wakeAudio\(true\),\{capture:true/);
