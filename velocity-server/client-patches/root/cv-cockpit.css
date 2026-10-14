@@ -1,0 +1,140 @@
+/* CHARTVOLT PATCH (14 Oct 2026, owner: "Please adjust the Volt Velocity cockpit to match the supplied mockups",
+   Volt-Velocity-Complete-Overlay pack). The inside view from cockpit-interior.js: one complete cockpit image
+   per screen shape, its three live instruments, one telemetry panel under the logo, and the race's own
+   controls re-skinned and placed on the two bays. cockpit-interior.js writes the boxes inline; this file only
+   decides what shows and how it looks. Every rule is scoped to html[data-cockpit], which the module sets only
+   while the inside view is drawn, so the chase views keep their HUD exactly as it was.
+   Stacking: world, cockpit image (11), HUD panels (12), brand (13), controls (14), utility row (30), menus. */
+.cv-cockpit{position:fixed;inset:0;z-index:11;pointer-events:none;overflow:hidden;user-select:none;-webkit-user-select:none;contain:layout paint}
+.cv-cockpit[hidden],.cv-cockpit [hidden]{display:none!important}
+/* Reason: the hangar and the results screen own the screen once a race is over, so the cockpit steps away. */
+body:not([data-state=racing]):not([data-state=countdown]):not([data-state=paused]) .cv-cockpit{display:none!important}
+.cv-ck-art{position:absolute;display:block;margin:0;max-width:none;-webkit-user-drag:none}
+.cv-ck-safe{position:absolute;visibility:hidden;width:0;height:0;
+  padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+
+/* ---------- The three instruments, each sized from its own bay ---------- */
+.cv-ck-bay{position:absolute;display:flex;box-sizing:border-box;--ck-h:80px;color:#e3f9ff;line-height:1;white-space:nowrap;
+  text-shadow:0 0 6px rgba(80,220,255,.5);padding:calc(var(--ck-h) * .12) calc(var(--ck-h) * .16)}
+.cv-ck-bay small{font-size:max(7px,calc(var(--ck-h) * .13));letter-spacing:.14em;font-weight:700;color:#8fd3e8}
+.cv-ck-bay b{font-weight:800;font-variant-numeric:tabular-nums}
+.cv-ck-bar{display:block;width:100%;height:max(3px,calc(var(--ck-h) * .06));border-radius:9px;background:rgba(143,185,201,.22);overflow:hidden}
+.cv-ck-bar span{display:block;height:100%;width:0;background:var(--ck-tone);box-shadow:0 0 6px var(--ck-tone);transition:width .2s linear}
+.cv-ck-hull{--ck-tone:#21e3b4;align-items:center;gap:8%}
+.cv-cockpit[data-hull=low] .cv-ck-hull{--ck-tone:#ffb347}
+.cv-cockpit[data-hull=critical] .cv-ck-hull{--ck-tone:#ff4d6d}
+.cv-ck-shield{height:58%;flex:none;fill:color-mix(in srgb,var(--ck-tone) 18%,transparent);stroke:var(--ck-tone);stroke-width:2}
+.cv-ck-col{display:flex;flex-direction:column;justify-content:center;gap:10%;flex:1;min-width:0;height:100%}
+.cv-ck-hull b{font-size:max(10px,calc(var(--ck-h) * .28));color:var(--ck-tone)}
+.cv-ck-speed{flex-direction:column;align-items:center;justify-content:flex-end}
+.cv-ck-arc{position:absolute;left:8%;top:6%;width:84%;overflow:visible}
+.cv-ck-arc path{fill:none;stroke-width:10;stroke-linecap:round}
+.cv-ck-track{stroke:rgba(143,185,201,.18)}
+.cv-ck-fill{stroke:#59d8ff;filter:drop-shadow(0 0 4px #59d8ff);transition:stroke-dasharray .12s linear}
+.cv-ck-speed b{position:relative;font-size:max(12px,calc(var(--ck-h) * .4))}
+.cv-ck-speed small{position:relative;margin-top:4%}
+.cv-ck-boost{--ck-tone:#6b8796;flex-direction:column;justify-content:center;align-items:flex-start;gap:9%}
+.cv-cockpit[data-boost=ready] .cv-ck-boost{--ck-tone:#59d8ff}
+.cv-cockpit[data-boost=active] .cv-ck-boost{--ck-tone:#ffe066}
+.cv-ck-bolts{display:flex;gap:6%;height:22%}
+.cv-ck-bolts svg{height:100%;fill:var(--ck-tone);filter:drop-shadow(0 0 4px var(--ck-tone))}
+.cv-ck-boost b{font-size:max(9px,calc(var(--ck-h) * .2));letter-spacing:.08em;color:var(--ck-tone)}
+
+/* ---------- Telemetry: lap, time, best, live over position, hull, speed ---------- */
+.cv-ck-tele{position:absolute;box-sizing:border-box;--ck-h:86px;display:flex;flex-direction:column;
+  background:rgba(3,12,22,.62);border:1px solid rgba(89,216,255,.55);border-radius:calc(var(--ck-h) * .14);
+  box-shadow:0 0 18px rgba(31,214,255,.18),inset 0 0 22px rgba(31,214,255,.08);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.cv-ck-row{flex:1;display:flex;min-height:0}
+.cv-ck-row+.cv-ck-row{border-top:1px solid rgba(89,216,255,.28)}
+.cv-ck-cell{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:6px;
+  padding:0 calc(var(--ck-h) * .16);line-height:1;white-space:nowrap}
+.cv-ck-cell+.cv-ck-cell{border-left:1px solid rgba(89,216,255,.2)}
+.cv-ck-cell small{font:700 max(8px,calc(var(--ck-h) * .13))/1 Arial,sans-serif;letter-spacing:.14em;color:#8fd3e8}
+.cv-ck-cell b{font:800 max(11px,calc(var(--ck-h) * .22))/1 Arial,sans-serif;color:#eafcff;font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis;text-shadow:0 0 6px rgba(80,220,255,.45)}
+.cv-ck-cell em{font-style:normal;font-size:.6em;color:#8fd3e8}
+.cv-ck-cell[data-cell=hull] b{color:#21e3b4}
+.cv-cockpit[data-hull=low] .cv-ck-cell[data-cell=hull] b{color:#ffb347}
+.cv-cockpit[data-hull=critical] .cv-ck-cell[data-cell=hull] b{color:#ff4d6d}
+.cv-ck-live-cell b,.cv-ck-logo{position:absolute;background-repeat:no-repeat}
+.cv-ck-pill{display:inline-flex;align-items:center;gap:6px}
+.cv-ck-dot{width:8px;height:8px;border-radius:50%;flex:none;background:#6b8796}
+.cv-cockpit:is([data-live=live],[data-live=connected]) .cv-ck-dot{background:#21e3b4;box-shadow:0 0 8px #21e3b4}
+.cv-cockpit:is([data-live=reconnecting],[data-live=connecting]) .cv-ck-dot{background:#ffb347}
+.cv-cockpit:is([data-live=offline],[data-live=error]) .cv-ck-dot{background:#ff4d6d}
+/* Portrait has the width for three cells a row, so LIVE leaves the panel for a pill beside the logo. */
+.cv-cockpit[data-variant=portrait] .cv-ck-live-cell{display:none}
+.cv-cockpit[data-variant=portrait] .cv-ck-cell{flex-direction:column;justify-content:center;align-items:flex-start;gap:5px}
+.cv-ck-pill{position:absolute;box-sizing:border-box;justify-content:center;padding:0 8px;border-radius:999px;
+  background:rgba(3,12,22,.7);border:1px solid rgba(89,216,255,.55);font:800 11px/1 Arial,sans-serif;letter-spacing:.12em;color:#eafcff}
+.cv-cockpit:not([data-variant=portrait]) .cv-ck-pill{display:none}
+
+/* ---------- The old HUD steps aside: the panel and the instruments replace it ---------- */
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] :is(.cv-race,.cv-pace,.cv-keys,.cv-brand){display:none!important}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-tc{position:fixed!important;top:var(--ck-msg-top,96px)!important;bottom:auto!important;
+  left:50%!important;right:auto!important;transform:translateX(-50%)!important}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] :is(#callout,#pickupFlash){position:fixed!important;top:auto!important;
+  bottom:calc(var(--ck-dash-bottom,30vh) + 8px)!important}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-map{position:fixed!important;z-index:12;display:flex;flex-direction:column;
+  align-items:stretch;gap:3px;box-sizing:border-box}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-map canvas{width:100%!important;height:auto}
+html[data-cockpit][data-cockpit-map="0"] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-map{display:none!important}
+
+/* ---------- Utility row: pause and settings on a phone, all five with a mouse ---------- */
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-util{right:auto!important;bottom:auto!important;gap:var(--ck-ugap,10px)}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-util .cv-u{display:grid!important;width:var(--ck-u,52px);height:var(--ck-u,52px);border:0;border-radius:0;
+  background:var(--ck-blank-utility) center/contain no-repeat}
+html[data-cockpit][data-touch="1"] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-util :is(#mute,#cameraCycle,#fullscreenBtn){display:none!important}
+html[data-cockpit] .cv-util :is(#cameraCycle,#pause,#settings,#fullscreenBtn) svg{display:none!important}
+html[data-cockpit] .cv-util #cameraCycle{background-image:var(--ck-camera-idle)}
+html[data-cockpit] .cv-util #pause{background-image:var(--ck-pause-idle)}
+html[data-cockpit] .cv-util #settings{background-image:var(--ck-settings-idle)}
+html[data-cockpit] .cv-util #fullscreenBtn{background-image:var(--ck-fullscreen-idle)}
+html[data-cockpit] .cv-util #cameraCycle:active{background-image:var(--ck-camera-pressed)}
+html[data-cockpit] .cv-util #pause:active{background-image:var(--ck-pause-pressed)}
+html[data-cockpit] .cv-util #settings:active{background-image:var(--ck-settings-pressed)}
+html[data-cockpit] .cv-util #fullscreenBtn:active{background-image:var(--ck-fullscreen-pressed)}
+@media (hover:hover){
+  html[data-cockpit] .cv-util #cameraCycle:hover:not(:active){background-image:var(--ck-camera-hover)}
+  html[data-cockpit] .cv-util #pause:hover:not(:active){background-image:var(--ck-pause-hover)}
+  html[data-cockpit] .cv-util #settings:hover:not(:active){background-image:var(--ck-settings-hover)}
+  html[data-cockpit] .cv-util #fullscreenBtn:hover:not(:active){background-image:var(--ck-fullscreen-hover)}
+}
+
+/* ---------- Controls: the same buttons touch-controls.js drives, on the cockpit's two bays ---------- */
+/* Reason: display:contents lets each button be placed by itself while staying inside #cvControls, so the
+   pointer capture, multi-touch and release-on-cancel in touch-controls.js are untouched. */
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls{display:block!important;position:fixed;inset:0;padding:0;pointer-events:none}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls :is(.cv-steer,.cv-pedals,.cv-steer-buttons){display:contents!important}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls #steeringPad{display:none!important}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls button{position:fixed!important;display:grid!important;place-items:center;box-sizing:border-box;
+  margin:0;padding:0;min-width:0;min-height:0;border:0!important;border-radius:0;box-shadow:none;opacity:1;animation:none;
+  background:transparent center/contain no-repeat;font-size:0;color:transparent;--ck-h:56px}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls button:is([data-action=left],[data-action=right],[data-action=brake],[data-action=throttle],[data-action=boost])>*{display:none!important}
+html[data-cockpit] .cv-controls [data-action=left]{background-image:var(--ck-left-idle)!important}
+html[data-cockpit] .cv-controls [data-action=right]{background-image:var(--ck-right-idle)!important}
+html[data-cockpit] .cv-controls [data-action=brake]{background-image:var(--ck-brake-idle)!important}
+html[data-cockpit] .cv-controls [data-action=throttle]{background-image:var(--ck-accel-idle)!important}
+html[data-cockpit] .cv-controls [data-action=boost]{background-image:var(--ck-boost-idle)!important}
+html[data-cockpit] .cv-controls [data-action=boost][data-ready=none]{background-image:var(--ck-boost-disabled)!important}
+html[data-cockpit] .cv-controls [data-action=left].pressed{background-image:var(--ck-left-pressed)!important}
+html[data-cockpit] .cv-controls [data-action=right].pressed{background-image:var(--ck-right-pressed)!important}
+html[data-cockpit] .cv-controls [data-action=brake].pressed{background-image:var(--ck-brake-pressed)!important}
+html[data-cockpit] .cv-controls [data-action=throttle].pressed{background-image:var(--ck-accel-pressed)!important}
+html[data-cockpit] .cv-controls [data-action=boost]:not([data-ready=none]).pressed{background-image:var(--ck-boost-pressed)!important}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls button.pressed{transform:scale(.96);filter:none}
+@media (hover:hover){
+  html[data-cockpit] .cv-controls [data-action=left]:hover:not(.pressed){background-image:var(--ck-left-hover)!important}
+  html[data-cockpit] .cv-controls [data-action=right]:hover:not(.pressed){background-image:var(--ck-right-hover)!important}
+  html[data-cockpit] .cv-controls [data-action=brake]:hover:not(.pressed){background-image:var(--ck-brake-hover)!important}
+  html[data-cockpit] .cv-controls [data-action=throttle]:hover:not(.pressed){background-image:var(--ck-accel-hover)!important}
+  html[data-cockpit] .cv-controls [data-action=boost]:not([data-ready=none]):hover:not(.pressed){background-image:var(--ck-boost-hover)!important}
+}
+/* The item slot is not always a shield, so it wears the blank wide skin and keeps the live icon and name. */
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item{background-image:var(--ck-blank-wide)!important;
+  grid-auto-flow:column;justify-content:center;gap:8px;color:#eafcff;font-size:max(10px,calc(var(--ck-h) * .22))}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item span{font-size:1.3em}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item b{font-size:1em;letter-spacing:.12em;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item small{display:none}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item[data-item=empty]{color:#8fb9c9}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item[data-item=ready]{filter:drop-shadow(0 0 8px rgba(255,214,92,.45))}

@@ -74,7 +74,7 @@ The owner reported three faults: the touch controls missing on a phone, equipmen
 | **Panels are measured, not guessed.** After every layout change the HUD panels are measured and any that touch a neighbour are moved vertically clear of it (top half down, bottom half up). The touch pads, top buttons and logo are never moved. Only the CSS `translate` property is written, so it never fights the scaling `transform`. The aux row counts as its two buttons, since its middle lets touches through | `client-patches/hud-layout.js`, called from `main.js` |
 | One panel style, panels scaled to the window (1 on a large monitor, down to .62 in a small frame), live position under the map on PC and beside the lap panel on a sideways phone | `root/chartvolt.css` |
 | The text brand is replaced by the Volt Velocity logo (black keyed to transparent, 84 KB), hidden while racing on small screens | `root/assets/ui/volt-velocity-logo.webp`, `root/index.html`, `hud-layout.js` |
-| **Cockpit rebuilt from the owner's artwork** (14 Oct 2026): titanium pillars, a lit crossbeam, a triple-bay dashboard (hull, arc speedometer, boost), a throttle and a sidestick, as image layers over the 3D view in cockpit mode only | `client-patches/cockpit-layout.js`, `cockpit-interior.js`, `scene.js`, `root/cv-hud.css`, `root/assets/ui/cockpit/*.webp` |
+| **Cockpit rebuilt from the owner's artwork** (14 Oct 2026), then **matched to the full-overlay mockups** the same day: one full-screen cockpit image per screen shape, the telemetry under the logo, and the controls on the dashboard bays, in the Inside cockpit camera only | `client-patches/cockpit-layout.js`, `cockpit-interior.js`, `scene.js`, `root/cv-cockpit.css`, `root/tools/build.mjs`, `root/assets/ui/cockpit/*.webp` |
 
 `root/tools/chartvolt-shots.mjs [hangar|race|all] [size,...]` screenshots the start screen and a race
 (with a forced 8-row live position list) at eight sizes, from 1920x1080 down to a 390x640 phone
@@ -117,6 +117,41 @@ the triple-bay dashboard, a throttle and a sidestick. They ship as WebP in
   shots tool. The tool also printed "on-screen controls missing" and a 404 at every size in **both**
   camera views, while the controls are visible in the shots; that check looks for selectors this
   client no longer has and was not changed here. **Never verified by eye on a real device.**
+
+### The cockpit, matched to the full-overlay mockups (14 October 2026, second pass)
+
+**This supersedes the section above for layout.** The gauges' rules are the same; the seven separate
+pieces (pillars, beam, dash, throttle, stick) are gone (`git rm`). The owner supplied finished
+full-screen cockpit overlays (`External game plans/design-reference/Volt-Velocity-Complete-Overlay`)
+and mockups for desktop and mobile. Only the converted WebP copies under `root/assets/ui/cockpit/`
+are committed; the PNG originals stay uncommitted.
+
+- **One image per screen shape, chosen by aspect ratio** (`chooseOverlay`), drawn with a cover fit
+  anchored to the bottom, so the dashboard always meets the bottom edge with no gap and fills about
+  the bottom 25-30% of the screen. A NaN or zero size falls back rather than producing NaN boxes.
+- **`cockpitOverlay` places everything in screen pixels from the art's own regions**: the three
+  instrument bays, the telemetry panel under the logo (row 1 Lap, Time, Best, Live; row 2 Position,
+  Hull, Speed; portrait is 3x2 with Live as a pill beside the logo), and the controls on the lower
+  bays - Shield above Left/Right, Boost above Brake/Accel, swapped for left-handed players. Touch
+  targets are at least 48px and everything stays inside the safe area.
+- **A cropped logo is redrawn.** On a portrait tablet the cover fit crops the painted logo off the
+  top, which left a lone Solo pill and a panel at the very top. The same image's logo region is now
+  drawn as a badge at the top centre (`.cv-ck-logo`, background-size and position from the layout),
+  with the Live pill beside it and the panel below it.
+- **Desktop utilities** (camera, pause, settings, fullscreen) stay top right; on touch, pause and
+  settings are visible and camera and fullscreen are in the menu.
+- **Inputs:** held controls were already released on touchend, touchcancel, pause, blur and
+  `visibilitychange` (`main.js`, `touch-controls.js`); verified, not changed.
+- **Styles** moved to `root/cv-cockpit.css`, concatenated after `cv-hud.css` by `root/tools/build.mjs`,
+  every rule scoped to racing, countdown and paused.
+- **Guarded by** `tests/chartvolt-cockpit-interior.test.mjs` (42 tests): 13 screen sizes x both hands -
+  art covers to the bottom, every box on screen and inside the safe area, no two boxes overlap, no
+  control over an instrument, 48px targets, the panel under the logo (redrawn or painted), the
+  controls below the panel - plus the overlay WebP sizes and the readout ids. Probes (removing the
+  style release, the badge, the touch minimum) each turned red. 223 velocity-server tests pass.
+- Screenshots via the shots tool at 1024x576, 1920x1080, 1280x649, 820x1180, 390x844, 844x390,
+  740x320 and 667x300 were checked by eye. The chase views are unchanged. **Never verified by eye on
+  a real device.** Deploy: pull, then `pm2 restart chartvolt-games`.
 
 ### Gates, collisions, a wider road and an F1 grid (28 September 2026, fourth pass)
 
