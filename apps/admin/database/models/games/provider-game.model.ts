@@ -63,6 +63,8 @@ export interface IProviderGame extends Document {
   maxPlayers?: number;
   /** Ours. Lobby length for a scheduled contest. Read through `resolveLobbySeconds`. */
   lobbySeconds?: number;
+  /** Ours. Computer opponents seated beside a player in a FREE practice round (1-15). */
+  practiceAiPilots?: number;
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsPractice: boolean;
@@ -369,6 +371,11 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     // value is COPIED onto the contest at creation, so changing it here never moves the lobby
     // of a contest already sold.
     lobbySeconds: { type: Number },
+    // How many computer pilots join a player's PRACTICE round, so a player can race a full
+    // grid when nobody else is online and an operator can test a 16-car race alone. OURS, in
+    // no sync list. NO DEFAULT: absent means none. Practice only - the platform never sends it
+    // on a ranked round and the provider refuses it there, so it cannot touch a paid contest.
+    practiceAiPilots: { type: Number, min: 0, max: 15 },
     supportsCompetition: { type: Boolean, default: false },
     supportsOneVsOne: { type: Boolean, default: false },
     supportsPractice: { type: Boolean, default: false },

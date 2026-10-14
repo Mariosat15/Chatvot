@@ -54,6 +54,8 @@ export interface CreateRoundInput {
   startWaitSeconds?: unknown;
   /** HTML v1.22: "competition" | "challenge" | "practice". Optional; see `contest-type.ts`. */
   contestType?: unknown;
+  /** Volt Velocity practice only: computer pilots to race against, 0-15. */
+  practiceOpponents?: unknown;
 }
 
 export interface CreateRoundOutput {
@@ -351,6 +353,18 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
     throw badRequest("'contentSeed' is required for a ranked round.");
   }
 
+  // Refused rather than ignored on a ranked round: a bot in a contest somebody paid into is the
+  // one place this must never quietly happen, so a platform asking for it gets told why.
+  const rawOpponents = input.practiceOpponents;
+  const practiceOpponents =
+    rawOpponents === undefined || rawOpponents === null ? 0 : (rawOpponents as number);
+  if (!Number.isInteger(practiceOpponents) || practiceOpponents < 0 || practiceOpponents > 15) {
+    throw badRequest("'practiceOpponents' must be a whole number from 0 to 15.");
+  }
+  if (practiceOpponents > 0 && (mode !== "practice" || !isVelocity)) {
+    throw badRequest("'practiceOpponents' is only valid on a Volt Velocity practice round.");
+  }
+
   const expected = fingerprint({ gameCode, mode, playerId, contentSeed, config });
 
   const existing = await Round.findOne({ roundId });
@@ -394,6 +408,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
       solo ? providerRoundId : undefined,
       parseStartWait(input.startWaitSeconds, scheduledStartAt),
       practice,
+      practiceOpponents,
     );
   }
 

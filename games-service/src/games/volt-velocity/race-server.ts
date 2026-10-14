@@ -140,7 +140,14 @@ export async function seatPlayer(
   identity: RaceIdentity,
   player: { id: string; name: string },
   scheduledStartAt: Date | undefined,
-  room: { laps: number; solo: boolean; practice?: boolean; latestStartAt?: Date },
+  room: {
+    laps: number;
+    solo: boolean;
+    practice?: boolean;
+    latestStartAt?: Date;
+    /** Computer pilots beside the player - free practice only, never a ranked room. */
+    aiPilots?: number;
+  },
 ): Promise<SeatOutcome> {
   const scheduled = scheduledStartAt && !room.solo;
   try {
@@ -156,6 +163,7 @@ export async function seatPlayer(
       // Reason: an unscheduled paid competition is a solo room too, so "solo" cannot mean
       // "the pilot may change the track". Only an unranked practice room lets them pick.
       ...(room.solo && room.practice ? { trackChoice: true } : {}),
+      ...(room.solo && room.practice && room.aiPilots ? { aiPilots: room.aiPilots } : {}),
       ...(scheduled ? { scheduledStartAt: scheduledStartAt.getTime() } : {}),
       // Reason: only the player who CREATES the room sets it; it is not part of the room id, so
       // every round of one contest (same play window) computes the same value anyway.

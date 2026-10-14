@@ -28,6 +28,7 @@ import { useTerms } from "@/contexts/TerminologyContext";
 import type { ProviderTitleRow } from "./provider-types";
 import type { WorkspaceTab, WorkspaceTitle } from "./GamesWorkspaceSection";
 import GamePlayStyleControl from "./GamePlayStyleControl";
+import GamePracticeAiControl from "./GamePracticeAiControl";
 import VelocitySecretsControl from "./VelocitySecretsControl";
 import GameScoringDialog from "./GameScoringDialog";
 import GameChallengeDefaultsDialog from "./GameChallengeDefaultsDialog";
@@ -415,6 +416,15 @@ function GeneralTab({
             />
           </div>
         </div>
+        {title.supportsPractice && (
+          <div className="mt-4 border-t border-white/10 pt-3">
+            <GamePracticeAiControl
+              providerKey={title.providerKey}
+              title={title}
+              onChanged={onTitlePatch}
+            />
+          </div>
+        )}
       </PanelCard>
 
       <PanelCard>

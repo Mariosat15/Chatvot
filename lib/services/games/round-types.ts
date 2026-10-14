@@ -353,6 +353,8 @@ export interface CreateRoundInput {
   progressCallbackUrl?: string;
   /** Where the provider may ask for seated players' standings to order a grid. Optional. */
   standingsUrl?: string;
+  /** Practice only: computer opponents the operator configured on the title (1-15). */
+  practiceOpponents?: number;
   /** Non-identifying display name. A provider never receives an email or a wallet. */
   displayName?: string;
   locale?: string;

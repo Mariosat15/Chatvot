@@ -77,6 +77,8 @@ export interface ProviderTitleRow {
   supportedPlayModes?: string[];
   /** OUR lobby length for a scheduled race, in seconds. Absent means the platform default. */
   lobbySeconds?: number;
+  /** OUR count of computer opponents in a free practice round (1-15). Absent means none. */
+  practiceAiPilots?: number;
   /** The provider's cap on players in one round. Absent means no cap. */
   maxPlayers?: number;
   providerStatus: "active" | "deprecated" | "maintenance";

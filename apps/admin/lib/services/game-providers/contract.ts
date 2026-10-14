@@ -220,6 +220,11 @@ export interface CreateRoundRequest {
    * credentials as the result callback. Chapter 01 section 5.6, added 13 Oct 2026.
    */
   standingsUrl?: string;
+  /**
+   * Practice only: how many computer opponents the operator wants beside the player (1-15).
+   * Absent means none. Never sent on a ranked round - the provider refuses it there.
+   */
+  practiceOpponents?: number;
   returnUrl: string;
   /**
    * Origin of the page that hosts the play iframe (scheme + host + optional port).

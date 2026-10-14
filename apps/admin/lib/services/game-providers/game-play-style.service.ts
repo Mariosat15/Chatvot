@@ -335,3 +335,56 @@ export async function setGameLobbySeconds(
 
   return { success: true, lobbySeconds: seconds };
 }
+
+export type PracticeAiPilotsResult =
+  | { success: true; practiceAiPilots: number | null }
+  | { success: false; error: string };
+
+/** `null` clears it (no computer opponents); otherwise a whole number from 1 to 15. */
+export function parsePracticeAiPilotsInput(
+  value: unknown,
+): { ok: true; count: number | null } | { ok: false; error: string } {
+  if (value === null || value === 0) return { ok: true, count: null };
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 15) {
+    return {
+      ok: false,
+      error: "Computer opponents must be a whole number from 1 to 15, or null for none.",
+    };
+  }
+  return { ok: true, count: value };
+}
+
+/**
+ * Set - or clear - how many computer pilots join a player's FREE practice round of one title.
+ *
+ * OPERATOR-OWNED, in no sync list. Refused for a title without practice: the count would be
+ * written and read by nothing. It never reaches a ranked round - the practice launcher is its
+ * only reader, and the provider refuses it on anything else.
+ */
+export async function setGamePracticeAiPilots(
+  providerKey: string,
+  gameCode: string,
+  count: number | null,
+): Promise<PracticeAiPilotsResult> {
+  await connectToDatabase();
+
+  const title = await ProviderGame.findOne({ providerKey, gameCode }).lean();
+  if (!title) {
+    return { success: false, error: "That game is not in this provider's catalogue." };
+  }
+  if (!title.supportsPractice) {
+    return {
+      success: false,
+      error: "This game has no practice mode, so it cannot have computer opponents.",
+    };
+  }
+
+  await ProviderGame.updateOne(
+    { providerKey, gameCode },
+    count === null
+      ? { $unset: { practiceAiPilots: "" } }
+      : { $set: { practiceAiPilots: count } },
+  );
+
+  return { success: true, practiceAiPilots: count };
+}

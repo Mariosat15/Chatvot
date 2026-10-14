@@ -14,6 +14,7 @@ import {
   resolveAttemptSecondsFromSchema,
 } from "./config-schema";
 import { publicBaseUrl } from "./public-base-url";
+import { practiceOpponentsFor } from "./practice-opponents";
 import { getBrowsableGameBySlug } from "./player-catalogue.service";
 import {
   SCORE_PRODUCING_ROUND_STATUSES,
@@ -80,6 +81,7 @@ interface PracticeTitle {
   chartvoltEnabled?: boolean;
   providerStatus?: string;
   supportsPractice?: boolean;
+  practiceAiPilots?: number;
 }
 
 export type PracticeAvailability =
@@ -120,7 +122,7 @@ async function lookUpPracticeTitle(slug: string): Promise<TitleLookup> {
   await connectToDatabase();
   const title = await ProviderGame.findOne({ gameKey: card.gameKey })
     .select(
-      "providerKey gameCode gameKey displayName maxDurationSeconds configSchema scoreType chartvoltEnabled providerStatus supportsPractice",
+      "providerKey gameCode gameKey displayName maxDurationSeconds configSchema scoreType chartvoltEnabled providerStatus supportsPractice practiceAiPilots",
     )
     .lean<PracticeTitle | null>();
 
@@ -414,6 +416,7 @@ export async function launchPracticeRound(
       parentOrigin: new URL(baseUrl).origin,
       resultCallbackUrl: `${baseUrl}/api/games/providers/${title.providerKey}/events`,
       progressCallbackUrl: `${baseUrl}/api/games/providers/${title.providerKey}/progress`,
+      practiceOpponents: practiceOpponentsFor(title),
       displayName: actor.displayName,
     });
 

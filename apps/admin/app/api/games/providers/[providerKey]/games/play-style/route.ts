@@ -4,9 +4,11 @@ import { auditLogService } from "@/lib/services/audit-log.service";
 import {
   parseLobbySecondsInput,
   parsePlayStyleInput,
+  parsePracticeAiPilotsInput,
   parseSupportedPlayModesInput,
   setGameLobbySeconds,
   setGamePlayStyle,
+  setGamePracticeAiPilots,
   setGameSupportedPlayModes,
 } from "@/lib/services/game-providers/game-play-style.service";
 
@@ -45,6 +47,7 @@ export async function PATCH(
       playMode?: unknown;
       supportedPlayModes?: unknown;
       lobbySeconds?: unknown;
+      practiceAiPilots?: unknown;
     };
 
     if (!body.gameCode || typeof body.gameCode !== "string") {
@@ -63,13 +66,14 @@ export async function PATCH(
     const setsStyle = "playMode" in body;
     const setsSupported = "supportedPlayModes" in body;
     const setsLobby = "lobbySeconds" in body;
-    const decisions = [setsStyle, setsSupported, setsLobby].filter(Boolean).length;
+    const setsAi = "practiceAiPilots" in body;
+    const decisions = [setsStyle, setsSupported, setsLobby, setsAi].filter(Boolean).length;
 
     if (decisions > 1) {
       return NextResponse.json(
         {
           error:
-            "Change the play style, the supported styles or the lobby length one at a time - each is recorded separately.",
+            "Change the play style, the supported styles, the lobby length or the practice opponents one at a time - each is recorded separately.",
         },
         { status: 400 },
       );
@@ -83,6 +87,34 @@ export async function PATCH(
         { error: "A play style is required, or null to follow the provider." },
         { status: 400 },
       );
+    }
+
+    if (setsAi) {
+      const parsed = parsePracticeAiPilotsInput(body.practiceAiPilots);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+
+      const result = await setGamePracticeAiPilots(providerKey, body.gameCode, parsed.count);
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+
+      await auditLogService.log({
+        admin: guard.admin,
+        action: "settings_updated",
+        category: "settings",
+        description: `Practice on "${providerKey}/${body.gameCode}" now seats ${
+          result.practiceAiPilots === null
+            ? "no computer opponents"
+            : `${result.practiceAiPilots} computer opponent${result.practiceAiPilots === 1 ? "" : "s"}`
+        }`,
+        targetType: "settings",
+        targetId: `${providerKey}/${body.gameCode}`,
+        newValue: result.practiceAiPilots,
+      });
+
+      return NextResponse.json({ success: true, practiceAiPilots: result.practiceAiPilots });
     }
 
     if (setsLobby) {

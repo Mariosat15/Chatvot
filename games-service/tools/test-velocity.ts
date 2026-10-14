@@ -209,6 +209,34 @@ async function main(): Promise<number> {
     assert(response.status === 400, `expected 400, got ${response.status}`);
   });
 
+  // Reason: the race server refuses `aiPilots` on any room that is not a practice room, so a 201
+  // here proves both halves agree on where computer pilots may sit.
+  await test("practice seats the computer pilots the admin asked for; anything else is refused", async () => {
+    await clearRounds();
+    const practice = (practiceOpponents: unknown) =>
+      velocityBody("", {
+        mode: "practice",
+        contestType: "practice",
+        contentSeed: undefined,
+        resultCallbackUrl: callbackUrl,
+        practiceOpponents,
+      });
+    const seated = await callApi("/v1/rounds", { method: "POST", body: practice(15) });
+    assert(seated.status === 201, `practice with 15 bots returned ${seated.status}: ${seated.raw}`);
+    for (const bad of [16, -1, 2.5, "3"]) {
+      const refused = await callApi("/v1/rounds", { method: "POST", body: practice(bad) });
+      assert(refused.status === 400, `practiceOpponents ${String(bad)} returned ${refused.status}`);
+    }
+    const ranked = await callApi("/v1/rounds", {
+      method: "POST",
+      body: velocityBody(`cv_vv_bots_${crypto.randomBytes(3).toString("hex")}`, {
+        resultCallbackUrl: callbackUrl,
+        practiceOpponents: 3,
+      }),
+    });
+    assert(ranked.status === 400, `a ranked round accepted bots (HTTP ${ranked.status})`);
+  });
+
   await test("a ranked round seats the player, and two entrants share one room", async () => {
     await clearRounds();
     const seed = `cv_vv_room_${crypto.randomBytes(3).toString("hex")}`;

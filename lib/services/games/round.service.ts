@@ -360,6 +360,9 @@ export async function createRound(
     resultCallbackUrl: input.resultCallbackUrl,
     progressCallbackUrl: input.progressCallbackUrl,
     standingsUrl: input.standingsUrl,
+    ...(input.contestType === "practice" && input.practiceOpponents
+      ? { practiceOpponents: input.practiceOpponents }
+      : {}),
     returnUrl: input.returnUrl,
     parentOrigin: input.parentOrigin,
   });

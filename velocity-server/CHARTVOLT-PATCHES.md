@@ -1,4 +1,4 @@
-# Volt Velocity race server - ChartVolt patches
+ Volt Velocity race server - ChartVolt patches
 
 Vendor source: `Volt-Velocity-0.21-Play.zip` (`server/`, the ten `src/` modules the server
 imports, and the three multiplayer tests), copied unchanged on 27 September 2026 and then patched.
@@ -418,3 +418,6 @@ at top centre.
 Tests: `tests/chartvolt-mobile-lighten.test.mjs` (10), including one that a skipped taxi consumes
 exactly the draws a kept one makes. velocity-server 126/126, games-service velocity 19/19. Deploy:
 pull + `pm2 restart chartvolt-games` (client only). **Never verified by eye or ear on a phone.**
+## AI pilots in practice (14 Oct 2026)
+
+`server/ai-pilot.mjs` (new) and `server/race-room.mjs`. A practice room (`trackChoice`) may be created with `aiPilots` (0-15). It fills that many `ai-*` seats driven by a seeded controller that sends the same inputs a browser would, so a bot follows the same physics and rules as a player. Personalities differ in pace (80-94% of the corner limit), reaction time, racing line, apex, wobble, gate and pickup hunting, boost timing and the odd mistake. A bot thinks only every 5-11 steps and allocates nothing per step. A room without `trackChoice` refuses `aiPilots`, so bots never reach a competition, a challenge or a paid room. Tests: `tests/chartvolt-ai-pilots.test.mjs` (6), 132/132 overall. **Never verified by eye.**
