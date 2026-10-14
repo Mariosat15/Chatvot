@@ -393,3 +393,42 @@ html:is([data-layout=portrait],[data-layout=landscape]) body:not([data-state=han
 /* Reason: a portrait phone is ~390px wide, so a centred strip would overlap the lap card in the top-left corner;
    the card steps down by the strip's height instead. Sideways there is room for both on one line. */
 html[data-layout=portrait] body:not([data-state=hangar]) .cv-tl{padding-top:30px}
+
+/* CHARTVOLT PATCH (14 Oct 2026, owner: "rebuild the cockpit to look like image 1 ... it must also work in all modes
+   and devices"): the image cockpit from cockpit-interior.js. It sits above the 3D view and below the HUD (12) and
+   the touch controls (14-15), takes no pointer events, and is placed per screen by cockpitLayout(). */
+.cv-cockpit{position:fixed;inset:0;z-index:11;pointer-events:none;overflow:hidden;user-select:none;-webkit-user-select:none;contain:layout paint}
+.cv-cockpit[hidden],.cv-cockpit [hidden]{display:none!important}
+/* Reason: the hangar and the results screen own the screen once a race is over, so the cockpit steps away. */
+body:not([data-state=racing]):not([data-state=countdown]):not([data-state=paused]) .cv-cockpit{display:none!important}
+.cv-cockpit img,.cv-ck-dash,.cv-ck-floor{position:absolute;display:block;margin:0}
+.cv-cockpit img{max-width:none;-webkit-user-drag:none}
+.cv-ck-floor{background:linear-gradient(to bottom,rgba(2,6,11,0),rgba(2,6,11,.9) 34%,#02060b)}
+.cv-ck-pillar,.cv-ck-beam{filter:drop-shadow(0 0 10px rgba(0,0,0,.55))}
+.cv-ck-pillar[data-mirror="1"]{transform:scaleX(-1)}
+.cv-ck-dash{--ck-h:120px}
+.cv-cockpit .cv-ck-shell{position:absolute;inset:0;width:100%;height:100%}
+.cv-ck-bay{position:absolute;display:flex;color:#e3f9ff;line-height:1;white-space:nowrap;text-shadow:0 0 6px rgba(80,220,255,.5)}
+.cv-ck-bay small{font-size:max(7px,calc(var(--ck-h) * .075));letter-spacing:.14em;font-weight:700;color:#8fd3e8}
+.cv-ck-bay b{font-weight:800;font-variant-numeric:tabular-nums}
+.cv-ck-bar{display:block;width:100%;height:max(3px,calc(var(--ck-h) * .03));border-radius:9px;background:rgba(143,185,201,.22);overflow:hidden}
+.cv-ck-bar span{display:block;height:100%;width:0;background:var(--ck-tone);box-shadow:0 0 6px var(--ck-tone);transition:width .2s linear}
+.cv-ck-hull{--ck-tone:#21e3b4;left:18.5%;top:21%;width:15%;height:36%;align-items:center;gap:7%}
+.cv-cockpit[data-hull=low] .cv-ck-hull{--ck-tone:#ffb347}
+.cv-cockpit[data-hull=critical] .cv-ck-hull{--ck-tone:#ff4d6d}
+.cv-ck-shield{height:66%;flex:none;fill:color-mix(in srgb,var(--ck-tone) 18%,transparent);stroke:var(--ck-tone);stroke-width:2}
+.cv-ck-col{display:flex;flex-direction:column;justify-content:center;gap:9%;flex:1;min-width:0;height:100%}
+.cv-ck-hull b{font-size:max(10px,calc(var(--ck-h) * .15));color:var(--ck-tone)}
+.cv-ck-speed{left:40%;top:25%;width:20%;height:41%;flex-direction:column;align-items:center;justify-content:flex-end}
+.cv-ck-arc{position:absolute;left:3%;top:0;width:94%;overflow:visible}
+.cv-ck-arc path{fill:none;stroke-width:10;stroke-linecap:round}
+.cv-ck-track{stroke:rgba(143,185,201,.18)}
+.cv-ck-fill{stroke:#59d8ff;filter:drop-shadow(0 0 4px #59d8ff);transition:stroke-dasharray .12s linear}
+.cv-ck-speed b{position:relative;font-size:max(12px,calc(var(--ck-h) * .2))}
+.cv-ck-speed small{position:relative;margin-top:3%}
+.cv-ck-boost{--ck-tone:#6b8796;left:67%;top:21%;width:15%;height:36%;flex-direction:column;justify-content:center;align-items:flex-start;gap:8%}
+.cv-cockpit[data-boost=ready] .cv-ck-boost{--ck-tone:#59d8ff}
+.cv-cockpit[data-boost=active] .cv-ck-boost{--ck-tone:#ffe066}
+.cv-ck-bolts{display:flex;gap:6%;height:24%}
+.cv-ck-bolts svg{height:100%;fill:var(--ck-tone);filter:drop-shadow(0 0 4px var(--ck-tone))}
+.cv-ck-boost b{font-size:max(9px,calc(var(--ck-h) * .11));letter-spacing:.08em;color:var(--ck-tone)}

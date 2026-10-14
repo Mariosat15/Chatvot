@@ -74,6 +74,7 @@ The owner reported three faults: the touch controls missing on a phone, equipmen
 | **Panels are measured, not guessed.** After every layout change the HUD panels are measured and any that touch a neighbour are moved vertically clear of it (top half down, bottom half up). The touch pads, top buttons and logo are never moved. Only the CSS `translate` property is written, so it never fights the scaling `transform`. The aux row counts as its two buttons, since its middle lets touches through | `client-patches/hud-layout.js`, called from `main.js` |
 | One panel style, panels scaled to the window (1 on a large monitor, down to .62 in a small frame), live position under the map on PC and beside the lap panel on a sideways phone | `root/chartvolt.css` |
 | The text brand is replaced by the Volt Velocity logo (black keyed to transparent, 84 KB), hidden while racing on small screens | `root/assets/ui/volt-velocity-logo.webp`, `root/index.html`, `hud-layout.js` |
+| **Cockpit rebuilt from the owner's artwork** (14 Oct 2026): titanium pillars, a lit crossbeam, a triple-bay dashboard (hull, arc speedometer, boost), a throttle and a sidestick, as image layers over the 3D view in cockpit mode only | `client-patches/cockpit-layout.js`, `cockpit-interior.js`, `scene.js`, `root/cv-hud.css`, `root/assets/ui/cockpit/*.webp` |
 
 `root/tools/chartvolt-shots.mjs [hangar|race|all] [size,...]` screenshots the start screen and a race
 (with a forced 8-row live position list) at eight sizes, from 1920x1080 down to a 390x640 phone
@@ -88,6 +89,34 @@ the default on every device (`client-patches/touch-controls.js`, now patched): t
 loaded the game; a touch device's old value is carried over. That pass was applied to the built
 `.html.gz` directly (the asset-complete vendor tree was not available) and re-packed; these sources
 produce the same output on the next full rebuild.
+
+### The cockpit, rebuilt from artwork (14 October 2026)
+
+The owner supplied a target render and six pieces: two raked pillars, a slender pillar, a crossbeam,
+the triple-bay dashboard, a throttle and a sidestick. They ship as WebP in
+`root/assets/ui/cockpit/` and are bundled with the client build (the extracted tree serves them from `assets/` like every other image).
+
+- **An image overlay, not 3D meshes.** `#cvCockpit` is a fixed layer at z-index 11, under the HUD
+  (12), the logo (13), the controls (14) and the touch pads (15). It is shown only in the cockpit
+  camera and only while racing, counting down or paused; every chase view is unchanged.
+- **One pure function decides where every piece goes** (`cockpitLayout` in `cockpit-layout.js`), per
+  screen shape. On a touch device the dashboard sits above the reserved band for the touch controls
+  (`interiorReserve`: 31% of a portrait phone, 34% landscape, 12% tablet). Portrait uses the slender
+  pillar mirrored; wider screens use the raked pair. The dashboard may be widened to at most 1.45x
+  its own proportions so the pillars stand apart on a short landscape phone. **The throttle and
+  sidestick are drawn only without touch and at 700px or wider**, because on a phone they would sit
+  exactly where the thumbs go.
+- **The gauges read the simulation and never write it.** Speed is m/s x 3.6, the arc is full at
+  720 km/h, hull and boost are the simulation's 0-1 values. BOOST reads READY only above the same
+  `energy > .02` the simulation needs to fire, ACTIVE while boosting, otherwise EMPTY; a race starts
+  at 0% boost, so EMPTY at the gun is the truth, not a fault. Redrawn at 10 Hz.
+- **Guarded by** `tests/chartvolt-cockpit-interior.test.mjs` (23 tests): every piece on screen and clear
+  of the touch band at eight sizes, the WebP sizes equal the layout's table, every `data-ck` part
+  exists, and the stacking order. 7 probes, each red.
+- Screenshots at desktop, tablet, phone, phone landscape, 740x320 and 667x300 were taken with the
+  shots tool. The tool also printed "on-screen controls missing" and a 404 at every size in **both**
+  camera views, while the controls are visible in the shots; that check looks for selectors this
+  client no longer has and was not changed here. **Never verified by eye on a real device.**
 
 ### Gates, collisions, a wider road and an F1 grid (28 September 2026, fourth pass)
 
