@@ -221,6 +221,27 @@ accelerates, release coasts, brake stops fully" now fails by design and is named
 `EXPECTED_VENDOR_FAILURES`. **`PHYSICS_VERSION` is `velocity-3d-18`**, so the race server and
 games-service deploy together. **Never verified by eye.**
 
+### The HUD is recomposed per device, not scaled (14 Oct 2026, owner)
+
+Owner brief: `External game plans/design-reference/velocity fix`. Mechanics, physics and the server are
+untouched; only the presentation layer changed. **This supersedes the "HUD that cannot overlap" pass
+above**: the measured collision layout and the `--cv-hud` scale are gone.
+
+| Change | Where |
+|---|---|
+| **One layout per device**: `html[data-layout]` is `desktop` (≥1024), `tablet` (768-1023 or a coarse pointer), `portrait` or `landscape` (short side ≤500 or under 768 wide), from `visualViewport`, re-applied on resize and rotation without reloading the race | `client-patches/hud-layout.js` (`layoutFor`) |
+| **Six zones, empty centre.** TL race card (lap, time, total, hull, sector), TC skill chain and warnings, TR position + speed card and a minimap that can be switched off (off by default on phones), BL keyboard hint strip that collapses after 5 s. A LIVE dot by the timer fades to 40% after 3 s and comes back when the connection changes | `root/index.html`, **new `root/cv-hud.css`** (registered in `root/tools/build.mjs`) |
+| **Utility controls**: desktop shows audio, pause, settings, full screen; tablet hides audio; phones show one ☰ that opens the pause card (Resume, Controls, Audio, Graphics, Camera, Full screen, Restart, Leave). Full screen is hidden where the browser has none (iOS), where the platform pins the stage instead | `root/index.html`, `hud-layout.js` |
+| **Touch controls**: shown on touch devices or when "Show touch controls" is on in Settings; ITEM above-left, BOOST (energy ring, pulses when ready) above-right, STEER bottom-left, BRAKE + ACCEL bottom-right, all sized with `clamp` per layout, left-hand mirror kept | `root/cv-hud.css`, `main.js` (`--boost`, `data-ready`, `data-item`) |
+| **Cameras per layout**: portrait fov 70, landscape 62, desktop 58 | `scene.js` (`CAMERA_PRESETS`) |
+| **Phone frame rate and sharpness**: HUD writes only on change, minimap at 10 Hz and skipped when hidden, phone render budget raised so text and road are not blurry; fog thinned 35% on touch devices (fog costs frame time, not memory) | `main.js`, `scene.js`, `environment.js` |
+
+**Not done:** new ship and city 3D models (the brief asked for them; they need modelling work, not a
+code change), the hangar swipe carousel, and the track picker / Shuffle report. Tests: vendor 79/84
+(5 expected), velocity-server 104/104, games-service velocity 19/19. Deploy: pull +
+`pm2 restart chartvolt-games` (client fingerprint changes). **Never verified by eye** — the automated
+browser has no WebGL, so the game would not render for a check.
+
 The lighten step is **not idempotent**: it deletes the 4k originals it shrinks, so a second rebuild
 over the same `%TEMP%\vvfull` fails with `Input file is missing: ...rock_3_diff_4k.webp`. Pass
 `--fresh` when that happens.

@@ -44,6 +44,9 @@ import sunsetURL from '../assets/art-direction/qwantani_sunset_puresky_2k.hdr';
 import rock from '../assets/environment/rock-diff.webp';
 import rockNormal from '../assets/environment/rock-normal.webp';
 const textures={};let environmentHDR,sunsetHDR;
+/* CHARTVOLT PATCH (14 Oct 2026, owner: "reduce the fog if takes to much memmory"): FogExp2 is a per-pixel formula and holds no texture, so it costs no memory; it is thinned by 35% on touch devices anyway so the skyline reads further out on a small screen. */
+const PHONE_FOG_SCALE=.65;
+function phoneFog(density){return globalThis.matchMedia?.('(pointer:coarse)').matches?density*PHONE_FOG_SCALE:density;}
 export const ENVIRONMENTS={
  alpine:{sky:'dawn',fog:0x9bb7cd,road:0x7a99aa,land:0xbad2de,type:'alpine',label:'ALPINE ASCENT · GLACIER',sun:2.6},
  coast:{sky:'dawn',fog:0x9fcbd4,road:0x7aa4b2,land:0x438b83,type:'coast',label:'AZURE ARCHIPELAGO · OCEAN',sun:2.8},
@@ -79,9 +82,9 @@ export async function ensureLandscapeAssets(trackId){if(!['jungle','coast','alpi
 }
 export function materialTexture(name,repeat=1){const t=textures[name].clone();t.wrapS=t.wrapT=T.RepeatWrapping;t.repeat.set(repeat,repeat);t.anisotropy=8;t.needsUpdate=true;return t;}
 export function setupEnvironment(view){
- const p=ENVIRONMENTS[view.track.definition.id],night=p.sky==='night';view.environment=p;view.scene.fog=new T.FogExp2(p.fog,night?.0007:.0006);
+ const p=ENVIRONMENTS[view.track.definition.id],night=p.sky==='night';view.environment=p;view.scene.fog=new T.FogExp2(p.fog,phoneFog(night?.0007:.0006));
  const golden=['skyline','solar'].includes(view.track.definition.id);const sky=(golden?sunsetHDR:textures[p.sky]).clone();sky.mapping=T.EquirectangularReflectionMapping;sky.needsUpdate=true;view.scene.background=sky;view.scene.backgroundIntensity=night?.48:golden?.12:.84;view.scene.backgroundRotation.y=golden?-1.82:view.track.definition.startFraction*5;
- const pmrem=new T.PMREMGenerator(view.renderer),target=pmrem.fromEquirectangular(golden?sunsetHDR:environmentHDR);pmrem.dispose();view.environmentTarget=target;view.scene.environment=target.texture;view.scene.environmentIntensity=night?.6:golden?.5:.75;view.scene.environmentRotation.copy(view.scene.backgroundRotation);if(golden){view.scene.environmentRotation.y=-2.3;view.scene.fog.color.setHex(0x82788b);view.scene.fog.density=.00045;};
+ const pmrem=new T.PMREMGenerator(view.renderer),target=pmrem.fromEquirectangular(golden?sunsetHDR:environmentHDR);pmrem.dispose();view.environmentTarget=target;view.scene.environment=target.texture;view.scene.environmentIntensity=night?.6:golden?.5:.75;view.scene.environmentRotation.copy(view.scene.backgroundRotation);if(golden){view.scene.environmentRotation.y=-2.3;view.scene.fog.color.setHex(0x82788b);view.scene.fog.density=phoneFog(.00045);};
  view.scene.add(new T.HemisphereLight(night?0x779cca:0xc5ddff,0x393c48,night?.55:.55));
  const sun=new T.DirectionalLight(night?0x98bcff:0xffd5a3,night?2:2.8);sun.position.set(-400,500,-220);sun.castShadow=true;sun.shadow.mapSize.setScalar(matchMedia('(pointer:coarse)').matches?1024:2048);sun.shadow.camera.left=-125;sun.shadow.camera.right=125;sun.shadow.camera.top=125;sun.shadow.camera.bottom=-125;sun.shadow.camera.near=1;sun.shadow.camera.far=900;sun.shadow.bias=-.0003;sun.shadow.normalBias=.2;sun.shadow.radius=2;view.scene.add(sun,sun.target);view.sun=sun;view.sunOffset=new T.Vector3(...(golden?[-480,135,105]:[-240,380,-180]));
  // Reflection lighting is independent of the directly sampled visible sky.
@@ -112,7 +115,7 @@ export function applyAtmosphere(view,choice='auto'){
  const p=profiles[id];if(!p)return;
  const sky=textures[p.sky].clone();sky.mapping=T.EquirectangularReflectionMapping;sky.needsUpdate=true;
  for(const t of view.environmentTextures||[])t.dispose();view.environmentTextures=[sky];view.scene.background=null;view.scene.backgroundIntensity=p.background;view.sky.material.uniforms.panorama.value=sky;view.sky.material.uniforms.intensity.value=p.background;view.sky.material.uniforms.night.value=id==='night'?1:0;
- view.sky.visible=true;view.sun.color.setHex(p.sun);view.sun.intensity=p.key;view.sunOffset.set(...p.offset);view.scene.fog.color.setHex(p.fog);view.scene.fog.density=id==='night'?.0006:.00045;
+ view.sky.visible=true;view.sun.color.setHex(p.sun);view.sun.intensity=p.key;view.sunOffset.set(...p.offset);view.scene.fog.color.setHex(p.fog);view.scene.fog.density=phoneFog(id==='night'?.0006:.00045);
  view.scene.traverse(o=>{if(o.isHemisphereLight){o.color.setHex(p.fill);o.intensity=id==='night'?.28:.42;}});
  view.scene.environmentIntensity=p.env;view.scene.traverse(o=>{for(const m of (o.material?Array.isArray(o.material)?o.material:[o.material]:[]))if(m.userData.facadeStyle)m.emissiveIntensity=id==='night'?.9:.14;});
  // Separate prefiltered reflection capture follows the chosen lighting family.

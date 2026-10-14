@@ -1,5 +1,10 @@
 # 23 - Volt Velocity: a scheduled 16-player race
 
+> **BUILT 14 October 2026 - the race HUD is recomposed per device** (desktop, tablet, phone
+> portrait, phone landscape) with an empty centre, rather than one layout scaled down. This is
+> presentation only, and race rules and scoring are unchanged. Details are in
+> `velocity-server/CHARTVOLT-PATCHES.md`. New ship and city models are not part of it. **Never verified by eye.**
+
 > **BUILT 13 October 2026 - races are skill-only (owner, after the preliminary legal opinion).**
 > Nothing a pilot does can touch another pilot, in every room including solo. **Removed:** EMP,
 > Shockwave, Mines, Oil slick, Cloak and - a deviation from the brief, which kept weapons for

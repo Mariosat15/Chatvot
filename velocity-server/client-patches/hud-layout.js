@@ -1,114 +1,180 @@
-// CHARTVOLT PATCH (28 Sep 2026): race HUD layout that cannot overlap.
-// Reason: the vendor places every HUD panel with fixed pixel offsets per breakpoint, so any panel
-// whose size differs from what a breakpoint assumed (a long equipment name, the multiplayer
-// standings list, a tall window) lands on top of its neighbour. Rather than add yet more
-// breakpoints, this measures what is actually on screen and nudges a colliding panel vertically
-// away from the ones already placed. It only ever writes the CSS `translate` property, which
-// composes with (and never fights) the `transform` each stylesheet uses for scaling.
+// CHARTVOLT PATCH (14 Oct 2026, owner's "velocity fix" HUD spec): the race HUD is recomposed per
+// device rather than scaled.
+//
+// Reason this replaced the 28 Sep collision pass: that version measured every panel on screen and
+// nudged colliding ones vertically, which was a synchronous layout of the whole HUD inside the WebGL
+// frame loop and still left large panels over the road. The HUD is now a CSS grid of six edge zones
+// (root/cv-hud.css) and nothing is measured at all - this file only decides WHICH layout applies and
+// wires the few presentation buttons. Nothing here touches the simulation, inputs or scoring.
 import logoUrl from '../assets/ui/volt-velocity-logo.webp';
 
-// Never moved: the top buttons and the touch pads are where a player's thumbs and clicks go.
-// The aux row is a full-width, pointer-events:none strip with a button at each end, so only its
-// buttons count; the strip's empty middle is road the other panels may use.
-const FIXED = ['header .brand', 'header .actions', '#steeringPad', '#touch .steer-controls', '#touch .aux-controls button', '#touch .pedal-controls'];
-// Moved if needed, in priority order: earlier panels keep their place, later ones give way.
-const MOVABLE = ['#hud .map', '#hud .race-stats', '#hud .speed', '#hud .integrity', '.skill-panel', '#liveStandings', '#hud .item-slot'];
-const GAP = 8;
+const $ = (id) => document.getElementById(id);
+const root = document.documentElement;
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  // Reason: localStorage THROWS (rather than returning null) when a browser refuses storage, and an
+  // unwrapped write would kill the race in exactly the privacy settings most likely to refuse.
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* preference simply not remembered */ } },
+};
+const coarse = () => matchMedia('(any-pointer:coarse)').matches || (navigator.maxTouchPoints > 0 && matchMedia('(hover:none)').matches);
 
-function visible(el) {
-  if (!el || el.getClientRects().length === 0) return false;
-  const cs = getComputedStyle(el);
-  if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false;
-  const r = el.getBoundingClientRect();
-  return r.width > 1 && r.height > 1;
+// The layout is decided by the SHORT side and the orientation, never the width alone: a phone held
+// sideways is ~850px wide and still has phone-sized thumbs and a 390px-tall screen.
+export function layoutFor(w, h, isCoarse) {
+  const short = Math.min(w, h);
+  if (short <= 500 || w < 768) return w > h ? 'landscape' : 'portrait';
+  if (isCoarse || w < 1024) return 'tablet';
+  return 'desktop';
 }
-const shifted = (r, dy) => ({ left: r.left, right: r.right, top: r.top + dy, bottom: r.bottom + dy });
-const hits = (a, b) => a.left < b.right + GAP && a.right + GAP > b.left && a.top < b.bottom + GAP && a.bottom + GAP > b.top;
 
-// Walk in one direction until the panel clears everything already placed. Each step moves strictly
-// further, so the loop ends; the bound is only a guard against a pathological layout.
-function settle(r, placed, dir) {
-  let dy = 0;
-  for (let i = 0; i <= placed.length * 2; i++) {
-    const hit = placed.find((p) => hits(shifted(r, dy), p));
-    if (!hit) return dy;
-    dy = dir > 0 ? hit.bottom + GAP - r.top : hit.top - GAP - r.bottom;
+function viewportSize() {
+  const vv = globalThis.visualViewport;
+  return vv ? [Math.round(vv.width), Math.round(vv.height)] : [innerWidth, innerHeight];
+}
+
+// Rotating only rewrites these attributes; nothing reloads, and the canvas resizes on its own.
+function applyLayout() {
+  const [w, h] = viewportSize();
+  const layout = layoutFor(w, h, coarse());
+  if (root.dataset.layout !== layout) root.dataset.layout = layout;
+  const touch = touchWanted(layout) ? '1' : '0';
+  if (root.dataset.touch !== touch) root.dataset.touch = touch;
+}
+
+// Desktop shows no touch pads unless the device can be touched or the player asked for them.
+function touchWanted(layout) {
+  const pref = store.get('cv-touch-controls');
+  if (pref === 'on') return true;
+  if (pref === 'off' && layout === 'desktop') return false;
+  return layout !== 'desktop' || coarse() || document.body.dataset.touch === '1';
+}
+
+// The minimap is visible by default on desktop and tablet and a toggle on phones; when it is hidden
+// main.js skips drawing it, which is a whole 2D canvas redraw saved every 100ms.
+export function mapShown() {
+  return root.dataset.map !== 'off';
+}
+function setMap(on, remember) {
+  root.dataset.map = on ? 'on' : 'off';
+  $('mapToggle')?.setAttribute('aria-pressed', String(on));
+  if (remember) store.set('cv-map', on ? 'on' : 'off');
+}
+
+function installFullscreen() {
+  const buttons = [...document.querySelectorAll('.cv-fs')];
+  // Reason: iPhone Safari has no element Fullscreen API at all; a button that does nothing is worse
+  // than none, and on a phone the platform already pins the stage over the whole window.
+  if (!document.fullscreenEnabled || typeof root.requestFullscreen !== 'function') {
+    for (const b of buttons) b.hidden = true;
+    return;
   }
-  return dy;
-}
-const offscreen = (r, dy) => r.top + dy < 0 || r.bottom + dy > innerHeight;
-
-export function layoutHud() {
-  const movable = MOVABLE.map((q) => document.querySelector(q)).filter(Boolean);
-  for (const el of movable) el.style.translate = '';
-  if ((document.body.dataset.state || 'hangar') === 'hangar') return;
-  const placed = FIXED.flatMap((q) => [...document.querySelectorAll(q)]).filter(visible).map((el) => el.getBoundingClientRect());
-  for (const el of movable) {
-    if (!visible(el)) continue;
-    const r = el.getBoundingClientRect();
-    const away = r.top + r.height / 2 < innerHeight / 2 ? 1 : -1;
-    let dy = settle(r, placed, away);
-    if (offscreen(r, dy)) {
-      const back = settle(r, placed, -away);
-      if (!offscreen(r, back) || Math.abs(back) < Math.abs(dy)) dy = back;
+  const label = () => {
+    const on = !!document.fullscreenElement;
+    for (const b of buttons) {
+      b.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
+      if (b.id === 'pauseFullscreen') b.textContent = on ? 'EXIT FULL SCREEN' : 'FULL SCREEN';
     }
-    if (dy) el.style.translate = `0 ${Math.round(dy)}px`;
-    placed.push(shifted(r, dy));
+    root.dataset.fullscreen = on ? '1' : '0';
+  };
+  for (const b of buttons) b.addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else root.requestFullscreen({ navigationUI: 'hide' }).catch(() => { /* refused: nothing changed */ });
+  });
+  document.addEventListener('fullscreenchange', label);
+  label();
+}
+
+// The key strip is a reminder, not furniture: it collapses to one chip five seconds into each race.
+function installKeys() {
+  const strip = $('cvKeys');
+  const pref = $('cvKeysPref');
+  if (!strip) return;
+  let timer = 0;
+  const enabled = () => store.get('cv-keys') !== 'off';
+  const show = (open) => { strip.dataset.open = open ? '1' : '0'; };
+  $('cvKeysToggle')?.addEventListener('click', () => { clearTimeout(timer); show(strip.dataset.open !== '1'); });
+  if (pref) {
+    pref.checked = enabled();
+    pref.addEventListener('change', () => { store.set('cv-keys', pref.checked ? 'on' : 'off'); strip.hidden = !pref.checked; });
+  }
+  strip.hidden = !enabled();
+  show(false);
+  return () => { clearTimeout(timer); show(true); timer = setTimeout(() => show(false), 5000); };
+}
+
+// The LIVE indicator: full strength when the connection changes, 40% three seconds later.
+function installLiveDot() {
+  const el = $('networkStatus');
+  if (!el) return;
+  let last = '', timer = 0;
+  new MutationObserver(() => {
+    const text = el.textContent || '';
+    if (text === last) return;
+    last = text;
+    const live = /LIVE|CONNECTED/i.test(text) && !/RECONNECT|LOST|OFFLINE|CONNECTING/i.test(text);
+    el.dataset.state = live ? 'live' : 'alert';
+    el.dataset.short = live ? 'LIVE' : (text.split('·')[0].trim() || 'OFFLINE');
+    el.classList.add('fresh');
+    clearTimeout(timer);
+    timer = setTimeout(() => el.classList.remove('fresh'), 3000);
+  }).observe(el, { childList: true, characterData: true, subtree: true });
+}
+
+// The pause card's shortcuts open the existing settings dialog at the matching section.
+function installPauseCard() {
+  const dialog = $('settingsDialog');
+  const target = { driving: 0, sound: 1, display: 2 };
+  for (const b of document.querySelectorAll('[data-settings]')) b.addEventListener('click', () => {
+    $('settings')?.click();
+    const key = b.dataset.settings;
+    const el = key === 'camera' ? $('reduced')?.closest('label') : dialog?.querySelectorAll('h3')[target[key]];
+    requestAnimationFrame(() => el?.scrollIntoView({ block: 'start' }));
+  });
+  const leave = $('leaveRace');
+  const pauseLeave = $('pauseLeave');
+  if (leave && pauseLeave) {
+    pauseLeave.addEventListener('click', () => leave.click());
+    const sync = () => pauseLeave.classList.toggle('hidden', leave.classList.contains('hidden'));
+    new MutationObserver(sync).observe(leave, { attributes: true, attributeFilter: ['class'] });
+    sync();
   }
 }
 
-// Panel scale for mouse-and-keyboard screens: 1 on a large monitor, shrinking with the window so
-// an embedded ~900x560 frame still leaves the road open. Touch layouts ignore it.
-function setScale() {
-  const s = Math.max(0.62, Math.min(1, innerWidth / 1500, innerHeight / 860));
-  document.documentElement.style.setProperty('--cv-hud', s.toFixed(3));
-}
-
-// Reason: the vendor only showed the touch pad after the first touchstart, and our desktop rule hides
-// it until then, so a touch device whose browser also reports a fine pointer (iPad with a trackpad,
-// many Android tablets, hybrids) could never reveal the controls it needs to start driving.
-function detectTouch() {
-  const coarse = matchMedia('(any-pointer:coarse)').matches;
-  const noHover = matchMedia('(hover:none)').matches;
-  if (coarse || (navigator.maxTouchPoints > 0 && noHover)) document.body.dataset.touch = '1';
-}
-
-function installLogo() {
-  const img = document.getElementById('brandLogo');
-  if (img) img.src = logoUrl;
+function installTouchPref() {
+  const box = $('cvTouchToggle');
+  if (!box) return;
+  box.checked = root.dataset.touch === '1';
+  box.addEventListener('change', () => { store.set('cv-touch-controls', box.checked ? 'on' : 'off'); applyLayout(); });
 }
 
 export function initHudLayout() {
-  installLogo();
-  detectTouch();
-  setScale();
+  const img = $('brandLogo');
+  if (img) img.src = logoUrl;
+  applyLayout();
+  const remembered = store.get('cv-map');
+  setMap(remembered ? remembered === 'on' : !['portrait', 'landscape'].includes(root.dataset.layout), false);
+  $('mapToggle')?.addEventListener('click', () => setMap(!mapShown(), true));
+  installFullscreen();
+  const raceStarted = installKeys();
+  installLiveDot();
+  installPauseCard();
+  installTouchPref();
+
   let queued = false;
   const schedule = () => {
     if (queued) return;
     queued = true;
-    requestAnimationFrame(() => { queued = false; setScale(); layoutHud(); });
+    requestAnimationFrame(() => { queued = false; applyLayout(); });
   };
   addEventListener('resize', schedule);
-  addEventListener('orientationchange', schedule);
-  const ro = new ResizeObserver(schedule);
-  for (const q of [...FIXED, ...MOVABLE]) for (const el of document.querySelectorAll(q)) ro.observe(el);
-  // The game rewrites body attributes every frame with unchanged values; only react to real changes.
-  let last = '';
+  globalThis.visualViewport?.addEventListener('resize', schedule);
+  // main.js rewrites body attributes every frame with unchanged values; react to real changes only.
+  let lastState = '', lastTouch = '';
   new MutationObserver(() => {
-    const b = document.body.dataset;
-    const key = `${b.state}|${b.mode}|${b.touch}|${b.controlSize}`;
-    if (key !== last) { last = key; schedule(); afterFade(); }
-  }).observe(document.body, { attributes: true, attributeFilter: ['data-state', 'data-mode', 'data-touch', 'data-control-size'] });
-  const standings = document.getElementById('liveStandings');
-  if (standings) new MutationObserver(schedule).observe(standings, { attributes: true, attributeFilter: ['class'] });
-  // Panels fade in and out with CSS (opacity), which no observer reports, and the fades follow a state
-  // change. Reason (13 Oct 2026, owner: "framerate is terrible it keep freezing"): this used to be a
-  // sweep every second for the whole race, forcing a synchronous layout of every HUD panel in the
-  // middle of the WebGL frame loop; two passes after each real change cover the fades and nothing else.
-  const fadeTimers = [];
-  function afterFade() {
-    for (const t of fadeTimers.splice(0)) clearTimeout(t);
-    for (const ms of [450, 1300]) fadeTimers.push(setTimeout(schedule, ms));
-  }
-  schedule();
+    const { state = '', touch = '' } = document.body.dataset;
+    if (touch !== lastTouch) { lastTouch = touch; schedule(); }
+    if (state === lastState) return;
+    if (state === 'countdown' && lastState !== 'paused') raceStarted?.();
+    lastState = state;
+  }).observe(document.body, { attributes: true, attributeFilter: ['data-state', 'data-touch'] });
 }
