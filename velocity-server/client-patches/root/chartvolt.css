@@ -211,6 +211,33 @@ html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:c
 }
 @media (max-height:500px){#hangar .cv-launch #play{min-height:40px}}
 
+/* CHARTVOLT PATCH (14 Oct 2026, owner: show the pre-race tips on the ship screen - camera, connection,
+   graphics, device). Most screens have no room for four lines beside the ship (a 768px laptop puts the ship
+   dock straight over them), so the default is ONE tip at a time, rotating every 4s, next to the Settings
+   button. Only a tall screen (900px+) has the space to list all four at once. */
+#hangar .cv-tips{margin:10px 0 0;padding:7px 9px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;
+  border:1px solid var(--edge);border-left:2px solid #7af0c8b0;border-radius:12px;background:linear-gradient(150deg,#0a1f30e6,#050f1ce6 75%)}
+#hangar .cv-tips-head{display:contents}
+#hangar .cv-tips-head b,#hangar .cv-tips small{display:none}
+#hangar #cvTipsSettings{grid-column:2;grid-row:1;min-height:30px;padding:0 9px;border:1px solid #5fe3f4;border-radius:7px;background:#0b2a3c;
+  color:#e8fbff;font:700 10px/1 system-ui,sans-serif;letter-spacing:.08em;cursor:pointer;white-space:nowrap}
+#hangar .cv-tips ul{grid-column:1;grid-row:1;display:grid;margin:0;padding:0;list-style:none}
+#hangar .cv-tips li b{font:700 10px ui-monospace,monospace;letter-spacing:1.5px;color:#9fe8ff}
+/* Every tip shares one grid cell, so the box is as tall as the longest and nothing below it jumps. */
+#hangar .cv-tips li{grid-area:1/1;display:grid;grid-template-columns:minmax(0,1fr);gap:1px;font:11.5px/1.3 system-ui,sans-serif;color:#cfe9f2;
+  opacity:0;animation:cv-tip 16s infinite;animation-delay:calc(var(--i) * 4s)}
+@media (max-height:500px){#hangar .cv-tips{margin:6px 0 0;padding:5px 8px}#hangar .cv-tips li{font-size:10.5px;line-height:1.25}
+  #hangar .cv-tips li b{font-size:9px}#hangar #cvTipsSettings{min-height:28px}}
+@media (min-width:601px) and (min-height:900px){
+  #hangar .cv-tips{display:block;padding:10px 12px;margin:12px 0 0}
+  #hangar .cv-tips-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px}
+  #hangar .cv-tips-head b{display:inline;font:700 10px ui-monospace,monospace;letter-spacing:2px;color:#7af0c8}
+  #hangar .cv-tips ul{gap:5px}
+  #hangar .cv-tips li{grid-area:auto;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:baseline;font-size:12px;opacity:1;animation:none}
+  #hangar .cv-tips small{display:block;margin:6px 0 0;font:11px/1.3 system-ui,sans-serif;color:var(--muted)}
+}
+@keyframes cv-tip{0%{opacity:0}3%,22%{opacity:1}25%,100%{opacity:0}}
+
 /* ---------- Power-up pickup: banner + equipment-slot pulse ---------- */
 #pickupFlash{position:absolute;left:50%;top:22%;z-index:30;display:flex;align-items:center;gap:12px;padding:8px 22px 8px 8px;
   border-radius:999px;border:1px solid var(--pickup,#65e7ff);pointer-events:none;visibility:hidden;opacity:0;

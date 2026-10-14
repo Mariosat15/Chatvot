@@ -513,3 +513,16 @@ Owner: "when start still other ships clunky like back and forth".
 **Fix.** `noteClock` ignores any snapshot whose `status` is not `racing` and drops the anchor, so the first racing snapshot re-anchors from scratch. Measured with a 10 s countdown: the lead at the start went from 0.350 s to 0.060 s and stays there. This is presentation only; the server and the simulation are unchanged.
 
 Tests: `tests/chartvolt-rival-start.test.mjs` (2). Two probes turned it red: removing the guard failed 2 tests, and keeping the anchor through the countdown failed 1. velocity-server 178/178. Deploy: pull, rebuild the client, `pm2 restart chartvolt-games`. **Never verified by eye in a live multiplayer race.**
+
+
+## Pre-race tips on the ship screen, and the menu remembers your settings (14 Oct 2026)
+
+Owner: show "select your preferred camera view / have a good internet connection / pick graphics settings for your device / prefer desktop or tablet" on the ship screen in simple gamer wording, and save every menu setting so it doesn't need redoing every time.
+
+**Tips.** A `PRE-RACE CHECK` card in the hangar intro (`root/index.html`), with an OPEN SETTINGS button wired to the same handler as the gear (`main.js`). Wording: CAMERA "Pick your view in Settings. You can also switch mid-race with the camera button or C."; CONNECTION "Race on strong Wi-Fi or 5G. A weak signal makes rivals jump around."; GRAPHICS "Game lagging? Lower Render quality. Running smooth? Turn it up."; DEVICE "Best on desktop or tablet. Phones work, but a bigger screen helps." Layout (`root/chartvolt.css`): by default ONE tip shows at a time, rotating every 4 s, beside the button, because a 768px-tall laptop puts the ship dock straight over a four-line list; only screens at least 601px wide and 900px tall list all four plus "Your settings are saved for next time."
+
+**Saved settings.** New `client-patches/settings-memory.js` saves 14 controls that were reset on every visit (render quality, bloom, reduced motion, atmosphere, sky, clouds, shadows, textures, reflections, music and effects volume, both mutes, soundtrack) under `cv-setting:<id>`. Settings already saved by their own module (camera, touch layout, keys, vibration, coach) are left with their owners. A stored value that is not a real choice is ignored; a per-device render ratio is accepted and its option added back. A browser that refuses storage still loads. In `boot()` the saved values are applied **after** the phone defaults and **before** the first scene, so a saved choice wins; bloom and reduced motion are now read from the checkboxes on first load; the volumes, mutes and soundtrack are pushed into the mixer at start; and each race keeps a saved sky choice on touch devices instead of forcing 2048.
+
+**Risk, owner's choice:** a phone that saves high graphics no longer gets the protective phone defaults. If it struggles, the player lowers it in Settings, which is what the GRAPHICS tip says.
+
+Tests: `tests/chartvolt-settings-memory.test.mjs` (6). 6 probes each turned exactly one test red. velocity-server 184/184, games-service velocity 20/20. Headless screenshots at 1920x1080, 1366x768, tablet, phone and phone landscape: the hangar fits with ENTER CIRCUIT visible at every size. Deploy: pull, rebuild the client, `pm2 restart chartvolt-games`. **Never verified by eye on a real device.**
