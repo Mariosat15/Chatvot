@@ -602,3 +602,18 @@ Owner: "when in cockpit in portrait i cant see the frame of the cockpit also the
 **End-of-race jump** (new `client-patches/correction-smoothing.js`, `main.js`). When the tab or the network stalls, the server's step clamp of .25 s drops time while the race ends on the wall clock, so the server's position at time-up lands 6-20 m from the predicted one (about 30 m at the stall itself). `reconcile` only eased corrections under 25 m and only while racing, so the cockpit camera, which shows every snap, jumped. `easesCorrection` now eases while racing or finished, up to 60 m along the track, 8 m sideways and 1 rad of heading, and still snaps on a respawn or any non-finite value.
 
 Tests: `tests/chartvolt-cockpit-interior.test.mjs` (now 17: placement on desktop and on three phone shapes, reserve, refit, readout edge derived from the source, readout drawn on top, hull rule); new `tests/chartvolt-correction-smoothing.test.mjs` (5, including a fake-clock stall through the real `RaceRoom` and `RaceSimulation`). 7 probes each turned the expected tests red. velocity-server 198/198, games-service velocity 20/20. Headless screenshots of the inside view at 390x844, 844x390, 740x320 and desktop, and the chase view at 740x320 and 667x300, show the frame, the readout and the hull bar. **Never verified by eye on a real device.**
+
+## Phone landscape cockpit: lower dashboard, compact HUD, clear road (14 Oct 2026, owner brief "Volt Velocity Mobile Landscape UI Fix")
+
+**BUILT, never verified by eye on a real phone.** Applies only to a touch screen whose primary pointer is coarse, held landscape, 500 px tall or less (`cockpitOverlay` in `client-patches/cockpit-layout.js`, `PHONE_LANDSCAPE`). Desktop, tablets and portrait phones keep the earlier layout, and every phone rule in `root/cv-cockpit.css` is keyed on `html[data-cockpit-phone]`. Nothing in the simulation, physics or inputs changed.
+
+- **Cockpit:** the landscape art is drawn twice. The pillars are clipped to drop the painted logo and the dashboard. The dashboard is a band squashed to at most 24% of the screen height and clipped at the seam. About two thirds of the road is clear.
+- **HUD:** a two-row strip under the logo (Lap, Time, Best, Live / Position, Hull, Speed). It is semi-transparent with a cyan border and stays clear of the logo and of the pause and settings buttons.
+- **Controls:** steering is in one corner and brake/accelerate in the other, swapped by the hand setting. Item and Boost sit above them within thumb reach. Every target is at least 44 px, even at "Compact". Nothing sits over the middle of the road.
+- **Camera button:** pinned to the right pillar with the neon glow. It is restored to the top row when the cockpit hides, and it still cycles views.
+- **Speedometer:** centred, with the arc stroke 15 (was 10) and a bigger number. The number and KM/H are centred inside the arc.
+- **Viewport:** the height uses Safari's visual viewport when not pinch-zoomed. Safe areas come from `env()`.
+- **Gate:** the HUD (`hud-layout.js`) marks any small mouse window as touch, so the gate also requires `(pointer:coarse)`. A desktop browser shrunk to 844x390 keeps the generic cockpit, checked in the browser.
+- **Label fix:** the shared item/boost padding is a percentage of the whole control bar, which squeezed the phone label to 29 px. The phone rule now uses a fixed 10 px.
+
+Tests: `tests/chartvolt-cockpit-interior.test.mjs`, which covers six phone sizes x two hands x three control sizes, mouse windows of phone shape, and a small mouse window flagged touch. velocity-server 253/253. The client was rebuilt (`games-service/vendor/volt-velocity-client.html.gz`). Emulated screenshots at 667x375, 844x390 and 932x430. Deploy: pull, then `pm2 restart chartvolt-games`.

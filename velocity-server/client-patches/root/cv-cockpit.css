@@ -142,8 +142,26 @@ html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-stat
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item small{display:none}
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item[data-item=empty]{color:#8fb9c9}
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item[data-item=ready]{filter:drop-shadow(0 0 8px rgba(255,214,92,.45))}
-/* Landscape phone: telemetry is already a short strip from cockpit-layout; tighten the type to match. */
-html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-tele{--ck-h:42px}
-html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-cell{padding:0 calc(var(--ck-h) * .12)}
-html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-cell small{font-size:max(7px,calc(var(--ck-h) * .2));letter-spacing:.1em}
-html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-cell b{font-size:max(9px,calc(var(--ck-h) * .28))}
+/* ---------- Landscape PHONE only (data-cockpit-phone is set for landscape art + touch, never with a mouse) ----------
+   CHARTVOLT PATCH (14 Oct 2026, owner: "Mobile Landscape UI Fix"): a short dashboard band, a compact
+   two-row race strip under the logo, and a bigger centred speed gauge. Desktop and portrait never match. */
+html[data-cockpit-phone] .cv-ck-tele{background:rgba(3,12,22,.48);border-radius:8px}
+html[data-cockpit-phone] .cv-ck-cell{gap:4px;padding:0 calc(var(--ck-h) * .16)}
+html[data-cockpit-phone] .cv-ck-cell small{font-size:max(7px,calc(var(--ck-h) * .2));letter-spacing:.08em}
+html[data-cockpit-phone] .cv-ck-cell b{font-size:max(9px,calc(var(--ck-h) * .29))}
+html[data-cockpit-phone] .cv-ck-bay{padding:calc(var(--ck-h) * .08) calc(var(--ck-h) * .14)}
+html[data-cockpit-phone] .cv-ck-bay small{font-size:max(7px,calc(var(--ck-h) * .18))}
+html[data-cockpit-phone] .cv-ck-hull b{font-size:max(10px,calc(var(--ck-h) * .34))}
+html[data-cockpit-phone] .cv-ck-boost b{font-size:max(9px,calc(var(--ck-h) * .26))}
+html[data-cockpit-phone] .cv-ck-boost{padding-left:calc(var(--ck-h) * .5)}
+html[data-cockpit-phone] .cv-ck-speed{padding:0}
+/* Reason: the shared rule's 8% padding resolves against the whole control bar, not the button, which left
+   a phone's item label 29 px and "EMPTY" ellipsised. */
+html[data-cockpit-phone] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item{padding:0 10px}
+/* Reason: the arc is sized by the bay's height and centred, so a wide flat bay cannot push it off one side. */
+html[data-cockpit-phone] .cv-ck-arc{left:50%;top:5%;width:auto;height:90%;transform:translateX(-50%)}
+html[data-cockpit-phone] .cv-ck-arc path{stroke-width:15}
+html[data-cockpit-phone] .cv-ck-speed b{position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);font-size:max(13px,calc(var(--ck-h) * .46))}
+html[data-cockpit-phone] .cv-ck-speed small{position:absolute;left:50%;top:86%;transform:translate(-50%,-50%);margin:0;font-size:max(7px,calc(var(--ck-h) * .16))}
+/* The camera leaves the top row for the right edge of the cockpit, above the right control bay. */
+html[data-cockpit-phone] .cv-util #cameraCycle{z-index:31;filter:drop-shadow(0 0 6px rgba(89,216,255,.55))}

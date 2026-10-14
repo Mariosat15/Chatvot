@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {CAMERA_VIEWS, chaseCamera, interiorEye, cockpitEye, nextCameraView} from '../client-patches/camera-views.js';
-import {interiorReadout, cockpitGauges, cockpitOverlay, chooseOverlay, OVERLAY_ART, TOUCH_TARGET_PX, UTIL_COUNT, BOOST_MIN_ENERGY, GAUGE_FULL_SCALE_KMH, LANDSCAPE_SHELL_HEIGHT, itemBayLabel} from '../client-patches/cockpit-layout.js';
+import {interiorReadout, cockpitGauges, cockpitOverlay, chooseOverlay, OVERLAY_ART, TOUCH_TARGET_PX, UTIL_COUNT, BOOST_MIN_ENERGY, GAUGE_FULL_SCALE_KMH, itemBayLabel} from '../client-patches/cockpit-layout.js';
 
 // CHARTVOLT PATCH (14 Oct 2026, owner): "add another camera inside the cockpit meaning you need to design
 // interior as well", "select also the cameras from the game not only in the menu ... easy to select ... work
@@ -123,23 +123,87 @@ const SCREENS = {
   'short landscape phone': {width: 740, height: 320, touch: true, art: 'landscape'},
   'smallest landscape phone': {width: 667, height: 300, touch: true, art: 'landscape'},
 };
+// Owner, 14 Oct 2026 ("Mobile Landscape UI Fix"): landscape phones get their own layout, tested at the three
+// named sizes plus a Safari visual viewport with its toolbars showing; a mouse window of the same shape does not.
+const PHONES = {
+  'iPhone SE landscape': {width: 667, height: 375},
+  'iPhone 14 landscape': {width: 844, height: 390},
+  'iPhone Pro Max landscape': {width: 932, height: 430},
+  'notched iPhone 14 landscape': {width: 844, height: 390, safe: {left: 47, right: 47, bottom: 21}},
+  'Safari with toolbars': {width: 667, height: 300},
+  'short Android landscape': {width: 740, height: 320},
+};
 const hits = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const CONTROLS = ['fire', 'left', 'right', 'boost', 'brake', 'accel'];
 
+for (const [name, sc] of Object.entries(PHONES)) for (const hand of ['right', 'left']) for (const controlScale of [.88, 1, 1.12]) {
+  test(`${name} (${hand} hand, size ${controlScale}) gets the dedicated landscape layout with the road clear`, () => {
+    const W = sc.width, H = sc.height, safe = {top: 0, right: 0, bottom: 0, left: 0, ...sc.safe};
+    const L = cockpitOverlay({width: W, height: H, touch: true, hand, controlScale, safe});
+    assert.equal(L.variant, 'landscape');
+    assert.equal(L.phone, true);
+    assert.ok(L.dash.y + L.dash.h >= H - 1 && L.dash.x <= 0 && L.dash.w >= W, 'the dashboard band meets the bottom edge, full width');
+    assert.ok(L.art.y <= 0 && L.art.w >= W, 'the pillars run from the top');
+    assert.match(L.artClip, /^polygon\(/);
+    assert.match(L.dashClip, /^inset\(/);
+    const boxes = {...L.controls, camera: L.camera, telemetry: L.telemetry, util: L.util, logo: L.logo};
+    for (const [part, b] of Object.entries(boxes)) {
+      assert.ok(b.x >= safe.left && b.y >= safe.top && b.x + b.w <= W - safe.right && b.y + b.h <= H - safe.bottom, `${part} ${JSON.stringify(b)} is off screen or under a notch`);
+    }
+    const names = Object.keys(boxes);
+    for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) assert.ok(!hits(boxes[names[i]], boxes[names[j]]), `${names[i]} overlaps ${names[j]}`);
+    for (const c of [...CONTROLS, 'camera']) {
+      const b = boxes[c];
+      assert.ok(b.w >= 44 && b.h >= 44, `${c} ${b.w}x${b.h} is under 44px`);
+      assert.ok(b.x + b.w <= W * .3 || b.x >= W * .7, `${c} sits in the middle of the road`);
+      for (const [k, r] of Object.entries(L.instruments)) assert.ok(!hits(b, r), `${c} covers the ${k} instrument`);
+    }
+    assert.equal(L.util.count, UTIL_COUNT.touch - 1, 'pause and settings stay at the top; the camera moves to the cockpit');
+    assert.ok(L.camera.x > W / 2 && L.camera.y + L.camera.h < Math.min(L.controls.boost.y, L.controls.fire.y), 'the camera sits above the right bay');
+    assert.ok(L.telemetry.y >= L.logo.y + L.logo.h, 'the race strip sits under the logo');
+    assert.ok(!hits(L.telemetry, L.util), 'the strip clears pause and settings');
+    assert.ok(L.telemetry.h <= 40 && L.telemetry.h >= 30, 'two compact rows');
+    const dashH = H - (L.dash.y + L.dash.h - L.dash.h * (853 - 560) / 853);
+    assert.ok(dashH <= H * .24 + 1, `the dashboard band ${dashH}px is at most a quarter of the screen`);
+    const road = (L.dashTop - (L.telemetry.y + L.telemetry.h)) / H;
+    assert.ok(road >= .55, `only ${(road * 100).toFixed(0)}% of the height is open road`);
+    assert.ok(L.messagesTop > L.telemetry.y + L.telemetry.h && L.messagesTop < L.dashTop);
+    const [steer, pedal] = hand === 'left' ? ['accel', 'left'] : ['left', 'accel'];
+    assert.ok(L.controls[steer].x < W / 2 && L.controls[pedal].x > W / 2);
+  });
+}
+
+test('a mouse window of phone-landscape shape keeps the generic cockpit, so desktop is never affected', () => {
+  for (const [w, h] of [[844, 390], [1280, 649], [1600, 740]]) {
+    const L = cockpitOverlay({width: w, height: h, touch: false});
+    assert.equal(L.phone, false);
+    assert.equal(L.dash, null);
+    assert.equal(L.camera, null);
+    assert.equal(L.artClip, null);
+  }
+  // Reason: hud-layout marks any small mouse window touch, so the browser-side flag alone would let a
+  // shrunken desktop window into the phone cockpit; the primary pointer is what keeps it out.
+  assert.equal(cockpitOverlay({width: 844, height: 390, touch: true, coarse: false}).phone, false, 'a small mouse window flagged touch by the HUD');
+  assert.match(interior, /const coarse = view\?\.matchMedia\?\.\('\(pointer:coarse\)'\)\.matches/);
+  assert.match(interior, /cockpitOverlay\(\{width, height, touch, coarse,/);
+  for (const [w, h] of [[390, 844], [1024, 768]]) assert.equal(cockpitOverlay({width: w, height: h, touch: true}).phone, false, 'portrait and tablet touch screens are unchanged');
+  assert.match(cockpitCss, /html\[data-cockpit-phone\] \.cv-ck-arc path\{stroke-width:15\}/, 'the thicker arc is phone-landscape only');
+  assert.doesNotMatch(cockpitCss, /\[data-cockpit-variant=landscape\]/, 'no rule keys on the landscape art alone, which a desktop window can pick');
+  assert.match(interior, /if \(L\.phone\) html\.dataset\.cockpitPhone = '1'; else delete html\.dataset\.cockpitPhone;/);
+  const hide = interior.slice(interior.indexOf("delete html.dataset.cockpit;"), interior.indexOf('update(sim, dt)'));
+  assert.match(hide, /delete html\.dataset\.cockpitPhone;/);
+  assert.match(hide, /releaseCamera\(\);/, 'the camera goes back into the top row when the cockpit hides');
+});
+
 for (const [name, sc] of Object.entries(SCREENS)) for (const hand of ['right', 'left']) {
+  if (sc.touch && sc.width > sc.height && sc.height <= 500) continue;
   test(`on a ${name} (${hand} hand) the cockpit fills the bottom and nothing overlaps or leaves the screen`, () => {
     const safe = {top: 0, right: 0, bottom: 0, left: 0, ...sc.safe};
     const L = cockpitOverlay({width: sc.width, height: sc.height, touch: sc.touch, hand, safe});
     assert.equal(L.variant, sc.art);
+    assert.equal(L.phone, false);
     assert.ok(L.art.y + L.art.h >= sc.height - 1, 'the image meets the bottom edge');
-    // Reason: landscape shrinks the shell so the road stays visible; side letterboxing is allowed there only.
-    if (sc.art === 'landscape') {
-      assert.ok(L.art.y >= sc.height * (1 - LANDSCAPE_SHELL_HEIGHT) - 2, 'landscape leaves a clear track band above the shell');
-      assert.ok(L.telemetry.h <= sc.height * .14 + 1, 'landscape telemetry is a short strip');
-      assert.ok(L.telemetry.y <= (safe.top || 0) + 12, 'landscape telemetry sits at the top');
-    } else {
-      assert.ok(L.art.x <= 1 && L.art.x + L.art.w >= sc.width - 1, 'portrait/desktop cover the full width');
-    }
+    assert.ok(L.art.x <= 1 && L.art.x + L.art.w >= sc.width - 1, 'the image covers the full width');
     const boxes = {...L.controls, telemetry: L.telemetry, util: L.util};
     if (L.minimap) boxes.minimap = L.minimap;
     if (L.live) boxes.live = L.live;
@@ -157,7 +221,7 @@ for (const [name, sc] of Object.entries(SCREENS)) for (const hand of ['right', '
     assert.equal(Boolean(L.live), sc.art === 'portrait', 'portrait moves LIVE to a pill');
     assert.equal(Boolean(L.logo), L.logoCropped, 'a logo the crop removed is drawn again');
     const logoBottom = L.logo ? L.logo.y + L.logo.h : L.telemetry.y;
-    assert.ok(L.telemetry.y >= logoBottom || sc.art === 'landscape', 'the panel sits under the logo');
+    assert.ok(L.telemetry.y >= logoBottom, 'the panel sits under the logo');
     const [steerSide, pedalSide] = hand === 'left' ? ['accel', 'left'] : ['left', 'accel'];
     assert.ok(L.controls[steerSide].x < sc.width / 2 && L.controls[pedalSide].x > sc.width / 2, 'steering under one thumb, pedals under the other');
     assert.ok(L.controls.fire.y < L.controls.left.y && L.controls.boost.y < L.controls.accel.y, 'the wide button sits above its pair');
@@ -192,7 +256,7 @@ test('a large control size grows the buttons and a small one never drops a touch
 });
 
 test('the cockpit refits on size, touch, hand, control size and safe area, and hands back every borrowed style', () => {
-  assert.match(interior, /const key = `\$\{width\}x\$\{height\}\|\$\{touch\}\|\$\{hand\}\|\$\{controlScale\}\|/);
+  assert.match(interior, /const key = `\$\{width\}x\$\{height\}\|\$\{touch\}\|\$\{coarse\}\|\$\{hand\}\|\$\{controlScale\}\|/);
   assert.match(interior, /if \(on\) \{ html\.dataset\.cockpit = '1'; fitted = ''; since = 1; lastText = ''; return; \}/, 'a resize while hidden is picked up when shown again');
   const hide = interior.slice(interior.indexOf("delete html.dataset.cockpit;"), interior.indexOf('update(sim, dt)'));
   assert.match(hide, /release\(\);/, 'the chase views must get their own control layout back');

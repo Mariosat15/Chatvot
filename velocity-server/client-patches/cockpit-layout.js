@@ -69,10 +69,19 @@ export const LIVE_PILL = Object.freeze({w: 78, h: 26});
  *  CHARTVOLT PATCH (14 Oct 2026, owner: put the camera change button back in the game area): a phone keeps
  *  camera + pause + settings (mute and fullscreen stay in the menu). */
 export const UTIL_COUNT = Object.freeze({mouse: 5, touch: 3});
-/** Landscape phone only: the shell may use at most this fraction of the screen height so the road stays visible. */
-export const LANDSCAPE_SHELL_HEIGHT = 0.66;
-/** Landscape phone only: the lap/time strip stays this tall relative to the screen. */
-export const LANDSCAPE_TELEMETRY_HEIGHT = 0.11;
+/**
+ * Landscape PHONE only (landscape art + touch). CHARTVOLT PATCH (14 Oct 2026, owner: the cockpit covers the
+ * road on a landscape phone). The art is drawn as two layers from the one image: the side pillars above
+ * `seam` stretched to the full height, and the dashboard below it squashed to `keep` of its cover-fit height
+ * and never more than `maxShare` of the screen. `panels` are the painted instrument panels (art px).
+ */
+export const PHONE_LANDSCAPE = Object.freeze({
+  seam: 560, keep: .66, maxShare: .24, maxHeight: 500,
+  logoClip: [38, 62],
+  logoH: [.068, 20, 30], teleH: [.092, 30, 40], teleW: [.58, 380, 500],
+  panels: Object.freeze({left: [452, 648, 256, 130], centre: [708, 668, 410, 127], right: [1112, 648, 256, 130]}),
+});
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 
 const EDGE = 8;
 const num = (value, fallback) => Number.isFinite(value) && value > 0 ? value : fallback;
@@ -99,17 +108,16 @@ export function chooseOverlay(width, height) {
  * each group is anchored to its bay's outer bottom corner, kept inside the safe area, grown to the minimum
  * finger size and kept clear of the instruments. `hand: 'left'` swaps the two groups.
  */
-export function cockpitOverlay({width, height, touch = false, hand = 'right', controlScale = 1, safe = {}} = {}) {
+export function cockpitOverlay({width, height, touch = false, coarse = touch, hand = 'right', controlScale = 1, safe = {}} = {}) {
   const W = num(width, 1280), H = num(height, 720);
+  // Reason: chosen by the screen, not the art ratio - a 16:9 iPhone SE would otherwise get the desktop image,
+  // and a wide mouse window the landscape one. Touch plus a phone's height keeps tablets and desktops out.
+  // `coarse` is the primary pointer: the HUD marks any small mouse window touch, so touch alone is not enough.
+  if (touch && coarse && W > H && H <= PHONE_LANDSCAPE.maxHeight) return phoneLandscapeOverlay(W, H, hand, controlScale, safe);
   const art = OVERLAY_ART[chooseOverlay(W, H)];
   const variant = Object.keys(OVERLAY_ART).find(name => OVERLAY_ART[name] === art);
   const portrait = variant === 'portrait';
-  const landscape = variant === 'landscape';
-  // Reason: landscape phones match the art's aspect, so a cover fit fills the whole height and the road
-  // window collapses between the lap strip and the dashboard. Shrink only that shell (portrait/desktop
-  // keep cover) and leave a clear band of track above it.
-  let s = Math.max(W / art.w, H / art.h);
-  if (landscape) s = Math.min(s, (H * LANDSCAPE_SHELL_HEIGHT) / art.h);
+  const s = Math.max(W / art.w, H / art.h);
   const ox = (W - art.w * s) / 2, oy = H - art.h * s;
   const map = ([x, y, w, h]) => ({x: ox + x * s, y: oy + y * s, w: w * s, h: h * s});
   const top0 = inset(safe.top) + EDGE, bottom0 = H - inset(safe.bottom) - EDGE;
@@ -120,22 +128,18 @@ export function cockpitOverlay({width, height, touch = false, hand = 'right', co
   for (const [key, rect] of Object.entries(art.instruments)) instruments[key] = map(rect);
   const logo = map(art.logo);
   // Reason: a cover fit on a screen taller than the art crops its top, and the painted logo goes with it.
-  // Landscape already clears the top for the track, so the painted logo is never re-drawn as a badge there.
-  const logoCropped = !landscape && logo.y < top0 - logo.h * .25;
+  const logoCropped = logo.y < top0 - logo.h * .25;
   // Reason: the mockups always carry the logo above the panel, so a cropped one is drawn again as a badge,
   // cut from the same image at the same scale, at the top centre.
   const badge = logoCropped ? {x: W / 2 - logo.w / 2, y: top0, w: logo.w, h: logo.h} : null;
   const head = badge || logo;
 
   // Telemetry: the mapped panel, widened to a readable minimum and kept on screen below the safe area.
-  // Landscape: a compact strip pinned under the safe area (the mapped slot sits mid-screen and blocks the road).
   const t = map(art.telemetry);
   const avail = right0 - left0;
-  const want = Math.min(avail, portrait ? TELEMETRY_MIN_WIDTH.portrait : landscape ? Math.min(TELEMETRY_MIN_WIDTH.wide * .72, avail * .62) : TELEMETRY_MIN_WIDTH.wide);
-  const grow = landscape ? Math.min(want / t.w, avail / t.w) : Math.min(Math.max(1, want / t.w), avail / t.w);
-  const tele = landscape
-    ? {w: Math.min(t.w * Math.max(grow, .55), avail * .62), h: Math.min(t.h * .55, H * LANDSCAPE_TELEMETRY_HEIGHT), y: top0}
-    : {w: t.w * grow, h: t.h * grow, y: Math.max(t.y, top0, badge ? badge.y + badge.h + 4 : 0)};
+  const want = Math.min(avail, portrait ? TELEMETRY_MIN_WIDTH.portrait : TELEMETRY_MIN_WIDTH.wide);
+  const grow = Math.min(Math.max(1, want / t.w), avail / t.w);
+  const tele = {w: t.w * grow, h: t.h * grow, y: Math.max(t.y, top0, badge ? badge.y + badge.h + 4 : 0)};
   tele.x = Math.min(Math.max(W / 2 - tele.w / 2, left0), right0 - tele.w);
 
   // Portrait has six cells, so LIVE becomes a pill beside the logo, or above the panel when there is no room.
@@ -158,11 +162,7 @@ export function cockpitOverlay({width, height, touch = false, hand = 'right', co
   const uWidth = uCount * uSize + (uCount - 1) * uGap;
   const util = {x: uRight - uWidth, y: uY, w: uWidth, h: uSize, size: uSize, gap: uGap, count: uCount};
   // Reason: the 48 px finger minimum can make the row taller than the art's, which would reach the panel.
-  // Landscape pins the lap strip at the top for road visibility, so the utility row steps under it instead.
-  if (!portrait && hits(util, tele)) {
-    if (landscape) util.y = tele.y + tele.h + 6;
-    else tele.y = util.y + util.h + 6;
-  }
+  if (!portrait && hits(util, tele)) tele.y = util.y + util.h + 6;
 
   // Minimap, mouse screens only: under the utility row, right-aligned with it.
   let minimap = null;
@@ -224,7 +224,7 @@ export function cockpitOverlay({width, height, touch = false, hand = 'right', co
   const out = {};
   for (const [key, r] of Object.entries(instruments)) out[key] = box(r.x, r.y, r.w, r.h);
   return {
-    variant, scale: s, controlScale: k, logoCropped,
+    variant, phone: false, scale: s, controlScale: k, logoCropped, artClip: null, dash: null, dashClip: null, camera: null,
     logo: badge && {...box(badge.x, badge.y, badge.w, badge.h), size: [Math.round(art.w * s), Math.round(art.h * s)], offset: [Math.round(-art.logo[0] * s), Math.round(-art.logo[1] * s)]},
     art: box(ox, oy, art.w * s, art.h * s),
     instruments: out,
@@ -235,5 +235,85 @@ export function cockpitOverlay({width, height, touch = false, hand = 'right', co
     controls,
     messagesTop: Math.round(Math.max(tele.y + tele.h, portrait ? util.y + util.h : 0, live ? live.y + live.h : 0) + 8),
     dashTop: Math.round(dashTop),
+  };
+}
+
+/**
+ * The landscape phone layout: a dedicated arrangement, not the wide one scaled down. The dashboard is a short
+ * full-width band at the bottom, the logo and a two-row race strip sit at the top centre, pause and settings
+ * at the top right, and every control stands at a side edge so nothing is drawn over the middle of the road.
+ */
+function phoneLandscapeOverlay(W, H, hand, controlScale, safe) {
+  const art = OVERLAY_ART.landscape, P = PHONE_LANDSCAPE;
+  const sx = W / art.w;
+  const top0 = inset(safe.top) + 6, bottom0 = H - inset(safe.bottom) - 6;
+  const left0 = inset(safe.left) + EDGE, right0 = W - inset(safe.right) - EDGE;
+  const factor = Number.isFinite(controlScale) && controlScale > 0 ? controlScale : 1;
+  // Reason: the "small" control size must never drop a target under the touch minimum.
+  const hit = Math.max(TOUCH_TARGET_PX, Math.round(TOUCH_TARGET_PX * factor));
+
+  // Dashboard band: full width, squashed vertically only, and always tall enough for one row of buttons.
+  const dashArt = art.h - P.seam;
+  const dashH = Math.max(hit + 12, Math.min(dashArt * sx * P.keep, H * P.maxShare));
+  const sy = dashH / dashArt, dashY = H - dashH;
+  const dash = {x: 0, y: H - art.h * sy, w: W, h: art.h * sy};
+  const pillars = {x: 0, y: 0, w: W, h: dashY * art.h / P.seam};
+  const S = (P.seam / art.h * 100).toFixed(3), [L, R] = P.logoClip;
+  // Reason: one polygon keeps both pillars and drops the painted logo and everything below the seam; the logo
+  // is re-drawn at its own (unsquashed) aspect, and the dashboard comes from the second layer.
+  const artClip = `polygon(0 0,${L}% 0,${L}% ${S}%,${R}% ${S}%,${R}% 0,100% 0,100% ${S}%,0 ${S}%)`;
+  const dashClip = `inset(${S}% 0 0 0)`;
+
+  const lh = clamp(H * P.logoH[0], P.logoH[1], P.logoH[2]), ls = lh / art.logo[3], lw = art.logo[2] * ls;
+  const logo = {...box(W / 2 - lw / 2, top0, lw, lh),
+    size: [Math.round(art.w * ls), Math.round(art.h * ls)], offset: [Math.round(-art.logo[0] * ls), Math.round(-art.logo[1] * ls)]};
+
+  const uSize = hit, uGap = 8, uCount = UTIL_COUNT.touch - 1;
+  const uw = uCount * uSize + (uCount - 1) * uGap;
+  const util = {x: right0 - uw, y: top0, w: uw, h: uSize, size: uSize, gap: uGap, count: uCount};
+
+  const th = clamp(H * P.teleH[0], P.teleH[1], P.teleH[2]);
+  const tw = Math.min(clamp(W * P.teleW[0], P.teleW[1], P.teleW[2]), W - 2 * (uw + 16));
+  const tele = {x: W / 2 - tw / 2, y: logo.y + logo.h + 3, w: tw, h: th};
+  if (hits(tele, util)) tele.x = Math.max(left0, util.x - 8 - tele.w);
+
+  // Controls: a pair at each bottom corner with the wide button above it; the camera tops the right column.
+  const pairW = Math.round(hit * 1.5), topH = Math.max(TOUCH_TARGET_PX, Math.round(hit * .92)), groupW = 2 * pairW + 6;
+  const groups = hand === 'left'
+    ? {left: ['boost', 'brake', 'accel'], right: ['fire', 'left', 'right']}
+    : {left: ['fire', 'left', 'right'], right: ['boost', 'brake', 'accel']};
+  const pairY = bottom0 - hit, topY = pairY - 6 - topH;
+  const controls = {};
+  for (const side of ['left', 'right']) {
+    const x0 = side === 'left' ? left0 : right0 - groupW;
+    const [topName, aName, bName] = groups[side];
+    controls[topName] = box(x0, topY, groupW, topH);
+    controls[aName] = box(x0, pairY, pairW, hit);
+    controls[bName] = box(x0 + pairW + 6, pairY, pairW, hit);
+  }
+  const camera = box(right0 - hit, topY - 8 - hit, hit, hit);
+
+  // Instruments sit on their painted panels; on a notched phone they close up between the two control groups.
+  const raw = {};
+  for (const [key, [x, y, w, h]] of Object.entries(P.panels)) raw[key] = {x: x * sx, y: dashY + (y - P.seam) * sy, w: w * sx, h: h * sy};
+  const freeL = left0 + groupW + 8, freeR = right0 - groupW - 8;
+  const x0 = Math.min(...Object.values(raw).map(r => r.x)), x1 = Math.max(...Object.values(raw).map(r => r.x + r.w));
+  const f = Math.min(1, (freeR - freeL) / (x1 - x0));
+  const shift = x0 < freeL || x1 > freeR ? (freeL + freeR) / 2 - (x0 + x1) / 2 : 0;
+  const mid = (x0 + x1) / 2;
+  const instruments = {};
+  for (const [key, r] of Object.entries(raw)) instruments[key] = box(mid + shift + (r.x - mid) * f, r.y, r.w * f, r.h);
+
+  return {
+    variant: 'landscape', phone: true, scale: sx, controlScale: hit / TOUCH_TARGET_PX, logoCropped: true,
+    logo, art: box(pillars.x, pillars.y, pillars.w, pillars.h), artClip, dash: box(dash.x, dash.y, dash.w, dash.h), dashClip,
+    instruments,
+    telemetry: {...box(tele.x, tele.y, tele.w, tele.h), portrait: false},
+    live: null,
+    util: {...box(util.x, util.y, util.w, util.h), size: uSize, gap: uGap, count: uCount},
+    minimap: null,
+    controls, camera,
+    messagesTop: Math.round(tele.y + tele.h + 6),
+    dashTop: Math.round(Math.min(...Object.values(instruments).map(r => r.y)) - 8),
   };
 }

@@ -72,6 +72,7 @@ const ARC = 'M16 100A84 84 0 0 1 184 100';
 const cell = (key, label, value) => `<div class="cv-ck-cell" data-cell="${key}"><small>${label}</small><b data-ck="t-${key}">${value}</b></div>`;
 // Reason: fixed markup with no game or player text in it, so innerHTML carries nothing a player can inject.
 const MARKUP = `<img class="cv-ck-art" data-ck="art" alt="" draggable="false">
+<img class="cv-ck-art cv-ck-dash" data-ck="dash" alt="" draggable="false" hidden>
 <div class="cv-ck-bay cv-ck-hull" data-ck="bay-left"><svg class="cv-ck-shield" viewBox="0 0 24 28" aria-hidden="true"><path d="M12 1 22 5v8c0 7-4.4 11.6-10 14C6.4 24.6 2 20 2 13V5z"/></svg><div class="cv-ck-col"><small>HULL</small><b data-ck="hull">100%</b><i class="cv-ck-bar"><span data-ck="hullBar"></span></i></div></div>
 <div class="cv-ck-bay cv-ck-speed" data-ck="bay-centre"><svg class="cv-ck-arc" viewBox="0 0 200 108" aria-hidden="true"><path class="cv-ck-track" d="${ARC}" pathLength="100"/><path class="cv-ck-fill" data-ck="arc" d="${ARC}" pathLength="100" stroke-dasharray="0 100"/></svg><b data-ck="speed">0</b><small>KM/H</small></div>
 <div class="cv-ck-bay cv-ck-boost" data-ck="bay-right"><small>BOOST</small><span class="cv-ck-bolts">${BOLT}${BOLT}</span><b data-ck="boostState">EMPTY</b><i class="cv-ck-bar"><span data-ck="boostBar"></span></i></div>
@@ -103,7 +104,7 @@ export function createCockpitInterior(doc = document) {
 
   const part = name => root.querySelector(`[data-ck="${name}"]`);
   const el = {};
-  for (const name of ['art', 'logo', 'bay-left', 'bay-centre', 'bay-right', 'tele', 'pill', 'pillText', 'safe', 'hull', 'hullBar', 'arc', 'speed', 'boostState', 'boostBar', 't-lap', 't-time', 't-best', 't-live', 't-liveText', 't-pos', 't-hull', 't-speed']) el[name] = part(name);
+  for (const name of ['art', 'dash', 'logo', 'bay-left', 'bay-centre', 'bay-right', 'tele', 'pill', 'pillText', 'safe', 'hull', 'hullBar', 'arc', 'speed', 'boostState', 'boostBar', 't-lap', 't-time', 't-best', 't-live', 't-liveText', 't-pos', 't-hull', 't-speed']) el[name] = part(name);
   const $ = id => doc.getElementById(id);
   const html = doc.documentElement;
 
@@ -113,6 +114,14 @@ export function createCockpitInterior(doc = document) {
   const release = () => {
     for (const [node, style] of borrowed) { if (style === null) node.removeAttribute('style'); else node.setAttribute('style', style); }
     borrowed.clear();
+  };
+  // The camera button leaves the utility row only in the phone-landscape layout, so it keeps its own saved style.
+  let cameraStyle;
+  const releaseCamera = () => {
+    const cam = $('cameraCycle');
+    if (!cam || cameraStyle === undefined) return;
+    if (cameraStyle === null) cam.removeAttribute('style'); else cam.setAttribute('style', cameraStyle);
+    cameraStyle = undefined;
   };
   const place = (node, b) => {
     if (!node) return;
@@ -128,20 +137,34 @@ export function createCockpitInterior(doc = document) {
   let fitted = '';
   function fit() {
     const view = doc.defaultView;
-    const width = view?.innerWidth ?? 1280, height = view?.innerHeight ?? 720;
+    const width = view?.innerWidth ?? 1280;
+    // Reason: iOS Safari's toolbars can cover part of the layout viewport; the visual viewport is what is
+    // actually on screen (ignored while pinch-zoomed, when it measures the zoomed region instead).
+    const vv = view?.visualViewport;
+    const visible = vv && Math.abs((vv.scale ?? 1) - 1) < .01 && vv.height > 0 ? vv.height + (vv.offsetTop || 0) : Infinity;
+    const height = Math.round(Math.min(view?.innerHeight ?? 720, visible));
     const touch = html.dataset.touch === '1';
+    const coarse = view?.matchMedia?.('(pointer:coarse)').matches ?? touch;
     const body = doc.body?.dataset ?? {};
     const hand = body.hand === 'left' ? 'left' : 'right';
     const controlScale = body.controlSize === 'small' ? .88 : body.controlSize === 'large' ? 1.12 : 1;
     const safe = insets();
-    const key = `${width}x${height}|${touch}|${hand}|${controlScale}|${safe.top},${safe.right},${safe.bottom},${safe.left}`;
+    const key = `${width}x${height}|${touch}|${coarse}|${hand}|${controlScale}|${safe.top},${safe.right},${safe.bottom},${safe.left}`;
     if (key === fitted) return;
     fitted = key;
-    const L = cockpitOverlay({width, height, touch, hand, controlScale, safe});
+    const L = cockpitOverlay({width, height, touch, coarse, hand, controlScale, safe});
     root.dataset.variant = L.variant;
     html.dataset.cockpitVariant = L.variant;
     if (el.art.dataset.src !== L.variant) { el.art.src = OVERLAY[L.variant]; el.art.dataset.src = L.variant; }
     place(el.art, L.art);
+    el.art.style.clipPath = L.artClip || '';
+    el.dash.hidden = !L.dash;
+    if (L.dash) {
+      if (el.dash.dataset.src !== L.variant) { el.dash.src = OVERLAY[L.variant]; el.dash.dataset.src = L.variant; }
+      place(el.dash, L.dash);
+      el.dash.style.clipPath = L.dashClip;
+    }
+    if (L.phone) html.dataset.cockpitPhone = '1'; else delete html.dataset.cockpitPhone;
     for (const [side, name] of [['left', 'bay-left'], ['centre', 'bay-centre'], ['right', 'bay-right']]) {
       place(el[name], L.instruments[side]);
       // Reason: every readout is sized from its own bay, so text scales with the art on any screen.
@@ -168,6 +191,13 @@ export function createCockpitInterior(doc = document) {
       util.style.setProperty('--ck-u', `${L.util.size}px`);
       util.style.setProperty('--ck-ugap', `${L.util.gap}px`);
     }
+    const cam = $('cameraCycle');
+    if (cam && L.camera) {
+      if (cameraStyle === undefined) cameraStyle = cam.getAttribute('style');
+      // Reason: .cv-util is a fixed box with no transform, so a fixed child is placed against the viewport.
+      cam.style.position = 'fixed';
+      place(cam, L.camera);
+    } else releaseCamera();
     const map = borrow(doc.querySelector('.cv-map'));
     if (map) { if (L.minimap) place(map, L.minimap); html.dataset.cockpitMap = L.minimap ? '1' : '0'; }
     html.style.setProperty('--ck-msg-top', `${L.messagesTop}px`);
@@ -216,6 +246,8 @@ export function createCockpitInterior(doc = document) {
       delete html.dataset.cockpit;
       delete html.dataset.cockpitVariant;
       delete html.dataset.cockpitMap;
+      delete html.dataset.cockpitPhone;
+      releaseCamera();
       html.style.removeProperty('--ck-msg-top');
       html.style.removeProperty('--ck-dash-bottom');
       release();
