@@ -62,7 +62,7 @@ export const VOLT_VELOCITY_RULES_BY_LOCALE: Record<SupportedLocale, readonly str
   en: [
     "Join the lobby and pick one of the eight ships - each trades speed, handling, hull and boost differently.",
     "Press Ready when you are set. You race even if you do not, as long as you are connected when the race starts.",
-    "Steer, accelerate and brake around every lap of the race. Boost drains energy; pickups refill it, repair your hull, or give you a shield or a missile.",
+    "Steer, accelerate and brake around every lap of the race. Boost is a power-up: your tank starts empty and fills only from energy capsules, boost pads, skill moves and the service lane. Other pickups repair your hull or give you a shield or a missile.",
     "Weapons only destroy towers on the track - nothing you collect can slow, damage or block another pilot. Ships that touch bounce apart without damage, and every pilot collects every pickup for themselves.",
     "Your starting place on the grid comes from your Volt Velocity points: most points at the front, then whoever joined first.",
     "If you disconnect, your ship stops and the clock keeps running. Reconnect within 30 seconds to carry on; after that you are out with no score, and dropping out does not return your entry fee. A race cancelled before it starts is refunded in full; if a fault on our side stops a race, the contest's stated rule for unfinished rounds applies.",
@@ -71,7 +71,7 @@ export const VOLT_VELOCITY_RULES_BY_LOCALE: Record<SupportedLocale, readonly str
   el: [
     "Μπες στο lobby και διάλεξε ένα από τα οκτώ σκάφη - το καθένα ζυγίζει διαφορετικά ταχύτητα, χειρισμό, θωράκιση και boost.",
     "Πάτα Ready όταν είσαι έτοιμος. Τρέχεις ακόμη κι αν δεν το πατήσεις, αρκεί να είσαι συνδεδεμένος στην εκκίνηση.",
-    "Στρίψε, επιτάχυνε και φρέναρε σε κάθε γύρο του αγώνα. Το boost καταναλώνει ενέργεια· τα pickups την αναπληρώνουν, επισκευάζουν ή δίνουν ασπίδα ή πύραυλο.",
+    "Στρίψε, επιτάχυνε και φρέναρε σε κάθε γύρο του αγώνα. Το boost είναι power-up: η δεξαμενή ξεκινά άδεια και γεμίζει μόνο από κάψουλες ενέργειας, boost pads, κινήσεις δεξιοτεχνίας και τη λωρίδα service. Τα άλλα pickups επισκευάζουν ή δίνουν ασπίδα ή πύραυλο.",
     "Τα όπλα καταστρέφουν μόνο πύργους στην πίστα - τίποτα από όσα μαζεύεις δεν επιβραδύνει, δεν βλάπτει και δεν μπλοκάρει άλλο πιλότο. Τα σκάφη που ακουμπούν αναπηδούν χωρίς ζημιά, και κάθε πιλότος μαζεύει κάθε pickup για τον εαυτό του.",
     "Η θέση σου στην εκκίνηση βγαίνει από τους πόντους σου στο Volt Velocity: όσοι έχουν τους περισσότερους μπροστά, μετά όποιος μπήκε πρώτος.",
     "Αν αποσυνδεθείς, το σκάφος σταματά και το χρονόμετρο συνεχίζει. Επανασυνδέσου μέσα σε 30 δευτερόλεπτα για να συνεχίσεις· μετά αποκλείεσαι χωρίς σκορ και η αποχώρηση δεν επιστρέφει το κόστος συμμετοχής. Αγώνας που ακυρώνεται πριν ξεκινήσει επιστρέφεται πλήρως· αν βλάβη από τη δική μας πλευρά σταματήσει τον αγώνα, ισχύει ο δηλωμένος κανόνας του διαγωνισμού για ημιτελείς γύρους.",

@@ -310,3 +310,17 @@ Tests: `npm test` (97 on 28 Sep 2026 after the power-ups pass; 82 after the four
 `tests/chartvolt-client-prediction.test.mjs`, which drives the **real patched client** against the
 real server over HTTP and asserts the prediction agrees with the server to within 5 cm). Deploy: PM2 `chartvolt-velocity` (reads `games-service/.env`),
 nginx `/race/` (player endpoints only).
+
+## 14 Oct 2026 - boost is a power-up, and the phone menu works in a live race
+
+- **Boost** (`src/simulation.js`, `PHYSICS_VERSION` `velocity-3d-19`): the tank starts at
+  `STARTING_BOOST = 0` and does not refill on its own (`BOOST_REGEN_PER_SECOND = 0`); a respawn
+  no longer tops it up to 40%. It fills only from energy capsules (+40%), boost pads, skill moves
+  and the service lane - the same capsules for every pilot, so it stays skill-only. The bump to
+  the physics version is required: a client and server disagreeing on regen would mispredict.
+  Pinned by `tests/chartvolt-boost-powerup.test.mjs` (5 tests). The HUD label now opens at 0%.
+- **Phone menu in a live race** (`client-patches/main.js`): the multiplayer render disabled
+  `#pause`, which on a phone (`html[data-layout=portrait|landscape]`) is the ONLY menu button,
+  so tapping it did nothing. On a phone it stays enabled and opens the settings dialog (which holds
+  LEAVE RACE); a live race is still never paused. Desktop keeps the disabled button.
+- **Not verified by eye.**

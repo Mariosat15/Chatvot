@@ -43,6 +43,14 @@ const EXPECTED_VENDOR_FAILURES = [
   // expects a standstill; a held brake now reverses. velocity-server/tests/chartvolt-reverse.test.mjs
   // pins the new behaviour (stop first, reverse only while still held).
   "throttle accelerates, release coasts, brake stops fully",
+  // 14 Oct 2026, owner: "put a boost as power up". These four assume the tank starts full (energy
+  // 1 at rest, boost from the line, an EMP draining a full tank, a blaster shot out of it); the
+  // tank now starts empty and fills only from pickups. velocity-server/tests/chartvolt-boost-
+  // powerup.test.mjs pins the new behaviour.
+  "no automatic acceleration or steering when stationary",
+  "boost requires throttle and costs energy",
+  "EMP damages/slows nearby opponents and drains energy, but ignores distant ships",
+  "blaster consumes energy, damages a real opponent, and enforces cooldown",
 ];
 
 const run = (cmd, cmdArgs, cwd = tree) =>

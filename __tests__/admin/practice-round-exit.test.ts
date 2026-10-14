@@ -38,6 +38,17 @@ describe("practice rounds end when the player leaves", () => {
     expect(code).toMatch(/onExit=\{\(\)\s*=>\s*handleExit/);
   });
 
+  it("re-reads the history when the lobby is shown again, so a score needs no re-entry", () => {
+    // Reason (14 Oct 2026, owner: "the user must exit and go in again to see the score"):
+    // navigating back reused cached page props, and a late race result outlived the finish pull.
+    const code = read("components/games/PracticeRoundHost.tsx");
+    expect(code).toMatch(/addEventListener\(\s*["']pageshow["']/);
+    expect(code).toMatch(/addEventListener\(\s*["']visibilitychange["']/);
+    expect(code).toMatch(/fetch\(endpoint,\s*\{\s*cache:\s*["']no-store["']\s*\}\)/);
+    expect(code).toMatch(/if \(!idle \|\| !hasLiveRow\) return;/);
+    expect(code).toMatch(/polls > LIVE_ROW_POLL_LIMIT/);
+  });
+
   it("does not void a practice round while the finish pull is still running", () => {
     // Reason: Velocity posts exit ~1s after finished; voiding mid-pull left Ended/- rows
     // after a refresh (owner, 6 Oct 2026).

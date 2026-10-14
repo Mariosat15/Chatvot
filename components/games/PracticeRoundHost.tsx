@@ -36,6 +36,9 @@ interface PracticeRoundHostProps {
 /** Race-server result can lag the frame's `finished` by a beat; retry before giving up. */
 const FINISH_PULL_ATTEMPTS = 6;
 const FINISH_PULL_GAP_MS = 500;
+/** While a history row is still live after returning to the lobby, keep re-reading the list. */
+const LIVE_ROW_POLL_MS = 2000;
+const LIVE_ROW_POLL_LIMIT = 30;
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -74,7 +77,7 @@ export function PracticeRoundHost({
 
   const refreshRounds = useCallback(async () => {
     try {
-      const response = await fetch(endpoint);
+      const response = await fetch(endpoint, { cache: "no-store" });
       const data = await response.json();
       if (response.ok && data.success && Array.isArray(data.rounds)) {
         setRounds(data.rounds);
@@ -83,6 +86,46 @@ export function PracticeRoundHost({
       /* List refresh is best-effort; the next Start still works. */
     }
   }, [endpoint]);
+
+  const idle = phase.name === "idle";
+  const hasLiveRow = rounds.some((round) => round.isLive);
+
+  useEffect(() => {
+    // Reason (14 Oct 2026, owner: "the user must exit and go in again to see the score"):
+    // navigating back reuses Next's cached page props, and a tab restored from the back/forward
+    // cache keeps its old state, so the list re-reads on mount and whenever the page is shown
+    // again. The GET pulls any finished leftover before reading, so this is where it lands.
+    if (!idle) return;
+    void refreshRounds();
+    const onShown = () => {
+      if (document.visibilityState === "visible") void refreshRounds();
+    };
+    window.addEventListener("pageshow", onShown);
+    window.addEventListener("focus", onShown);
+    document.addEventListener("visibilitychange", onShown);
+    return () => {
+      window.removeEventListener("pageshow", onShown);
+      window.removeEventListener("focus", onShown);
+      document.removeEventListener("visibilitychange", onShown);
+    };
+  }, [idle, refreshRounds]);
+
+  useEffect(() => {
+    // Reason: the race server's result can land after the ~3s finish pull gives up, which left
+    // the row on "In progress" until a reload. Bounded so a round live in another tab cannot
+    // keep this polling for ever.
+    if (!idle || !hasLiveRow) return;
+    let polls = 0;
+    const timer = setInterval(() => {
+      polls += 1;
+      if (polls > LIVE_ROW_POLL_LIMIT) {
+        clearInterval(timer);
+        return;
+      }
+      void refreshRounds();
+    }, LIVE_ROW_POLL_MS);
+    return () => clearInterval(timer);
+  }, [idle, hasLiveRow, refreshRounds]);
 
   useEffect(() => {
     // Reason: React's unmount cleanup does not run when the player closes the tab.
