@@ -57,15 +57,16 @@ test('the blaster, EMP and mines are gone: fire with no item does nothing', () =
   assert.equal(r.feed.hit, undefined, 'there is no code path that damages a rival');
 });
 
-test('ship contact bounces without damage and without pushing anyone forward', () => {
+// Flipped 14 Oct 2026: contact used to bounce the hulls apart; ships now pass through each other.
+test('ship contact does nothing: no bounce, no damage, nobody pushed forward', () => {
   const {r, a, b} = setup();
   b.sim.distance = a.sim.distance + 2; a.sim.speed = 100; b.sim.speed = 50;
-  const dA = a.sim.distance, dB = b.sim.distance;
-  r.feed.step(1 / 60, new Map([['a', {distance: dA}], ['b', {distance: dB}]]));
-  assert.ok(Math.abs(a.sim.lateral - b.sim.lateral) >= 3.4, 'the hulls were separated');
+  const dA = a.sim.distance, dB = b.sim.distance, lA = a.sim.lateral, lB = b.sim.lateral;
+  r.feed.step(1 / 60);
+  assert.equal(a.sim.lateral, lA); assert.equal(b.sim.lateral, lB);
   assert.equal(a.sim.hull, 1); assert.equal(b.sim.hull, 1);
   assert.equal(a.sim.distance, dA); assert.equal(b.sim.distance, dB);
-  assert.ok(r.feed.events.some(e => e.type === 'bump'));
+  assert.ok(!r.feed.events.some(e => e.type === 'bump'));
 });
 
 test('a forged input naming a weapon, damage or target is refused those fields', () => {

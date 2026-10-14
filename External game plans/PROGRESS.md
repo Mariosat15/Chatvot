@@ -993,6 +993,8 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+- **14 Oct 2026 - Volt Velocity: ships pass through each other, and the phone vibrates.** Ship-to-ship contact was removed from the race server (`ship-contact.mjs` deleted, along with the every-pair check, the cooldown map and the per-tick position copy). Ships no longer push, slow or damage each other, and the client's bump sparks and camera shake are gone. Added touch-only vibration (`client-patches/haptics.js`): wall scrape, hit, your own explosion, and button presses, with turn and brake repeating while held. There is a Settings toggle. Android only, because iPhone has no vibration API, so the toggle is hidden there. velocity-server 168/168, games-service velocity 20/20, 15 probes red. Details in `velocity-server/CHARTVOLT-PATCHES.md`. Deploy needs a client rebuild, `pm2 restart chartvolt-games` and a race-server restart. **Never verified by eye.**
+
 ### 14 Oct 2026 - Volt Velocity: race messages in the bottom gap, four camera views, rivals no longer boost when you do
 
 - **The boost report was a drawing fault, not a game fault.** No rival boosted when the player did. Rival exhaust flames were simply never animated, and the player's own boost camera pull made the whole field look like it surged. Rival flames now follow each rival's own boost state. The other power-ups were checked and nothing is shared between pilots.

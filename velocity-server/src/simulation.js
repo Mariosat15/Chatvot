@@ -64,7 +64,7 @@ export class RaceSimulation{
     this.lateralVelocity=this.speed*Math.sin(this.heading);
     this.lateral+=this.lateralVelocity*dt;
     if(Math.abs(this.lateral)>DRIVE_LIMIT){const side=Math.sign(this.lateral),into=this.lateralVelocity*side;this.lateral=side*DRIVE_LIMIT;
-      if(into>WALL_IMPACT_SPEED){this.heading*=-.25;this.lateralVelocity*=-.25;this.speed*=.83;this.damage(Math.min(.09,Math.abs(this.speed)*.001));this.events.push({type:'impact'});}
+      if(into>WALL_IMPACT_SPEED){this.heading*=-.25;this.lateralVelocity*=-.25;this.speed*=.83;this.damage(Math.min(.09,Math.abs(this.speed)*.001));this.events.push({type:'impact',source:'wall'});}
       else {this.heading=-side*Math.sign(this.speed||1)*.04;this.lateralVelocity=0;this.speed*=1-Math.min(1,.6*dt);}}
     if(input.fire&&!this.fireHeld)this.useItem();this.fireHeld=Boolean(input.fire);
     for(const p of this.projectiles){p.distance+=240*dt;p.height=1.6+((p.targetHeight||1.6)-1.6)*Math.min(1,(p.distance-p.startDistance)/Math.max(1,p.targetDistance-p.startDistance));p.lane=p.startLane+(p.targetLane-p.startLane)*Math.min(1,(p.distance-p.startDistance)/Math.max(1,p.targetDistance-p.startDistance));if(p.distance>=p.targetDistance)this.destroy(p.target);}

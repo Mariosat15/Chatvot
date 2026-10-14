@@ -190,7 +190,7 @@ export class RaceRoom {
   if(now-this.startAt>=this.config.maxSeconds*1000){for(const p of this.players.values())if(p.active&&p.finishTimeMs==null){p.dnf=true;p.sim.finish('time-up');}}
   if(this.humansDone()){this.status='finished';this.finishedAt=now;}
  }
- step(now){this.tick++;this.raceElapsed+=1/60;const previous=new Map([...this.players.values()].map(p=>[p.id,{distance:p.sim.distance,lateral:p.sim.lateral}]));for(const p of this.players.values()){
+ step(now){this.tick++;this.raceElapsed+=1/60;for(const p of this.players.values()){
   if(!p.active||p.dnf||p.finishTimeMs!=null)continue;
   // Reason (14 Oct 2026, owner: rotating a phone mid-race "exits the game"): a phone that loses its
   // graphics context reloads the whole frame and rejoins, which on a slow device took longer than the
@@ -200,7 +200,7 @@ export class RaceRoom {
   let control;if(p.bot)control=p.ai.control(p.sim);else if(p.frameQueue.length){const f=p.frameQueue.shift();p.lastInput=f.input;p.ackStep=f.step;control=f.input;}else control=now-p.lastInputAt>250?EMPTY_INPUT:p.lastInput;
   p.sim.update(1/60,control);
   if(p.sim.state==='finished'){if(p.sim.result().finished)p.finishTimeMs=p.sim.result().timeMs+p.lateOffsetMs;else p.dnf=true;}
- }this.feed.step(1/60,previous);}
+ }this.feed.step(1/60);}
  /** CHARTVOLT PATCH (28 Sep 2026): a pilot who pressed throttle inside the last POWER_TUNING.perfectStart.window seconds, and is still holding it at the green light, gets a short launch boost. Pressing earlier earns nothing, so holding throttle through the whole countdown is not a free win. */
  perfectStarts(){const w=POWER_TUNING.perfectStart;for(const p of this.players.values()){if(!p.active||!p.launchThrottle||!(p.launchPressedAt>=this.startAt-w.window*1000))continue;p.sim.padBoost=Math.max(p.sim.padBoost,w.boost);this.feed.event('perfect-start',p,null,'launch');}}
  ranked(){return standings([...this.players.values()].filter(p=>this.status==='lobby'||p.active));}
