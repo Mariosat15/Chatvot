@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {CAMERA_VIEWS, chaseCamera, interiorEye, cockpitEye, nextCameraView} from '../client-patches/camera-views.js';
-import {interiorReadout, cockpitGauges, cockpitOverlay, chooseOverlay, OVERLAY_ART, TOUCH_TARGET_PX, UTIL_COUNT, BOOST_MIN_ENERGY, GAUGE_FULL_SCALE_KMH} from '../client-patches/cockpit-layout.js';
+import {interiorReadout, cockpitGauges, cockpitOverlay, chooseOverlay, OVERLAY_ART, TOUCH_TARGET_PX, UTIL_COUNT, BOOST_MIN_ENERGY, GAUGE_FULL_SCALE_KMH, LANDSCAPE_SHELL_HEIGHT, itemBayLabel} from '../client-patches/cockpit-layout.js';
 
 // CHARTVOLT PATCH (14 Oct 2026, owner): "add another camera inside the cockpit meaning you need to design
 // interior as well", "select also the cameras from the game not only in the menu ... easy to select ... work
@@ -131,7 +131,15 @@ for (const [name, sc] of Object.entries(SCREENS)) for (const hand of ['right', '
     const safe = {top: 0, right: 0, bottom: 0, left: 0, ...sc.safe};
     const L = cockpitOverlay({width: sc.width, height: sc.height, touch: sc.touch, hand, safe});
     assert.equal(L.variant, sc.art);
-    assert.ok(L.art.y + L.art.h >= sc.height - 1 && L.art.x <= 1 && L.art.x + L.art.w >= sc.width - 1, 'the image covers the screen to the bottom edge, no gap');
+    assert.ok(L.art.y + L.art.h >= sc.height - 1, 'the image meets the bottom edge');
+    // Reason: landscape shrinks the shell so the road stays visible; side letterboxing is allowed there only.
+    if (sc.art === 'landscape') {
+      assert.ok(L.art.y >= sc.height * (1 - LANDSCAPE_SHELL_HEIGHT) - 2, 'landscape leaves a clear track band above the shell');
+      assert.ok(L.telemetry.h <= sc.height * .14 + 1, 'landscape telemetry is a short strip');
+      assert.ok(L.telemetry.y <= (safe.top || 0) + 12, 'landscape telemetry sits at the top');
+    } else {
+      assert.ok(L.art.x <= 1 && L.art.x + L.art.w >= sc.width - 1, 'portrait/desktop cover the full width');
+    }
     const boxes = {...L.controls, telemetry: L.telemetry, util: L.util};
     if (L.minimap) boxes.minimap = L.minimap;
     if (L.live) boxes.live = L.live;
@@ -149,7 +157,7 @@ for (const [name, sc] of Object.entries(SCREENS)) for (const hand of ['right', '
     assert.equal(Boolean(L.live), sc.art === 'portrait', 'portrait moves LIVE to a pill');
     assert.equal(Boolean(L.logo), L.logoCropped, 'a logo the crop removed is drawn again');
     const logoBottom = L.logo ? L.logo.y + L.logo.h : L.telemetry.y;
-    assert.ok(L.telemetry.y >= logoBottom, 'the panel sits under the logo');
+    assert.ok(L.telemetry.y >= logoBottom || sc.art === 'landscape', 'the panel sits under the logo');
     const [steerSide, pedalSide] = hand === 'left' ? ['accel', 'left'] : ['left', 'accel'];
     assert.ok(L.controls[steerSide].x < sc.width / 2 && L.controls[pedalSide].x > sc.width / 2, 'steering under one thumb, pedals under the other');
     assert.ok(L.controls.fire.y < L.controls.left.y && L.controls.boost.y < L.controls.accel.y, 'the wide button sits above its pair');
@@ -202,8 +210,18 @@ test('the controls keep their touch wiring: the same buttons, never covered and 
   assert.doesNotMatch(interior, /addEventListener\('pointer/, 'input stays in touch-controls.js');
   assert.match(cockpitCss, /@media \(hover:hover\)\{/, 'a hover skin must not stick on a phone after a tap');
   assert.match(cockpitCss, /\[data-action=boost\]\[data-ready=none\]\{background-image:var\(--ck-boost-disabled\)!important\}/);
-  assert.match(cockpitCss, /html\[data-cockpit\]\[data-touch="1"\] [^{]*\.cv-util :is\(#mute,#cameraCycle,#fullscreenBtn\)\{display:none!important\}/, 'a phone keeps pause and settings; the menu has camera and full screen');
-  assert.match(html, /CAMERA/i);
+  assert.match(cockpitCss, /html\[data-cockpit\]\[data-touch="1"\] [^{]*\.cv-util :is\(#mute,#fullscreenBtn\)\{display:none!important\}/, 'a phone keeps camera, pause and settings; mute and full screen stay in the menu');
+  assert.doesNotMatch(cockpitCss, /#mute,#cameraCycle,#fullscreenBtn/, 'the camera button must not be hidden on touch again');
+  assert.equal(UTIL_COUNT.touch, 3, 'util row reserves space for camera + pause + settings');
+  assert.match(html, /id="cameraCycle"/);
+});
+
+test('item bay labels fit long names without READY, and the race uses that helper', () => {
+  assert.equal(itemBayLabel(null), 'EMPTY');
+  assert.equal(itemBayLabel({name: 'MAGNET'}), 'MAGNET READY');
+  assert.equal(itemBayLabel({name: 'OVERDRIVE'}), 'OVERDRIVE');
+  assert.equal(itemBayLabel({name: 'COUNTERMEASURE'}), 'COUNTER READY');
+  assert.match(strip(read('main.js')), /put\('itemName',itemBayLabel\(item\)\)/);
 });
 
 test('the three bays read hull, speed and boost, and READY uses the simulation\'s own boost line', () => {

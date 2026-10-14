@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {CAMERA_VIEWS, chaseCamera, cockpitEye, resolveCameraView, nextCameraView} from '../client-patches/camera-views.js';
+import {CAMERA_VIEWS, DEFAULT_CAMERA_VIEW, chaseCamera, cockpitEye, resolveCameraView, nextCameraView} from '../client-patches/camera-views.js';
 import {exhaustLook, applyExhaust} from '../client-patches/ship-exhaust.js';
 
 // CHARTVOLT PATCH (14 Oct 2026, owner): "move these kind of wording to the place the red box is",
 // "we need another cameras ... cockpit ... closer ... another camera you choose", and
 // "when user use boost all ships boost as well".
+// CHARTVOLT PATCH (14 Oct 2026, owner): "make the cockpit camera as default ... whatever he choose must be the default".
 
 const read = name => readFileSync(fileURLToPath(new URL(`../client-patches/${name}`, import.meta.url)), 'utf8');
 const strip = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
@@ -17,14 +18,15 @@ const html = read('root/index.html');
 const hud = strip(read('root/cv-hud.css'));
 const preset = {back: 24, up: 8.2, fov: 62, boostBack: 4, boostFov: 7};
 
-test('five views, and an unknown or prototype id falls back to the chase view', () => {
+test('five views, default is inside cockpit, and an unknown or prototype id falls back to that default', () => {
   assert.deepEqual(Object.keys(CAMERA_VIEWS), ['chase', 'close', 'interior', 'cockpit', 'high']);
-  for (const bad of ['__proto__', 'constructor', 'toString', '', null, undefined, 3]) assert.equal(resolveCameraView(bad), 'chase');
+  assert.equal(DEFAULT_CAMERA_VIEW, 'interior');
+  for (const bad of ['__proto__', 'constructor', 'toString', '', null, undefined, 3]) assert.equal(resolveCameraView(bad), 'interior');
   assert.equal(nextCameraView('high'), 'chase');
   assert.equal(nextCameraView('chase'), 'close');
 });
 
-test('the chase view is exactly the old camera, so nobody who never opens settings sees a change', () => {
+test('the chase view framing is unchanged so a player who picks it still gets the classic camera', () => {
   assert.deepEqual(chaseCamera('chase', preset, false), {cockpit: false, back: 24, up: 8.2, shipPull: .32, fov: 62});
   assert.deepEqual(chaseCamera('chase', preset, true), {cockpit: false, back: 28, up: 8.2, shipPull: .32, fov: 69});
 });
@@ -52,7 +54,7 @@ test('the scene reads the chosen view, and the cockpit follows the hull with no 
   assert.match(scene, /goal=hangar\?55:Number\.isFinite\(this\.viewFov\)\?this\.viewFov:/);
 });
 
-test('settings offer the view, it is saved, a refused storage keeps chase, and C cycles it', () => {
+test('settings offer the view, it is saved, a refused storage keeps the cockpit default, and C cycles it', () => {
   const select = html.slice(html.indexOf('<select id="cameraView">'), html.indexOf('</select>', html.indexOf('<select id="cameraView">')));
   assert.ok(select.length > 0, 'camera view select missing');
   for (const id of Object.keys(CAMERA_VIEWS)) assert.match(select, new RegExp(`value="${id}"`));
@@ -60,6 +62,7 @@ test('settings offer the view, it is saved, a refused storage keeps chase, and C
   assert.match(main, /try\{localStorage\.setItem\(CAMERA_VIEW_KEY,next\);\}catch\{\}/);
   assert.match(main, /\$\('cameraView'\)\.onchange=\(\)=>setCameraView\(\$\('cameraView'\)\.value\);/);
   assert.match(main, /e\.code==='KeyC'&&!e\.repeat/);
+  assert.match(main, /\$\('cameraCycle'\)\.onclick=/);
 });
 
 test('a rival flame follows that rival, not the player', () => {

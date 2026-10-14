@@ -5,6 +5,14 @@
  * buttons and the two control groups land on it. No DOM, no three.js and no asset imports, so it is tested
  * directly. Pure presentation - nothing here reads back into the simulation. */
 
+/** Label for the item bay / chip. Long names drop " READY" (and COUNTERMEASURE shortens) so the fixed skin does not overflow.
+ *  CHARTVOLT PATCH (14 Oct 2026, owner: "the overdrive word come out of the button"). */
+export function itemBayLabel(item) {
+  if (!item?.name) return 'EMPTY';
+  const name = item.name === 'COUNTERMEASURE' ? 'COUNTER' : item.name;
+  return name.length > 7 ? name : `${name} READY`;
+}
+
 /** Readout text, kept pure so it can be tested without a page. */
 export function interiorReadout(sim) {
   const speed = Number.isFinite(sim?.speed) ? Math.round(Math.abs(sim.speed) * 3.6) : 0;
@@ -57,8 +65,14 @@ export const MOUSE_TARGET_PX = 36;
 export const TELEMETRY_MIN_WIDTH = Object.freeze({wide: 460, portrait: 360});
 /** Size of the LIVE pill a portrait screen draws beside the logo instead of a seventh panel cell. */
 export const LIVE_PILL = Object.freeze({w: 78, h: 26});
-/** How many utility buttons show along the top: mute, camera, pause, settings, fullscreen; a phone keeps two. */
-export const UTIL_COUNT = Object.freeze({mouse: 5, touch: 2});
+/** How many utility buttons show along the top: mute, camera, pause, settings, fullscreen.
+ *  CHARTVOLT PATCH (14 Oct 2026, owner: put the camera change button back in the game area): a phone keeps
+ *  camera + pause + settings (mute and fullscreen stay in the menu). */
+export const UTIL_COUNT = Object.freeze({mouse: 5, touch: 3});
+/** Landscape phone only: the shell may use at most this fraction of the screen height so the road stays visible. */
+export const LANDSCAPE_SHELL_HEIGHT = 0.66;
+/** Landscape phone only: the lap/time strip stays this tall relative to the screen. */
+export const LANDSCAPE_TELEMETRY_HEIGHT = 0.11;
 
 const EDGE = 8;
 const num = (value, fallback) => Number.isFinite(value) && value > 0 ? value : fallback;
@@ -90,7 +104,12 @@ export function cockpitOverlay({width, height, touch = false, hand = 'right', co
   const art = OVERLAY_ART[chooseOverlay(W, H)];
   const variant = Object.keys(OVERLAY_ART).find(name => OVERLAY_ART[name] === art);
   const portrait = variant === 'portrait';
-  const s = Math.max(W / art.w, H / art.h);
+  const landscape = variant === 'landscape';
+  // Reason: landscape phones match the art's aspect, so a cover fit fills the whole height and the road
+  // window collapses between the lap strip and the dashboard. Shrink only that shell (portrait/desktop
+  // keep cover) and leave a clear band of track above it.
+  let s = Math.max(W / art.w, H / art.h);
+  if (landscape) s = Math.min(s, (H * LANDSCAPE_SHELL_HEIGHT) / art.h);
   const ox = (W - art.w * s) / 2, oy = H - art.h * s;
   const map = ([x, y, w, h]) => ({x: ox + x * s, y: oy + y * s, w: w * s, h: h * s});
   const top0 = inset(safe.top) + EDGE, bottom0 = H - inset(safe.bottom) - EDGE;
@@ -101,18 +120,22 @@ export function cockpitOverlay({width, height, touch = false, hand = 'right', co
   for (const [key, rect] of Object.entries(art.instruments)) instruments[key] = map(rect);
   const logo = map(art.logo);
   // Reason: a cover fit on a screen taller than the art crops its top, and the painted logo goes with it.
-  const logoCropped = logo.y < top0 - logo.h * .25;
+  // Landscape already clears the top for the track, so the painted logo is never re-drawn as a badge there.
+  const logoCropped = !landscape && logo.y < top0 - logo.h * .25;
   // Reason: the mockups always carry the logo above the panel, so a cropped one is drawn again as a badge,
   // cut from the same image at the same scale, at the top centre.
   const badge = logoCropped ? {x: W / 2 - logo.w / 2, y: top0, w: logo.w, h: logo.h} : null;
   const head = badge || logo;
 
   // Telemetry: the mapped panel, widened to a readable minimum and kept on screen below the safe area.
+  // Landscape: a compact strip pinned under the safe area (the mapped slot sits mid-screen and blocks the road).
   const t = map(art.telemetry);
   const avail = right0 - left0;
-  const want = Math.min(avail, portrait ? TELEMETRY_MIN_WIDTH.portrait : TELEMETRY_MIN_WIDTH.wide);
-  const grow = Math.min(Math.max(1, want / t.w), avail / t.w);
-  const tele = {w: t.w * grow, h: t.h * grow, y: Math.max(t.y, top0, badge ? badge.y + badge.h + 4 : 0)};
+  const want = Math.min(avail, portrait ? TELEMETRY_MIN_WIDTH.portrait : landscape ? Math.min(TELEMETRY_MIN_WIDTH.wide * .72, avail * .62) : TELEMETRY_MIN_WIDTH.wide);
+  const grow = landscape ? Math.min(want / t.w, avail / t.w) : Math.min(Math.max(1, want / t.w), avail / t.w);
+  const tele = landscape
+    ? {w: Math.min(t.w * Math.max(grow, .55), avail * .62), h: Math.min(t.h * .55, H * LANDSCAPE_TELEMETRY_HEIGHT), y: top0}
+    : {w: t.w * grow, h: t.h * grow, y: Math.max(t.y, top0, badge ? badge.y + badge.h + 4 : 0)};
   tele.x = Math.min(Math.max(W / 2 - tele.w / 2, left0), right0 - tele.w);
 
   // Portrait has six cells, so LIVE becomes a pill beside the logo, or above the panel when there is no room.
@@ -135,7 +158,11 @@ export function cockpitOverlay({width, height, touch = false, hand = 'right', co
   const uWidth = uCount * uSize + (uCount - 1) * uGap;
   const util = {x: uRight - uWidth, y: uY, w: uWidth, h: uSize, size: uSize, gap: uGap, count: uCount};
   // Reason: the 48 px finger minimum can make the row taller than the art's, which would reach the panel.
-  if (!portrait && hits(util, tele)) tele.y = util.y + util.h + 6;
+  // Landscape pins the lap strip at the top for road visibility, so the utility row steps under it instead.
+  if (!portrait && hits(util, tele)) {
+    if (landscape) util.y = tele.y + tele.h + 6;
+    else tele.y = util.y + util.h + 6;
+  }
 
   // Minimap, mouse screens only: under the utility row, right-aligned with it.
   let minimap = null;

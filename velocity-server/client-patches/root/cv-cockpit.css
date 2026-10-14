@@ -84,7 +84,9 @@ html[data-cockpit][data-cockpit-map="0"] body:is([data-state=racing],[data-state
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-util{right:auto!important;bottom:auto!important;gap:var(--ck-ugap,10px)}
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-util .cv-u{display:grid!important;width:var(--ck-u,52px);height:var(--ck-u,52px);border:0;border-radius:0;
   background:var(--ck-blank-utility) center/contain no-repeat}
-html[data-cockpit][data-touch="1"] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-util :is(#mute,#cameraCycle,#fullscreenBtn){display:none!important}
+/* CHARTVOLT PATCH (14 Oct 2026, owner: put the camera change button back): mute and fullscreen stay in the
+   menu on a phone; camera sits with pause and settings so a player can cycle views without opening Settings. */
+html[data-cockpit][data-touch="1"] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-util :is(#mute,#fullscreenBtn){display:none!important}
 html[data-cockpit] .cv-util :is(#cameraCycle,#pause,#settings,#fullscreenBtn) svg{display:none!important}
 html[data-cockpit] .cv-util #cameraCycle{background-image:var(--ck-camera-idle)}
 html[data-cockpit] .cv-util #pause{background-image:var(--ck-pause-idle)}
@@ -130,11 +132,18 @@ html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-stat
   html[data-cockpit] .cv-controls [data-action=throttle]:hover:not(.pressed){background-image:var(--ck-accel-hover)!important}
   html[data-cockpit] .cv-controls [data-action=boost]:not([data-ready=none]):hover:not(.pressed){background-image:var(--ck-boost-hover)!important}
 }
-/* The item slot is not always a shield, so it wears the blank wide skin and keeps the live icon and name. */
+/* The item slot is not always a shield, so it wears the blank wide skin and keeps the live icon and name.
+   CHARTVOLT PATCH (14 Oct 2026, owner: OVERDRIVE spills out of the button): long names scale down via
+   container width + ellipsis; the label helper in main.js also drops " READY" when the name is already long. */
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item{background-image:var(--ck-blank-wide)!important;
-  grid-auto-flow:column;justify-content:center;gap:8px;color:#eafcff;font-size:max(10px,calc(var(--ck-h) * .22))}
-html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item span{font-size:1.3em}
-html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item b{font-size:1em;letter-spacing:.12em;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  grid-auto-flow:column;justify-content:center;gap:max(4px,calc(var(--ck-h) * .06));padding:0 8%;box-sizing:border-box;color:#eafcff;font-size:max(9px,calc(var(--ck-h) * .2))}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item span{font-size:1.15em;flex:none}
+html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item b{font-size:1em;letter-spacing:.06em;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item small{display:none}
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item[data-item=empty]{color:#8fb9c9}
 html[data-cockpit] body:is([data-state=racing],[data-state=countdown],[data-state=paused])[data-mode] .cv-controls .cv-item[data-item=ready]{filter:drop-shadow(0 0 8px rgba(255,214,92,.45))}
+/* Landscape phone: telemetry is already a short strip from cockpit-layout; tighten the type to match. */
+html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-tele{--ck-h:42px}
+html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-cell{padding:0 calc(var(--ck-h) * .12)}
+html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-cell small{font-size:max(7px,calc(var(--ck-h) * .2));letter-spacing:.1em}
+html[data-cockpit][data-cockpit-variant=landscape] .cv-ck-cell b{font-size:max(9px,calc(var(--ck-h) * .28))}

@@ -14,7 +14,9 @@ export const CAMERA_VIEWS = Object.freeze({
   cockpit: Object.freeze({label: 'Roof cam',    cockpit: true, fov: 76}),
   high:    Object.freeze({label: 'High view',   back: 1.3,  up: 2.4,  shipPull: .55, fovAdd: -4}),
 });
-export const DEFAULT_CAMERA_VIEW = 'chase';
+/* CHARTVOLT PATCH (14 Oct 2026, owner: "make the cockpit camera as default ... whatever he choose must be
+ * the default for him"): first race is the inside cockpit; a saved choice always wins over this. */
+export const DEFAULT_CAMERA_VIEW = 'interior';
 export const CAMERA_VIEW_KEY = 'cv-camera-view';
 export const CAMERA_VIEW_ORDER = Object.freeze(Object.keys(CAMERA_VIEWS));
 
