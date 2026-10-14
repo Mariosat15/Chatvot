@@ -18,6 +18,7 @@ import {SHIPS,ITEMS,SHIP_TRADEOFFS,shipMetrics} from './catalog.js';
 import {RaceAudio} from './audio.js';
 import {CAMERA_VIEWS,CAMERA_VIEW_KEY,resolveCameraView,nextCameraView} from './camera-views.js';
 import {restoreSettings,rememberSettings,hasSavedSetting} from './settings-memory.js';
+import {easesCorrection} from './correction-smoothing.js';
 const RESIZE_SETTLE_MS=220;
 const $=id=>document.getElementById(id),audio=new RaceAudio();let config=raceConfig(),track=createTrack(config.trackId);track.content=generateContent(track,config.seed);let sim=new RaceSimulation(track.length,track.curvature,{...config,content:track.content}),changing=false;
 let view,chosen=0,last=0,accumulator=0,calloutTime=0,uiTime=0,previousState='',alive=true,fireQueued=false;
@@ -57,8 +58,8 @@ function reconcile(s){
  if(s.self.state==='racing'&&pending.length<=180)for(const f of pending){if(sim.state!=='racing')break;sim.update(1/60,f.input);}
  sim.events=[];
  const dd=before.distance-sim.distance,dl=before.lateral-sim.lateral,dh=before.heading-sim.heading;
- // Reason: a respawn, a lap wrap or a state change is a real jump, and easing across it would fly the ship through the scenery.
- if(before.state==='racing'&&sim.state==='racing'&&!(before.respawn>0)&&!(sim.respawnRemaining>0)&&Math.abs(dd)<25&&Math.abs(dl)<8&&Math.abs(dh)<1){smoothing.distance+=dd;smoothing.lateral+=dl;smoothing.heading+=dh;}else resetSmoothing();
+ // Reason: which corrections are eased and which are real jumps is decided in correction-smoothing.js, where it is tested.
+ if(easesCorrection(before,{state:sim.state,respawn:sim.respawnRemaining},{distance:dd,lateral:dl,heading:dh})){smoothing.distance+=dd;smoothing.lateral+=dl;smoothing.heading+=dh;}else resetSmoothing();
 }
 function applyLiveSnapshot(s){
  const prior=sim.state;reconcile(s);if(SHIPS[chosen].id!==s.self.shipId)select(Math.max(0,SHIPS.findIndex(x=>x.id===s.self.shipId)),true);

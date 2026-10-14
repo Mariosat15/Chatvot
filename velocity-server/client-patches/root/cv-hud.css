@@ -60,6 +60,12 @@ html body[data-state][data-mode] #hud.cv-hud{
 /* Vendor race-assist.js calls hullLabel.closest('.integrity') and crashes boot without it; neutralise the vendor panel styling that class carries. */
 html body .cv-hull.integrity{position:static;left:auto;top:auto;bottom:auto;width:auto;height:auto;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
 html body .cv-hull.integrity small{font-size:var(--cv-label);letter-spacing:.08em}
+/* Owner, 14 Oct 2026 ("in mobile landscape i cant see the hull health anymore, only in portrait"): the vendor sheet
+   hides .integrity with body[data-mode=multiplayer] .integrity{display:none} inside @media (max-height:360px) and
+   (orientation:landscape) - every real phone held sideways. This card is ours, so it is shown at (0,3,2), above it. */
+html body[data-state][data-mode] .cv-hull.integrity{display:flex}
+/* Beside the HP figure on a narrow phone card the meter shrank to a dot; it keeps a readable width. */
+html body[data-state][data-mode] .cv-hull .cv-meter{min-width:44px}
 html body .cv-hull.integrity.critical #hull{background:#ff806e}
 html body .cv-hull.integrity.critical #hullLabel{color:#ff806e}
 .cv-hull b{font-size:var(--cv-sub);min-width:4ch;text-align:right}

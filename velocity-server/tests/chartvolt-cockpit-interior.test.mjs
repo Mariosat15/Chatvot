@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {CAMERA_VIEWS, chaseCamera, interiorEye, cockpitEye, nextCameraView} from '../client-patches/camera-views.js';
-import {interiorReadout} from '../client-patches/cockpit-interior.js';
+import {interiorReadout, interiorPlacement, interiorReserve, INTERIOR_RESERVE} from '../client-patches/cockpit-interior.js';
 
 // CHARTVOLT PATCH (14 Oct 2026, owner): "add another camera inside the cockpit meaning you need to design
 // interior as well", "select also the cameras from the game not only in the menu ... easy to select ... work
@@ -91,4 +91,68 @@ test('on a phone in a race the logo is gone and position + speed are one slim st
   assert.match(strip, /backdrop-filter:none/);
   assert.match(rule('html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode]:not([data-state=hangar]) .cv-pace .position-head small{'), /display:none/);
   assert.match(rule('html[data-layout=portrait] body:not([data-state=hangar]) .cv-tl{'), /padding-top:30px/, 'the lap card must step below the strip in portrait');
+});
+
+// Owner, 14 Oct 2026: "in cockpit in portrait i cant see the frame of the cockpit also the dashboard is hidden in
+// both views in landscape and portrait". A camera-space point at depth z shows at ndc = y / (z tan(fov/2)).
+const ndcY = (y, z, fov = 80) => y / (z * Math.tan(fov * Math.PI / 360));
+const ndcX = (x, z, aspect, fov = 80) => x / (z * Math.tan(fov * Math.PI / 360) * aspect);
+const SCREEN_BOTTOM = {y: -.4865, z: .747};
+const shapes = {portrait: 390 / 844, landscape: 844 / 390, 'short landscape': 740 / 320};
+
+test('on a desktop the cockpit keeps exactly its original layout', () => {
+  const p = interiorPlacement({aspect: 1920 / 1080, fov: 80, reserve: interiorReserve('desktop', false)});
+  assert.deepEqual(p, {pillarBottomX: 1.25, pillarTopX: .72, sideLightX: .62, lift: 0});
+  assert.equal(interiorReserve('landscape', false), 0, 'no touch pads, nothing to clear');
+});
+
+for (const [name, aspect] of Object.entries(shapes)) {
+  const layout = name.includes('portrait') ? 'portrait' : 'landscape';
+  test(`on a ${name} phone the frame is on screen and the dashboard screen clears the controls`, () => {
+    const reserve = interiorReserve(layout, true);
+    const p = interiorPlacement({aspect, fov: 80, reserve});
+    for (const [x, z] of [[p.pillarBottomX, 1.05], [p.pillarTopX, 1.22]]) {
+      const n = ndcX(x, z, aspect);
+      assert.ok(n > .3 && n < 1, `pillar at ndc ${n.toFixed(2)} must be visible, not off the edge`);
+    }
+    const bottom = ndcY(SCREEN_BOTTOM.y + p.lift, SCREEN_BOTTOM.z);
+    assert.ok(bottom >= -1 + 2 * reserve, `screen bottom at ndc ${bottom.toFixed(2)} is under the controls (reserve ${reserve})`);
+    assert.ok(bottom < 0, 'and still in the lower half, not over the road ahead');
+    assert.ok(ndcY(.8, 1.22) < 1, 'the header bar is on screen');
+  });
+}
+
+test('the phone reserve covers the control zone, and bad input falls back instead of NaN', () => {
+  assert.ok(INTERIOR_RESERVE.portrait >= .3, 'portrait controls are max-height:30dvh');
+  assert.ok(INTERIOR_RESERVE.landscape >= .3);
+  assert.equal(interiorReserve('unknown', true), INTERIOR_RESERVE.landscape);
+  assert.equal(interiorReserve('__proto__', true), INTERIOR_RESERVE.landscape);
+  for (const v of Object.values(interiorPlacement({aspect: NaN, fov: undefined, reserve: NaN}))) assert.ok(Number.isFinite(v));
+});
+
+test('the interior refits whenever the screen shape or layout changes', () => {
+  assert.match(interior, /const key = \`\$\{camera\.aspect\.toFixed\(3\)\}\|\$\{Math\.round\(camera\.fov\)\}\|\$\{reserve\}\`;/);
+  assert.match(interior, /update\(sim, dt\) \{\s*fit\(\);/);
+  assert.match(interior, /dashboard\.position\.y = p\.lift;/);
+  assert.match(interior, /placeStrut\(pillar, \[side \* p\.pillarBottomX, -\.52 \+ p\.lift, -1\.05\], \[side \* p\.pillarTopX, \.8, -1\.22\]\)/);
+});
+
+// Owner, 14 Oct 2026: "in mobile landscape i cant see the hull health anymore, only in portrait".
+test('the hull row is shown over the vendor rule that hides it on landscape phones', () => {
+  assert.match(rule('html body[data-state][data-mode] .cv-hull.integrity{'), /display:flex/, 'must outrank body[data-mode=multiplayer] .integrity{display:none}');
+  assert.match(rule('html body[data-state][data-mode] .cv-hull .cv-meter{'), /min-width:44px/);
+});
+
+test('the screen-edge figures the placement uses match where the readout actually is', () => {
+  const [, y, z] = interior.match(/screen\.position\.set\(0, (-?[\d.]+), (-?[\d.]+)\);/).map(Number);
+  const tilt = Number(interior.match(/screen\.rotation\.x = (-?[\d.]+);/)[1]);
+  const half = Number(interior.match(/new T\.PlaneGeometry\(\.44, ([\d.]+)\)/)[1]) / 2;
+  const bottomY = y - half * Math.cos(tilt), bottomZ = -z + half * Math.sin(tilt);
+  assert.ok(Math.abs(bottomY - SCREEN_BOTTOM.y) < 1e-3 && Math.abs(bottomZ - SCREEN_BOTTOM.z) < 1e-3, `readout lower edge is at y ${bottomY.toFixed(4)}, z ${bottomZ.toFixed(4)}`);
+  const src = n => String(n).replace(/^(-?)0\./, '$1.');
+  assert.ok(interior.includes(`screenBottomY: ${src(SCREEN_BOTTOM.y)}, screenDepth: ${src(SCREEN_BOTTOM.z)}`), 'BASE must carry the same edge');
+});
+
+test('the speed readout is never hidden behind the hood or the dash', () => {
+  assert.match(interior, /screen\.renderOrder = 11;\s*screen\.material\.depthTest = false;/);
 });
