@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Game Competition Lobby mobile tightened (owner: "too busy, no flow, needs consistency")
+
+The first phone pass (entry below) was rejected as too busy. Rebuilt the same day so a game lobby reads exactly like the trading phone lobby: back link → the **shared** `MobileLobbyHero` (`kind="game"`, genre as the badge via the new optional `kindLabel`) → **2×2 tiles using the shared `MobileLobbyTile`** (exported from `MobileLobbyMetrics.tsx`, trading unchanged) — Prize pool, Entry fee, Players, and the **one** clock (Ends in / Starts in) → **one action card** ("Your entry" with the PLAY/Join button beside the heading before joining; "Your run" with score, rank, attempts and round time as label-left/value-right rows after) → tabs. Deleted `MobileGameLobbyHero.tsx` and `MobileGameLobbyStatus.tsx` (the separate status strip and the second 2×2 grid duplicated the clock and round time). Tabs are drawn only when they have content (Your rounds only once joined; Tips and Prizes only when present; prizes last, as on trading). Same background, `max-w-[430px] gap-3.5 px-4 pt-4` container and safe-area padding as trading. Desktop `GameCompetitionArenaShell` untouched; same data, entry button and standings poll. `__tests__/competitions/game-lobby-mobile.test.ts` rewritten (8 tests); competitions + provider-play suites green. **Never verified by eye.**
+
 ### 15 October 2026 - Game Competition Lobby mobile redesign
 
 Owner guide: `ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide (1).md`. Rebuilt the phone provider-contest lobby as a dedicated tree (not a stacked desktop). Live code: `components/games/lobby/mobile/MobileGameCompetitionLobby.tsx` plus hero / status / Your Run / metrics / rounds; wired from `ProviderContestLobby` at `min-[769px]:hidden`. Order: back → cover hero → one status countdown → Your Run (score/rank/attempts/CTA) → prize/entry/players/round-time essentials → `MobileLobbyPages` tabs. Desktop `GameCompetitionArenaShell` unchanged. No new APIs. `__tests__/competitions/game-lobby-mobile.test.ts`. **Never verified by eye.**

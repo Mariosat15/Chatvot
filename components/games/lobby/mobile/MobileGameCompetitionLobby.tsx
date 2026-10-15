@@ -1,54 +1,56 @@
 import type { ReactNode } from "react";
+import { BarChart3 } from "lucide-react";
 import { COMPETITIONS_ARENA_BG } from "@/lib/competitions/game-definitions";
-import { NeonBackLink } from "@/components/neon/Buttons";
+import { NeonBackLink, NeonPill } from "@/components/neon/Buttons";
 import type { NeonHeroBanner } from "@/components/neon/Hero";
 import type { PlayState } from "@/components/games/play-state";
 import type { GameScoreType } from "@/lib/utils/format-game-score";
+import { MobileLobbyHero } from "@/components/competitions/lobby/mobile/MobileLobbyHero";
+import { MobileLobbyCard } from "@/components/competitions/lobby/mobile/MobileLobbyCard";
 import {
   MobileLobbyPages,
   type MobileLobbyPage,
 } from "@/components/competitions/lobby/mobile/MobileLobbyPages";
-import { MobileGameLobbyHero } from "./MobileGameLobbyHero";
-import { MobileGameLobbyStatus } from "./MobileGameLobbyStatus";
 import { MobileGameLobbyRunCard } from "./MobileGameLobbyRunCard";
 import { MobileGameLobbyMetrics } from "./MobileGameLobbyMetrics";
 import { MobileGameLobbyRounds } from "./MobileGameLobbyRounds";
 
 /**
  * Dedicated phone Game Competition Lobby
- * (`ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide`, 15 Oct 2026).
+ * (`ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide`, rebuilt 15 Oct 2026 after the
+ * owner found the first pass "too busy, no flow").
  *
- * Order: back → hero → status/countdown → Your Run → essentials → tab pages.
+ * It reads in the SAME order as the trading phone lobby, with the same shared hero, tiles,
+ * card shell and tabs: what is it -> the four facts -> what do I do -> more detail.
+ *   back (+ Results when finished and in) -> hero -> 2×2 tiles (one clock) -> one action
+ *   card -> tabs. A tab with nothing in it is not drawn, rather than showing a placeholder.
  * Desktop three-column shell is untouched. Same loaders / entry / standings.
  */
 
 export type MobileGameCompetitionLobbyProps = {
+  competitionId: string;
   contestsHref: string;
   contestsLabel: string;
   hero: {
     title: string;
-    tagline?: string | null;
     description?: string | null;
     banner?: NeonHeroBanner;
     categoryLabel?: string | null;
     status: string;
-    scoringNote?: string | null;
+    cancellationReason?: string | null;
   };
-  status: {
-    status: string;
+  contest: {
     isActive: boolean;
+    isUpcoming: boolean;
     isCompleted: boolean;
     isCancelled: boolean;
     countdownTarget?: Date | string | null;
-    contestLabel?: string;
   };
   run: {
     isUserIn: boolean;
-    isCompleted: boolean;
-    isUpcoming: boolean;
-    isCancelled: boolean;
     state: PlayState | null;
     roundTimeLabel?: string | null;
+    scoringNote?: string | null;
     initialScore?: number;
     initialRank?: number;
     entryControl: ReactNode;
@@ -58,7 +60,8 @@ export type MobileGameCompetitionLobbyProps = {
     entryFee: number;
     currentParticipants: number;
     maxParticipants: number;
-    roundTimeLabel?: string | null;
+    minParticipants: number;
+    playersLabel: string;
     creditSymbol?: string;
     funded?: boolean;
   };
@@ -75,10 +78,11 @@ export type MobileGameCompetitionLobbyProps = {
 };
 
 export function MobileGameCompetitionLobby({
+  competitionId,
   contestsHref,
   contestsLabel,
   hero,
-  status,
+  contest,
   run,
   metrics,
   leaderboard,
@@ -88,78 +92,98 @@ export function MobileGameCompetitionLobby({
   rounds,
   details,
 }: MobileGameCompetitionLobbyProps) {
+  const scoringNote = run.scoringNote?.trim();
+
   const pages: MobileLobbyPage[] = [
     {
       id: "overview",
       label: "Overview",
       content: (
-        <div className="space-y-4">
+        <>
+          {scoringNote ? (
+            <MobileLobbyCard title="How to win">
+              <p className="text-center text-[14px] font-semibold text-amber-200">{scoringNote}</p>
+            </MobileLobbyCard>
+          ) : null}
           {howItWorks}
           {details}
-        </div>
+        </>
       ),
     },
-    {
-      id: "leaderboard",
-      label: "Leaderboard",
-      content: leaderboard,
-    },
-    {
-      id: "prizes",
-      label: "Prizes",
-      content: prizes ?? (
-        <p className="text-center text-[13px] text-gray-400">
-          No prize distribution for this competition.
-        </p>
-      ),
-    },
-    {
-      id: "rounds",
-      label: "Rounds",
-      content: (
-        <MobileGameLobbyRounds
-          rounds={rounds.list}
-          scoreType={rounds.scoreType}
-          scoreLabel={rounds.scoreLabel}
-        />
-      ),
-    },
-    {
-      id: "tips",
-      label: "Tips",
-      content: tips ?? (
-        <p className="text-center text-[13px] text-gray-400">
-          No tips for this game yet.
-        </p>
-      ),
-    },
+    { id: "leaderboard", label: "Leaderboard", content: leaderboard },
+    ...(run.isUserIn
+      ? [
+          {
+            id: "rounds",
+            label: "Your rounds",
+            content: (
+              <MobileGameLobbyRounds
+                rounds={rounds.list}
+                scoreType={rounds.scoreType}
+                scoreLabel={rounds.scoreLabel}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(tips ? [{ id: "tips", label: "Tips", content: tips }] : []),
+    ...(prizes ? [{ id: "prizes", label: "Prizes", content: prizes }] : []),
   ];
 
   return (
     <div
-      className="min-h-screen w-full"
+      className="min-h-screen w-full min-w-0"
       style={{
-        backgroundImage: `linear-gradient(rgba(1,7,20,.55), rgba(1,7,20,.78)), url(${COMPETITIONS_ARENA_BG})`,
+        backgroundImage: `linear-gradient(rgba(1,7,20,.35), rgba(1,7,20,.55)), url(${COMPETITIONS_ARENA_BG})`,
         backgroundSize: "cover",
         backgroundPosition: "top center",
       }}
     >
       <div
-        className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col gap-4 overflow-x-hidden px-3 py-4"
+        className="mx-auto flex w-full max-w-[430px] min-w-0 flex-col gap-3.5 overflow-x-hidden px-4 pt-4"
         style={{
-          paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
-          paddingLeft: "max(0.75rem, env(safe-area-inset-left))",
-          paddingRight: "max(0.75rem, env(safe-area-inset-right))",
+          paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))",
+          paddingLeft: "max(1rem, env(safe-area-inset-left))",
+          paddingRight: "max(1rem, env(safe-area-inset-right))",
         }}
       >
-        <div className="flex min-w-0 items-center">
+        <div className="flex flex-wrap items-center gap-2">
           <NeonBackLink href={contestsHref} label={contestsLabel} />
+          {contest.isCompleted && run.isUserIn ? (
+            <NeonPill
+              href={`/competitions/${competitionId}/results`}
+              icon={BarChart3}
+              label="Results"
+            />
+          ) : null}
         </div>
 
-        <MobileGameLobbyHero {...hero} />
-        <MobileGameLobbyStatus {...status} />
-        <MobileGameLobbyRunCard {...run} />
-        <MobileGameLobbyMetrics {...metrics} />
+        <MobileLobbyHero
+          title={hero.title}
+          description={hero.description}
+          banner={hero.banner}
+          kind="game"
+          kindLabel={hero.categoryLabel}
+          status={hero.status}
+          isCancelled={contest.isCancelled}
+          cancellationReason={hero.cancellationReason}
+        />
+
+        <MobileGameLobbyMetrics {...metrics} {...contest} />
+
+        <MobileGameLobbyRunCard
+          isUserIn={run.isUserIn}
+          isCompleted={contest.isCompleted}
+          isUpcoming={contest.isUpcoming}
+          isCancelled={contest.isCancelled}
+          state={run.state}
+          roundTimeLabel={run.roundTimeLabel}
+          scoringNote={run.scoringNote}
+          initialScore={run.initialScore}
+          initialRank={run.initialRank}
+          entryControl={run.entryControl}
+        />
+
         <MobileLobbyPages pages={pages} />
       </div>
     </div>

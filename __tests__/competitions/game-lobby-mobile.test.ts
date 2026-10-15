@@ -1,10 +1,12 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide (15 Oct 2026).
- * Desktop three-column shell stays; phone is a dedicated vertical tree.
+ * ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide (15 Oct 2026), rebuilt the same day
+ * after the owner found the first pass "too busy, no flow, needs consistency with other
+ * pages". Desktop three-column shell stays; the phone tree now reads in the same order as
+ * the trading phone lobby and shares its hero, tiles, card shell and tabs.
  */
 function read(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8")
@@ -12,18 +14,13 @@ function read(relativePath: string): string {
     .replace(/^\s*\/\/.*$/gm, "");
 }
 
-const phone = read(
-  "components/games/lobby/mobile/MobileGameCompetitionLobby.tsx",
-);
-const hero = read("components/games/lobby/mobile/MobileGameLobbyHero.tsx");
+const phone = read("components/games/lobby/mobile/MobileGameCompetitionLobby.tsx");
 const run = read("components/games/lobby/mobile/MobileGameLobbyRunCard.tsx");
 const metrics = read("components/games/lobby/mobile/MobileGameLobbyMetrics.tsx");
-const status = read("components/games/lobby/mobile/MobileGameLobbyStatus.tsx");
 const rounds = read("components/games/lobby/mobile/MobileGameLobbyRounds.tsx");
 const lobby = read("components/games/ProviderContestLobby.tsx");
-const desktopShell = read(
-  "components/games/lobby/GameCompetitionArenaShell.tsx",
-);
+const tradingPhone = read("components/competitions/lobby/mobile/MobileCompetitionLobby.tsx");
+const desktopShell = read("components/games/lobby/GameCompetitionArenaShell.tsx");
 
 describe("game competition lobby mobile (owner guide)", () => {
   it("keeps desktop on the three-column shell and phone on its own tree", () => {
@@ -31,58 +28,74 @@ describe("game competition lobby mobile (owner guide)", () => {
     expect(lobby).toContain("<MobileGameCompetitionLobby");
     expect(lobby).toContain('className="min-[769px]:hidden min-w-0"');
     expect(lobby).toContain('className="hidden min-[769px]:block"');
-    // Phone must not import the desktop column grid.
     expect(phone).not.toContain("xl:grid-cols-[");
     expect(phone).not.toContain("GameCompetitionArenaShell");
     expect(desktopShell).toContain("xl:grid-cols-[");
   });
 
-  it("orders hero → status → Your Run → essentials → tab pages", () => {
-    const heroAt = phone.indexOf("<MobileGameLobbyHero");
-    const statusAt = phone.indexOf("<MobileGameLobbyStatus");
-    const runAt = phone.indexOf("<MobileGameLobbyRunCard");
+  it("reads like the trading phone lobby: hero → tiles → one action card → tabs", () => {
+    const heroAt = phone.indexOf("<MobileLobbyHero");
     const metricsAt = phone.indexOf("<MobileGameLobbyMetrics");
+    const runAt = phone.indexOf("<MobileGameLobbyRunCard");
     const tabsAt = phone.indexOf("<MobileLobbyPages");
     expect(heroAt).toBeGreaterThan(-1);
-    expect(statusAt).toBeGreaterThan(heroAt);
-    expect(runAt).toBeGreaterThan(statusAt);
-    expect(metricsAt).toBeGreaterThan(runAt);
-    expect(tabsAt).toBeGreaterThan(metricsAt);
+    expect(metricsAt).toBeGreaterThan(heroAt);
+    expect(runAt).toBeGreaterThan(metricsAt);
+    expect(tabsAt).toBeGreaterThan(runAt);
+    // Same order in the trading tree.
+    expect(tradingPhone.indexOf("<MobileLobbyMetrics")).toBeGreaterThan(
+      tradingPhone.indexOf("<MobileLobbyHero"),
+    );
   });
 
-  it("uses cover hero art and does not hardcode Circuit Sprint", () => {
-    expect(hero).toContain("object-cover");
-    expect(hero).toContain("min-h-[220px]");
-    expect(hero).not.toMatch(/circuit\s*sprint/i);
-    expect(phone).not.toMatch(/circuit-sprint|circuitSprint/);
-    expect(run).not.toMatch(/circuit-sprint/);
-    expect(metrics).not.toMatch(/circuit-sprint/);
+  it("shares the trading hero and tile instead of game-only forks", () => {
+    expect(phone).toContain('kind="game"');
+    expect(metrics).toContain("MobileLobbyTile");
+    expect(metrics).not.toMatch(/function Tile\(/);
+    expect(existsSync(join(process.cwd(), "components/games/lobby/mobile/MobileGameLobbyHero.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "components/games/lobby/mobile/MobileGameLobbyStatus.tsx"))).toBe(false);
+    expect(phone).not.toMatch(/circuit-sprint|circuitSprint/i);
   });
 
-  it("puts one countdown on the status strip, not on essentials", () => {
-    expect(status).toContain("InlineCountdown");
-    expect(metrics).not.toContain("InlineCountdown");
-    expect(metrics).toContain("Round time");
+  it("matches the trading page's spacing and background", () => {
+    for (const token of ["max-w-[430px]", "gap-3.5", "px-4 pt-4", "rgba(1,7,20,.35)"]) {
+      expect(phone).toContain(token);
+      expect(tradingPhone).toContain(token);
+    }
+    expect(phone).toContain("env(safe-area-inset-bottom)");
+  });
+
+  it("has exactly one clock, in the fourth tile", () => {
+    expect(metrics.match(/<InlineCountdown/g)?.length).toBe(1);
+    expect(run).not.toContain("InlineCountdown");
+    expect(phone).not.toContain("InlineCountdown");
     expect(metrics).toContain("DATA_ICON.prizePool");
   });
 
-  it("Your Run is the primary card with shared entry control", () => {
-    expect(run).toContain("Your run");
-    expect(run).toContain("LobbyLiveYourScoreValue");
-    expect(run).toContain("entryControl");
-    expect(lobby).toContain("entryControl");
+  it("round time appears once, in the action card, not as a tile", () => {
+    expect(metrics).not.toContain("Round time");
+    expect(run).toContain('label="Round time"');
   });
 
-  it("tab pages cover overview, leaderboard, prizes, rounds, tips", () => {
-    for (const id of ["overview", "leaderboard", "prizes", "rounds", "tips"]) {
+  it("one action card: Your entry before joining, Your run after, values beside labels", () => {
+    expect(run).toContain('title="Your entry"');
+    expect(run).toContain('title="Your run"');
+    expect(run).toContain("LobbyLiveYourScoreValue");
+    expect(run).toContain("justify-between");
+    // No second 2×2 grid of boxed stats.
+    expect(run).not.toContain("grid-cols-2");
+    expect(lobby).toContain('layout="mobile"');
+    expect(lobby).toContain("entryControl: mobileEntryControl");
+  });
+
+  it("draws only tabs that have content, prizes last like trading", () => {
+    for (const id of ["overview", "leaderboard", "rounds", "tips", "prizes"]) {
       expect(phone).toContain(`id: "${id}"`);
     }
+    expect(phone).not.toContain("No tips for this game yet");
+    expect(phone).not.toContain("No prize distribution");
+    expect(phone).toMatch(/run\.isUserIn\s*\?/);
+    expect(phone.indexOf('id: "prizes"')).toBeGreaterThan(phone.indexOf('id: "tips"'));
     expect(rounds).toContain("Your rounds");
-    expect(phone).toContain("<MobileGameLobbyRounds");
-  });
-
-  it("caps the phone column and pads safe areas", () => {
-    expect(phone).toContain("max-w-[430px]");
-    expect(phone).toContain("env(safe-area-inset-bottom)");
   });
 });

@@ -7,7 +7,7 @@ import { contestPlayersLabel } from "@/components/competitions/lobby/contest-lob
 import { MobileIcon } from "./MobileLobbyCard";
 
 /**
- * Essentials as four EQUAL tiles in a 2×2 grid (mobile fix guide, point 4).
+ * Essentials as four EQUAL tiles in a 2Ã—2 grid (mobile fix guide, point 4).
  *
  * Every tile has the same shape: icon box, label, value, one short line underneath. The
  * row stretches each pair to the taller tile so the grid never looks ragged. Volts only,
@@ -17,7 +17,8 @@ import { MobileIcon } from "./MobileLobbyCard";
  * mongoose and must not sit in a tree that can reach a client boundary (R58).
  */
 
-type Tone = "gold" | "red" | "blue" | "purple";
+export type MobileTileTone = "gold" | "red" | "blue" | "purple";
+type Tone = MobileTileTone;
 
 const TONE_BOX = new Map<Tone, string>([
   ["gold", "border-amber-400/25 bg-amber-500/10"],
@@ -68,21 +69,21 @@ export function MobileLobbyMetrics({
 
   return (
     <div className="grid min-w-0 grid-cols-2 gap-3">
-      <Tile
+      <MobileLobbyTile
         tone="gold"
         iconSrc={DATA_ICON.prizePool}
         label="Prize pool"
         value={formatVolts(maxPool, { symbol: creditSymbol })}
         sub={`${filledPct}% filled`}
       />
-      <Tile
+      <MobileLobbyTile
         tone="red"
         iconSrc={COMPETITION_ICON.entryFee}
         label="Entry fee"
         value={funded ? "FREE" : formatVolts(fee, { symbol: creditSymbol })}
         sub={funded ? "GM pays your seat" : "Paid once for your seat"}
       />
-      <Tile
+      <MobileLobbyTile
         tone="blue"
         iconSrc={COMPETITION_ICON.players}
         label={contestPlayersLabel(kind)}
@@ -97,7 +98,7 @@ export function MobileLobbyMetrics({
           )
         }
       />
-      <Tile
+      <MobileLobbyTile
         tone="purple"
         iconSrc={COMPETITION_ICON.clock}
         label={isCancelled || isCompleted ? "Status" : isActive ? "Ends in" : "Starts in"}
@@ -116,7 +117,7 @@ export function MobileLobbyMetrics({
   );
 }
 
-function Tile({
+export function MobileLobbyTile({
   tone,
   iconSrc,
   label,

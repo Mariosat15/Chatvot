@@ -24,11 +24,14 @@ export function MobileLobbyHero({
   status,
   isCancelled,
   cancellationReason,
+  kindLabel,
 }: {
   title: string;
   description?: string | null;
   banner?: NeonHeroBanner;
   kind: "trading" | "game";
+  /** Overrides the badge word, e.g. a game's genre. Falls back to Trading / Game. */
+  kindLabel?: string | null;
   status: string;
   isCancelled: boolean;
   cancellationReason?: string | null;
@@ -62,7 +65,7 @@ export function MobileLobbyHero({
           <NeonStatusBadge status={status} />
           <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-violet-200">
             <KindIcon className="h-3.5 w-3.5" aria-hidden />
-            {kind === "trading" ? "Trading" : "Game"}
+            {kindLabel?.trim() || (kind === "trading" ? "Trading" : "Game")}
           </span>
         </div>
 

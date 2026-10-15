@@ -7,6 +7,13 @@
 > `GameCompetitionArenaShell` unchanged. Tabs reuse `MobileLobbyPages`
 > (Overview / Leaderboard / Prizes / Rounds / Tips). Same loaders, entry button,
 > standings poll, prize table. **Never verified by eye** (behind sign-in).
+>
+> **AMENDED 15 October 2026 (owner: "too busy, no flow, needs consistency with other
+> pages").** The separate hero and status files are gone. The phone lobby now reuses the
+> trading phone lobby's hero (`MobileLobbyHero kind="game"`), its 2×2 `MobileLobbyTile`s
+> (prize / entry / players / the single countdown), one action card ("Your entry" →
+> "Your run") and `MobileLobbyPages`, in the trading order. Empty tabs are not drawn.
+> Where this guide's section order differs, the trading-consistent order wins.
 
 ### PURPOSE
 

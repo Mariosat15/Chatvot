@@ -296,6 +296,34 @@ export default async function ProviderContestLobby({
     </>
   );
 
+  // Phone: same entry rules, arranged like the trading phone entry card (CTA beside heading).
+  const mobileEntryControl = (
+    <>
+    <LobbyLiveEntryButton
+      competition={competition}
+      userBalance={walletBalance}
+      isUserIn={isUserIn}
+      isFull={isFull}
+      participantStatus={participantStatus}
+      registrationClosed={registrationClosed}
+      levelLadder={levelLadder}
+      currentUserId={userId}
+      appearance="arena"
+      layout="mobile"
+    />
+      {isUserIn && !canLaunch && (
+        <div className="mt-3">
+          <StatusCard
+            icon={TriangleAlert}
+            accent="waiting"
+            title="This competition cannot start a round yet"
+            detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
+          />
+        </div>
+      )}
+    </>
+  );
+
   const attemptsPanel =
     state != null ? (
       <NeonPanel
@@ -457,45 +485,36 @@ export default async function ProviderContestLobby({
       */}
       <div className="min-[769px]:hidden min-w-0">
         <MobileGameCompetitionLobby
+          competitionId={String(competition._id)}
           contestsHref="/competitions"
           contestsLabel={terms.contests}
           hero={{
             title: heroTitle,
-            tagline:
-              heroNameSubtitle ||
-              presentation.tagline ||
-              competition.description ||
-              presentation.description,
             description: centerDescription,
             banner: resolveProviderBanner({
               bannerUrl: presentation?.bannerUrl,
               gameName: presentation?.gameName ?? gameName,
               gameCode: competition?.gameConfig?.gameCode,
             }),
-            categoryLabel: presentation.category
-              ? `${presentation.category} competition`
-              : "Game competition",
+            categoryLabel: presentation.category ?? null,
             status,
-            scoringNote,
+            cancellationReason: competition.cancellationReason ?? null,
           }}
-          status={{
-            status,
+          contest={{
             isActive,
+            isUpcoming: status === "upcoming",
             isCompleted,
             isCancelled,
             countdownTarget,
-            contestLabel: terms.contest,
           }}
           run={{
             isUserIn,
-            isCompleted,
-            isUpcoming: status === "upcoming",
-            isCancelled,
             state,
             roundTimeLabel,
+            scoringNote,
             initialScore: myInitialScore,
             initialRank: standings.yourRank,
-            entryControl,
+            entryControl: mobileEntryControl,
           }}
           metrics={{
             prizePool: Number(
@@ -506,7 +525,8 @@ export default async function ProviderContestLobby({
             ),
             currentParticipants: Number(competition.currentParticipants ?? 0),
             maxParticipants: Number(competition.maxParticipants ?? 0),
-            roundTimeLabel,
+            minParticipants: Number(competition.minParticipants ?? 0),
+            playersLabel: terms.players,
             creditSymbol,
             funded: competition.fundingMode === "gm_funded",
           }}
