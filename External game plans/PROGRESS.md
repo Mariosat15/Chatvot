@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Trading lobby Overview: About and Battle plan as two full-width bands
+
+Owner screenshot of the trading lobby's Overview tab: side by side, the Battle plan's four steps ran taller than the About card and spilled below it. `components/competitions/detail/TradingOverview.tsx` now stacks two full-width bands - "About this competition" with its text beside the two fact tiles (`xl`), then "Battle plan" with its steps in one row (`xl:grid-cols-4`, two columns at `sm`, one on phones). The vertical rail is removed because the steps no longer stack. Copy comes from `buildTradingOverviewCopy` unchanged. Layout only. **Never verified by eye.**
+
 ### 15 October 2026 - Play-screen stage uses the neon icon art; hero banner shows whole
 
 Owner screenshot, two areas. **Stage:** `RoundPreflight.tsx` and `lobby/LobbyCenterStage.tsx` swap the lucide gamepad disc for the shipped `gamepad-blue` neon webp (`NEON_ICON`), and the three notice rows (blocked reason, late entry, round note) become glowing cyan/amber cards with `clockbox` / `target-purple` / `clock-v2` / `fire` icons and larger text; the helpers (`StageIcon`, `STAGE_NOTICE`, `STAGE_NOTICE_WARN`) live in the new `components/games/preflight-parts.tsx` because `RoundPreflight.tsx` is already over 500 lines. No gate, copy or state logic changed. **Banner:** `GameArenaLayout.tsx` drew the art twice (a 40% wash plus a 52% right-hand copy) with the logo over its left third; it is now one full-strength full-bleed `object-cover object-center` layer with a left-only scrim for the copy, and `ArenaIdentity.tsx` drops the logo track at `xl` (kept below `xl`), with a larger title. The fixed `sm:h-[220px]` height is unchanged. `arena-hero.test.ts`: the reserve-track test is flipped to the new grid and the wash-before-piece test is replaced by one asserting a single, undimmed art layer, both with dated reasons. **Never verified by eye.**

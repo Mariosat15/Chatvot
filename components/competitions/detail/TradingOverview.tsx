@@ -19,7 +19,7 @@ import type {
 
 /**
  * The trading Overview tab (owner reference, 12 Oct 2026): "About this competition" with two
- * centred fact tiles (market and how you win - seats and the pot already sit in the summary above) (each with up to two small icon rows), beside a "Battle plan" numbered timeline.
+ * centred fact tiles (market and how you win - seats and the pot already sit in the summary above) (each with up to two small icon rows), above a "Battle plan" of numbered steps in one row.
  *
  * Every word comes from `buildTradingOverviewCopy`; this file only draws it. Headings sit on one
  * line with their icon (`items-center`, `leading-none`), each step's title shares the height of
@@ -103,17 +103,22 @@ export function TradingOverview({
   overview: TradingOverviewCopy;
 }) {
   return (
-    // Reason: items-start (owner, 12 Oct 2026) - stretching both cards to one height left an
-    // empty block under the About tiles once the Battle plan artwork was removed.
-    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-      <section className={CARD}>
-        <CardHeading
-          icon={<Info className="h-7 w-7 shrink-0 text-cyan-300" />}
-          lead="About this"
-          accent="competition"
-        />
-        <p className="mt-4 text-base leading-relaxed text-gray-300">{about}</p>
-        <ul className="mt-6 grid grid-cols-2 gap-3">
+    // Reason: TWO FULL-WIDTH BANDS (owner, 15 Oct 2026). Side by side, the Battle plan's four
+    // steps ran taller than the About card and spilled below it; stacked, each band reads
+    // across - About's text beside its tiles, then the four steps in one row.
+    <div className="flex flex-col gap-5">
+      <section
+        className={`${CARD} grid grid-cols-1 items-center gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]`}
+      >
+        <div className="min-w-0">
+          <CardHeading
+            icon={<Info className="h-7 w-7 shrink-0 text-cyan-300" />}
+            lead="About this"
+            accent="competition"
+          />
+          <p className="mt-4 text-base leading-relaxed text-gray-300">{about}</p>
+        </div>
+        <ul className="grid grid-cols-2 gap-3">
           {overview.features.map((feature, index) => {
             const tone = TILE_TONES[index % TILE_TONES.length];
             return (
@@ -155,16 +160,11 @@ export function TradingOverview({
           lead="Battle"
           accent="plan"
         />
-        <ol className="relative mt-6">
-          {/* The rail runs through the centres of the number circles. */}
-          <span
-            aria-hidden
-            className="absolute bottom-5 left-[18px] top-5 w-px bg-sky-400/40"
-          />
+        <ol className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
           {overview.steps.map((step, index) => (
             <li
               key={step.title}
-              className="relative grid grid-cols-[36px_minmax(0,1fr)] gap-x-4 pb-5 last:pb-0"
+              className="relative grid grid-cols-[36px_minmax(0,1fr)] gap-x-3"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-sky-400 bg-[#060A18] text-sm font-bold text-white shadow-[0_0_12px_rgba(56,189,248,0.45)]">
                 {index + 1}
