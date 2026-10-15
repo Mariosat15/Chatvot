@@ -3,47 +3,50 @@
 import { useEffect } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 
+const OWN_LINK_ATTR = "data-dynamic-favicon";
+
+function iconType(href: string): string | undefined {
+  const path = href.split("?")[0].toLowerCase();
+  if (path.endsWith(".ico")) return "image/x-icon";
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".svg")) return "image/svg+xml";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+  return undefined;
+}
+
 /**
  * Client follow-up after a Brand Icon upload without a full reload.
  * Reason: Google/Bing read the server `icons` from generateMetadata in
  * app/layout.tsx — this component alone is not enough for search results.
+ *
+ * Reason (15 Oct 2026): it must NEVER remove the `<link rel="icon">` tags
+ * Next.js renders from `generateMetadata` — React owns those nodes, and
+ * deleting them makes the next client navigation crash while committing the
+ * new head, so every link and menu item needed a second press. It only
+ * updates one link of its own, appended last so browsers prefer it.
  */
 export default function DynamicFavicon() {
   const { settings, loading } = useAppSettings();
 
   useEffect(() => {
-    if (loading || !settings?.branding?.favicon) return;
+    const favicon = settings?.branding?.favicon;
+    if (loading || !favicon) return;
 
-    const favicon = settings.branding.favicon;
-
-    // Update existing favicon links
-    const existingLinks = document.querySelectorAll("link[rel*='icon']");
-    existingLinks.forEach((link) => link.remove());
-
-    // Create new favicon link
-    const link = document.createElement("link");
-    link.rel = "icon";
-    link.href = favicon;
-
-    // Determine type based on extension
-    if (favicon.endsWith(".ico")) {
-      link.type = "image/x-icon";
-    } else if (favicon.endsWith(".png")) {
-      link.type = "image/png";
-    } else if (favicon.endsWith(".svg")) {
-      link.type = "image/svg+xml";
+    let link = document.head.querySelector<HTMLLinkElement>(
+      `link[${OWN_LINK_ATTR}]`,
+    );
+    if (!link) {
+      link = document.createElement("link");
+      link.setAttribute(OWN_LINK_ATTR, "");
+      link.rel = "icon";
+      document.head.appendChild(link);
     }
-
-    document.head.appendChild(link);
-
-    // Also add apple-touch-icon if it's a PNG
-    if (favicon.endsWith(".png")) {
-      const appleLink = document.createElement("link");
-      appleLink.rel = "apple-touch-icon";
-      appleLink.href = favicon;
-      document.head.appendChild(appleLink);
-    }
+    if (link.getAttribute("href") !== favicon) link.href = favicon;
+    const type = iconType(favicon);
+    if (type) link.type = type;
+    else link.removeAttribute("type");
   }, [settings, loading]);
 
-  return null; // This component doesn't render anything
+  return null;
 }
