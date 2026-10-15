@@ -148,7 +148,12 @@ export default function GameRulesPanel({ presentation, layout }: Props) {
       both screens, which is also one fewer thing that can differ between them. The name is
       still on the picture's `alt`, where a length is harmless.
     */
-    <NeonHeadedPanel icon={BookOpen} title="How it works" bodyClassName="p-4">
+    <NeonHeadedPanel
+      icon={BookOpen}
+      title="How it works"
+      bodyClassName="p-4"
+      backdropSrc={presentation.howToPlayImageUrl}
+    >
       {/*
         ONE ROW, NOT A GRID OF STACKED BLOCKS, which is the owner's correction applied to the
         lobby after the arena band. The two-column grid put the scoring rule in one cell and
@@ -218,16 +223,19 @@ export default function GameRulesPanel({ presentation, layout }: Props) {
               off a badge. `cover` stays the kit's default because the slots that came first
               are a logo and a hero banner.
             */}
-            <div className="hidden w-[132px] shrink-0 sm:block">
-              <NeonIllustration
-                src={presentation.howToPlayImageUrl}
-                alt={`How ${presentation.gameName} is played`}
-                icon={BookOpen}
-                accent="players"
-                shape="landscape"
-                fit="contain"
-              />
-            </div>
+            {/* SUPERSEDED 15 Oct 2026: an upload is the whole card's faded backdrop
+                (`backdropSrc`); this emblem is drawn only when there is none. */}
+            {!presentation.howToPlayImageUrl && (
+              <div className="hidden w-[132px] shrink-0 sm:block">
+                <NeonIllustration
+                  alt={`How ${presentation.gameName} is played`}
+                  icon={BookOpen}
+                  accent="players"
+                  shape="landscape"
+                  fit="contain"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -289,7 +297,7 @@ function RulesStrip({
   const steps = paragraphs(text).slice(0, STRIP_STEP_LIMIT);
 
   return (
-    <NeonHeadedPanel icon={BookOpen} title="How it works">
+    <NeonHeadedPanel icon={BookOpen} title="How it works" backdropSrc={imageUrl}>
       <div className="flex h-full items-center gap-3 px-3 py-2.5">
         {authored.length > 0 ? (
           /*
@@ -403,16 +411,20 @@ function RulesStrip({
         {/* SUPERSEDED 15 Oct 2026 (owner image 2 vs 3): `cover` in a stretched slot cropped a
             landscape picture into a tall sliver. `natural` shows the whole upload at its own
             proportions and the card grows to it - the band no longer has a fixed height. */}
-        <div className="hidden w-[42%] max-w-[260px] shrink-0 self-center sm:block">
-          <NeonIllustration
-            src={imageUrl}
-            alt={`How ${gameName} is played`}
-            icon={BookOpen}
-            accent="players"
-            shape="natural"
-            fit="contain"
-          />
-        </div>
+        {/* SUPERSEDED 15 Oct 2026 (owner: "taking all box in fadeout mode like you do with
+            banners"): an upload is the card's faded backdrop (`backdropSrc` above); the emblem
+            beside the steps is drawn only when there is none. */}
+        {!imageUrl && (
+          <div className="hidden w-[42%] max-w-[260px] shrink-0 self-center sm:block">
+            <NeonIllustration
+              alt={`How ${gameName} is played`}
+              icon={BookOpen}
+              accent="players"
+              shape="natural"
+              fit="contain"
+            />
+          </div>
+        )}
       </div>
     </NeonHeadedPanel>
   );

@@ -50,7 +50,7 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
   if (highlights.length === 0) return null;
 
   return (
-    <NeonHeadedPanel icon={Lightbulb} title="Game tips">
+    <NeonHeadedPanel icon={Lightbulb} title="Game tips" backdropSrc={imageUrl}>
       <div className="flex h-full items-center gap-3 px-3 py-2.5">
         <ul className="min-w-0 flex-1 space-y-3">
           {highlights.slice(0, STRIP_TIP_LIMIT).map((highlight, index) => {
@@ -93,16 +93,20 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
         */}
         {/* SUPERSEDED 15 Oct 2026 (owner image 3): `natural` shows the whole upload at its own
             proportions, and the card - no longer a fixed height - grows to fit it. */}
-        <div className="hidden w-[38%] max-w-[240px] shrink-0 self-center sm:block">
-          <NeonIllustration
-            src={imageUrl}
-            alt="This game's emblem"
-            icon={Crown}
-            accent="prize"
-            shape="natural"
-            fit="contain"
-          />
-        </div>
+        {/* SUPERSEDED 15 Oct 2026 (owner: "taking all box in fadeout mode like you do with
+            banners"): an uploaded picture is the card's faded backdrop (`backdropSrc` above), so
+            the emblem beside the lines is drawn only when there is no upload. */}
+        {!imageUrl && (
+          <div className="hidden w-[38%] max-w-[240px] shrink-0 self-center sm:block">
+            <NeonIllustration
+              alt="This game's emblem"
+              icon={Crown}
+              accent="prize"
+              shape="natural"
+              fit="contain"
+            />
+          </div>
+        )}
       </div>
     </NeonHeadedPanel>
   );

@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - "How it works" and "Game tips" pictures fill the whole card, faded like the banners
+
+Owner: the picture beside the text should take the whole box in fade-out mode, as the hero banners do, on every page with these boxes. `NeonHeadedPanel` gained `backdropSrc`, drawn by a new shared `NeonPanelBackdrop` (`components/neon/Cards.tsx`): the image covers the body anchored right, a mask fades it out towards the copy, and a navy scrim keeps the text legible. It is wired into the three places these boxes render - the arena band's rules strip and Game tips card (competition and challenge arenas), and the lobby's full "How it works" panel. When no picture has been uploaded the old emblem tile still shows, so an un-illustrated card is not bare. The body wrapper is added only when a backdrop is set, so no other panel's layout changed. One assertion in `__tests__/games/arena-illustrations.test.ts` was flipped (`src=` to `backdropSrc=`) with a dated reason; the field-to-panel pairing it pins is unchanged. The three pre-existing failures (`arena-band` highlights hint, two byte-identical mirror checks) are untouched by this. **Never verified by eye.**
+
 ### 15 October 2026 - One entry-fee icon everywhere (the red wallet), and a registry so one piece of data has one icon
 
 Owner: "entry fee replace with the red wallet here for all places ... the icon used for other pages must match the same icons for all not different icons for the same data". **Visual only; no money logic, no route, no model changed; nothing backfilled.**

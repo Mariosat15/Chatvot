@@ -504,8 +504,11 @@ export function NeonHeadedPanel({
   bodyClassName = "",
   dense = false,
   iconSrc,
+  backdropSrc,
 }: {
   icon?: LucideIcon;
+  /** A picture drawn across the whole body, faded towards the copy (`NeonPanelBackdrop`). */
+  backdropSrc?: string;
   /** A neon picture tile drawn instead of `icon` (owner's Menuitems set). */
   iconSrc?: string;
   title: string;
@@ -577,7 +580,37 @@ export function NeonHeadedPanel({
         </div>
         {action}
       </div>
-      <div className={`min-h-0 flex-1 ${bodyClassName}`}>{children}</div>
+      {backdropSrc ? (
+        <div className={`relative min-h-0 flex-1 ${bodyClassName}`}>
+          <NeonPanelBackdrop src={backdropSrc} />
+          <div className="relative z-10 h-full">{children}</div>
+        </div>
+      ) : (
+        <div className={`min-h-0 flex-1 ${bodyClassName}`}>{children}</div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The operator's picture as the WHOLE card's background, faded out towards the copy - the
+ * same treatment the hero banners get (owner, 15 Oct 2026: "taking all box in fadeout mode
+ * like you do with banners").
+ *
+ * Anchored right and masked to transparent on the left, with a navy scrim over it, so the
+ * text side always sits on the panel colour whatever picture an operator uploads. Absolute,
+ * so it never adds height: the card is as tall as its copy and the picture covers that.
+ */
+export function NeonPanelBackdrop({ src }: { src: string }) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        className="h-full w-full object-cover object-right opacity-70 [mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.35)_40%,black_85%)]"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0C1C3E] via-[#0C1C3E]/75 to-[#0C1C3E]/30" />
     </div>
   );
 }

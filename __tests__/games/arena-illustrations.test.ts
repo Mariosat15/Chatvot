@@ -217,12 +217,16 @@ describe("the illustration beside a panel", () => {
       Two panels, two fields, and the pairing is the thing that gets crossed: both props are
       optional strings, so handing the highlights emblem to the rules panel typechecks and
       renders a picture in the wrong place.
+
+      Flipped 15 Oct 2026: the owner asked for the upload to fill the whole card as a faded
+      backdrop, like the hero banners, so the field now reaches `backdropSrc` rather than a
+      side tile's `src`. The pairing is still the claim being pinned.
     */
     const rules = readCode(RULES);
-    expect(rules).toMatch(/src=\{presentation\.howToPlayImageUrl\}/);
+    expect(rules).toMatch(/backdropSrc=\{presentation\.howToPlayImageUrl\}/);
 
     const highlights = readCode(HIGHLIGHTS);
-    expect(highlights).toMatch(/src=\{imageUrl\}/);
+    expect(highlights).toMatch(/backdropSrc=\{imageUrl\}/);
 
     const page = readCode(PLAY_PAGE);
     expect(page).toMatch(/imageUrl=\{presentation\.highlightsImageUrl\}/);
