@@ -213,8 +213,12 @@ describe("the rules panel says nothing rather than saying nothing usefully", () 
     // Reason: FLIPPED 27 Sep 2026. Both pictures were `contain` so a crop could not take the
     // corners off a badge; the owner then asked the arena strip's picture to fill its slot
     // with no gaps, so the strip is `cover` and only the lobby's wide picture stays `contain`.
-    expect(code.match(/fit="contain"/g)).toHaveLength(1);
-    expect(code.match(/fit="cover"/g)).toHaveLength(1);
+    // Reason: FLIPPED AGAIN 15 Oct 2026 (owner image 2 vs 3): `cover` cropped the arena
+    // strip's landscape picture into a sliver, so both pictures are `contain` again and the
+    // strip draws it whole at its own proportions (`shape="natural"`).
+    expect(code.match(/fit="contain"/g)).toHaveLength(2);
+    expect(code).not.toMatch(/fit="cover"/);
+    expect(code).toMatch(/shape="natural"/);
   });
 
   it("offers only the two layouts a screen actually asks for", () => {

@@ -143,7 +143,11 @@ describe("the band is a fixed-height strip", () => {
     */
     const band = bandMarkup();
 
-    expect(band).toMatch(/\bsm:h-\[300px\]/);
+    // Reason: FLIPPED 15 Oct 2026 (owner: "the page is cutoff in the end" and "make the boxes
+    // auto adjust to show the images"). The fixed 300px with `overflow-hidden` WAS the cut, so
+    // the band now sizes to its content. What survives: no viewport-scaled height either.
+    expect(band).not.toMatch(/\bsm:h-\[/);
+    expect(band).not.toMatch(/overflow-hidden/);
     expect(band).not.toMatch(/\b(md|lg|xl|2xl):h-[\d[]/);
   });
 
@@ -264,16 +268,19 @@ describe("each card draws a capped number of one-line items", () => {
     // 15px since 25 Sep 2026; 13px then 10px were both rejected as too small beside the tips.
     // FLIPPED 25 Sep 2026 from `truncate`: two lines per step, since one line cut the owner's
     // first step off mid-sentence and the 300px band has room for three two-line steps.
-    expect(rules).toMatch(/className="line-clamp-2 text-\[15px\]/);
+    // Reason: FLIPPED 15 Oct 2026. The band grows to its content now, so steps and tips
+    // wrap instead of clamping - a clamp in a growing card only hides text for nothing. The
+    // tooltip on paragraph steps stays.
+    expect(rules).toMatch(/className="text-\[15px\]/);
+    expect(rules).not.toMatch(/line-clamp-2/);
     expect(rules).toMatch(/title=\{/);
 
     const tips = readCode(HIGHLIGHTS);
     expect(tips).toMatch(/text-\[16px\] font-semibold/);
-    expect(tips).toMatch(/line-clamp-2/);
-    expect(tips).toMatch(/TIP_ICONS/);
-    // Identical Checkmarks were the rejected look; each tip slot gets its own icon.
-    expect(tips).toMatch(/Zap/);
-    expect(tips).toMatch(/Trophy/);
+    expect(tips).not.toMatch(/line-clamp-2/);
+    // 15 Oct 2026: icons come from the owner's Menuitems art, one per slot by slug/position.
+    expect(tips).toMatch(/resolveFeatureIconArt\(highlight\.icon, index\)/);
+    expect(rules).toMatch(/resolveFeatureIconArt\(step\.icon, index\)/);
 
     // The feed clamps too, but has no tooltip: its phrase is generated from the round's own
     // status by `describeRoundActivity`, so there is no longer text to reveal.
@@ -341,8 +348,10 @@ describe("the pictures are small and beside the text", () => {
     // Reason: FLIPPED 25 Sep 2026. The pictures were fixed widths (112 and 128); the owner
     // asked for them to auto-adjust and fill the card, so each now fills the card's height
     // and takes its width from the picture's own aspect, capped at half the card.
-    ["the rules card", RULES, 'shape="fill"'],
-    ["the tips card", HIGHLIGHTS, 'shape="fill"'],
+    // FLIPPED AGAIN 15 Oct 2026 (owner image 3): `natural` - the whole picture at its own
+    // proportions, the card growing to it, instead of a crop into the card's height.
+    ["the rules card", RULES, 'shape="natural"'],
+    ["the tips card", HIGHLIGHTS, 'shape="natural"'],
   ];
 
   it.each(beside)("%s draws it to fill the card height", (_label, file, size) => {

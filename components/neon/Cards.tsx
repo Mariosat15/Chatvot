@@ -141,8 +141,13 @@ export function NeonIllustration({
    * upload keeps its own proportions and grows with the card instead of sitting at a fixed
    * size in a gap (owner, 25 September 2026: "make the images auto adjust and fill the
    * space"). The parent must have a definite height - the arena band's cards do.
+   *
+   * `natural` (15 Oct 2026, owner: "make the boxes auto adjust to show the images") draws
+   * the whole upload at its OWN proportions - width from the slot, height from the picture -
+   * so the card grows to the image instead of cropping it into a fixed box. The emblem
+   * fallback keeps a 4:3 box so an un-illustrated card still has a shape.
    */
-  shape?: "square" | "landscape" | "fill";
+  shape?: "square" | "landscape" | "fill" | "natural";
   /**
    * `contain` keeps the whole picture visible; `cover` fills the box and crops.
    *
@@ -155,7 +160,7 @@ export function NeonIllustration({
   fit?: "cover" | "contain";
 }) {
   const box =
-    shape === "landscape"
+    shape === "landscape" || shape === "natural"
       ? "aspect-[4/3]"
       : shape === "fill"
         ? "absolute inset-0"
@@ -178,6 +183,17 @@ export function NeonIllustration({
         className={`absolute inset-0 h-full w-full ${NEON_FACE_TILE} ${
           fit === "contain" ? "object-contain" : "object-cover"
         }`}
+      />
+    );
+  }
+
+  if (src && shape === "natural") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        className={`block h-auto w-full ${NEON_FACE_TILE} object-contain`}
       />
     );
   }

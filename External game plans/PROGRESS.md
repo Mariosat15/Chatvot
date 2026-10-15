@@ -996,6 +996,21 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Arena third pass: bottom band grows to its content, whole pictures, Menuitems step/tip icons, GM crown at row end
+
+Owner: "the page is cutoff in the end ... make the boxes auto adjust to show the images like image 3 ... the icons must come from Menuitems ... the leaderboard cuts off names, move the gm icon to the end". Visual only; no logic, data or money path changed, nothing backfilled.
+
+- **Bottom cut-off:** the How it works / Game tips band had a fixed `sm:h-[300px]` plus `overflow-hidden`, and that pair was the cut. The band now sizes to its content. `[&>*]:h-full` still keeps the two cards the same height, `empty:hidden` still drops an empty slot, and the band still uses flex-wrap rather than a grid. The arena page also gained bottom padding that respects the phone's safe area.
+- **Whole pictures:** `NeonIllustration` gained `shape="natural"`. It shows the upload at its own proportions with `object-contain`, and the card grows to fit it. The fallback emblem without an upload keeps a 4:3 box. Both band cards use `natural`. Previously `fill`/`cover` cropped a landscape picture into a tall strip.
+- **Image 3 layout:** each authored step now has a lit number disc outside its box, and the box holds a Menuitems icon, the title and the full detail, with no truncation. Tips use Menuitems icons too. The new `resolveFeatureIconArt` maps the same slugs as the lucide map to `public/assets/neon/icons/*.webp`, using a `Map` and falling back by position. Step and tip text wraps instead of clamping, because the card can now grow.
+- **Leaderboard:** `GameMasterBadge` moved from the name line into a fifth `auto` column at the end of the row, so the name and the score get the width.
+- **Tests flipped, not deleted, each with a dated reason:**
+  - `arena-band.test.ts`: the fixed-height assertion became "no fixed height and no overflow-hidden"; the clamps became wrapping plus the Menuitems resolver; the picture shape is now `natural`.
+  - `game-rules-panel.test.ts`: both pictures are `contain`.
+  - `provider-play-ui.test.ts`: the five-column template is checked, and the GM crown must come after the time cell, exactly once.
+- **Still failing, and failing before this work:** the `practice-ai-opponents` mirror test, the `start-wait` round-types mirror test, and the arena-band `ARENA_HIGHLIGHT_LIMIT` admin-hint test.
+- **Never verified by eye.**
+
 ### 15 October 2026 - Arena second pass: trading's "Who wins what", full names, shared showcase clock, Menuitems icons, no right-hand cut-off
 
 **What:** The owner sent a second set of references (images 1-8). This was a **visual change only**: no logic, loader, route or money path changed, there is no risk number, and nothing was backfilled.

@@ -2170,10 +2170,14 @@ describe("the standings board fits the column it is given", () => {
       reference's Time column. The claim is unchanged and only the shape moved, so the
       assertion was re-pointed rather than relaxed: the name column is still the only flexible
       one and it is still `minmax(0,1fr)`.
+
+      A FIFTH `auto` COLUMN since 15 October 2026: the Game Master crown moved off the name
+      line to the end of the row (owner: "move the gm icon to end so the name can be shown").
+      Re-pointed again with the claim unchanged.
     */
     const template =
       board.match(
-        /grid-cols-\[[\w.]+_minmax\(0,1fr\)_minmax\([\d.]+rem,auto\)_minmax\([\d.]+rem,auto\)\]/g,
+        /grid-cols-\[[\w.]+_minmax\(0,1fr\)_minmax\([\d.]+rem,auto\)_minmax\([\d.]+rem,auto\)_auto\]/g,
       ) ?? [];
     expect(template).toHaveLength(2);
     expect(board).not.toMatch(/grid-cols-\[[\w.]+_1fr_/);
@@ -2222,9 +2226,16 @@ describe("the standings board fits the column it is given", () => {
     */
     expect(
       board.match(
-        /grid-cols-\[1\.75rem_minmax\(0,1fr\)_minmax\(3\.25rem,auto\)_minmax\(2\.75rem,auto\)\]/g,
+        /grid-cols-\[1\.75rem_minmax\(0,1fr\)_minmax\(3\.25rem,auto\)_minmax\(2\.75rem,auto\)_auto\]/g,
       ) ?? [],
     ).toHaveLength(2);
+    // 15 Oct 2026: the GM crown is the LAST cell, never on the name line.
+    const nameAt = board.indexOf("<NeonPlayerName");
+    const clockAt = board.indexOf("{clock ??");
+    const gmAt = board.indexOf("<GameMasterBadge");
+    expect(nameAt).toBeGreaterThan(0);
+    expect(gmAt).toBeGreaterThan(clockAt);
+    expect(board.match(/<GameMasterBadge/g) ?? []).toHaveLength(1);
     expect(board.match(/gap-x-1\.5/g) ?? []).toHaveLength(2);
     // Inset so gold rims survive overflow-clipping parents (lobby page + arena rail).
     expect(board).toMatch(/flex min-w-0 flex-col gap-1\.5 px-1/);

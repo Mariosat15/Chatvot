@@ -1,6 +1,9 @@
 import { BookOpen, Target } from "lucide-react";
 import { NeonHeadedPanel, NeonIllustration } from "@/components/neon/Cards";
-import { resolveFeatureLucideIcon } from "@/components/games/resolve-feature-icon";
+import {
+  resolveFeatureIconArt,
+  resolveFeatureLucideIcon,
+} from "@/components/games/resolve-feature-icon";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 
 type AuthoredStep = GamePresentation["howItWorksSteps"][number];
@@ -287,38 +290,47 @@ function RulesStrip({
 
   return (
     <NeonHeadedPanel icon={BookOpen} title="How it works">
-      <div className="flex h-full items-center gap-3 px-3 py-2">
+      <div className="flex h-full items-center gap-3 px-3 py-2.5">
         {authored.length > 0 ? (
-          <ol className="min-w-0 flex-1 space-y-1.5">
-            {authored.slice(0, STRIP_STEP_LIMIT).map((step, index) => {
-              const Icon = resolveFeatureLucideIcon(step.icon, index);
-              return (
-                <li
-                  key={index}
-                  className="relative flex min-h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-1"
+          /*
+            THE REFERENCE'S ROW SINCE 15 OCTOBER 2026 (owner image 3): the step number in a lit
+            disc OUTSIDE the box, then a box holding the Menuitems icon, the title and the
+            detail. The detail wraps rather than truncating, because the band now grows to its
+            content - "Pick a time to play within the..." was the cut the owner circled.
+          */
+          <ol className="min-w-0 flex-1 space-y-2">
+            {authored.slice(0, STRIP_STEP_LIMIT).map((step, index) => (
+              <li key={index} className="relative flex items-center gap-2.5">
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-cyan-400/70 bg-cyan-400/10 text-[13px] font-bold text-cyan-100 shadow-[0_0_10px_rgba(34,211,238,0.45)]"
+                  aria-hidden
                 >
-                  <span
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-cyan-400/60 bg-cyan-400/10 text-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.35)]"
+                  {index + 1}
+                </span>
+                {index < Math.min(authored.length, STRIP_STEP_LIMIT) - 1 && (
+                  <StepConnector left="left-4" />
+                )}
+                <span className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-sky-400/25 bg-sky-400/[0.06] px-2.5 py-1.5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={resolveFeatureIconArt(step.icon, index)}
+                    alt=""
                     aria-hidden
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </span>
-                  {index < Math.min(authored.length, STRIP_STEP_LIMIT) - 1 && (
-                    <StepConnector left="left-[1.375rem]" />
-                  )}
-                  <span className="min-w-0" title={`${step.title} — ${step.detail}`}>
-                    <span className="block truncate text-[14px] font-semibold leading-snug text-gray-50">
-                      {index + 1}. {step.title}
+                    className="h-8 w-8 shrink-0 object-contain"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold leading-snug text-gray-50">
+                      {step.title}
                     </span>
                     {step.detail && (
-                      <span className="block truncate text-[12px] leading-snug text-gray-400">
+                      <span className="block text-[12px] leading-snug text-gray-400">
                         {step.detail}
                       </span>
                     )}
                   </span>
-                </li>
-              );
-            })}
+                </span>
+              </li>
+            ))}
           </ol>
         ) : (
         <ol className="min-w-0 flex-1 space-y-1.5">
@@ -355,7 +367,7 @@ function RulesStrip({
                 and one line cut the owner's first step to "Try to Connect all the numbers by ...".
               */}
               <span
-                className="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-50"
+                className="text-[15px] font-semibold leading-snug text-gray-50"
                 title={step}
               >
                 {step}
@@ -388,14 +400,17 @@ function RulesStrip({
             `contain` letterboxed a wide banner with empty bands either side, so the arena strip
             now uses `cover` and bleeds to the card's right, top and bottom edges (the negative
             margins cancel the body padding). The lobby's wide picture keeps `contain`. */}
-        <div className="relative -my-2 -mr-3 hidden w-[42%] shrink-0 self-stretch overflow-hidden rounded-r-xl sm:block">
+        {/* SUPERSEDED 15 Oct 2026 (owner image 2 vs 3): `cover` in a stretched slot cropped a
+            landscape picture into a tall sliver. `natural` shows the whole upload at its own
+            proportions and the card grows to it - the band no longer has a fixed height. */}
+        <div className="hidden w-[42%] max-w-[260px] shrink-0 self-center sm:block">
           <NeonIllustration
             src={imageUrl}
             alt={`How ${gameName} is played`}
             icon={BookOpen}
             accent="players"
-            shape="fill"
-            fit="cover"
+            shape="natural"
+            fit="contain"
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { Crown, Lightbulb } from "lucide-react";
 import { NeonHeadedPanel, NeonIllustration } from "@/components/neon/Cards";
-import { resolveFeatureLucideIcon } from "@/components/games/resolve-feature-icon";
+import { resolveFeatureIconArt } from "@/components/games/resolve-feature-icon";
 
 /**
  * The operator's "why this game is fun" cards along the bottom of the arena.
@@ -54,15 +54,17 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
       <div className="flex h-full items-center gap-3 px-3 py-2.5">
         <ul className="min-w-0 flex-1 space-y-3">
           {highlights.slice(0, STRIP_TIP_LIMIT).map((highlight, index) => {
-            const Icon = resolveFeatureLucideIcon(highlight.icon, index);
             return (
               <li key={highlight.title} className="flex items-start gap-3">
-                <span
-                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-300/45 bg-amber-300/15 text-amber-200"
+                {/* Menuitems artwork since 15 Oct 2026 (owner: "the icons must come from
+                    Menuitems"), resolved from the same slug the lucide map used. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={resolveFeatureIconArt(highlight.icon, index)}
+                  alt=""
                   aria-hidden
-                >
-                  <Icon className="h-5 w-5" />
-                </span>
+                  className="mt-0.5 h-9 w-9 shrink-0 object-contain"
+                />
                 {/*
                   BIGGER TYPE SINCE 25 SEPTEMBER 2026 (owner: "the game tips wording must be
                   more big to take more space and also have icons"). Title + detail both show
@@ -73,7 +75,7 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
                     {highlight.title}
                   </span>
                   {highlight.detail ? (
-                    <span className="mt-0.5 block text-[13px] leading-snug text-gray-300 line-clamp-2">
+                    <span className="mt-0.5 block text-[13px] leading-snug text-gray-300">
                       {highlight.detail}
                     </span>
                   ) : null}
@@ -89,13 +91,15 @@ export function ArenaHighlights({ highlights, imageUrl }: Props) {
           their room (25 September 2026). The picture is absolute so it can never add height to
           the card (that is what cut the card's bottom off), so this slot is `relative` and sized.
         */}
-        <div className="relative hidden w-[36%] shrink-0 self-stretch sm:block">
+        {/* SUPERSEDED 15 Oct 2026 (owner image 3): `natural` shows the whole upload at its own
+            proportions, and the card - no longer a fixed height - grows to fit it. */}
+        <div className="hidden w-[38%] max-w-[240px] shrink-0 self-center sm:block">
           <NeonIllustration
             src={imageUrl}
             alt="This game's emblem"
             icon={Crown}
             accent="prize"
-            shape="fill"
+            shape="natural"
             fit="contain"
           />
         </div>

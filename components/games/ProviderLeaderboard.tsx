@@ -189,12 +189,13 @@ export default function ProviderLeaderboard({
         figures cannot force the row past its container (and take the right border with them).
       */}
       <div
-        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)] items-center gap-x-1.5 px-2.5 pb-1.5 ${NEON_TABLE_HEAD}`}
+        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)_auto] items-center gap-x-1.5 px-2.5 pb-1.5 ${NEON_TABLE_HEAD}`}
       >
         <div>#</div>
         <div className="min-w-0">Player</div>
         <div className="text-right">{scoreLabel}</div>
         <div className="text-right">Time</div>
+        <div aria-hidden />
       </div>
 
       {/*
@@ -218,7 +219,7 @@ export default function ProviderLeaderboard({
           return (
             <div
               key={row.userId}
-              className={`grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)] items-center gap-x-1.5 px-2.5 py-2 ${neonRowClasses(
+              className={`grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)_auto] items-center gap-x-1.5 px-2.5 py-2 ${neonRowClasses(
                 { rank: row.currentRank, isCurrentUser: isYou, variant: "flush" },
               )}`}
             >
@@ -268,8 +269,6 @@ export default function ProviderLeaderboard({
                       showYouMarker={!ranking}
                       wrap
                     />
-                    {/* Crown only: this line is the one the owner reported truncating. */}
-                    <GameMasterBadge userId={row.userId} compact />
                   </div>
 
                   {phrase && (
@@ -341,6 +340,16 @@ export default function ProviderLeaderboard({
               */}
               <div className="min-w-[2.75rem] self-center text-right text-xs tabular-nums text-gray-400">
                 {clock ?? <span className="text-gray-600">-</span>}
+              </div>
+
+              {/*
+                THE GAME MASTER CROWN IS THE LAST CELL SINCE 15 OCTOBER 2026 (owner: "move the gm
+                icon to end so the name can be shown and score complete"). On the name line it took
+                width from the one column with no upper bound; here it costs only its own glyph and
+                an empty `auto` track for everyone else.
+              */}
+              <div className="flex items-center justify-end">
+                <GameMasterBadge userId={row.userId} compact />
               </div>
             </div>
           );

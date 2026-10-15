@@ -59,4 +59,41 @@ export function resolveFeatureLucideIcon(
   return FALLBACK_ICONS[fallbackIndex % FALLBACK_ICONS.length] ?? Zap;
 }
 
+/**
+ * The owner's Menuitems artwork (converted into `public/assets/neon/icons/`) for the same
+ * slugs, used by the arena band's How it works / Game tips rows since 15 Oct 2026 ("the
+ * icons must come from Menuitems"). Same slug, same position fallback as the lucide map, so
+ * an operator's pick draws the same meaning in both styles.
+ */
+const FEATURE_ICON_ART = new Map<HeroFeatureIcon, string>([
+  ["speed", "bolt-blue"],
+  ["clock", "clockbox"],
+  ["players", "users-v2"],
+  ["skill", "shield"],
+  ["ranking", "chart-bars-blue"],
+  ["reward", "trophy-gold"],
+  ["target", "target-purple"],
+  ["spark", "star"],
+]);
+
+const FALLBACK_ART = [
+  "bolt-blue",
+  "trophy-gold",
+  "clockbox",
+  "target-purple",
+  "star",
+  "shield",
+];
+
+export function resolveFeatureIconArt(
+  slug: string | undefined,
+  fallbackIndex = 0,
+): string {
+  const known = resolveHeroFeatureIcon(slug);
+  const name = known
+    ? (FEATURE_ICON_ART.get(known) ?? "bolt-blue")
+    : (FALLBACK_ART[fallbackIndex % FALLBACK_ART.length] ?? "bolt-blue");
+  return `/assets/neon/icons/${name}.webp`;
+}
+
 export { HERO_FEATURE_ICONS };

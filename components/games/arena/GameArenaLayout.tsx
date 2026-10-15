@@ -116,7 +116,7 @@ export function GameArenaLayout({
       bigger board is a wider middle column, and on a wide monitor the old cap left that width
       unused at the page's sides. At 1480px and below nothing changes.
     */
-    <div className="mx-auto max-w-[1720px] px-3 py-4">
+    <div className="mx-auto max-w-[1720px] px-3 pt-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
       {/*
         THE PAGE'S OWN SURFACE, and the reason it is a fixed backdrop rather than a class on
         the app's body: the reference's arena is a lit navy room and the rest of the
@@ -337,12 +337,19 @@ export function GameArenaLayout({
         300px SINCE 25 SEPTEMBER 2026 (third raise the same day). 200 still clipped How it
         works / Game tips after tips grew icons + title + detail - the owner's "cutoff"
         screenshot. Fixed height stays; content still cannot turn the strip into a section.
+
+        SUPERSEDED 15 OCTOBER 2026 (owner: "the page is cutoff in the end" + "make the boxes
+        auto adjust to show the images"). The fixed 300px with `overflow-hidden` was itself the
+        cut: authored steps, tips and a whole-picture image need more on a narrow board column,
+        and the clip took the bottom of both cards. The band now sizes to its content; the
+        wrappers' `[&>*]:h-full` still levels the two cards and `empty:hidden` still drops an
+        absent one.
       */}
       {/*
         Rules / tips sit quieter than the board stage (26 Sep 2026 hierarchy pass). Opacity on
         the wrappers, not inside the panels — lobby callers of the same panels stay full-bright.
       */}
-      <div className="order-5 flex flex-wrap items-stretch gap-2.5 overflow-hidden has-[>:not(:empty)]:sm:h-[300px] lg:order-4 lg:col-span-2 xl:col-span-1 xl:col-start-2 xl:row-start-2 [:not(:has(>:not(:empty)))]:hidden">
+      <div className="order-5 flex flex-wrap items-stretch gap-2.5 lg:order-4 lg:col-span-2 xl:col-span-1 xl:col-start-2 xl:row-start-2 [:not(:has(>:not(:empty)))]:hidden">
         <div className="min-w-[240px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>
