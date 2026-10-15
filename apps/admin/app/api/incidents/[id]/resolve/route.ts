@@ -9,6 +9,16 @@ import { notificationService } from "@/lib/services/notification.service";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import mongoose from "mongoose";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { isGmFundedContest } from "@/lib/services/gamemaster/free-private-competition";
+
+/**
+ * Reason: on a Game Master funded contest the players paid nothing - the Game Master did.
+ * Crediting each player the entry fee here hands out spendable, withdrawable Volts the Game
+ * Master paid for, and returns nothing to the Game Master. Their refund goes through the
+ * incident action below, which uses `refundFundedContestToGameMaster`.
+ */
+const GM_FUNDED_REFUND_REFUSAL =
+  'This competition is funded by the Game Master, so players paid no entry fee and cannot be refunded. Use the incident action "Platform / Technical Fault — Full GM Refund" to return the funds to the Game Master.';
 
 // Helper to get user from collection
 async function getUserById(userId: string) {
@@ -125,6 +135,7 @@ export async function GET(
         : totalParticipants;
 
     const hasSpecificAffected = specifiedAffectedUsers.length > 0;
+    const gmFunded = isGmFundedContest({ fundingMode: competition?.fundingMode });
 
     // Calculate compensation options
     const options = {
@@ -167,6 +178,16 @@ export async function GET(
         requiresManualReview: true,
       },
     };
+    if (gmFunded) {
+      const refused = {
+        description: GM_FUNDED_REFUND_REFUSAL,
+        totalAmount: 0,
+        affectedUsers: 0,
+        perUserAmount: 0,
+      };
+      options.partial_refund = { ...options.partial_refund, ...refused };
+      options.full_refund = { ...options.full_refund, ...refused };
+    }
 
     return NextResponse.json({
       success: true,
@@ -300,6 +321,14 @@ export async function POST(
         entryFee = competition.entryFee || 0;
         participants = await getCompetitionParticipants(incident.competitionId);
       }
+    }
+
+    if (
+      isGmFundedContest({ fundingMode: competition?.fundingMode }) &&
+      (resolutionType === "partial_refund" || resolutionType === "full_refund")
+    ) {
+      await mongoSession.abortTransaction();
+      return NextResponse.json({ error: GM_FUNDED_REFUND_REFUSAL }, { status: 400 });
     }
 
     // Determine users to compensate and amounts
