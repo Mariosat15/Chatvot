@@ -31,6 +31,11 @@ interface RoundPreflightProps {
   state: PlayState;
   launching: boolean;
   refusal: string | null;
+  /**
+   * Server refusal code from the launch route. Permanent codes disable Join Late so a finished
+   * race does not keep offering a button that only re-shows the same red box.
+   */
+  refusalCode?: string | null;
   onLaunch: () => void;
   /**
    * A challenge has no gun - both players share one room that starts when both are in - so
@@ -39,11 +44,22 @@ interface RoundPreflightProps {
   format?: "competition" | "challenge";
 }
 
+/** Codes where pressing Play again cannot help - disable the button, do not invite a retry. */
+const PERMANENT_LAUNCH_REFUSALS = new Set([
+  "race_unjoinable",
+  "play_window_closed",
+  "play_window_too_short",
+  "attempts_exhausted",
+  "contest_not_open",
+  "title_unavailable",
+]);
+
 export function RoundPreflight({
   gameName,
   state,
   launching,
   refusal,
+  refusalCode = null,
   onLaunch,
   format = "competition",
 }: RoundPreflightProps) {
@@ -195,6 +211,14 @@ export function RoundPreflight({
     windowStartMs !== null &&
     now >= windowStartMs;
 
+  // Reason: the red box used to sit beside an enabled Join Late after a finished race - the
+  // player paid, pressed, was refused, and the button invited them to try the same refusal
+  // again. Permanent codes (and the finished-race sentence as a fallback if the code is absent)
+  // fold into `blocked` so the control matches the verdict.
+  const permanentlyRefused =
+    (refusalCode !== null && PERMANENT_LAUNCH_REFUSALS.has(refusalCode)) ||
+    (refusal !== null && /can no longer be joined/i.test(refusal));
+
   const blocked =
     notStartedYet ||
     noLongerOpen ||
@@ -202,7 +226,8 @@ export function RoundPreflight({
     windowNotOpen ||
     windowClosed ||
     tooLateToStart ||
-    exhausted;
+    exhausted ||
+    permanentlyRefused;
 
   /*
     ONE BIG CLOCK, the competition page's own card (owner, 2 Oct 2026: "make the clocks more
@@ -270,7 +295,8 @@ export function RoundPreflight({
               ? "There is not enough time left in this competition to finish a round, so no new round can be started."
               : exhausted
                 ? "You have used all of your attempts for this competition."
-                : null;
+                : // Permanent launch refusals keep their own red box below - do not duplicate.
+                  null;
 
   const buttonLabel = launching
     ? "Opening the game…"
@@ -292,21 +318,23 @@ export function RoundPreflight({
                 ? "Too late to start a round"
                 : exhausted
                   ? "No attempts left"
-                  : resuming
-                    ? beforeTheGun
-                      ? "Back to the lobby"
-                      : "Resume your round"
-                    : beforeTheGun
-                      ? "Enter the lobby"
-                    : startPassed
-                      ? "Join late"
-                    : // Reason the shortening reaches the button and not only the panel above:
-                      // the button is the thing being pressed, and a player who has skimmed
-                      // the panel should still not be able to spend an attempt without having
-                      // seen that this round is not a full one.
-                      shortenedMs !== null
-                      ? "Play a shortened round"
-                      : "Play";
+                  : permanentlyRefused
+                    ? "Cannot join"
+                    : resuming
+                      ? beforeTheGun
+                        ? "Back to the lobby"
+                        : "Resume your round"
+                      : beforeTheGun
+                        ? "Enter the lobby"
+                        : startPassed
+                          ? "Join late"
+                          : // Reason the shortening reaches the button and not only the panel above:
+                            // the button is the thing being pressed, and a player who has skimmed
+                            // the panel should still not be able to spend an attempt without having
+                            // seen that this round is not a full one.
+                            shortenedMs !== null
+                            ? "Play a shortened round"
+                            : "Play";
 
   return (
     <div className={`space-y-4 p-6 ${NEON_STAGE_PANEL}`}>

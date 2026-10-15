@@ -1,28 +1,22 @@
 import {
   Clock,
   Gamepad2,
-  Link2,
+  Hourglass,
   LifeBuoy,
   RotateCcw,
-  Trophy,
   TriangleAlert,
-  Users,
 } from "lucide-react";
 import { connectToDatabase } from "@/database/mongoose";
 import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
-import ContestCountdown from "@/components/games/ContestCountdown";
 import ProviderClientWarmup from "@/components/games/ProviderClientWarmup";
 import {
   LobbyLiveEntryButton,
   LobbyLiveLeaderboard,
-  LobbyLivePlayersMinNote,
-  LobbyLivePlayersValue,
   LobbyLivePrizePanel,
-  LobbyLivePrizePoolValue,
-  LobbyLiveYourScoreValue,
 } from "@/components/games/LobbyLiveParts";
 import { ArenaLiveProvider } from "@/components/games/arena/ArenaLiveStandings";
+import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { resolveProviderBanner } from "@/components/neon/banners";
 import { NeonBackLink, NeonPill } from "@/components/neon/Buttons";
@@ -30,22 +24,12 @@ import {
   NeonNote,
   NeonPanel,
   NeonRow,
-  StatCard,
   StatusCard,
 } from "@/components/neon/Cards";
 import { NEON_LABEL, NEON_PANEL } from "@/components/neon/tokens";
-import { formatVolts } from "@/lib/utils/format-volts";
-import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
-import { CompetitionDetailShell } from "@/components/competitions/detail/CompetitionDetailShell";
 import { CompetitionRulesFairPlay } from "@/components/competitions/detail/CompetitionRulesFairPlay";
 import { GameEventDetails } from "@/components/competitions/detail/GameEventDetails";
 import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
-import { ContestOverviewPanel } from "@/components/competitions/lobby/ContestOverviewPanel";
-import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
-import {
-  contestModeLabel,
-  contestPlayersLabel,
-} from "@/components/competitions/lobby/contest-lobby-copy";
 import { getTerms } from "@/lib/services/terminology.service";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import {
@@ -60,72 +44,42 @@ import {
   contestReservesFullRound,
   fullRoundCutoffMs,
 } from "@/components/games/round-window";
+import { describeAttempts } from "@/components/games/preflight-parts";
+import { GameCompetitionArenaShell } from "@/components/games/lobby/GameCompetitionArenaShell";
+import { LobbyHeroFeaturePills } from "@/components/games/lobby/LobbyHeroFeaturePills";
+import { LobbyContestStatsGrid } from "@/components/games/lobby/LobbyContestStatsGrid";
+import {
+  LobbyCenterStage,
+  LobbyRuleBadge,
+} from "@/components/games/lobby/LobbyCenterStage";
+import { MobileGameCompetitionLobby } from "@/components/games/lobby/mobile/MobileGameCompetitionLobby";
+import {
+  resolveHeroFeatures,
+  scoringSummary,
+  splitGameTitle,
+} from "@/components/games/arena/arena-facts";
 
 /**
  * The lobby a player sees for a contest played through a game provider.
  *
- * IT EXISTS BECAUSE THE TRADING LOBBY KEPT WORKING, which is the failure mode this programme
- * keeps meeting. `app/(root)/competitions/[id]/page.tsx` renders charts, margin, leverage,
- * "PnL" and an Enter Terminal button, and for a puzzle contest it rendered all of them without
- * an error - nothing crashed, because the fields a provider contest lacks are either guarded or
- * filled by schema defaults (verified against a real MongoDB in
- * `__tests__/services/provider-contest-lobby-shape.test.ts`, not reasoned about). A player
- * simply read a trading screen for a game with no market. Same shape as the trading-shaped
- * services in `matchmaking.service.ts` and the admin list rendering drafts in the grey it uses
- * for finished contests.
- *
- * IT IS A BRANCH AT THE TOP OF THE PAGE, NOT A FIELD-BY-FIELD GUARD, and that is deliberate.
- * Threading conditionals through a thousand lines of trading layout would touch every line the
- * live trading lobby depends on, to serve a contest type that has never had a player.
- *
- * THREE FACTS `13` SECTION 4 SAYS A PROVIDER LOBBY MUST ANSWER, because a player will hit all
- * three and a lobby that stays silent generates support tickets: when the play window opens and
- * closes, how many attempts are left, and what happens if a round never finishes. The third is
- * the one nobody thinks to show and the one that costs money when it happens.
- *
- * THE CHROME COMES FROM `components/neon/`, WHICH THE TRADING LOBBY ALSO WEARS (owner
- * requirement, 6 Sep 2026, from the style sheet in
- * `External game plans/design-reference/component-sheet.png`). This replaces an earlier and
- * weaker arrangement worth describing, because the reason it was replaced generalises: the two
- * lobbies used to be kept consistent by copying the trading page's class strings into this file
- * and having a test compare the two files. That works for two screens and collapses at five -
- * the same sheet also specifies the dashboard, the competitions hub, the game arena and the
- * rankings page, and pairwise comparison between five screens is twenty comparisons nobody
- * maintains. **One definition with tests on the definition** is the version that survives the
- * next screen.
- *
- * What is emphatically not shared is the content: no capital, no margin, no leverage, no asset
- * classes, no profit and loss, no trade counts. `05` section 10 makes that binding rather than
- * stylistic.
+ * Desktop uses the three-column arena shell (leaderboard | play stage | contest
+ * info). Phone uses a dedicated vertical tree under 769px. Trading stays on
+ * `CompetitionDetailShell` and is untouched.
  */
 
 interface ProviderContestLobbyProps {
-  /*
-    Loosely typed on purpose, matching what `getCompetitionById` hands the page. Reason it is not
-    a hand-written field list: an explicitly-typed shape is exactly where an invented field name
-    survives a typecheck - `billsPerRound` on the pre-flight checklist and `scoreDirection` on
-    the participant both got that far. Every field read below was checked against
-    `competition.model.ts`.
-  */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
-  /**
-   * First paint from `getArenaStandings` — same producer the lobby's poll and the arena use.
-   * Never `getCompetitionLeaderboard`: that path ranks settled seat scores only, so mid-round
-   * provisional ranks stay frozen until a full reload.
-   */
   standings: ArenaStandings;
   isUserIn: boolean;
   isFull: boolean;
   userId: string;
   walletBalance: number;
-  /** `AppSettings.credits.symbol`. Replaced a `currencySymbol` prop handed the fiat symbol. */
   creditSymbol?: string;
   participantStatus?: string;
   registrationClosed?: boolean;
 }
 
-/** What each unresolved-round policy actually means to the player whose round it was. */
 const UNRESOLVED_POLICY_COPY: Record<string, string> = {
   score_zero:
     "If your round never reports a result, it is scored zero and the competition still settles on time. You will be told it happened.",
@@ -147,6 +101,16 @@ function formatUTC(value: Date | string | undefined): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toUTCString();
 }
 
+function formatRoundClock(seconds?: number | null): string {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds <= 0) {
+    return "—";
+  }
+  const whole = Math.floor(seconds);
+  const m = Math.floor(whole / 60);
+  const s = whole % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 export default async function ProviderContestLobby({
   competition,
   standings,
@@ -159,72 +123,20 @@ export default async function ProviderContestLobby({
   registrationClosed,
 }: ProviderContestLobbyProps) {
   await connectToDatabase();
-  // Reason: X8 pass 3 — one getTerms() per lobby render; children must not call it again.
   const terms = await getTerms();
 
-  /*
-    The player-facing name comes from the catalogue, which is the editable content layer - never
-    from `providerKey`, and never from `gameKey`, which is an internal join key that happens to
-    read like English and would leak our own naming onto a player screen. Also never the
-    provider's brand: `13` section 4 requires provider-neutral labels, because the player is
-    playing a ChartVolt game.
-
-    IT WAS ITS OWN `ProviderGame.findOne` UNTIL 11 SEPTEMBER 2026, and the reasoning recorded
-    here then is worth keeping because it is still true of anything that writes one: it
-    selected `displayName` and `scoreType`, both of which `provider-game.model.ts` really
-    declares, after a first draft had read a third field the model does NOT have - which would
-    have rendered nothing for ever while looking entirely correct. **An unverified field name
-    is a claim, not a fact**, and a hand-written `.lean<{...}>()` generic is precisely where
-    one survives a typecheck, because the compiler checks the generic rather than the schema.
-
-    What the read could not survive was a SECOND field being needed. `getGamePresentation` is
-    the shared projection of this document, and the rules text the owner asked for on 11
-    September lives on it - so a lobby with its own projection would have rendered the rules
-    on the play screen and silently not here, which is task 20.1's defect exactly: two
-    hand-written projections of one document, and a field added to the shape arrives
-    `undefined` at whichever caller nobody remembered. The placeholder differs (a badge wants
-    "Game", a sentence wants "this game"), and that is now handled in the open below rather
-    than by keeping a second reader.
-  */
   const presentation = await getGamePresentation(
     competition?.gameConfig?.providerKey,
     competition?.gameConfig?.gameCode,
   );
 
-  /*
-    Attempts and the live round are only meaningful for someone holding a seat, and `getPlayState`
-    is the authoritative source for both - the same function the play route and the launch API
-    use, so this lobby cannot disagree with the screen it links to about how many attempts are
-    left. A player without a seat gets a refusal here, which is correct and is simply not shown.
-  */
   const playState =
     isUserIn && userId
       ? await getPlayState(String(competition._id), userId)
       : null;
   const state = playState?.success ? playState.state : null;
 
-  /*
-    WHAT EACH PLAYER HAS DONE arrives on `standings.activity` from the same producer the arena
-    polls. A second `getContestActivity` here would be a second clock beside that poll.
-  */
-
-  /*
-    The operator's level ladder, for the entry button's level-requirement line (R88/R90).
-
-    Read here rather than taken as a prop, matching this component's own self-contained
-    fetching: the page above renders this lobby OR the trading sidebar and never both, so a
-    prop would make the page fetch a ladder that one of its two branches always discards.
-  */
   const levelLadder = await getTitleLevels();
-
-  /*
-    THE LABEL DECIDES THE SCREEN; THE KEYS DECIDE WHETHER PLAY CAN WORK. The page routes here on
-    the label alone, because a contest labelled provider with no provider key is still not a
-    trading contest and must not be shown trading panels. But it cannot launch a round, so the
-    Play control has to say so rather than fail on the click. Same distinction the admin
-    competitions list draws between `hasProviderGameLabel` and `isProviderContest`, and giving
-    the two questions two names is what stops the strict helper being reused for the first.
-  */
   const canLaunch = isProviderContest(competition);
 
   const playWindowStart = formatUTC(competition.playWindowStart);
@@ -236,24 +148,9 @@ export default async function ProviderContestLobby({
     ? UNRESOLVED_POLICY_COPY[competition.unresolvedRoundPolicy as string]
     : undefined;
 
-  /*
-    The badge's own placeholder. `UNKNOWN_GAME_NAME` reads correctly inside a sentence and
-    badly on its own next to a controller icon, so the substitution is explicit rather than
-    the service being asked to answer two questions. Only reachable on a contest whose title
-    has left the catalogue, which already renders its own warning card further down.
-  */
   const gameName =
     presentation.gameName === UNKNOWN_GAME_NAME ? terms.game : presentation.gameName;
 
-  /*
-    The column heading comes from the game's own score type, which is the smallest possible step
-    towards `13` section 4's per-game ranking labels. It is NOT the full `ranking-config.service`
-    pass - that is still outstanding - but "Score" on a time trial is the trading-shaped-label
-    problem in miniature, and a heading is cheap to get right here.
-
-    Note what it does not do: it does not reformat the number. `05` section 2 requires the raw
-    score to be displayed as stored, because any transformation makes a dispute unanswerable.
-  */
   const scoreLabel =
     presentation.scoreType === "duration_ms" ? "Time" : "Score";
 
@@ -262,29 +159,8 @@ export default async function ProviderContestLobby({
   const isCompleted = status === "completed";
   const isCancelled = status === "cancelled";
 
-  /*
-    THE CONTEST CLOCK TARGET for `ContestCountdown` in the sidebar. The hero's fourth KPI is
-    Mode (Competition) when the player is not seated, and Your score once they are - matching
-    the owner game-lobby reference. Trading's hero still shows Starts In; game puts the big
-    four-cell clock beside Join so the KPI strip stays non-busy.
-  */
   const countdownTarget = isActive ? competition.endTime : competition.startTime;
 
-  /*
-    THE DOOR ON STARTING AN ATTEMPT, which is a different clock from the contest's end and was
-    shown on neither this screen nor anywhere a player looks before travelling to the play
-    screen. The owner's report was about the entry deadline; this is its sibling, and the two
-    are easy to conflate: one is the last moment to *join*, this is the last moment to *start*.
-
-    Derived from `fullRoundCutoffMs`, the same producer `RoundPreflight` uses to decide whether
-    Play is still offered. A second expression here would eventually promise time the play
-    screen refuses, which is worse than saying nothing at all.
-
-    Only for a player holding a seat, because `state` is the authoritative source and a player
-    without one has no attempts to start. Only while the cut-off is real: under
-    `until_window_closes` there is none, and implying one would send a player away believing
-    they had missed a deadline that does not exist.
-  */
   const playWindowEndMs = state?.playWindowEnd
     ? new Date(state.playWindowEnd).getTime()
     : null;
@@ -294,31 +170,9 @@ export default async function ProviderContestLobby({
   const reservesFullRound = state
     ? contestReservesFullRound(state.roundStartPolicy)
     : true;
-  // The contest's OWN stored mode, as the launch service reads it - never the title's.
   const playMode = competition.playMode === "scheduled" ? "scheduled" : "anytime";
   const modeRule = playModePlayerRule(playMode, "competition");
 
-  /*
-    THE SCHEDULE, BUILT ONCE AND HOSTED IN TWO PLACES (owner instruction, 11 September 2026:
-    "no need to have 2, merge them into the big one").
-
-    It used to be a card of its own headed "Play window", sitting directly under the four-cell
-    countdown, and it carried a "Closes in" countdown of its own. Since `12` s2.3 derives the
-    window from the contest clock, `playWindowEnd` IS `endTime` - so that row and the cells above
-    it were counting down to the same instant in two sizes, one above the other. **The
-    duplication was of a clock, not merely of a card**, which is the reason to remove it rather
-    than to restyle it.
-
-    WHY IT IS A VARIABLE RATHER THAN JSX WRITTEN INSIDE THE COUNTDOWN. The countdown is withheld
-    from a finished or cancelled contest, and the window's open and close are still facts on one
-    - so there has to be a second host. Two copies of these rows is the "one rule, two copies"
-    shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`; one node
-    with two hosts cannot drift.
-
-    The heading survives inside it because a player still has to be told which pair of times
-    these are, and "Play window" is the phrase `13` s4 names as one of the three things this
-    lobby must answer.
-  */
   const scheduleDetails =
     playWindowStart || playWindowEnd ? (
       <>
@@ -326,22 +180,6 @@ export default async function ProviderContestLobby({
         <div className="mt-2 space-y-2">
           {playWindowStart && <NeonRow label="Opens" value={playWindowStart} />}
           {playWindowEnd && <NeonRow label="Closes" value={playWindowEnd} />}
-          {/*
-            THE SECOND DEADLINE, AND THE ONE PLAYERS MISS. Under `reserve_full_round` the last
-            attempt has to begin a full round before the window shuts, so a player watching
-            "Closes in 4m" on a game whose rounds run five minutes has in fact already missed it.
-            Stating the contest's close and staying silent about this one is how a player arrives
-            at the play screen to find Play disabled with time visibly left on the clock they
-            were shown.
-
-            This is the ONE countdown that survived the merge, and it survived because it counts
-            down to a different moment from the cells above - which is exactly why the other one
-            did not.
-
-            `zeroLabel` is "Passed" rather than "Ended", because the contest has not ended - only
-            the chance to open a new round has, and a player with a round already running may
-            still finish it.
-          */}
           {isActive &&
             reservesFullRound &&
             attemptCutoffMs !== null &&
@@ -359,31 +197,6 @@ export default async function ProviderContestLobby({
               />
             )}
         </div>
-        {/*
-          THIS NOTE USED TO SAY THE PLAY WINDOW COULD BE NARROWER THAN THE COMPETITION, and it was
-          true when an operator set four separate dates. Since the window is derived from the
-          contest clock (`12` s2.3) it is false, and a player-facing caution that has become false
-          is worse than none - it sends somebody looking for a second pair of times that no longer
-          exists. Replaced rather than deleted, because the fact players actually need is what
-          happens to a round still open when the clock runs out.
-
-          THE SECOND HALF OF THE SENTENCE DEPENDS ON THE POLICY, and getting it wrong is not
-          harmless in either direction. Under `reserve_full_round` a round cannot still be running
-          at the close - that is the entire point of holding time back - so promising that it
-          would be closed and scored describes a situation the contest has made impossible, and a
-          player reading it concludes they may start whenever they like. Under
-          `until_window_closes` the opposite is true and must be said, because it is the fact that
-          makes a shortened attempt worth taking at all.
-
-          It defaults to the reserving wording for a player with no seat, matching the schema
-          default rather than the wizard's.
-        */}
-        {/*
-          THE PLAY-MODE RULE, stated before a player pays (owner, 28 Sep 2026). It comes from
-          `playModePlayerRule`, which names the rule and never the game, so every title of either
-          shape reads the same sentence. For a together-start contest the window sentences below
-          are false - nobody starts "at any time" - so they are replaced rather than appended.
-        */}
         <NeonNote>
           <span className="font-semibold text-gray-100">{modeRule.label}</span>{" "}
           {modeRule.detail}
@@ -401,12 +214,7 @@ export default async function ProviderContestLobby({
 
   const showCountdown = Boolean(countdownTarget) && !isCompleted && !isCancelled;
 
-  /*
-    Poll while seats can still join OR rounds can still score — same endpoint as the arena.
-    Completed / cancelled contests keep the first paint only; nothing mid-flight to watch.
-  */
-  const pollStandings =
-    status === "active" || status === "upcoming";
+  const pollStandings = status === "active" || status === "upcoming";
 
   const initialContest = {
     currentParticipants: standings.contest.currentParticipants,
@@ -426,16 +234,15 @@ export default async function ProviderContestLobby({
   const myInitialScore = standings.rows.find((row) => row.userId === userId)
     ?.score;
 
-  /*
-    Spec game main: Overview → How it works → Leaderboard.
-    Spec game sidebar: CTA → Countdown → Prize → Event details → Rules & Fair Play.
-    Summary KPIs sit BELOW the hero, never inside it.
-  */
   const eventDetailRows: Array<{ label: string; value: string }> = [
     { label: "Format", value: modeRule.label },
     {
       label: "Scoring",
-      value: attemptsCopy ?? (scoreLabel === "Time" ? "Faster finishes rank higher" : "Higher scores rank higher"),
+      value:
+        attemptsCopy ??
+        (scoreLabel === "Time"
+          ? "Faster finishes rank higher"
+          : "Higher scores rank higher"),
     },
     {
       label: "Play window",
@@ -449,6 +256,248 @@ export default async function ProviderContestLobby({
       value: unresolvedCopy ?? "",
     },
   ];
+
+  const roundSeconds =
+    state?.maxRoundSeconds ?? presentation.maxDurationSeconds ?? null;
+  const roundTimeLabel = formatRoundClock(roundSeconds);
+  const scoringNote =
+    scoringSummary(presentation.scoreType, presentation.scoreDirection) ??
+    (scoreLabel === "Time" ? "Fastest time wins" : "Highest score wins");
+
+  const heroFeaturePills = resolveHeroFeatures(
+    presentation.heroFeatures,
+    presentation.maxDurationSeconds,
+    presentation.family,
+    competition.minParticipants,
+    competition.maxParticipants,
+  );
+
+  const { title: heroTitle, subtitle: heroNameSubtitle } = splitGameTitle(gameName);
+
+  const attemptBadges = (
+    <>
+      {state ? (
+        <LobbyRuleBadge tone="warn">{describeAttempts(state)}</LobbyRuleBadge>
+      ) : competition.attemptsPolicy === "single" ? (
+        <LobbyRuleBadge tone="warn">You have one attempt</LobbyRuleBadge>
+      ) : null}
+      {playMode === "anytime" ? (
+        <LobbyRuleBadge>
+          Jump in whenever you&apos;re ready!
+        </LobbyRuleBadge>
+      ) : (
+        <LobbyRuleBadge>{modeRule.label}</LobbyRuleBadge>
+      )}
+    </>
+  );
+
+  const attemptNote =
+    roundSeconds && roundSeconds > 0
+      ? `Each round takes up to ${formatRoundClock(roundSeconds)}. ${
+          playMode === "anytime"
+            ? "Start any time before the end."
+            : "Everyone starts together when the window opens."
+        } Starting uses one attempt, even if you leave before finishing.`
+      : null;
+
+  const entryControl = (
+    <>
+      <LobbyLiveEntryButton
+        competition={competition}
+        userBalance={walletBalance}
+        isUserIn={isUserIn}
+        isFull={isFull}
+        participantStatus={participantStatus}
+        registrationClosed={registrationClosed}
+        levelLadder={levelLadder}
+        currentUserId={userId}
+        appearance="arena"
+      />
+      {isUserIn && !canLaunch && (
+        <div className="mt-3">
+          <StatusCard
+            icon={TriangleAlert}
+            accent="waiting"
+            title="This competition cannot start a round yet"
+            detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
+          />
+        </div>
+      )}
+    </>
+  );
+
+  const attemptsPanel =
+    state != null ? (
+      <NeonPanel
+        icon={RotateCcw}
+        accent="score"
+        title="Your attempts"
+        size="lg"
+        className="mt-3"
+      >
+        <NeonRow
+          label="Remaining"
+          accent="score"
+          value={`${state.attemptsRemaining} of ${state.attemptsPermitted}`}
+        />
+        {attemptsCopy && <NeonNote>{attemptsCopy}</NeonNote>}
+        <NeonNote>
+          An attempt is used the moment a round opens, even if you leave before
+          finishing.
+        </NeonNote>
+      </NeonPanel>
+    ) : null;
+
+  const centerStage = (
+    <LobbyCenterStage
+      title={competition.name}
+      badges={attemptBadges}
+      showCountdown={showCountdown}
+      countdownTarget={countdownTarget}
+      serverNow={state?.serverNow}
+      countdownLabel={
+        isActive ? "Play closes in" : `${terms.contest} starts in`
+      }
+      countdownVariant={isActive ? "end" : "start"}
+      scheduleDetails={scheduleDetails}
+      attemptNote={attemptNote}
+      entryControl={entryControl}
+      attemptsPanel={attemptsPanel}
+    />
+  );
+
+  const statsGrid = (
+    <LobbyContestStatsGrid
+      prizePool={competition.prizePool ?? 0}
+      entryFee={competition.entryFee ?? 0}
+      currentParticipants={competition.currentParticipants ?? 0}
+      maxParticipants={competition.maxParticipants ?? 0}
+      roundTimeLabel={roundTimeLabel}
+      creditSymbol={creditSymbol}
+      playersLabel={terms.players}
+      prizePoolLabel={terms.prizePool}
+      entryFeeLabel={terms.entryFee}
+      initialScore={myInitialScore}
+      initialRank={standings.yourRank}
+      showScore={isUserIn}
+      scoringNote={scoringNote}
+    />
+  );
+
+  const rightColumn = (
+    <>
+      <NeonPanel accent="players" size="lg">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <NeonStatusBadge status={status} />
+          {showCountdown && countdownTarget ? (
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/90">
+              <Hourglass className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>
+                {isActive ? "Ends in" : "Starts in"}{" "}
+                <InlineCountdown
+                  targetDate={
+                    countdownTarget instanceof Date
+                      ? countdownTarget.toISOString()
+                      : String(countdownTarget)
+                  }
+                  type={isActive ? "end" : "start"}
+                />
+              </span>
+            </div>
+          ) : null}
+        </div>
+        {statsGrid}
+      </NeonPanel>
+
+      {(competition.prizeDistribution?.length ?? 0) > 0 && (
+        <LobbyLivePrizePanel
+          initialCompetition={competition}
+          creditSymbol={creditSymbol}
+        />
+      )}
+
+      <GameEventDetails rows={eventDetailRows} />
+      <CompetitionRulesFairPlay />
+    </>
+  );
+
+  const leaderboard = (
+    <LobbyLiveLeaderboard title={terms.leaderboard} scoreLabel={scoreLabel} />
+  );
+
+  const howItWorks = (
+    <ContestHowItWorks
+      kind="game"
+      steps={
+        presentation.howItWorksSteps?.length
+          ? presentation.howItWorksSteps.map((step) => ({
+              title: step.title || "Step",
+              detail: step.detail || "",
+            }))
+          : undefined
+      }
+    />
+  );
+
+  const tips =
+    presentation.highlights.length > 0 ? (
+      <ArenaHighlights
+        highlights={presentation.highlights}
+        imageUrl={
+          presentation.highlightsImageUrl || presentation.thumbnailUrl
+        }
+      />
+    ) : null;
+
+  const nav = (
+    <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+      <NeonBackLink href="/competitions" label={terms.contests} />
+      <div className="hidden sm:block">
+        <UTCClock />
+      </div>
+    </div>
+  );
+
+  const hero = (
+    <NeonHero
+      banner={resolveProviderBanner({
+        bannerUrl: presentation?.bannerUrl,
+        gameName: presentation?.gameName ?? gameName,
+        gameCode: competition?.gameConfig?.gameCode,
+      })}
+      badge={{ icon: Gamepad2, label: heroTitle }}
+      title={heroTitle}
+      subtitle={
+        heroNameSubtitle ||
+        presentation.tagline ||
+        competition.description ||
+        presentation.description
+      }
+      status={<NeonStatusBadge status={status} />}
+      meta={<LobbyHeroFeaturePills features={heroFeaturePills} />}
+    >
+      {presentation.description &&
+      (presentation.tagline || heroNameSubtitle) ? (
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-300/95">
+          {presentation.description}
+        </p>
+      ) : null}
+    </NeonHero>
+  );
+
+  const helpFooter = (
+    <div
+      className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
+    >
+      <div className="flex items-center gap-2.5">
+        <LifeBuoy className="h-4 w-4 text-sky-300" />
+        <p className="text-sm text-gray-400">
+          Need help? Read how competitions work, or contact support.
+        </p>
+      </div>
+      <NeonPill href="/help/competitions" icon={LifeBuoy} label="Help centre" />
+    </div>
+  );
 
   return (
     <ArenaLiveProvider
@@ -468,237 +517,65 @@ export default async function ProviderContestLobby({
       {isUserIn ? (
         <ProviderClientWarmup gameCode={competition?.gameConfig?.gameCode} />
       ) : null}
-      <CompetitionDetailShell
-        nav={
-          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-            <NeonBackLink href="/competitions" label={terms.contests} />
-            <div className="hidden sm:block">
-              <UTCClock />
-            </div>
-          </div>
-        }
-        hero={
-          <NeonHero
-            banner={resolveProviderBanner({
-              bannerUrl: presentation?.bannerUrl,
-              gameName: presentation?.gameName ?? gameName,
-              gameCode: competition?.gameConfig?.gameCode,
-            })}
-            badge={{ icon: Gamepad2, label: gameName }}
-            title={competition.name}
-            subtitle={competition.description}
-            status={<NeonStatusBadge status={status} />}
-          />
-        }
-        summary={
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
-            <StatCard
-              size="lg"
-              icon={Trophy}
-              imageSrc={COMPETITION_ICON.volts}
-              accent="prize"
-              label={terms.prizePool}
-              value={
-                <LobbyLivePrizePoolValue
-                  initialPool={competition.prizePool ?? 0}
-                  creditSymbol={creditSymbol}
-                />
-              }
-            />
-            <StatCard
-              size="lg"
-              icon={Link2}
-              imageSrc={COMPETITION_ICON.wallet}
-              accent="entry"
-              label={terms.entryFee}
-              value={
-                competition.entryFee
-                  ? formatVolts(competition.entryFee, { symbol: creditSymbol })
-                  : "Free"
-              }
-            />
-            <StatCard
-              size="lg"
-              icon={Users}
-              imageSrc={COMPETITION_ICON.players}
-              accent="players"
-              label={contestPlayersLabel("game")}
-              value={
-                <LobbyLivePlayersValue
-                  initialCurrent={competition.currentParticipants ?? 0}
-                  initialMax={competition.maxParticipants ?? 0}
-                />
-              }
-              note={
-                <>
-                  <LobbyFillBar
-                    current={competition.currentParticipants ?? 0}
-                    max={competition.maxParticipants ?? 0}
-                  />
-                  {status === "upcoming" && competition.minParticipants > 0 ? (
-                    <LobbyLivePlayersMinNote
-                      minParticipants={competition.minParticipants}
-                      playersLabel={terms.players}
-                      initialCurrent={competition.currentParticipants ?? 0}
-                    />
-                  ) : null}
-                </>
-              }
-            />
-            {/*
-              The score, not PnL. A puzzle has no profit and loss, and `05` section 10 makes this a
-              binding rule rather than a style point. A dash, never a zero, for a player with no
-              scored round (R50). Live standings poll supplies mid-round totals.
-            */}
-            {isUserIn ? (
-              <StatCard
-                size="lg"
-                icon={Gamepad2}
-                imageSrc={COMPETITION_ICON.gamepad}
-                accent="score"
-                label="Your score"
-                value={
-                  <LobbyLiveYourScoreValue initialScore={myInitialScore} />
-                }
-              />
-            ) : (
-              <StatCard
-                size="lg"
-                icon={Gamepad2}
-                imageSrc={COMPETITION_ICON.gamepad}
-                accent={isCancelled ? "ended" : isActive ? "score" : "waiting"}
-                label={isCancelled || isCompleted ? "Status" : "Mode"}
-                value={
-                  isCancelled
-                    ? "Cancelled"
-                    : isCompleted
-                      ? "Completed"
-                      : contestModeLabel("game")
-                }
-              />
-            )}
-          </div>
-        }
-        main={
-          <>
-            <ContestOverviewPanel
-              kind="game"
-              description={
-                competition.description ||
-                presentation?.description ||
-                presentation?.tagline ||
-                null
-              }
-              imageUrl={
-                presentation?.howToPlayImageUrl || presentation?.bannerUrl
-              }
-              imageAlt={gameName}
-            />
-            <ContestHowItWorks kind="game" />
-            <LobbyLiveLeaderboard
-              title={terms.leaderboard}
-              scoreLabel={scoreLabel}
-            />
-          </>
-        }
-        sidebar={
-          <>
-            <LobbyLiveEntryButton
-              competition={competition}
-              userBalance={walletBalance}
-              isUserIn={isUserIn}
-              isFull={isFull}
-              participantStatus={participantStatus}
-              registrationClosed={registrationClosed}
-              levelLadder={levelLadder}
-              currentUserId={userId}
-            />
 
-            {/*
-              ContestCountdown on the SERVER clock — every game gate uses the same time.
-              Schedule folds into details so one clock is not stated twice.
-            */}
-            {showCountdown && (
-              <ContestCountdown
-                target={countdownTarget}
-                serverNow={state?.serverNow}
-                label={
-                  isActive ? "Time remaining" : `${terms.contest} starts in`
-                }
-                variant={isActive ? "end" : "start"}
-                details={scheduleDetails}
-              />
-            )}
-
-            {isUserIn && !canLaunch && (
-              <StatusCard
-                icon={TriangleAlert}
-                accent="waiting"
-                title="This competition cannot start a round yet"
-                detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
-              />
-            )}
-
-            {(competition.prizeDistribution?.length ?? 0) > 0 && (
+      {/* Phone: dedicated tree — never a squeezed three-column desktop. */}
+      <div className="min-[769px]:hidden min-w-0">
+        <MobileGameCompetitionLobby
+          nav={nav}
+          hero={hero}
+          center={centerStage}
+          stats={
+            <NeonPanel accent="players" size="lg" title="Contest info">
+              {statsGrid}
+            </NeonPanel>
+          }
+          leaderboard={leaderboard}
+          prizes={
+            (competition.prizeDistribution?.length ?? 0) > 0 ? (
               <LobbyLivePrizePanel
                 initialCompetition={competition}
                 creditSymbol={creditSymbol}
               />
-            )}
+            ) : null
+          }
+          howItWorks={howItWorks}
+          tips={tips}
+          footer={
+            <>
+              <GameEventDetails rows={eventDetailRows} />
+              <CompetitionRulesFairPlay />
+              {helpFooter}
+            </>
+          }
+        />
+      </div>
 
-            {!showCountdown && scheduleDetails && (
-              <NeonPanel
-                icon={Clock}
-                accent="players"
-                title="Schedule"
-                size="lg"
-              >
-                {scheduleDetails}
-              </NeonPanel>
-            )}
-
-            {state && (
-              <NeonPanel
-                icon={RotateCcw}
-                accent="score"
-                title="Your attempts"
-                size="lg"
-              >
-                <NeonRow
-                  label="Remaining"
-                  accent="score"
-                  value={`${state.attemptsRemaining} of ${state.attemptsPermitted}`}
-                />
-                {attemptsCopy && <NeonNote>{attemptsCopy}</NeonNote>}
-                <NeonNote>
-                  An attempt is used the moment a round opens, even if you leave
-                  before finishing.
-                </NeonNote>
-              </NeonPanel>
-            )}
-
-            <GameEventDetails rows={eventDetailRows} />
-            <CompetitionRulesFairPlay />
-          </>
-        }
-        footer={
-          <div
-            className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
-          >
-            <div className="flex items-center gap-2.5">
-              <LifeBuoy className="h-4 w-4 text-sky-300" />
-              <p className="text-sm text-gray-400">
-                Need help? Read how competitions work, or contact support.
-              </p>
-            </div>
-            <NeonPill
-              href="/help/competitions"
-              icon={LifeBuoy}
-              label="Help centre"
-            />
-          </div>
-        }
-      />
+      {/* Desktop / tablet arena: leaderboard | play stage | contest info. */}
+      <div className="hidden min-[769px]:block">
+        <GameCompetitionArenaShell
+          nav={nav}
+          hero={hero}
+          left={leaderboard}
+          center={centerStage}
+          right={rightColumn}
+          footer={
+            <>
+              {howItWorks}
+              {tips ?? (
+                <NeonPanel icon={Clock} accent="waiting" title="Game tips" size="lg">
+                  <p className="text-sm text-gray-400">
+                    Tips for this game appear here once they are written in the
+                    catalogue.
+                  </p>
+                </NeonPanel>
+              )}
+            </>
+          }
+        />
+        <div className="mx-auto max-w-[1600px] px-5 pb-8 sm:px-7 md:px-8">
+          {helpFooter}
+        </div>
+      </div>
     </ArenaLiveProvider>
   );
 }

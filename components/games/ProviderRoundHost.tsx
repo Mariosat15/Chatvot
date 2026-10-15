@@ -95,6 +95,7 @@ export function ProviderRoundHost({
   const [state, setState] = useState<PlayState>(initialState);
   const [phase, setPhase] = useState<Phase>({ name: "preflight" });
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusalCode, setRefusalCode] = useState<string | null>(null);
 
   // Reason for the ref: the poll loop is started from an effect and must be cancellable when
   // the component unmounts mid-round, or it keeps fetching against a page nobody is looking at.
@@ -197,6 +198,7 @@ export function ProviderRoundHost({
 
   const launch = useCallback(async () => {
     setRefusal(null);
+    setRefusalCode(null);
     setPhase({ name: "launching" });
 
     try {
@@ -210,6 +212,11 @@ export function ProviderRoundHost({
         // message: "you have used all your attempts" is a completely normal end state, not an
         // error, and showing "something went wrong" for it would be a lie.
         setRefusal(data.error ?? "Something went wrong. Please contact support.");
+        setRefusalCode(
+          typeof data.refusal === "string" && data.refusal.length > 0
+            ? data.refusal
+            : null,
+        );
         setPhase({ name: "preflight" });
         const refreshed = await readState();
         if (refreshed) setState(refreshed);
@@ -338,6 +345,7 @@ export function ProviderRoundHost({
       state={state}
       launching={phase.name === "launching"}
       refusal={refusal}
+      refusalCode={refusalCode}
       onLaunch={launch}
     />
   );

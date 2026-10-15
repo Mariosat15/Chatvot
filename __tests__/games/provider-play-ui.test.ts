@@ -834,14 +834,19 @@ describe("the two lobbies are built from one design kit", () => {
       12 Oct 2026 — summary KPIs moved BELOW the hero into CompetitionDetailShell
       (game lobby) and TradingLobbySummary (trading). The hero no longer owns StatCards;
       asserting TRADING_HERO would pin the rejected thin-row layout.
+
+      15 Oct 2026 — game arena redesign: provider lobby stats are a 2x3 grid in
+      LobbyContestStatsGrid (six contest figures). Trading summary keeps four StatCards.
     */
-    for (const consumer of [PROVIDER_LOBBY, TRADING_SUMMARY]) {
-      const code = readCode(consumer);
-      expect(code).toMatch(/<StatCard/);
-      expect(code).toMatch(/grid-cols-2[^"]*(md|lg):grid-cols-4/);
-      const grids = code.match(/grid-cols-4/g) ?? [];
-      expect(grids.length).toBe(1);
-    }
+    const gameStats = readCode("components/games/lobby/LobbyContestStatsGrid.tsx");
+    expect(readCode(PROVIDER_LOBBY)).toMatch(/LobbyContestStatsGrid/);
+    expect(gameStats).toMatch(/grid-cols-2/);
+    expect(gameStats).not.toMatch(/grid-cols-4/);
+
+    const trading = readCode(TRADING_SUMMARY);
+    expect(trading).toMatch(/<StatCard/);
+    expect(trading).toMatch(/grid-cols-2[^"]*(md|lg):grid-cols-4/);
+    expect(trading.match(/grid-cols-4/g) ?? []).toHaveLength(1);
     expect(readCode(TRADING_HERO)).not.toMatch(/<StatCard/);
   });
 
@@ -1624,24 +1629,25 @@ describe("the game lobby shows a joined player the clock", () => {
       Asserting the COUNT rather than the presence, because a bare `<InlineCountdown` match is
       green on a file that imports the component and never mounts it.
 
-      IT WAS THREE FROM 7 SEPTEMBER 2026, TWO FROM 11 SEPTEMBER, AND ONE FROM 12 OCTOBER 2026:
-      the hero's inline tile left when the shared lobby polish made the fourth KPI **Mode**
-      (Competition) to match the owner game-lobby reference, and the contest end already lives
-      in `CountdownPanel`'s four cells in the sidebar. The one that remains is the last moment
-      a new attempt may start under `reserve_full_round` - a different instant from the cells
-      above it. If this number rises, either a third clock has crept back or the Mode tile was
-      swapped for a second InlineCountdown; if it falls to zero, the attempt cut-off is gone.
+      IT WAS THREE FROM 7 SEPTEMBER 2026, TWO FROM 11 SEPTEMBER, ONE FROM 12 OCTOBER 2026,
+      AND TWO FROM 15 OCTOBER 2026 (arena redesign): the four-cell contest end clock lives in
+      LobbyCenterStage via ContestCountdown; the right-column status strip uses a compact
+      InlineCountdown for "Ends in" (not a second four-cell panel); the other InlineCountdown
+      is still the last-attempt cut-off under reserve_full_round. If this rises above two, a
+      third clock has crept back; if it falls to zero, the attempt cut-off is gone.
     */
     const countdowns = code.match(/<InlineCountdown/g) ?? [];
-    expect(countdowns.length).toBe(1);
+    expect(countdowns.length).toBe(2);
 
     // Reused, not re-implemented. A second place that formats "2d 4h" is a second place for the
     // wording to drift, which is the shape behind several defects here.
     expect(code).toMatch(/from "@\/components\/trading\/InlineCountdown"/);
-    // Contest end clock is ContestCountdown (server clock + four cells), not a second
-    // InlineCountdown in the hero. Mode is the fourth KPI for a player who is not seated.
-    expect(code).toMatch(/ContestCountdown/);
-    expect(code).toMatch(/contestModeLabel\("game"\)/);
+    // Showcase four-cell clock is composed through LobbyCenterStage (server clock).
+    expect(code).toMatch(/LobbyCenterStage/);
+    expect(code).toMatch(/playModePlayerRule/);
+    expect(readCode("components/games/lobby/LobbyCenterStage.tsx")).toMatch(
+      /size="showcase"/,
+    );
   });
 
   it("no longer tells players the play window can be narrower than the contest", () => {

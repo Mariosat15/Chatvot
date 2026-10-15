@@ -856,11 +856,11 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     // STEP 5: Update competition and participant statuses
     console.log(`ðŸŽ¯ Updating competition status...`);
     await completeContest({
-      session,
+        session,
       contest: competition,
       leaderboard,
       prizeWinnerCount: actualWinners,
-    });
+      });
 
     // SAFETY NET: guarantee no position survives finalization, regardless of any
     // per-position error in the close loop above. Force-close any straggler still

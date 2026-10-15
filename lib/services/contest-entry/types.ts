@@ -17,6 +17,10 @@ export type ContestEntryFailureCode =
   | "not_found"
   | "not_open"
   | "registration_closed"
+  /** Entry would succeed but the player could not play or trade afterwards. */
+  | "unplayable"
+  | "contest_paused"
+  | "title_unavailable"
   | "full"
   | "level_requirement"
   | "no_wallet"

@@ -400,8 +400,8 @@ export default function CompetitionDashboard({
         <DashboardActions back={back} primary={primary} />
 
         <p className="flex items-center justify-end gap-1 text-xs text-slate-500">
-          <RefreshCw className="h-3 w-3" />
-          Updated {lastUpdate.toLocaleTimeString()}
+            <RefreshCw className="h-3 w-3" />
+            Updated {lastUpdate.toLocaleTimeString()}
         </p>
       </section>
     </div>

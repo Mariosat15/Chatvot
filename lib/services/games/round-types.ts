@@ -368,6 +368,8 @@ export type CreateRoundRefusal =
   | "round_already_live"
   | "play_window_too_short"
   | "play_window_closed"
+  /** Together-start race finished or cancelled - permanent, not a transient provider fault. */
+  | "race_unjoinable"
   | "provider_error";
 
 export type CreateRoundOutcome =

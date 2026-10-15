@@ -383,10 +383,12 @@ export async function createRound(
     // Reason: a late player in a together-start race is refused by the game once the race has
     // finished or been cancelled. That is permanent, so "try again shortly" would send them
     // round a loop of refusals. INVALID_REQUEST is the game's code for exactly this.
+    // `race_unjoinable` (not `provider_error`) so the UI disables Join Late instead of treating
+    // it as a retryable 503, and so entry can share the same permanent meaning.
     if (input.config.scheduledStartAt && created.code === "INVALID_REQUEST") {
       return {
         success: false,
-        refusal: "provider_error",
+        refusal: "race_unjoinable",
         error:
           "This race can no longer be joined - it has already finished or was cancelled. Your attempt was not used.",
       };

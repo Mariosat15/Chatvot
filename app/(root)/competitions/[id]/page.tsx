@@ -20,6 +20,7 @@ import ProviderContestLobby from "@/components/games/ProviderContestLobby";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
 import { getArenaStandings } from "@/lib/services/games/arena-standings.service";
 import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
+import { explainWhyEntryIsUnplayable } from "@/lib/services/games/contest-playability";
 import {
   isCompetitionIdShaped,
   logMalformedCompetitionId,
@@ -207,7 +208,13 @@ const CompetitionDetailsPage = async ({
     // Reason it is extracted rather than inline: the clamp against `startTime` exists for
     // documents an old bug wrote with a deadline an hour BEFORE the start, and a second copy
     // that forgot it would silently refuse entry to those contests. See the helper.
-    const registrationClosed = isRegistrationClosed(competition);
+    //
+    // Playability OR: a together-start race can already be finished while the registration
+    // deadline (floored at the play-window end) still looks open. Without this, Join would
+    // still show, take a fee, and Play would refuse. Same helper `enterContest` uses.
+    const unplayable = await explainWhyEntryIsUnplayable(competition);
+    const registrationClosed =
+      isRegistrationClosed(competition) || unplayable !== null;
 
     /*
       THE GAME BRANCH, AND IT IS DELIBERATELY THE WHOLE PAGE RATHER THAN A SET OF GUARDS.
@@ -450,7 +457,7 @@ const CompetitionDetailsPage = async ({
             isCompleted={isCompleted}
             isUserIn={isUserIn && !!userParticipant}
             userParticipant={userParticipant}
-            competitionId={id}
+                competitionId={id}
             sections={lobbySections}
             overview={lobbyOverview}
             sidebar={{

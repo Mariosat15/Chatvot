@@ -58,6 +58,10 @@ import { runPostEntrySideEffects } from "./contest-entry/side-effects";
 import { fail } from "./contest-entry/types";
 import { isFundedContest, payFundedEntry } from "./contest-entry/free-private-entry";
 import { resolveRegistrationDeadline } from "../utils/registration-deadline";
+// Reason: use the `@/` path so the import string matches `!**/services/games/**`.
+// A relative `./games/...` is caught by the `**/games/*` boundary even though this
+// file is a legitimate services consumer (invariant 1).
+import { explainWhyEntryIsUnplayable } from "@/lib/services/games/contest-playability";
 import {
   PROVIDER_OUTAGE_ENTRY_MESSAGE,
   providerBlocksContestEntry,
@@ -196,6 +200,19 @@ export async function enterContest(
             startingCapital: competition.startingCapital,
           },
         };
+      }
+
+      // Reason: never take a fee for a seat the player cannot use. Registration can still look
+      // open (deadline floored at the play-window end) after a together-start race has finished
+      // or been cancelled, or after the contest clock ended while status is still `active`.
+      // AFTER the seat check so a double-click from someone already in still returns
+      // idempotent success; BEFORE any wallet read so a refusal cannot leave a debit.
+      {
+        const unplayable = await explainWhyEntryIsUnplayable(competition);
+        if (unplayable) {
+          await session.abortTransaction();
+          return fail(unplayable.code, unplayable.error);
+        }
       }
 
       // Reason: a Game Master's private contest is open only to their own affiliated players

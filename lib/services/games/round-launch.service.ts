@@ -8,6 +8,10 @@ import { contestRoundConfig, isProviderContest } from "./contest-config";
 import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import { publicBaseUrl } from "./public-base-url";
 import { lobbyOpensAt } from "./play-shape";
+import {
+  contestClockHasEnded,
+  scheduledRaceUnjoinable,
+} from "./contest-playability";
 import type { ProviderContestFields } from "./contest-config";
 import type { CreateRoundOutcome, CreateRoundRefusal } from "./round-types";
 
@@ -54,6 +58,7 @@ export type LaunchRefusal =
   | "play_window_not_started"
   | "title_unavailable"
   | "misconfigured"
+  | "race_unjoinable"
   | CreateRoundRefusal
   | "failed";
 
@@ -238,8 +243,18 @@ export async function launchContestRound(
     // NO START GATE, deliberately (owner rule, 28 Sep 2026). A together-start contest used to
     // refuse a new round after the gun. A late player may now join a race that is still
     // running, with the time already raced counting against them. Whether the race can still
-    // be joined is the game's decision: a finished or cancelled race refuses the seat, and
-    // `createRound` deletes the pending round on any provider refusal, so no attempt is spent.
+    // be joined is decided here from the same facts that refuse NEW entry fees
+    // (`contest-playability.ts`), and again by the game if our view is stale: a finished or
+    // cancelled race refuses the seat, and `createRound` deletes the pending round on any
+    // provider refusal, so no attempt is spent.
+    const clockEnded = contestClockHasEnded(contest);
+    if (clockEnded) {
+      return refuse("play_window_closed", clockEnded);
+    }
+    const raceClosed = await scheduledRaceUnjoinable(contest);
+    if (raceClosed) {
+      return refuse("race_unjoinable", raceClosed);
+    }
 
     const config = contestRoundConfig(contest);
     if (!config.ok) {

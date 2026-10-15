@@ -195,6 +195,7 @@ export function LobbyLiveEntryButton(
       {...props}
       competition={competition}
       isFull={isFull}
+      appearance={props.appearance ?? "arena"}
     />
   );
 }

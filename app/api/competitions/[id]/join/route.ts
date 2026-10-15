@@ -40,6 +40,10 @@ const STATUS_BY_CODE: Record<ContestEntryFailureCode, number> = {
   not_found: 404,
   not_open: 400,
   registration_closed: 400,
+  // Permanent: the player could not play or trade after paying - not a retryable conflict.
+  unplayable: 409,
+  contest_paused: 409,
+  title_unavailable: 503,
   full: 400,
   level_requirement: 403,
   no_wallet: 400,
@@ -52,6 +56,7 @@ const STATUS_BY_CODE: Record<ContestEntryFailureCode, number> = {
   free_private_terms_unavailable: 409,
   free_private_unfunded: 409,
   free_private_exhausted: 409,
+  free_private_min_balance: 400,
   contended: 409,
   failed: 500,
 };

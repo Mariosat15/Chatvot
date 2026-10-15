@@ -52,6 +52,8 @@ interface ContestCountdownProps {
    * through rather than built here, because this component has no contest to read.
    */
   details?: React.ReactNode;
+  /** Forwards to `CountdownPanel` — arena center uses `showcase`. */
+  size?: "default" | "showcase";
 }
 
 export default function ContestCountdown({
@@ -60,6 +62,7 @@ export default function ContestCountdown({
   label,
   variant,
   details,
+  size = "default",
 }: ContestCountdownProps) {
   const now = useServerClock(serverNow);
   const targetMs = new Date(target).getTime();
@@ -78,6 +81,7 @@ export default function ContestCountdown({
       label={label}
       variant={variant}
       details={details}
+      size={size}
     />
   );
 }

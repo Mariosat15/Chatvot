@@ -464,13 +464,13 @@ export default function CompetitionsPageContent({
           onLoadMore={mobilePages.loadMore}
           loadError={loadError}
         />
-      </div>
+          </div>
       <div className="hidden md:block">
         <CompetitionsArena
           {...filterProps}
           competitions={items}
           userInCompetitions={userInCompetitions}
-          viewMode={viewMode}
+                viewMode={viewMode}
           onViewModeChange={setViewMode}
           page={page}
           pageSize={pageSize}
@@ -480,7 +480,7 @@ export default function CompetitionsPageContent({
           hasPreviousPage={hasPreviousPage}
           onPageChange={setPage}
         />
-      </div>
+          </div>
     </>
   );
 }

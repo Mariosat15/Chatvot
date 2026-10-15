@@ -85,9 +85,13 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("mounts both lobbies on CompetitionDetailShell", () => {
-    expect(gameLobby).toContain("<CompetitionDetailShell");
-    // Flipped 13 Oct 2026 (Complobyymobile): phone tree is MobileCompetitionLobby under
-    // lobby/mobile/; breakpoint is 769px (min-[769px]), not Tailwind `md`.
+    // Flipped 15 Oct 2026 (game arena redesign): provider lobby uses
+    // GameCompetitionArenaShell + MobileGameCompetitionLobby. Trading stays on
+    // CompetitionDetailShell. Flipped rather than deleted so the old shared-shell
+    // claim stays on record.
+    expect(gameLobby).toContain("<GameCompetitionArenaShell");
+    expect(gameLobby).toContain("<MobileGameCompetitionLobby");
+    expect(gameLobby).not.toContain("<CompetitionDetailShell");
     expect(desktopTrading).toContain("<CompetitionDetailShell");
     expect(tradingPage).toContain("<DesktopTradingLobby");
     expect(tradingPage).toContain("<MobileCompetitionLobby");
@@ -163,13 +167,12 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("puts summary StatCards outside the hero on both kinds", () => {
-    expect(gameLobby).toContain('size="lg"');
-    expect(gameLobby).toContain("<StatCard");
-    // Flipped 12 Oct 2026, not deleted: the trading KPI row moved from `lg` to the larger
-    // `showcase` cards on the owner's reference; the game lobby keeps `lg`.
+    // Flipped 15 Oct 2026: game arena stats live in LobbyContestStatsGrid (right
+    // column / mobile), not StatCard under the hero. Trading unchanged.
+    expect(gameLobby).toContain("<LobbyContestStatsGrid");
+    expect(gameLobby).not.toContain("<StatCard");
     expect(tradingSummary).toContain('size="showcase"');
     expect(tradingSummary).toContain("<StatCard");
-    // Hero file must not own the KPI strip (that was the thin-row layout).
     const tradingHero = readCode(
       "components/trading/lobby/TradingLobbyHero.tsx",
     );
@@ -177,12 +180,17 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("game main is Overview → How it works → Leaderboard", () => {
-    expect(gameLobby).toContain("<ContestOverviewPanel");
+    // Flipped 15 Oct 2026 (arena redesign): left leaderboard, center play stage,
+    // how-it-works + tips under the columns. ContestOverviewPanel retired from
+    // this screen; prize + rules stay on the right.
+    expect(gameLobby).toContain("<LobbyCenterStage");
     expect(gameLobby).toContain('kind="game"');
     expect(gameLobby).toContain("<ContestHowItWorks");
     expect(gameLobby).toContain("<LobbyLiveLeaderboard");
     expect(gameLobby).toContain("<CompetitionRulesFairPlay");
     expect(gameLobby).toContain("<GameEventDetails");
+    expect(gameLobby).toContain("<LobbyLivePrizePanel");
+    expect(gameLobby).not.toContain("<ContestOverviewPanel");
   });
 
   it("trading main is detail tabs first, then the Leaderboard", () => {
@@ -262,9 +270,14 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
   });
 
   it("dresses KPI tiles with Menuitems Volt icons", () => {
-    expect(gameLobby).toContain("COMPETITION_ICON.volts");
+    // Flipped 15 Oct 2026: game arena stats use LobbyContestStatsGrid (icons live
+    // there). Trading summary still dresses its own StatCards.
+    const gameStats = readCode(
+      "components/games/lobby/LobbyContestStatsGrid.tsx",
+    );
+    expect(gameStats).toContain("COMPETITION_ICON.volts");
+    expect(gameStats).toContain("COMPETITION_ICON.entryFee");
     expect(tradingSummary).toContain("COMPETITION_ICON.volts");
-    expect(gameLobby).toContain("COMPETITION_ICON.wallet");
     // Flipped 12 Oct 2026: Entry fee uses owner wallet-up art; Simulated funds keep wallet.
     expect(tradingSummary).toContain("COMPETITION_ICON.entryFee");
     expect(tradingSummary).not.toContain("COMPETITION_ICON.wallet");

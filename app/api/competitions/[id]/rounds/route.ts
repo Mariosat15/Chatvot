@@ -86,6 +86,8 @@ function statusFor(refusal: LaunchRefusal): number {
       return 409;
     case "attempts_exhausted":
     case "round_already_live":
+    // Permanent: the shared race has finished or been cancelled. Not a provider outage.
+    case "race_unjoinable":
       return 409;
     // A provider being down or a title paused is not the player's fault and is expected to
     // pass, so it must be retryable rather than looking like a permanent rejection.

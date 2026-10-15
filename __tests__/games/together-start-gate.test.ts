@@ -119,8 +119,21 @@ describe("a late player is let in, and the game decides whether the race can sti
     expect(block).toMatch(/can no longer be joined/);
     expect(block).toMatch(/attempt was not used/);
     expect(block).not.toMatch(/try again/i);
+    // Permanent code so RoundPreflight disables Join Late instead of treating it as a 503 retry.
+    expect(block).toMatch(/race_unjoinable/);
     // The rollback must come first, or the refusal burns the attempt it promises was not used.
     expect(round.indexOf("GameRound.deleteOne({ _id: round._id })")).toBeLessThan(at);
+  });
+
+  it("paid entry and launch both refuse when the race is already unjoinable", () => {
+    const entry = read("lib/services/contest-entry.service.ts");
+    const launch = read("lib/services/games/round-launch.service.ts");
+    const page = read("app/(root)/competitions/[id]/page.tsx");
+    expect(entry).toMatch(/explainWhyEntryIsUnplayable/);
+    expect(launch).toMatch(/scheduledRaceUnjoinable/);
+    expect(launch).toMatch(/contestClockHasEnded/);
+    // Lobby hides Join when the same helper refuses - not only when the deadline has passed.
+    expect(page).toMatch(/isRegistrationClosed\(competition\) \|\| unplayable !== null/);
   });
 
   it("every round of a together-start contest lives until the play window closes", () => {

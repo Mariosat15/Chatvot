@@ -147,13 +147,19 @@ export default function CompetitionCard({
   // Reason: Registration closes when the deadline passes. For legacy competitions
   // where registrationDeadline was incorrectly set to 1hr before startTime,
   // we cap the effective deadline at startTime so registration stays open until start.
+  // ALSO refuse once the contest clock has ended - the server's enterContest refuses
+  // the fee in that case, and leaving Join clickable here only invites a charge-then-refuse
+  // path for list/card joins that never hit the lobby's playability OR.
   const registrationClosed = (() => {
+    const now = new Date();
+    const end = competition.endTime ? new Date(competition.endTime) : null;
+    if (end && !Number.isNaN(end.getTime()) && now > end) return true;
     if (!competition.registrationDeadline) return false;
     const deadline = new Date(competition.registrationDeadline);
     const start = new Date(competition.startTime);
     // Effective deadline is never earlier than startTime (legacy data guard)
     const effectiveDeadline = deadline < start ? start : deadline;
-    return new Date() > effectiveDeadline;
+    return now > effectiveDeadline;
   })();
 
   const rankingMethod = competition.rules?.rankingMethod || "pnl";

@@ -83,6 +83,11 @@ interface CompetitionEntryButtonProps {
    * the same; only the arrangement differs.
    */
   layout?: "panel" | "mobile";
+  /**
+   * Game-arena lobby chrome (provider contests). Gold PLAY gradient + cyan panel edge.
+   * Trading keeps the default grey shell.
+   */
+  appearance?: "default" | "arena";
 }
 
 export default function CompetitionEntryButton({
@@ -96,8 +101,10 @@ export default function CompetitionEntryButton({
   levelLadder,
   currentUserId,
   layout = "panel",
+  appearance = "default",
 }: CompetitionEntryButtonProps) {
   const mobile = layout === "mobile";
+  const arena = appearance === "arena";
   const [entering, setEntering] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showFundedTerms, setShowFundedTerms] = useState(false);
@@ -412,7 +419,9 @@ export default function CompetitionEntryButton({
       className={
         mobile
           ? "min-w-0"
-          : "rounded-xl bg-gray-800/50 border border-gray-700 p-6"
+          : arena
+            ? "rounded-xl border border-cyan-400/35 bg-gradient-to-b from-[#0A1630]/90 to-[#060B18]/95 p-5 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
+            : "rounded-xl bg-gray-800/50 border border-gray-700 p-6"
       }
     >
       {/* Already Entered */}
@@ -526,9 +535,35 @@ export default function CompetitionEntryButton({
                       : `/competitions/${competition._id}/trade`
                   }
                 >
-                  <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
-                    <Trophy className="mr-2 h-4 w-4" />
-                    {isProviderGame ? "Play" : "Start Trading"}
+                  <Button
+                    className={
+                      arena && isProviderGame
+                        ? "relative w-full overflow-hidden border-0 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 py-6 text-lg font-black uppercase tracking-[0.18em] text-[#1A0F00] shadow-[0_0_28px_rgba(251,191,36,0.45)] hover:from-amber-300 hover:via-orange-300 hover:to-amber-400 cursor-pointer active:scale-[0.98] transition-all duration-150"
+                        : "w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25"
+                    }
+                  >
+                    {arena && isProviderGame ? (
+                      <>
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
+                        >
+                          ▶▶
+                        </span>
+                        <span className="relative z-10">Play</span>
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
+                        >
+                          ◀◀
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Trophy className="mr-2 h-4 w-4" />
+                        {isProviderGame ? "Play" : "Start Trading"}
+                      </>
+                    )}
                   </Button>
                 </Link>
               ) : isUpcoming ? (
