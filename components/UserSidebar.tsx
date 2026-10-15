@@ -193,7 +193,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const pathname = usePathname();
   const terms = useTerms();
   const mainNavItems = buildMainNavItems(terms);
-  const { images } = useWhiteLabelImages();
+  const { images, ready: imagesReady } = useWhiteLabelImages();
+  // Reason: until the operator's logo is known the bundled default would
+  // paint first and then be swapped, which reads as the old logo flashing.
+  const logoVisibility = imagesReady ? "opacity-100" : "opacity-0";
   const { profileImage: avatarSrc, hasCustomImage } = useUserProfileImage();
   const { unreadCount: unreadMessages } = useUnreadMessages();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -432,7 +435,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                 alt="logo"
                 width={48}
                 height={48}
-                className="relative z-10 h-11 w-11 cursor-pointer object-contain"
+                className={cn(
+                  "relative z-10 h-11 w-11 cursor-pointer object-contain",
+                  logoVisibility,
+                )}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
                     "/assets/images/brand-icon.jpg";
@@ -451,7 +457,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                 alt="logo"
                 width={220}
                 height={64}
-                className="relative z-10 h-12 w-auto max-w-full cursor-pointer object-contain sm:h-14"
+                className={cn(
+                  "relative z-10 h-12 w-auto max-w-full cursor-pointer object-contain sm:h-14",
+                  logoVisibility,
+                )}
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
                 }}
@@ -710,7 +719,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             alt="logo"
             width={180}
             height={44}
-            className="object-contain"
+            className={cn("object-contain", logoVisibility)}
             style={{ width: "auto", height: "40px", maxWidth: "180px" }}
             onError={(e) => {
               (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
