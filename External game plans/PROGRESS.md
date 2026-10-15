@@ -996,6 +996,9 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - "Error tracking device fingerprint: aborted" in chartvolt-web logs
+Not a server fault: `POST /api/fraud/track-device` reads the body only after the DB connect and session lookup, so a player leaving the page in that window closes the socket and `request.json()` throws `Error: aborted`, which the catch logged as an error with stack. New `lib/utils/client-abort.ts` (`isClientAbort`: `message === "aborted"`, `AbortError`, `ECONNRESET`, `ERR_STREAM_PREMATURE_CLOSE`, or `request.signal.aborted`); the route now returns a silent 499 for those and still logs and 500s everything else. Test `__tests__/utils/client-abort.test.ts` pins both halves. Nothing about fingerprint tracking itself changed; an aborted visit was never tracked and still is not.
+
 ### 15 October 2026 - Phone game-lobby leaderboard: no gap, 5 per page, nothing cut off
 Owner: "the leaderboard has a big gup ... after 5 you have to add more pages ... some data are cutoff". The phone Leaderboard tab was reusing the desktop `NeonPanel` + `ProviderLeaderboard` five-column grid, which kept its desktop height (the empty gap) and truncated names and squeezed score/time on a 360px screen. New dedicated `components/games/lobby/mobile/MobileGameLobbyLeaderboard.tsx`: same `MobileLobbyCard` shell as the other phone cards, height comes only from its rows (1-5 per page), `LEADERBOARD_PAGE_SIZE = 5` with Prev/Next pager shown only when there are more than 5 players, page clamped when the polled board shrinks, "Go to my rank" jump. Names and activity wrap (`break-words`, no `truncate`); score and time never shrink. Rank is the server's `currentRank`, never the row index. Wired only into the phone tree via `ProviderContestLobby`; desktop board unchanged. Guard added in `game-lobby-mobile.test.ts`. **Never verified by eye.**
 

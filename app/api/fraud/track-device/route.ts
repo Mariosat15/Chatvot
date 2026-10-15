@@ -1,3 +1,4 @@
+import { isClientAbort } from "@/lib/utils/client-abort";
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
@@ -1039,6 +1040,13 @@ export async function POST(request: Request) {
     // Reason: Fallback return in case no branch above explicitly returns.
     return NextResponse.json({ success: true, message: "Device processed" });
   } catch (error) {
+    // Reason: the body is read after the DB connect and session lookup, so a
+    // player navigating away in that window closes the socket and
+    // `request.json()` throws "aborted". Nobody is left to receive a response
+    // and nothing failed on our side, so it must not be logged as an error.
+    if (isClientAbort(error, request)) {
+      return new NextResponse(null, { status: 499 });
+    }
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : "";
