@@ -108,7 +108,11 @@ export function MobileLobbyMetrics({
           ) : isCompleted ? (
             "Completed"
           ) : (
-            <InlineCountdown targetDate={clockTarget} type={isActive ? "end" : "start"} />
+            <InlineCountdown
+              targetDate={clockTarget}
+              type={isActive ? "end" : "start"}
+              className="block whitespace-nowrap text-[12px] tracking-tight min-[390px]:text-[13px]"
+            />
           )
         }
         sub={isCancelled || isCompleted ? null : formatUTCDate(new Date(clockTarget))}

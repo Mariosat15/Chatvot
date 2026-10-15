@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Phone lobby countdown overflowed its tile
+
+Owner: "the countdown clock numbers are too big and they fall out of the boxes". `InlineCountdown` renders up to `12d 5h 30m 12s` and inherited the tile's 16px value size, wider than a 360px half-width tile. Both phone tiles (game `MobileGameLobbyMetrics`, trading `MobileLobbyMetrics`) now pass `block whitespace-nowrap text-[12px] tracking-tight min-[390px]:text-[13px]` to the countdown only; other tile values unchanged. Guard added in `game-lobby-mobile.test.ts`. **Never verified by eye.**
+
 ### 15 October 2026 - Game Competition Lobby mobile tightened (owner: "too busy, no flow, needs consistency")
 
 The first phone pass (entry below) was rejected as too busy. Rebuilt the same day so a game lobby reads exactly like the trading phone lobby: back link → the **shared** `MobileLobbyHero` (`kind="game"`, genre as the badge via the new optional `kindLabel`) → **2×2 tiles using the shared `MobileLobbyTile`** (exported from `MobileLobbyMetrics.tsx`, trading unchanged) — Prize pool, Entry fee, Players, and the **one** clock (Ends in / Starts in) → **one action card** ("Your entry" with the PLAY/Join button beside the heading before joining; "Your run" with score, rank, attempts and round time as label-left/value-right rows after) → tabs. Deleted `MobileGameLobbyHero.tsx` and `MobileGameLobbyStatus.tsx` (the separate status strip and the second 2×2 grid duplicated the clock and round time). Tabs are drawn only when they have content (Your rounds only once joined; Tips and Prizes only when present; prizes last, as on trading). Same background, `max-w-[430px] gap-3.5 px-4 pt-4` container and safe-area padding as trading. Desktop `GameCompetitionArenaShell` untouched; same data, entry button and standings poll. `__tests__/competitions/game-lobby-mobile.test.ts` rewritten (8 tests); competitions + provider-play suites green. **Never verified by eye.**

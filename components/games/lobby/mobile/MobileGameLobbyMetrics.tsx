@@ -107,6 +107,7 @@ export function MobileGameLobbyMetrics({
               targetDate={target}
               type={isActive ? "end" : "start"}
               zeroLabel={isActive ? "Ending…" : "Starting…"}
+              className="block whitespace-nowrap text-[12px] tracking-tight min-[390px]:text-[13px]"
             />
           ) : (
             "-"

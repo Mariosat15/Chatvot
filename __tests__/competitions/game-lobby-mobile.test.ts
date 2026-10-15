@@ -72,6 +72,17 @@ describe("game competition lobby mobile (owner guide)", () => {
     expect(metrics).toContain("DATA_ICON.prizePool");
   });
 
+  it("sizes the tile countdown down so '12d 5h 30m 12s' fits a 360px half-width tile", () => {
+    const tradingMetrics = read("components/competitions/lobby/mobile/MobileLobbyMetrics.tsx");
+    for (const file of [metrics, tradingMetrics]) {
+      const at = file.indexOf("<InlineCountdown");
+      const tag = file.slice(at, file.indexOf("/>", at));
+      expect(at).toBeGreaterThan(-1);
+      expect(tag).toContain("whitespace-nowrap");
+      expect(tag).toContain("text-[12px]");
+    }
+  });
+
   it("round time appears once, in the action card, not as a tile", () => {
     expect(metrics).not.toContain("Round time");
     expect(run).toContain('label="Round time"');
