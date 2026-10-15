@@ -245,13 +245,20 @@ export function NeonAvatar({
   );
 }
 
+/** Font size that keeps a name of this length on one line of a 360px standings rail. */
+function fittedNameSize(name: string): string {
+  if (name.length <= 12) return "text-sm";
+  if (name.length <= 15) return "text-[13px] tracking-tight";
+  return "text-xs tracking-tight";
+}
+
 /** The player's name, with the "you" marker and the leader's crown the sheet draws. */
 export function NeonPlayerName({
   name,
   isCurrentUser,
   isLeader = false,
   showYouMarker = true,
-  wrap = false,
+  fit = false,
 }: {
   name: string;
   isCurrentUser: boolean;
@@ -267,18 +274,20 @@ export function NeonPlayerName({
    */
   showYouMarker?: boolean;
   /**
-   * Show the whole name, breaking onto a second line instead of ending in an ellipsis.
-   * Owner, 15 Oct 2026: "have the complete user names shown no cut off". Off by default so
-   * the boards that have always truncated are untouched.
+   * Keep the whole name on ONE line, stepping the font down for longer names rather than
+   * breaking it or cutting it. Owner, 15 Oct 2026: "show the usernames in a single line" -
+   * this replaced a `wrap` mode that broke names like `Player_6AF5CA` after the fifth
+   * character. The ellipsis survives only as a last resort for a name too long for any
+   * readable size. Off by default so the boards that have always truncated are untouched.
    */
-  wrap?: boolean;
+  fit?: boolean;
 }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span
-        className={`${
-          wrap ? "min-w-0 [overflow-wrap:anywhere] leading-tight" : "truncate"
-        } text-sm font-medium ${
+        className={`truncate whitespace-nowrap ${
+          fit ? fittedNameSize(name) : "text-sm"
+        } font-medium ${
           isCurrentUser ? "text-sky-200" : "text-gray-200"
         }`}
       >

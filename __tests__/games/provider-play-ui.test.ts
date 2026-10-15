@@ -2223,10 +2223,12 @@ describe("the standings board fits the column it is given", () => {
       Floors rather than fixed `w-12`/`w-10` since 26 Sep 2026: a five-figure score in a
       48px cell overflowed the lobby column and `overflow-x-hidden` clipped the row's right
       border (owner screenshot). `minmax` grows when needed and still counts twice.
+      Floors trimmed to 2.5rem/2.25rem 15 Oct 2026 (owner: "show the usernames in a single
+      line") - the empty columns were holding width the name needed.
     */
     expect(
       board.match(
-        /grid-cols-\[1\.75rem_minmax\(0,1fr\)_minmax\(3\.25rem,auto\)_minmax\(2\.75rem,auto\)_auto\]/g,
+        /grid-cols-\[1\.75rem_minmax\(0,1fr\)_minmax\(2\.5rem,auto\)_minmax\(2\.25rem,auto\)_auto\]/g,
       ) ?? [],
     ).toHaveLength(2);
     // 15 Oct 2026: the GM crown is the LAST cell, never on the name line.
@@ -2237,6 +2239,9 @@ describe("the standings board fits the column it is given", () => {
     expect(gmAt).toBeGreaterThan(clockAt);
     expect(board.match(/<GameMasterBadge/g) ?? []).toHaveLength(1);
     expect(board.match(/gap-x-1\.5/g) ?? []).toHaveLength(2);
+    // One line, never a second: the name is fitted, not wrapped.
+    expect(board).toMatch(/<NeonPlayerName[\s\S]*?\bfit\b[\s\S]*?\/>/);
+    expect(board).not.toMatch(/<NeonPlayerName[^>]*\bwrap\b/);
     // Inset so gold rims survive overflow-clipping parents (lobby page + arena rail).
     expect(board).toMatch(/flex min-w-0 flex-col gap-1\.5 px-1/);
   });

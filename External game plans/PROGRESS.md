@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Leaderboard names on ONE line
+
+Owner screenshot: names broke after a few characters (`Player_6AF5C` / `A`), because the same-day `wrap` mode on `NeonPlayerName` allowed a second line. Replaced by `fit` (`components/neon/LeaderboardRow.tsx`): the name is `whitespace-nowrap`, stepping from `text-sm` (12 characters or fewer) to 13px (up to 15) to `text-xs` beyond that, with the ellipsis kept only as a last resort. `ProviderLeaderboard.tsx` also gives the name back width the mostly-empty number columns held - score/time floors 3.25rem/2.75rem to 2.5rem/2.25rem (still `minmax`, so `21,911` and `48:22` grow their cells) and avatar gap 8px to 6px. The template test in `provider-play-ui.test.ts` was updated with a dated reason and now also asserts `fit` and forbids `wrap`. **Never verified by eye.**
+
 ### 15 October 2026 - "How it works" and "Game tips" pictures fill the whole card, faded like the banners
 
 Owner: the picture beside the text should take the whole box in fade-out mode, as the hero banners do, on every page with these boxes. `NeonHeadedPanel` gained `backdropSrc`, drawn by a new shared `NeonPanelBackdrop` (`components/neon/Cards.tsx`): the image covers the body anchored right, a mask fades it out towards the copy, and a navy scrim keeps the text legible. It is wired into the three places these boxes render - the arena band's rules strip and Game tips card (competition and challenge arenas), and the lobby's full "How it works" panel. When no picture has been uploaded the old emblem tile still shows, so an un-illustrated card is not bare. The body wrapper is added only when a backdrop is set, so no other panel's layout changed. One assertion in `__tests__/games/arena-illustrations.test.ts` was flipped (`src=` to `backdropSrc=`) with a dated reason; the field-to-panel pairing it pins is unchanged. The three pre-existing failures (`arena-band` highlights hint, two byte-identical mirror checks) are untouched by this. **Never verified by eye.**

@@ -185,11 +185,11 @@ export default function ProviderLeaderboard({
       {/*
         THE COLUMNS ARE MEASURED AGAINST THE 360px RAIL, NOT AGAINST THE LOBBY. Every fixed
         width here is space the name cannot have, and the name is the only column whose content
-        has no upper bound. Score/time floors are wide enough for `21,911` and `48:22` so those
-        figures cannot force the row past its container (and take the right border with them).
+        has no upper bound. Score/time are `minmax` floors, so `21,911` and `48:22` still grow
+        their cells; the floors were trimmed 15 Oct 2026 so the name stays on one line.
       */}
       <div
-        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)_auto] items-center gap-x-1.5 px-2.5 pb-1.5 ${NEON_TABLE_HEAD}`}
+        className={`grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(2.5rem,auto)_minmax(2.25rem,auto)_auto] items-center gap-x-1.5 px-2.5 pb-1.5 ${NEON_TABLE_HEAD}`}
       >
         <div>#</div>
         <div className="min-w-0">Player</div>
@@ -219,7 +219,7 @@ export default function ProviderLeaderboard({
           return (
             <div
               key={row.userId}
-              className={`grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_minmax(3.25rem,auto)_minmax(2.75rem,auto)_auto] items-center gap-x-1.5 px-2.5 py-2 ${neonRowClasses(
+              className={`grid min-w-0 grid-cols-[1.75rem_minmax(0,1fr)_minmax(2.5rem,auto)_minmax(2.25rem,auto)_auto] items-center gap-x-1.5 px-2.5 py-2 ${neonRowClasses(
                 { rank: row.currentRank, isCurrentUser: isYou, variant: "flush" },
               )}`}
             >
@@ -231,7 +231,7 @@ export default function ProviderLeaderboard({
               */}
               <NeonRankBadge rank={row.currentRank} size="sm" style="plates" />
 
-              <div className="flex min-w-0 flex-nowrap items-center gap-2">
+              <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
                 {/*
                   The picture comes on the row, or nothing does. This board never looks a
                   player up itself - it is rendered on the server once and then re-rendered
@@ -267,7 +267,7 @@ export default function ProviderLeaderboard({
                       name={row.username || "Anonymous"}
                       isCurrentUser={isYou}
                       showYouMarker={!ranking}
-                      wrap
+                      fit
                     />
                   </div>
 
@@ -302,7 +302,7 @@ export default function ProviderLeaderboard({
                 the read-side form of the `score ?? 0` that made every provider participant
                 tie in R37.
               */}
-              <div className="min-w-[3.25rem] self-center text-right tabular-nums">
+              <div className="min-w-[2.5rem] self-center text-right tabular-nums">
                 {row.score === undefined || row.score === null ? (
                   <span className="text-sm text-gray-600">-</span>
                 ) : (
@@ -338,7 +338,7 @@ export default function ProviderLeaderboard({
 
                 A dash for an unknown clock, never `0:00` - see `formatRoundClock`.
               */}
-              <div className="min-w-[2.75rem] self-center text-right text-xs tabular-nums text-gray-400">
+              <div className="min-w-[2.25rem] self-center text-right text-xs tabular-nums text-gray-400">
                 {clock ?? <span className="text-gray-600">-</span>}
               </div>
 
