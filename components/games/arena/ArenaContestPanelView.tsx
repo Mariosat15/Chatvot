@@ -7,6 +7,7 @@ import type { GamePresentation } from "@/lib/services/games/game-presentation.se
 import { attemptProgress, clock, scoreText, scoringSummary } from "./arena-facts";
 import { formatVolts } from "@/lib/utils/format-volts";
 import ArenaEndsIn from "./ArenaEndsIn";
+import { RoundTimeValue } from "../RoundCloseClock";
 import type { TerminologyPack } from "@/lib/constants/terminology";
 import { DATA_ICON } from "@/lib/constants/data-icons";
 
@@ -127,7 +128,9 @@ export function ArenaContestPanelView({
               iconSrc: NEON_ICON("clockbox"),
               accent: "waiting",
               label: `${terms.round} time`,
-              value: roundClock ?? "—",
+              // Counts down while a round of the player's is live (owner, 15 Oct 2026: one
+              // clock, not a second "Round closes in" panel). The configured length otherwise.
+              value: <RoundTimeValue fallback={roundClock ?? "—"} />,
             },
             // One grid since 15 Oct 2026 (arena brief): the player's own two figures sit in the
             // same set as the contest's four rather than in a second block below. Two columns

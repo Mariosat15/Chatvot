@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ProviderGameFrame } from "./ProviderGameFrame";
-import { RoundCloseClock } from "./RoundCloseClock";
+import { publishRoundClock } from "./round-clock-bus";
 import { RoundPreflight } from "./RoundPreflight";
 import { RoundResultPanel } from "./RoundResultPanel";
 import type { PlayState, PlayerRoundView } from "./play-state";
@@ -236,7 +236,7 @@ export function ProviderRoundHost({
         resumed: Boolean(data.resumed),
       });
 
-      // Reason: the "Round closes in" clock above the frame counts to the new round's
+      // Reason: the sidebar's Round time countdown counts to the new round's
       // `expiresAt`, which only the server knows - the launch response does not carry it.
       void readState().then((refreshed) => {
         if (refreshed) setState(refreshed);
@@ -326,6 +326,39 @@ export function ProviderRoundHost({
     [phase],
   );
 
+  /*
+    THE "ROUND TIME" TILE COUNTS DOWN FROM HERE. The sidebar is a sibling, so the running round's
+    deadline travels through `round-clock-bus` (see why there). Published while a round is being
+    played, and while the pre-flight is offering to resume one; cleared otherwise and on unmount,
+    so the tile drops back to the configured length.
+  */
+  const playingRoundId = phase.name === "playing" ? phase.roundId : null;
+  const clockRound =
+    playingRoundId !== null
+      ? (state.rounds.find((r) => r.roundId === playingRoundId) ?? state.liveRound)
+      : phase.name === "preflight"
+        ? state.liveRound
+        : null;
+  const clockExpiresAt = clockRound?.expiresAt ?? null;
+  const clockGameEndsAtMs =
+    playingRoundId !== null && gameClock?.roundId === playingRoundId
+      ? gameClock.endsAtMs
+      : null;
+
+  useEffect(() => {
+    publishRoundClock(
+      clockRound
+        ? {
+            expiresAt: clockExpiresAt,
+            serverNow: state.serverNow,
+            gameEndsAtMs: clockGameEndsAtMs,
+          }
+        : null,
+    );
+  }, [clockRound, clockExpiresAt, clockGameEndsAtMs, state.serverNow]);
+
+  useEffect(() => () => publishRoundClock(null), []);
+
   const handleUntrustedOrigin = useCallback((origin: string) => {
     console.error(
       `❌ The game frame sent a message from an unexpected origin (${origin}). Ignored.`,
@@ -333,19 +366,8 @@ export function ProviderRoundHost({
   }, []);
 
   if (phase.name === "playing") {
-    const playingRound =
-      state.rounds.find((r) => r.roundId === phase.roundId) ?? state.liveRound;
     return (
       <div className="space-y-4">
-        {playingRound && (
-          <RoundCloseClock
-            expiresAt={playingRound.expiresAt}
-            serverNow={state.serverNow}
-            gameEndsAtMs={
-              gameClock?.roundId === phase.roundId ? gameClock.endsAtMs : null
-            }
-          />
-        )}
         <ProviderGameFrame
           launchUrl={phase.launchUrl}
           gameName={gameName}

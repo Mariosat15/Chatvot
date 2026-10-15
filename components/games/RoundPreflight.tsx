@@ -16,7 +16,6 @@ import {
   StageIcon,
 } from "./preflight-parts";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
-import { RoundCloseClock } from "./RoundCloseClock";
 import { playModePlayerRule, LATE_ENTRY_NOTICE } from "@/lib/services/games/play-shape";
 
 /**
@@ -390,13 +389,6 @@ export function RoundPreflight({
               <p className="text-sm font-medium text-gray-100">{clock.note}</p>
             ) : undefined
           }
-        />
-      )}
-
-      {state.liveRound && (
-        <RoundCloseClock
-          expiresAt={state.liveRound.expiresAt}
-          serverNow={state.serverNow}
         />
       )}
 

@@ -1557,7 +1557,21 @@ describe("the play screen counts down on the server's clock", () => {
     expect(code).not.toMatch(/formatShortUtc\(clock\.targetMs\)/);
     expect(code).toMatch(/label:\s*"Competition closes in"/);
     expect(code).not.toMatch(/"Play closes in"/);
-    expect(code).toMatch(/<RoundCloseClock\s+expiresAt=\{state\.liveRound\.expiresAt\}/);
+    // Flipped 15 Oct 2026 (owner, "rather having 2 clocks... just start reducing the time from
+    // the round time on the right"): the second panel is GONE; the sidebar's Round time tile
+    // counts down instead, fed by `round-clock-bus`, so no round clock renders here.
+    expect(code).not.toMatch(/<RoundCloseClock\b/);
+  });
+
+  it("counts the live round down inside the Round time tile, not in a second panel", () => {
+    const host = readCode("components/games/ProviderRoundHost.tsx");
+    const panel = readCode("components/games/arena/ArenaContestPanelView.tsx");
+    // Reason: the host must PUBLISH the deadline rather than consume the arena context - a
+    // consumer re-renders on every board poll and the host renders the paid game frame.
+    expect(host).toMatch(/publishRoundClock\(/);
+    expect(host).not.toMatch(/<RoundCloseClock\b/);
+    expect(host).not.toMatch(/useArenaLive\w*\(/);
+    expect(panel).toMatch(/<RoundTimeValue\s+fallback=/);
   });
 
   it("counts down to the lobby opening on a play-together contest, and says the spot is saved", () => {

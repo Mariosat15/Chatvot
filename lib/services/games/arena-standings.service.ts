@@ -6,6 +6,7 @@ import { getTitleLevels } from "@/lib/services/xp-config.service";
 import { resolveLevelTitle } from "@/lib/utils/level-title";
 import { getContestActivity } from "./contest-activity.service";
 import { resolveLiveDisplayScores } from "./live-display-score.service";
+import { levelUnscoredRanks } from "./unscored-rank";
 import {
   attachArenaBoardExtras,
   type WithProfileImage,
@@ -175,7 +176,7 @@ export async function getArenaStandings(
     disqualifyOnLiquidation: true,
   };
 
-  const rankedParticipants = calculateRankings(participantData, rules as never, {
+  const engineRanked = calculateRankings(participantData, rules as never, {
     competitionStatus: competition.status as
       | "upcoming"
       | "active"
@@ -183,6 +184,13 @@ export async function getArenaStandings(
       | "cancelled",
     gameType: competition.gameType,
   });
+
+  // While the contest runs, nobody is ranked by join order: players without a score share
+  // one place (everyone is #1 before the first result). See `levelUnscoredRanks`.
+  const rankedParticipants =
+    competition.gameType === "provider" && competition.status !== "completed"
+      ? levelUnscoredRanks(engineRanked)
+      : engineRanked;
 
   const limited = rankedParticipants.slice(0, limit);
   const userIds = limited.map((p) => p.userId);

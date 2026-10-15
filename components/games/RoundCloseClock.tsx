@@ -1,35 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import CountdownPanel from "@/components/competitions/CountdownPanel";
 import { useServerClock } from "@/hooks/useServerClock";
 import { roundCloseRemainingMs } from "./round-close-time";
+import { useRoundClock } from "./round-clock-bus";
+import { clock } from "./arena/arena-facts";
 
 /** The game's own timer repaints four times a second; matching it needs the same cadence. */
 const GAME_CLOCK_TICK_MS = 250;
 
 /**
- * "Round closes in" - the second clock, shown once a player has a round running.
+ * The "Round time" tile's value: the round's length until a round is running, then the time
+ * left in it, counting down.
  *
- * Once the game reports its own clock (`gameEndsAtMs`), this counts to exactly the moment the
- * game's timer shows. Until then - before the player presses Start inside the frame, or for a
- * game that never sends a `clock` message - it falls back to `expiresAt`, the server's hard
- * close, which includes headroom for the frame loading and so reads a little longer.
+ * 15 Oct 2026 (owner): the separate "Round closes in" panel under the competition clock was
+ * removed - "just start reducing the time from the round time on the right". The round host
+ * publishes the running round through `round-clock-bus`; nothing published means no round is
+ * live and the tile shows the configured length.
  *
- * Reason it reads its own clocks rather than taking `now` as a prop: the host renders the game
- * frame beside it, and a re-render several times a second belongs to this panel, not the frame.
+ * Once the game reports its own clock (`gameEndsAtMs`) this counts to exactly the moment the
+ * game's timer shows. Until then it falls back to `expiresAt`, the server's hard close, which
+ * includes headroom for the frame loading and so reads a little longer.
  */
-export function RoundCloseClock({
-  expiresAt,
-  serverNow,
-  gameEndsAtMs,
+export function RoundTimeValue({ fallback }: { fallback: string }) {
+  const fact = useRoundClock();
+  if (!fact) return <>{fallback}</>;
+  return <CountingRoundTime fact={fact} fallback={fallback} />;
+}
+
+function CountingRoundTime({
+  fact,
+  fallback,
 }: {
-  expiresAt: string | null | undefined;
-  serverNow: string;
-  gameEndsAtMs?: number | null;
+  fact: NonNullable<ReturnType<typeof useRoundClock>>;
+  fallback: string;
 }) {
-  const serverNowMs = useServerClock(serverNow);
-  const followsGame = typeof gameEndsAtMs === "number";
+  const serverNowMs = useServerClock(fact.serverNow);
+  const followsGame = typeof fact.gameEndsAtMs === "number";
   const [browserNowMs, setBrowserNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -40,19 +47,19 @@ export function RoundCloseClock({
   }, [followsGame]);
 
   const remainingMs = roundCloseRemainingMs({
-    expiresAtMs: expiresAt ? Date.parse(expiresAt) : Number.NaN,
+    expiresAtMs: fact.expiresAt ? Date.parse(fact.expiresAt) : Number.NaN,
     serverNowMs,
-    gameEndsAtMs,
+    gameEndsAtMs: fact.gameEndsAtMs,
     browserNowMs,
   });
-  if (remainingMs === null) return null;
+  // A deadline that has passed reads 0:00 rather than snapping back to the round length.
+  if (remainingMs === null) {
+    return <>{fact.expiresAt || followsGame ? "0:00" : fallback}</>;
+  }
 
   return (
-    <CountdownPanel
-      remainingMs={remainingMs}
-      label="Round closes in"
-      variant="end"
-      size="showcase"
-    />
+    <span className="tabular-nums text-amber-300">
+      {clock(remainingMs / 1000) ?? "0:00"}
+    </span>
   );
 }
