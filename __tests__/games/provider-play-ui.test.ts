@@ -2129,9 +2129,16 @@ describe("the arena puts the board first at every width", () => {
       a board that demanded 320px is a horizontal scrollbar by construction. This pins the rail;
       the test below pins the board's side of the bargain.
     */
-    const rail = code.match(/xl:grid-cols-\[(\d+)px_/);
+    /*
+      FLIPPED 15 OCTOBER 2026, CLAIM NARROWED NOT DROPPED: the side tracks became proportional
+      (`minmax(<floor>px,<n>fr)`) because two fixed tracks of 300 and 340 starved the board's
+      column on a laptop with the navigation sidebar open, and `main`'s `overflow-x-clip` hid
+      the overflow - the owner's "the page is cut off". The rail still has a pixel FLOOR, and
+      that floor is what this pins; on a wide screen the fraction gives it more.
+    */
+    const rail = code.match(/xl:grid-cols-\[minmax\((\d+)px,[\d.]+fr\)_/);
     expect(rail).not.toBeNull();
-    expect(Number(rail![1])).toBeGreaterThanOrEqual(280);
+    expect(Number(rail![1])).toBeGreaterThanOrEqual(240);
   });
 });
 
@@ -2322,13 +2329,18 @@ describe("the arena states what the prize figures are", () => {
 
       FLIPPED 26 Sep 2026: the arena mounts the table from ArenaLiveSidebar (live contest
       snapshot), not from the play page JSX. Containment is asserted there.
+
+      FLIPPED 15 Oct 2026, CLAIM UNCHANGED: the owner asked for the trading lobby's "Who wins
+      what" panel in place of "Prize breakdown", so the heading is now the shared `NeonPanel`
+      the trading sidebar uses. Still the caller's heading, still not the table's.
     */
     const sidebar = readCode(ARENA_LIVE_SIDEBAR);
 
-    const openAt = sidebar.indexOf('title="Prize breakdown"');
+    const openAt = sidebar.indexOf('title="Who wins what"');
     expect(openAt).toBeGreaterThan(0);
+    expect(sidebar).not.toContain('title="Prize breakdown"');
 
-    const closeAt = sidebar.indexOf("</NeonHeadedPanel>", openAt);
+    const closeAt = sidebar.indexOf("</NeonPanel>", openAt);
     expect(closeAt).toBeGreaterThan(openAt);
 
     const inside = sidebar.slice(openAt, closeAt);
@@ -2342,10 +2354,14 @@ describe("the arena states what the prize figures are", () => {
       "Top 3 win" in the reference is three because that mock's contest pays three. An operator
       can configure any number of positions, so a literal here is a caption that is wrong for
       every contest but one - and it reads perfectly correctly in a diff.
+
+      FLIPPED 15 Oct 2026, CLAIM UNCHANGED: the "Who wins what" panel (trading lobby's) carries
+      no "Top N" pill - the table itself lists every paying position. The count still decides
+      whether the panel renders at all, and no literal count may appear.
     */
     const sidebar = readCode(ARENA_LIVE_SIDEBAR);
-    expect(sidebar).toMatch(/Top \{prizePositions\} win/);
-    expect(sidebar).not.toMatch(/Top 3 win/);
+    expect(sidebar).toMatch(/\{prizePositions > 0 && \(/);
+    expect(sidebar).not.toMatch(/Top \d+ win/);
   });
 });
 

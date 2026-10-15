@@ -169,8 +169,10 @@ export default function ProviderLeaderboard({
     without dragging.
 
     It compresses instead. The rank marker, the score and the clock are fixed, the name column
-    takes what is left and truncates, and the row never wraps - a wrapping row is what turned
-    the rail into a stack of three-line entries with the avatar on its own line.
+    takes what is left, and the row never wraps - a wrapping row is what turned the rail into
+    a stack of three-line entries with the avatar on its own line. Since 15 Oct 2026 the NAME
+    itself may break onto a second line inside its column (owner: "complete user names shown
+    no cut off"); the grid template and the avatar stay where they are.
 
     ROW BOXES MUST SIT INSET FROM ANY CLIPPING ANCESTOR. The lobby page (and several parents)
     set `overflow-x-hidden`, which also forces the y-axis to clip - so a full border or gold
@@ -264,6 +266,7 @@ export default function ProviderLeaderboard({
                       name={row.username || "Anonymous"}
                       isCurrentUser={isYou}
                       showYouMarker={!ranking}
+                      wrap
                     />
                     {/* Crown only: this line is the one the owner reported truncating. */}
                     <GameMasterBadge userId={row.userId} compact />

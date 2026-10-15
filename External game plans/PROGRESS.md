@@ -996,6 +996,26 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Arena second pass: trading's "Who wins what", full names, shared showcase clock, Menuitems icons, no right-hand cut-off
+
+**What:** The owner sent a second set of references (images 1-8). This was a **visual change only**: no logic, loader, route or money path changed, there is no risk number, and nothing was backfilled.
+- **Prizes:** the arena sidebar's "Prize breakdown" is replaced by the trading lobby's **"Who wins what"** `NeonPanel`, with the fee pill and `PrizeTable size="lg"`. It renders only while `prizePositions > 0`.
+- **Names:** `NeonPlayerName` gained `wrap`. The arena board and the provider board break a long name onto a second line instead of truncating it.
+- **Clock:** the pre-flight uses the trading lobby's `showcase` countdown, which now renders its `details`, so the round-length note survives.
+  - The showcase clock icon is now the owner's `clockbox.webp` on **both** arena and trading.
+- **Contest Info:** a 2-column grid of image tiles. The icons were converted from `design-reference/Menuitems` (`trophy-gold.webp` is new).
+- **Cut-off:** the `xl` grid's fixed 300px/340px side tracks became `minmax(240px,0.8fr)` / `minmax(270px,0.9fr)`, because on a laptop they starved the centre column and `main`'s `overflow-x-clip` hid the overflow. The band cards' minimum dropped from 260px to 240px.
+- **Glow:** `NEON_PANEL_LIT` and `NEON_FACE_TILE` have a brighter cyan edge and outer glow, toward image 8. These tokens are also used by the challenge lobby and the dashboard overview.
+
+**Tests:** three guards were flipped with dated reasons:
+- the rail now pins a pixel floor of at least 240
+- the prize heading is now "Who wins what" inside `NeonPanel`
+- the paying-position count gates the panel, and no literal "Top N"
+
+**Checks:** the games, competitions, player, ui and dashboard suites pass apart from the same four failures that were already there before this work. Lint is clean on the changed files, and the typecheck reports nothing in them.
+
+**Never verified by eye.**
+
 ### 15 October 2026 - Arena (`/competitions/[id]/play`) visual redesign to the owner's lobby reference
 
 **What:** The owner supplied a target screenshot and a written spec ("Circuit Sprint Competition Lobby Redesign"). This was a **visual change only**: no logic, route, loader or money path changed, and no risk number applies.

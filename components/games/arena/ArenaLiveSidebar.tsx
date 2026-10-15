@@ -1,7 +1,7 @@
 "use client";
 
-import { Gift } from "lucide-react";
-import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
+import { NeonPanel } from "@/components/neon/Cards";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import {
   ArenaContestPanelView,
@@ -92,15 +92,27 @@ export function ArenaLiveSidebar({
         terms={terms}
         rank={rank}
       />
+      {/*
+        The trading lobby's "Who wins what" card, reused as-is (owner, 15 Oct 2026: "reuse
+        from competition trading lobby"). Same component, icon, fee pill and `size="lg"` table,
+        so the two screens cannot drift into two prize panels.
+      */}
       {prizePositions > 0 && (
-        <NeonHeadedPanel
-          icon={Gift}
-          title="Prize breakdown"
-          action={<NeonCountPill>Top {prizePositions} win</NeonCountPill>}
-          bodyClassName="flex h-full flex-col p-4"
+        <NeonPanel
+          iconSrc={NEON_ICON("trophy-green")}
+          accent="prize"
+          title="Who wins what"
+          size="lg"
+          action={
+            competition.platformFeePercentage > 0 ? (
+              <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2.5 py-1 text-xs font-bold text-sky-300">
+                Fee {competition.platformFeePercentage}%
+              </span>
+            ) : undefined
+          }
         >
-          <PrizeTable competition={competition} creditSymbol={creditSymbol} />
-        </NeonHeadedPanel>
+          <PrizeTable competition={competition} creditSymbol={creditSymbol} size="lg" />
+        </NeonPanel>
       )}
     </>
   );

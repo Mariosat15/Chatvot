@@ -276,9 +276,12 @@ export const NEON_HEADING =
  * Distinct from `NEON_PANEL_SIDE` on purpose (26 Sep 2026 polish): a slightly warmer mid-navy
  * so contest info / prize do not share one wallpaper with the leaderboard. No circuit SVG —
  * that wash on every section made the page busy; the page backdrop alone carries the grid.
+ *
+ * Brighter cyan edge and outer glow since 15 Oct 2026 (owner image 8): the border was a
+ * muted navy that read as an outline rather than a lit neon edge.
  */
 export const NEON_PANEL_LIT =
-  "rounded-xl border border-[#2A6AB0]/45 bg-gradient-to-b from-[#122A52] via-[#0C1C3E] to-[#0A142C] shadow-[inset_0_1px_0_rgba(150,210,255,0.12),inset_0_0_24px_rgba(34,211,238,0.08),0_0_22px_-12px_rgba(56,189,248,0.35)]";
+  "rounded-xl border border-[#22B8F0]/45 bg-gradient-to-b from-[#122A52] via-[#0C1C3E] to-[#0A142C] shadow-[inset_0_1px_0_rgba(150,210,255,0.16),inset_0_0_28px_rgba(34,211,238,0.10),0_0_26px_-10px_rgba(34,190,250,0.55)]";
 
 /**
  * Soft navy glass for tiles INSIDE a lit panel (stat cards, prize rows, label/value rows).
@@ -288,7 +291,7 @@ export const NEON_PANEL_LIT =
  * tile is a surface, not a void.
  */
 export const NEON_FACE_TILE =
-  "rounded-lg border border-[#2A5080]/45 bg-[#153566]/40 shadow-[inset_0_1px_0_rgba(160,210,255,0.08)]";
+  "rounded-lg border border-[#2E7FC8]/45 bg-gradient-to-b from-[#1A3E73]/55 to-[#122B54]/40 shadow-[inset_0_1px_0_rgba(160,210,255,0.14),0_0_12px_-6px_rgba(56,189,248,0.45)]";
 
 export const NEON_FACE_TILE_MUTED =
   "rounded-lg border border-[#1A3558]/40 bg-[#0E2240]/35 opacity-55";

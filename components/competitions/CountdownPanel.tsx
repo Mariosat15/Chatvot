@@ -193,9 +193,15 @@ function PanelDetails({ children }: { children: React.ReactNode }) {
 function ShowcaseFrame({
   borderClassName,
   children,
+  details,
 }: {
   borderClassName: string;
   children: React.ReactNode;
+  /**
+   * The game arena's note under its clock (15 Oct 2026: the arena took the trading showcase
+   * clock). Trading passes none, so its card is unchanged.
+   */
+  details?: React.ReactNode;
 }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border bg-[#060B18] p-5 ${borderClassName}`}>
@@ -207,7 +213,10 @@ function ShowcaseFrame({
         className="pointer-events-none absolute inset-0 h-full w-full object-cover object-right-top opacity-35"
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#060B18] via-[#060B18]/80 to-transparent" />
-      <div className="relative">{children}</div>
+      <div className="relative">
+        {children}
+        {details ? <PanelDetails>{details}</PanelDetails> : null}
+      </div>
     </div>
   );
 }
@@ -233,12 +242,16 @@ function ArenaFrame({
   );
 }
 
-/** The showcase headings' clock, from the owner's Menuitems set rather than a line glyph. */
+/**
+ * The showcase headings' clock, from the owner's Menuitems set rather than a line glyph.
+ * `clockbox` since 15 Oct 2026 - the owner's chosen clock for the trading lobby AND the game
+ * arena/lobby, so every large countdown wears the same picture.
+ */
 function ShowcaseClock() {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
     <img
-      src="/assets/neon/icons/clock.webp"
+      src="/assets/neon/icons/clockbox.webp"
       alt=""
       draggable={false}
       className="h-10 w-10 object-contain"
@@ -327,7 +340,7 @@ export default function CountdownPanel({
       return (
         <ArenaFrame borderClassName="border-cyan-400/55 shadow-[0_0_28px_rgba(34,211,238,0.22)]">
           <ShowcaseHeading
-            icon={<Clock className="h-6 w-6 text-cyan-300" aria-hidden />}
+            icon={<ShowcaseClock />}
             label={label}
             className="text-cyan-200"
           />
@@ -338,7 +351,10 @@ export default function CountdownPanel({
 
     if (showcase) {
       return (
-        <ShowcaseFrame borderClassName="border-amber-400/40 shadow-[0_0_24px_rgba(251,191,36,0.12)]">
+        <ShowcaseFrame
+          borderClassName="border-amber-400/40 shadow-[0_0_24px_rgba(251,191,36,0.12)]"
+          details={details}
+        >
           <ShowcaseHeading
             icon={<ShowcaseClock />}
             label={label}
@@ -403,12 +419,7 @@ export default function CountdownPanel({
         }
       >
         <ShowcaseHeading
-          icon={
-            <Clock
-              className={`h-6 w-6 ${isWarning ? "text-red-400" : "text-cyan-300"}`}
-              aria-hidden
-            />
-          }
+          icon={<ShowcaseClock />}
           label={label}
           className={isWarning ? "text-red-200" : "text-cyan-200"}
           extra={endingBadge}
@@ -421,6 +432,7 @@ export default function CountdownPanel({
   if (showcase) {
     return (
       <ShowcaseFrame
+        details={details}
         borderClassName={
           isWarning
             ? "border-red-500/50 shadow-[0_0_24px_rgba(239,68,68,0.15)]"

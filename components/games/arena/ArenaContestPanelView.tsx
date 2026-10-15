@@ -1,13 +1,5 @@
-import {
-  Trophy,
-  Ticket,
-  Users,
-  Timer,
-  Target,
-  Info,
-  Gauge,
-  Medal,
-} from "lucide-react";
+import { Target } from "lucide-react";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import { NEON_DIVIDER, NEON_LABEL } from "@/components/neon/tokens";
 import { NeonHeadedPanel, NeonStatTiles } from "@/components/neon/Cards";
 import type { PlayState } from "@/components/games/play-state";
@@ -88,7 +80,7 @@ export function ArenaContestPanelView({
 
   return (
     <NeonHeadedPanel
-      icon={Info}
+      iconSrc={NEON_ICON("lightbulb")}
       title="Contest info"
       action={
         <StatePill
@@ -106,7 +98,7 @@ export function ArenaContestPanelView({
         <NeonStatTiles
           items={[
             {
-              icon: Trophy,
+              iconSrc: NEON_ICON("trophy-gold"),
               accent: "prize",
               label: terms.prizePool,
               value: formatVolts(facts.prizePool, {
@@ -114,7 +106,7 @@ export function ArenaContestPanelView({
               }),
             },
             {
-              icon: Ticket,
+              iconSrc: NEON_ICON("credits"),
               accent: "entry",
               label: terms.entryFee,
               value: formatVolts(facts.entryFee, {
@@ -122,7 +114,7 @@ export function ArenaContestPanelView({
               }),
             },
             {
-              icon: Users,
+              iconSrc: NEON_ICON("users-v2"),
               accent: "players",
               label: terms.players,
               value:
@@ -131,28 +123,28 @@ export function ArenaContestPanelView({
                   : "—",
             },
             {
-              icon: Timer,
+              iconSrc: NEON_ICON("clockbox"),
               accent: "waiting",
               label: `${terms.round} time`,
               value: roundClock ?? "—",
             },
-            // One 3x2 grid since 15 Oct 2026 (arena brief): the player's own two figures sit
-            // in the same set as the contest's four rather than in a second block below.
+            // One grid since 15 Oct 2026 (arena brief): the player's own two figures sit in the
+            // same set as the contest's four rather than in a second block below. Two columns
+            // of the owner's Menuitems pictures since the second pass that day (image 8).
             {
-              icon: Gauge,
+              iconSrc: NEON_ICON("target-purple"),
               accent: "score",
               label: `Your ${terms.score.toLowerCase()}`,
               value: scoreText(state.participantScore, presentation.scoreType),
             },
             {
-              icon: Medal,
+              iconSrc: NEON_ICON("crown"),
               accent: "prize",
               label: terms.rank,
               value: typeof rank === "number" ? `#${rank}` : "—",
             },
           ]}
-          columns={3}
-          stacked
+          columns={2}
         />
       </div>
 

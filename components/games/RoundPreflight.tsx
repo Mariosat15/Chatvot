@@ -374,7 +374,10 @@ export function RoundPreflight({
           remainingMs={clock.targetMs - now}
           label={clock.label}
           variant={clock.label === "Play closes in" ? "end" : "start"}
-          size="arena"
+          // The trading lobby's showcase clock (owner, 15 Oct 2026: "use the same from
+          // competition trading lobby for the clock"). Appearance only - the server clock above
+          // still decides `now`.
+          size="showcase"
           details={
             <div className="space-y-1">
               {clock.note && (

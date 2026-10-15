@@ -282,7 +282,15 @@ export function GameArenaLayout({
         round in an iframe that polls, so rendering it twice would run two rounds' worth of
         state against one paid attempt.
       */}
-      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)_auto]">
+      {/*
+        PROPORTIONAL SIDE TRACKS SINCE 15 OCTOBER 2026 (owner image 7, "the page is cut off").
+        Fixed 300px + 340px side columns left the board's column a remainder that on a laptop
+        with the navigation open was narrower than the stage and band need, and `main` clips
+        horizontal overflow silently, so the right column was cut rather than scrolled. The
+        side tracks keep a pixel floor and take a fraction (~0.8 : 2 : 0.9, the owner's image 8
+        proportions); the board's column is still `minmax(0,...)` so content cannot widen it.
+      */}
+      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(240px,0.8fr)_minmax(0,2fr)_minmax(270px,0.9fr)] xl:grid-rows-[minmax(0,1fr)_auto]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -335,10 +343,10 @@ export function GameArenaLayout({
         the wrappers, not inside the panels — lobby callers of the same panels stay full-bright.
       */}
       <div className="order-5 flex flex-wrap items-stretch gap-2.5 overflow-hidden has-[>:not(:empty)]:sm:h-[300px] lg:order-4 lg:col-span-2 xl:col-span-1 xl:col-start-2 xl:row-start-2 [:not(:has(>:not(:empty)))]:hidden">
-        <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
+        <div className="min-w-[240px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>
-        <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
+        <div className="min-w-[240px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {highlights}
         </div>
       </div>

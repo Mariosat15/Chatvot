@@ -251,6 +251,7 @@ export function NeonPlayerName({
   isCurrentUser,
   isLeader = false,
   showYouMarker = true,
+  wrap = false,
 }: {
   name: string;
   isCurrentUser: boolean;
@@ -265,11 +266,19 @@ export function NeonPlayerName({
    * The default is `true` so the boards that have always drawn it are untouched.
    */
   showYouMarker?: boolean;
+  /**
+   * Show the whole name, breaking onto a second line instead of ending in an ellipsis.
+   * Owner, 15 Oct 2026: "have the complete user names shown no cut off". Off by default so
+   * the boards that have always truncated are untouched.
+   */
+  wrap?: boolean;
 }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <span
-        className={`truncate text-sm font-medium ${
+        className={`${
+          wrap ? "min-w-0 [overflow-wrap:anywhere] leading-tight" : "truncate"
+        } text-sm font-medium ${
           isCurrentUser ? "text-sky-200" : "text-gray-200"
         }`}
       >

@@ -487,8 +487,11 @@ export function NeonHeadedPanel({
   className = "",
   bodyClassName = "",
   dense = false,
+  iconSrc,
 }: {
   icon?: LucideIcon;
+  /** A neon picture tile drawn instead of `icon` (owner's Menuitems set). */
+  iconSrc?: string;
   title: string;
   /** A count pill, a link - anything that belongs on the heading's right. */
   action?: React.ReactNode;
@@ -535,7 +538,15 @@ export function NeonHeadedPanel({
             duller - so the icon takes the heading's own colour rather than a sky tint beside
             it. One colour, one token, and they cannot drift a shade apart.
           */}
-          {Icon && (
+          {iconSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+            <img
+              src={iconSrc}
+              alt=""
+              draggable={false}
+              className={`${dense ? "h-5 w-5" : "h-7 w-7"} shrink-0 object-contain`}
+            />
+          ) : Icon && (
             <Icon
               className={`${dense ? "h-3 w-3" : "h-3.5 w-3.5"} shrink-0 text-[#16DFFF]`}
             />
@@ -622,7 +633,12 @@ export function NeonStatTiles({
   stacked = false,
 }: {
   items: {
-    icon: LucideIcon;
+    icon?: LucideIcon;
+    /**
+     * A neon picture (owner's Menuitems set) drawn instead of `icon`. With it, a tile lays
+     * out picture-left, label-over-value right - the arena reference's Contest Info shape.
+     */
+    iconSrc?: string;
     accent: NeonAccent;
     label: string;
     /** Absent renders a dash at the call site. A zero is a real figure and renders as zero. */
@@ -641,13 +657,37 @@ export function NeonStatTiles({
     >
       {items.map((item) => {
         const classes = accentClasses(item.accent);
+        if (item.iconSrc) {
+          return (
+            <div
+              key={item.label}
+              className={`${NEON_FACE_TILE} flex min-w-0 items-center gap-2.5 px-2.5 py-2.5`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
+              <img
+                src={item.iconSrc}
+                alt=""
+                draggable={false}
+                className="h-10 w-10 shrink-0 object-contain"
+              />
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className={`truncate text-[0.6rem] tracking-[0.12em] ${NEON_LABEL}`}>
+                  {item.label}
+                </span>
+                <span className={`truncate text-lg font-bold leading-none ${classes.text}`}>
+                  {item.value}
+                </span>
+              </div>
+            </div>
+          );
+        }
         if (stacked) {
           return (
             <div
               key={item.label}
               className={`${NEON_FACE_TILE} flex min-w-0 flex-col items-center gap-1 px-1.5 py-2.5 text-center`}
             >
-              <IconTile icon={item.icon} accent={item.accent} size="sm" />
+              {item.icon && <IconTile icon={item.icon} accent={item.accent} size="sm" />}
               <span className={`w-full truncate text-[0.58rem] tracking-[0.1em] ${NEON_LABEL}`}>
                 {item.label}
               </span>
@@ -668,7 +708,7 @@ export function NeonStatTiles({
               Padding/type matched to the in-frame readout cells (26 Sep rhythm pass).
             */}
             <div className="flex items-center justify-center gap-1.5">
-              <IconTile icon={item.icon} accent={item.accent} size="sm" />
+              {item.icon && <IconTile icon={item.icon} accent={item.accent} size="sm" />}
               <span className={`truncate text-[0.62rem] tracking-[0.14em] ${NEON_LABEL}`}>
                 {item.label}
               </span>

@@ -253,6 +253,7 @@ function PlayersTab({
               <NeonPlayerName
                 name={row.username || "Anonymous"}
                 isCurrentUser={isYou}
+                wrap
               />
               <div
                 className={`mt-0.5 truncate text-[11px] leading-tight ${roundActivityToneClass(
