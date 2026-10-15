@@ -253,29 +253,28 @@ describe("the arena hero stays one thin banner", () => {
       an EMPTY fractional track between the copy and the stacked feature chips, sized to
       match the layout's 52%-wide artwork. The track must exist and must hold nothing.
     */
+    /*
+      FLIPPED AGAIN 15 OCT 2026 (owner: "show complete banner like image 2"), claim unchanged:
+      the logo track left the `xl` grid so the art shows whole, and the empty reserve track
+      still sits between the copy and the chips.
+    */
     const code = readCode(IDENTITY);
-    expect(code).toMatch(/xl:grid-cols-\[200px_minmax\(0,0\.9fr\)_minmax\(0,1fr\)_190px\]/);
+    expect(code).toMatch(/xl:grid-cols-\[minmax\(0,0\.85fr\)_minmax\(0,1fr\)_190px\]/);
     expect(code).toMatch(/<div className="hidden xl:block" aria-hidden \/>/);
-    expect(readCode(LAYOUT)).toMatch(/w-\[52%\]/);
   });
 
-  it("paints the full-width wash before the right-hand piece", () => {
+  it("draws the banner art once, whole, at full strength", () => {
     /*
-      POSITION, NOT PRESENCE, and it is load-bearing. The two passes are absolutely positioned
-      siblings with no z-index between them, so they paint in document order. Written the other
-      way round the dim full-width wash covers the right-hand piece and the trophy disappears
-      behind a 40%-opacity copy of itself - which looks like a dim banner rather than like two
-      layers in the wrong order, so nothing about the symptom points at the cause.
+      REPLACES "paints the full-width wash before the right-hand piece" (15 Oct 2026, owner:
+      "show complete banner like image 2"). The old two passes - a 40% wash plus a 52%
+      right-hand copy - drew the picture twice and never showed it complete. One layer now;
+      a second copy or a dimmed wash returning is the defect the owner circled.
     */
     const banner = bannerMarkup();
-
-    const washAt = banner.indexOf("opacity-40");
-    // Right-hand piece: full-window cover (not the old free-floating h-[300px] crop).
-    const pieceAt = banner.indexOf("object-cover object-right");
-
-    expect(washAt).toBeGreaterThan(-1);
-    expect(pieceAt).toBeGreaterThan(-1);
-    expect(washAt).toBeLessThan(pieceAt);
+    expect(banner).toMatch(/object-cover object-center/);
+    expect(banner).not.toMatch(/opacity-40/);
+    expect(banner).not.toMatch(/w-\[52%\]/);
+    expect(banner.match(/src=\{banner\.src\}/g)?.length).toBe(1);
   });
 
   // Named without an apostrophe deliberately: vitest's `-t` filter is a REGULAR EXPRESSION,

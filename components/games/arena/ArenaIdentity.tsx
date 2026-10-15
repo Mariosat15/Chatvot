@@ -133,8 +133,16 @@ export async function ArenaIdentity({
       the copy off the picture - it just got wider. The chips carry their own opaque face, so
       nothing written sits on bare artwork.
     */
-    <div className="grid h-full items-center gap-3 grid-cols-[64px_minmax(0,1fr)] sm:gap-5 sm:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,0.9fr)_minmax(0,1fr)_190px]">
-      <GameLogo url={presentation.logoUrl} name={presentation.gameName} />
+    /*
+      NO LOGO TRACK AT `xl` SINCE 15 OCT 2026 (owner: "show complete banner like image 2").
+      The 200px logo sat over the banner's left third, so the picture never showed whole; at
+      desktop width the copy now starts at the left edge over the full-bleed art, as in the
+      reference. Below `xl` the logo track is unchanged.
+    */
+    <div className="grid h-full items-center gap-3 grid-cols-[64px_minmax(0,1fr)] sm:gap-5 sm:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1fr)_190px]">
+      <div className="xl:hidden">
+        <GameLogo url={presentation.logoUrl} name={presentation.gameName} />
+      </div>
 
       <div className="flex min-w-0 items-center gap-6">
         <div className="min-w-0 flex-1">
@@ -155,7 +163,7 @@ export async function ArenaIdentity({
             hide them with nothing on screen to say so - and the full name is on the logo's
             alt text and on the lobby.
           */}
-          <h1 className="mt-1 truncate bg-gradient-to-b from-white via-amber-100 to-amber-400 bg-clip-text text-[22px] font-black uppercase italic leading-tight tracking-wide text-transparent drop-shadow-[0_0_12px_rgba(34,211,238,0.45)] sm:text-[38px]">
+          <h1 className="mt-1 truncate bg-gradient-to-b from-white via-amber-100 to-amber-400 bg-clip-text text-[22px] font-black uppercase italic leading-tight tracking-wide text-transparent drop-shadow-[0_0_12px_rgba(34,211,238,0.45)] sm:text-[38px] xl:text-[46px]">
             {title}
           </h1>
 

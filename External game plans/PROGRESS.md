@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Play-screen stage uses the neon icon art; hero banner shows whole
+
+Owner screenshot, two areas. **Stage:** `RoundPreflight.tsx` and `lobby/LobbyCenterStage.tsx` swap the lucide gamepad disc for the shipped `gamepad-blue` neon webp (`NEON_ICON`), and the three notice rows (blocked reason, late entry, round note) become glowing cyan/amber cards with `clockbox` / `target-purple` / `clock-v2` / `fire` icons and larger text; the helpers (`StageIcon`, `STAGE_NOTICE`, `STAGE_NOTICE_WARN`) live in the new `components/games/preflight-parts.tsx` because `RoundPreflight.tsx` is already over 500 lines. No gate, copy or state logic changed. **Banner:** `GameArenaLayout.tsx` drew the art twice (a 40% wash plus a 52% right-hand copy) with the logo over its left third; it is now one full-strength full-bleed `object-cover object-center` layer with a left-only scrim for the copy, and `ArenaIdentity.tsx` drops the logo track at `xl` (kept below `xl`), with a larger title. The fixed `sm:h-[220px]` height is unchanged. `arena-hero.test.ts`: the reserve-track test is flipped to the new grid and the wash-before-piece test is replaced by one asserting a single, undimmed art layer, both with dated reasons. **Never verified by eye.**
+
 ### 15 October 2026 - "Who wins what" place cards no longer squeezed
 
 Owner screenshot: in a narrow column the `size="lg"` place cards wrapped "1st place" onto two lines and crowded the amount. `components/competitions/PrizeTable.tsx` (showcase branch only): place icon 56px to 44px, row gap 16px to 10px and padding 16px to 12px, place label `text-base` to `text-sm` with `whitespace-nowrap truncate`, percentage chips `text-xs` to 11px on one line, amount `text-2xl` to `text-lg` with `whitespace-nowrap`. Markup only - the payout expressions in `lib/utils/prize-projection.ts` are untouched. **Never verified by eye.**

@@ -1,13 +1,20 @@
 "use client";
 
-import { AlertCircle, Clock, Gamepad2, Info, Loader2, RotateCcw } from "lucide-react";
+import { AlertCircle, Info, Loader2, RotateCcw } from "lucide-react";
 import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { ArenaPlayPlate } from "@/components/games/lobby/ArenaPlayPlate";
 import CountdownPanel from "@/components/competitions/CountdownPanel";
-import { NEON_INSET, NEON_STAGE_PANEL } from "@/components/neon/tokens";
+import { NEON_STAGE_PANEL } from "@/components/neon/tokens";
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
-import { describeAttempts, formatShortUtc, PreflightRoundList } from "./preflight-parts";
+import {
+  describeAttempts,
+  formatShortUtc,
+  PreflightRoundList,
+  STAGE_NOTICE,
+  STAGE_NOTICE_WARN,
+  StageIcon,
+} from "./preflight-parts";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
 import { playModePlayerRule, LATE_ENTRY_NOTICE } from "@/lib/services/games/play-shape";
 
@@ -345,9 +352,7 @@ export function RoundPreflight({
       */}
       <div>
         <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_16px_rgba(34,211,238,0.35)]">
-            <Gamepad2 aria-hidden className="h-5 w-5 text-cyan-300" />
-          </span>
+          <StageIcon slug="gamepad-blue" size="lg" />
           <h2 className="min-w-0 truncate text-2xl font-black uppercase italic tracking-wide text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.35)] sm:text-[28px]">
             {gameName}
           </h2>
@@ -398,16 +403,16 @@ export function RoundPreflight({
         it as an error teaches them something is broken.
       */}
       {blockedReason && !clockExplainsWait && (
-        <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-          <p className="text-xs text-gray-300">{blockedReason}</p>
+        <div className={STAGE_NOTICE}>
+          <StageIcon slug={exhausted ? "target-purple" : "clockbox"} />
+          <p className="text-sm font-medium text-gray-100">{blockedReason}</p>
         </div>
       )}
 
       {startPassed && !blocked && (
-        <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-          <p className="text-xs text-amber-300/90">{LATE_ENTRY_NOTICE}</p>
+        <div className={STAGE_NOTICE_WARN}>
+          <StageIcon slug="clock-v2" />
+          <p className="text-sm text-amber-200">{LATE_ENTRY_NOTICE}</p>
         </div>
       )}
 
@@ -427,8 +432,8 @@ export function RoundPreflight({
         !windowClosed &&
         !noLongerOpen &&
         (showRoundNote || showWaitNote) && (
-        <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+        <div className={shortenedMs !== null ? STAGE_NOTICE_WARN : STAGE_NOTICE}>
+          <StageIcon slug={shortenedMs !== null ? "fire" : "clockbox"} />
           <div className="space-y-1">
             {/*
               THREE SENTENCES FOR THREE SITUATIONS, and they must not be collapsed into one.
@@ -445,7 +450,7 @@ export function RoundPreflight({
             {showRoundNote &&
               roundNeedsMs !== null &&
               (shortenedMs !== null ? (
-                <p className="text-xs text-amber-300/90">
+                <p className="text-sm text-amber-200">
                   Less than a full round is left. You get{" "}
                   <span className="font-semibold tabular-nums">
                     {formatRemaining(shortenedMs)}

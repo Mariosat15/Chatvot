@@ -1,5 +1,6 @@
-import { Clock, Gamepad2, PlayCircle, RotateCcw, type LucideIcon } from "lucide-react";
+import { Clock, PlayCircle, RotateCcw, type LucideIcon } from "lucide-react";
 import ContestCountdown from "@/components/games/ContestCountdown";
+import { StageIcon } from "@/components/games/preflight-parts";
 
 /**
  * Center column of the game arena lobby (owner target, 15 Oct 2026 image 1):
@@ -81,12 +82,7 @@ export function LobbyCenterStage({
         <div className="relative space-y-4">
           <div>
             <div className="flex items-center gap-3">
-              <span
-                aria-hidden
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-400/70 bg-cyan-500/10 shadow-[0_0_16px_rgba(34,211,238,0.35)]"
-              >
-                <Gamepad2 className="h-5 w-5 text-cyan-300" />
-              </span>
+              <StageIcon slug="gamepad-blue" size="lg" />
               <h2 className="text-2xl font-black uppercase tracking-[0.06em] text-white sm:text-3xl">
                 {title}
               </h2>

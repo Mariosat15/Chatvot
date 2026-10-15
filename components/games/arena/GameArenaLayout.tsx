@@ -183,40 +183,22 @@ export function GameArenaLayout({
           disappears behind a 40%-opacity version of itself - which looks like a dim banner
           rather than like a layer in the wrong order.
         */}
+        {/*
+          ONE COMPLETE PICTURE SINCE 15 OCT 2026 (owner: "show complete banner like image 2").
+          The dim wash plus a 52% right-hand copy drew the art twice and hid its left half
+          behind the logo; the banner is now a single full-strength full-bleed layer. The scrim
+          darkens only the LEFT third, which is where the copy sits - the white-text-on-any-
+          upload guarantee still holds there, and the rest of the art shows as uploaded.
+        */}
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={banner.src}
             alt=""
-            className="h-full w-full object-cover opacity-40"
+            className="h-full w-full object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#06122c] via-[#0a1d45]/80 to-[#2a0a4a]/55" />
-        </div>
-
-        {/*
-          RIGHT-HAND ART FILLS THE WINDOW, never an oversized free-floating bitmap.
-          Owner 26 Sep 2026: the previous `h-[300px]` piece was clipped mid-trophy by the
-          panel's `overflow-hidden`, which read as "the banner is cutoff". `object-cover` +
-          `object-right` keeps the trophy side inside the box; a light left feather still
-          joins copy to picture without eating the right edge.
-        */}
-        {/*
-          52% WIDE SINCE 15 OCT 2026 (cinematic hero brief): the picture is the right half of
-          the banner rather than a 360px corner. `ArenaIdentity` holds an empty track of the same
-          proportion, so the copy still ends before the artwork starts.
-        */}
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[52%] overflow-hidden xl:block"
-          aria-hidden
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={banner.src}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover object-right"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/25 to-transparent to-40%" />
-          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#070C1A]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#06122c]/90 via-[#06122c]/45 via-35% to-transparent to-60%" />
+          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#070C1A]/60 to-transparent" />
         </div>
 
         {/*
