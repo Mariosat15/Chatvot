@@ -279,17 +279,25 @@ export default async function ProviderContestLobby({
       {state ? (
         <LobbyRuleBadge tone="warn">{describeAttempts(state)}</LobbyRuleBadge>
       ) : competition.attemptsPolicy === "single" ? (
-        <LobbyRuleBadge tone="warn">You have one attempt</LobbyRuleBadge>
+        <LobbyRuleBadge tone="warn">You have one attempt.</LobbyRuleBadge>
       ) : null}
       {playMode === "anytime" ? (
         <LobbyRuleBadge>
-          Jump in whenever you&apos;re ready!
+          Jump in whenever you&apos;re ready! 🎮
         </LobbyRuleBadge>
       ) : (
         <LobbyRuleBadge>{modeRule.label}</LobbyRuleBadge>
       )}
     </>
   );
+
+  const centerDescription =
+    presentation.tagline ||
+    competition.description ||
+    presentation.description ||
+    (playMode === "anytime"
+      ? "Play anytime before the competition ends and push for your best score. When the timer hits zero, everyone's final scores are compared and the winners are decided."
+      : null);
 
   const attemptNote =
     roundSeconds && roundSeconds > 0
@@ -350,7 +358,8 @@ export default async function ProviderContestLobby({
 
   const centerStage = (
     <LobbyCenterStage
-      title={competition.name}
+      title={heroTitle}
+      description={centerDescription}
       badges={attemptBadges}
       showCountdown={showCountdown}
       countdownTarget={countdownTarget}

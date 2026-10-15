@@ -52,8 +52,8 @@ interface ContestCountdownProps {
    * through rather than built here, because this component has no contest to read.
    */
   details?: React.ReactNode;
-  /** Forwards to `CountdownPanel` — arena center uses `showcase`. */
-  size?: "default" | "showcase";
+  /** Forwards to `CountdownPanel` — game lobby center uses `arena`. */
+  size?: "default" | "showcase" | "arena";
 }
 
 export default function ContestCountdown({

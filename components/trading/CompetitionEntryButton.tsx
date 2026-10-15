@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Flag,
   Clock,
+  Play,
 } from "lucide-react";
 import { enterCompetition } from "@/lib/actions/trading/competition.actions";
 import { useRouter } from "next/navigation";
@@ -535,36 +536,43 @@ export default function CompetitionEntryButton({
                       : `/competitions/${competition._id}/trade`
                   }
                 >
-                  <Button
-                    className={
-                      arena && isProviderGame
-                        ? "relative w-full overflow-hidden border-0 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 py-6 text-lg font-black uppercase tracking-[0.18em] text-[#1A0F00] shadow-[0_0_28px_rgba(251,191,36,0.45)] hover:from-amber-300 hover:via-orange-300 hover:to-amber-400 cursor-pointer active:scale-[0.98] transition-all duration-150"
-                        : "w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25"
-                    }
-                  >
-                    {arena && isProviderGame ? (
-                      <>
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
-                        >
-                          ▶▶
+                  {arena && isProviderGame ? (
+                    <div className="flex w-full items-center justify-center gap-2 sm:gap-3">
+                      <span
+                        aria-hidden
+                        className="shrink-0 text-sm font-black tracking-widest text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.95)] sm:text-base"
+                      >
+                        {">>>"}
+                      </span>
+                      <Button
+                        className="relative min-h-[3.25rem] flex-1 overflow-hidden border-0 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 px-6 py-6 text-lg font-black uppercase tracking-[0.22em] text-[#0a1628] shadow-[0_0_32px_rgba(251,191,36,0.55)] hover:from-amber-300 hover:via-yellow-200 hover:to-amber-400 cursor-pointer active:scale-[0.98] transition-all duration-150"
+                        style={{
+                          // Reason: chevron ends match the owner PLAY plate (image 1).
+                          clipPath:
+                            "polygon(3% 0, 97% 0, 100% 50%, 97% 100%, 3% 100%, 0 50%)",
+                        }}
+                      >
+                        <span className="relative z-10 inline-flex items-center gap-2">
+                          <Play
+                            className="h-5 w-5 fill-cyan-400 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
+                            aria-hidden
+                          />
+                          PLAY
                         </span>
-                        <span className="relative z-10">Play</span>
-                        <span
-                          aria-hidden
-                          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-cyan-200 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]"
-                        >
-                          ◀◀
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <Trophy className="mr-2 h-4 w-4" />
-                        {isProviderGame ? "Play" : "Start Trading"}
-                      </>
-                    )}
-                  </Button>
+                      </Button>
+                      <span
+                        aria-hidden
+                        className="shrink-0 text-sm font-black tracking-widest text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.95)] sm:text-base"
+                      >
+                        {"<<<"}
+                      </span>
+                    </div>
+                  ) : (
+                    <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
+                      <Trophy className="mr-2 h-4 w-4" />
+                      {isProviderGame ? "Play" : "Start Trading"}
+                    </Button>
+                  )}
                 </Link>
               ) : isUpcoming ? (
                 <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">

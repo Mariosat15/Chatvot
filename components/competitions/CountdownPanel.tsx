@@ -64,8 +64,11 @@ export function splitDuration(ms: number): CountdownParts {
   };
 }
 
-/** `showcase` is the trading lobby's larger clock (owner reference, 12 Oct 2026). */
-export type CountdownSize = "default" | "showcase";
+/**
+ * `showcase` — trading lobby (arena backdrop, Menuitems clock).
+ * `arena` — provider game lobby center (clean cyan neon, no blur; owner image 1, 15 Oct 2026).
+ */
+export type CountdownSize = "default" | "showcase" | "arena";
 
 function Cell({
   value,
@@ -78,6 +81,28 @@ function Cell({
   valueClassName: string;
   size?: CountdownSize;
 }) {
+  if (size === "arena") {
+    const secondsTint = caption.toLowerCase() === "secs";
+    return (
+      <div
+        className={`text-center rounded-xl border bg-[#040914]/90 px-2 py-4 ${
+          secondsTint
+            ? "border-amber-400/55 shadow-[inset_0_0_18px_rgba(251,191,36,0.12)]"
+            : "border-cyan-400/50 shadow-[inset_0_0_16px_rgba(34,211,238,0.08)]"
+        }`}
+      >
+        <div
+          className={`text-4xl font-black tabular-nums leading-none sm:text-5xl ${valueClassName}`}
+        >
+          {value.toString().padStart(2, "0")}
+        </div>
+        <div className="mt-2 text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300">
+          {caption}
+        </div>
+      </div>
+    );
+  }
+
   if (size === "showcase") {
     return (
       <div className="text-center rounded-xl border border-white/10 bg-black/45 px-2 py-3 backdrop-blur-sm">
@@ -187,6 +212,27 @@ function ShowcaseFrame({
   );
 }
 
+/**
+ * Clean cyan neon frame for the game lobby center — no arena photograph.
+ * Target image 1 (15 Oct 2026) deliberately dropped the blur backdrop from image 2.
+ */
+function ArenaFrame({
+  borderClassName,
+  children,
+}: {
+  borderClassName: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-2xl border bg-[#060B18]/95 p-5 ${borderClassName}`}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(34,211,238,0.08),transparent_65%)]" />
+      <div className="relative">{children}</div>
+    </div>
+  );
+}
+
 /** The showcase headings' clock, from the owner's Menuitems set rather than a line glyph. */
 function ShowcaseClock() {
   return (
@@ -236,7 +282,7 @@ interface CountdownPanelProps {
    * it changes state is how a player concludes the page is broken.
    */
   details?: React.ReactNode;
-  /** Defaults to the compact card the game lobby renders. */
+  /** Defaults to the compact card. Game lobby center uses `arena`; trading uses `showcase`. */
   size?: CountdownSize;
 }
 
@@ -248,6 +294,7 @@ export default function CountdownPanel({
   size = "default",
 }: CountdownPanelProps) {
   const showcase = size === "showcase";
+  const arena = size === "arena";
   const parts = splitDuration(remainingMs);
   const isComplete = parts.total <= 0;
 
@@ -267,10 +314,27 @@ export default function CountdownPanel({
     const startCells = (
       <CountdownCells
         parts={parts}
-        secondsClassName={showcase ? "text-amber-300" : "text-yellow-400 animate-pulse"}
+        secondsClassName={
+          arena || showcase
+            ? "text-amber-300"
+            : "text-yellow-400 animate-pulse"
+        }
         size={size}
       />
     );
+
+    if (arena) {
+      return (
+        <ArenaFrame borderClassName="border-cyan-400/55 shadow-[0_0_28px_rgba(34,211,238,0.22)]">
+          <ShowcaseHeading
+            icon={<Clock className="h-6 w-6 text-cyan-300" aria-hidden />}
+            label={label}
+            className="text-cyan-200"
+          />
+          {startCells}
+        </ArenaFrame>
+      );
+    }
 
     if (showcase) {
       return (
@@ -319,11 +383,40 @@ export default function CountdownPanel({
     <CountdownCells
       parts={parts}
       secondsClassName={
-        isWarning ? "text-red-400 animate-pulse" : showcase ? "text-amber-300" : "text-blue-400"
+        isWarning
+          ? "text-red-400 animate-pulse"
+          : arena || showcase
+            ? "text-amber-300"
+            : "text-blue-400"
       }
       size={size}
     />
   );
+
+  if (arena) {
+    return (
+      <ArenaFrame
+        borderClassName={
+          isWarning
+            ? "border-red-500/50 shadow-[0_0_28px_rgba(239,68,68,0.18)]"
+            : "border-cyan-400/55 shadow-[0_0_28px_rgba(34,211,238,0.22)]"
+        }
+      >
+        <ShowcaseHeading
+          icon={
+            <Clock
+              className={`h-6 w-6 ${isWarning ? "text-red-400" : "text-cyan-300"}`}
+              aria-hidden
+            />
+          }
+          label={label}
+          className={isWarning ? "text-red-200" : "text-cyan-200"}
+          extra={endingBadge}
+        />
+        {endCells}
+      </ArenaFrame>
+    );
+  }
 
   if (showcase) {
     return (

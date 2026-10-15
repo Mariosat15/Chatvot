@@ -7,6 +7,10 @@
 
 Desktop three-column arena + dedicated phone tree for **provider-game** competition lobbies only. Trading stays on `CompetitionDetailShell` / trading mobile.
 
+### Center-stage polish (same day, owner image 1)
+
+Matched the clean neon center panel: gamepad circle + short game title (uppercase), gold/cyan rule badges, blurb under badges, `CountdownPanel` size **`arena`** (cyan neon cells, no arena-blur backdrop — trading keeps `showcase`), info bar with `i`, gold chevron **PLAY** with `>>>` / `<<<`. Live code: `LobbyCenterStage.tsx`, `CountdownPanel.tsx` (`arena`), `CompetitionEntryButton` arena PLAY branch.
+
 | Piece | Live code |
 |---|---|
 | Desktop shell (~23 / 55 / 22) | `components/games/lobby/GameCompetitionArenaShell.tsx` |

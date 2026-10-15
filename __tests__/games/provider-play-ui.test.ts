@@ -1642,11 +1642,12 @@ describe("the game lobby shows a joined player the clock", () => {
     // Reused, not re-implemented. A second place that formats "2d 4h" is a second place for the
     // wording to drift, which is the shape behind several defects here.
     expect(code).toMatch(/from "@\/components\/trading\/InlineCountdown"/);
-    // Showcase four-cell clock is composed through LobbyCenterStage (server clock).
+    // Arena four-cell clock is composed through LobbyCenterStage (server clock).
+    // Flipped 15 Oct 2026 (image-1 polish): size is `arena`, not trading's `showcase`.
     expect(code).toMatch(/LobbyCenterStage/);
     expect(code).toMatch(/playModePlayerRule/);
     expect(readCode("components/games/lobby/LobbyCenterStage.tsx")).toMatch(
-      /size="showcase"/,
+      /size="arena"/,
     );
   });
 
