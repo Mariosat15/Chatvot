@@ -78,3 +78,28 @@ it("the host remembers the game's clock per round and reads it back for the resu
   expect(host).toMatch(/rememberGameClock\(phase\.roundId,\s*endsAtMs\)/);
   expect(host).toMatch(/recallGameClock\(clockRoundId\)/);
 });
+
+/**
+ * Owner, 15 Oct 2026: "the round timer ... is going up and down". When the competition cuts the
+ * round short, the game's end and the server's deadline are the same instant on two clocks; a
+ * per-tick `min` swapped between them. Every tick must now read off the game alone.
+ */
+it("does not flip between the game's and the server's clock when both end together", () => {
+  const endMs = 600_000;
+  let rises = 0;
+  // The server clock reads up to a second ahead (transit counted as skew) and ticks once a
+  // second on its own phase; the tile ticks every 250ms on the browser's clock.
+  for (const phase of [0, 100, 400, 800]) {
+    for (const aheadMs of [100, 300, 600, 900]) {
+      let prev = Number.POSITIVE_INFINITY;
+      for (let t = 0; t < 10_000; t += 250) {
+        const serverNowMs = Math.floor((t - phase) / 1000) * 1000 + phase + aheadMs;
+        const shown =
+          roundCloseRemainingMs({ expiresAtMs: endMs, serverNowMs, gameEndsAtMs: endMs, browserNowMs: t }) ?? 0;
+        if (Math.floor(shown / 1000) > Math.floor(prev / 1000)) rises++;
+        prev = shown;
+      }
+    }
+  }
+  expect(rises).toBe(0);
+});

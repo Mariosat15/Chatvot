@@ -996,6 +996,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - The Round time tile no longer jumps up and down
+
+**Never verified by eye.** Owner report: during play the Round time tile went "up and down", then carried on, then did it again.
+- **Cause:** `roundCloseRemainingMs` took the smaller of the server's remaining time and the game's on every tick. When the competition cuts the round short, those two deadlines are the same instant, but they are measured on two clocks. The server clock reads up to a second ahead (`useServerClock` counts transit as skew) and updates once a second, while the tile ticks every 250ms on the browser's clock. So the smaller value kept switching sides, and the seconds rose and fell. A simulation over 16 tick phases and offsets counted 90 rises under the old rule and 0 under the new one.
+- **Fix, part 1:** the tile follows ONE clock. It uses the game's clock unless the game claims to end more than `GAME_CLOCK_TOLERANCE_MS` (5s) after the server deadline. Both paths now round up.
+- **Fix, part 2:** `neverCountsUp` in `RoundCloseClock.tsx` stops a board poll's re-anchoring from pushing the digits back up for the same deadline.
+- **Test:** the new test goes red when the old per-tick `min` is restored.
+
 ### 15 October 2026 - The Round time tile follows the game's clock, not the competition's
 
 **Never verified by eye.** Owner screenshot: on the resume screen, the Round time tile read 13:12, the same as "Competition ends in". The cause was that the game's clock exists only while its frame is open. Without it, the tile counted to `expiresAt`, which is clamped to `playWindowEnd`, the competition end. Fix:

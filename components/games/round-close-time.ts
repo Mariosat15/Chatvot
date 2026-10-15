@@ -8,10 +8,10 @@
  *    `clock` frame message). The game paints `endsAt - Date.now()` on the BROWSER's clock, so
  *    to read the same digits as the game this half is measured on the browser's clock too.
  *
- * Reason for the `min`: a frame is untrusted, so its number may only ever SHORTEN the panel. A
- * frame claiming a later end than the server's deadline is ignored. Rounded up to a whole
- * second when the game's figure is used, because the game rounds up (`Math.ceil`) and
- * `CountdownPanel` rounds down - left alone the two would disagree by one second, every second.
+ * A frame is untrusted, so a frame claiming to end clearly later than the server's deadline is
+ * ignored (see `GAME_CLOCK_TOLERANCE_MS`). Rounded up to a whole second, because the game rounds
+ * up (`Math.ceil`) and `clock()` rounds down - left alone the two would disagree by one second,
+ * every second.
  */
 export function roundCloseRemainingMs(input: {
   expiresAtMs: number;
@@ -27,10 +27,26 @@ export function roundCloseRemainingMs(input: {
       ? input.gameEndsAtMs - input.browserNowMs
       : Number.POSITIVE_INFINITY;
 
-  const remaining = Math.min(serverRemaining, gameRemaining);
+  /*
+    Reason for choosing ONE clock rather than taking the smaller on every tick (owner, 15 Oct
+    2026: "going up and down"): when the competition ends before a full round, the game's end and
+    the server's deadline are the same instant, measured on two clocks that tick at different
+    rates and re-anchor on every poll. A per-tick `min` then swapped between them and the digits
+    jumped a second up and down. The game wins unless it claims to end clearly AFTER the server's
+    deadline; the tolerance lets the frame lengthen the display by at most a few seconds, and the
+    round still ends when the server says so.
+  */
+  const followsGame =
+    Number.isFinite(gameRemaining) &&
+    gameRemaining <= serverRemaining + GAME_CLOCK_TOLERANCE_MS;
+  const remaining = followsGame ? gameRemaining : serverRemaining;
   if (!Number.isFinite(remaining) || remaining <= 0) return null;
-  return gameRemaining <= serverRemaining ? Math.ceil(remaining / 1000) * 1000 : remaining;
+  // Rounded up on both paths because the game rounds up and `clock()` rounds down.
+  return Math.ceil(remaining / 1000) * 1000;
 }
+
+/** How far past the server's deadline a game's clock may claim before it is ignored. */
+export const GAME_CLOCK_TOLERANCE_MS = 5_000;
 
 /**
  * Before the game has reported its own clock, should the tile count to the server's deadline?

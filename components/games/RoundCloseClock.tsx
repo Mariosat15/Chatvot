@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useServerClock } from "@/hooks/useServerClock";
 import { roundCloseRemainingMs, serverDeadlineCutsRoundShort } from "./round-close-time";
 import { useRoundClock } from "./round-clock-bus";
@@ -39,6 +39,24 @@ export function RoundTimeValue({
   return <CountingRoundTime fact={fact} fallback={fallback} roundSeconds={roundSeconds} />;
 }
 
+/**
+ * Reason (owner, 15 Oct 2026: "going up and down"): every board poll re-anchors the server clock
+ * by a fraction of a second, which could push the digits back up one second. For the same
+ * deadline the shown time may only fall; a new deadline (a new round, or the game reporting its
+ * clock) starts afresh.
+ */
+function neverCountsUp(
+  shownRef: MutableRefObject<{ key: string; ms: number } | null>,
+  key: string,
+  remainingMs: number | null,
+): number | null {
+  if (remainingMs === null) return null;
+  const last = shownRef.current;
+  const ms = last && last.key === key ? Math.min(last.ms, remainingMs) : remainingMs;
+  shownRef.current = { key, ms };
+  return ms;
+}
+
 function CountingRoundTime({
   fact,
   fallback,
@@ -51,6 +69,7 @@ function CountingRoundTime({
   const serverNowMs = useServerClock(fact.serverNow);
   const followsGame = typeof fact.gameEndsAtMs === "number";
   const [browserNowMs, setBrowserNowMs] = useState(() => Date.now());
+  const shownRef = useRef<{ key: string; ms: number } | null>(null);
 
   useEffect(() => {
     if (!followsGame) return;
@@ -67,12 +86,16 @@ function CountingRoundTime({
     return <>{fallback}</>;
   }
 
-  const remainingMs = roundCloseRemainingMs({
-    expiresAtMs,
-    serverNowMs,
-    gameEndsAtMs: fact.gameEndsAtMs,
-    browserNowMs,
-  });
+  const remainingMs = neverCountsUp(
+    shownRef,
+    `${fact.expiresAt ?? ""}|${fact.gameEndsAtMs ?? ""}`,
+    roundCloseRemainingMs({
+      expiresAtMs,
+      serverNowMs,
+      gameEndsAtMs: fact.gameEndsAtMs,
+      browserNowMs,
+    }),
+  );
   // A deadline that has passed reads 0:00 rather than snapping back to the round length.
   if (remainingMs === null) {
     return <>{fact.expiresAt || followsGame ? "0:00" : fallback}</>;
