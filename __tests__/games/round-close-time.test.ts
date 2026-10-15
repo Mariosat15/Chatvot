@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { roundCloseRemainingMs } from "../../components/games/round-close-time";
+import {
+  roundCloseRemainingMs,
+  serverDeadlineCutsRoundShort,
+} from "../../components/games/round-close-time";
 
 /**
  * "Round closes in" must read the same digits as the game's own timer once the game reports
@@ -47,4 +50,31 @@ describe("round close countdown", () => {
       roundCloseRemainingMs({ expiresAtMs: Number.NaN, serverNowMs, browserNowMs: 0 }),
     ).toBeNull();
   });
+});
+
+/**
+ * Owner, 15 Oct 2026: the Round time tile read the competition's 13:12 on the resume screen.
+ * Without the game's clock, the server deadline (capped at the competition end) may only be
+ * counted when it leaves less than a whole round.
+ */
+describe("when the tile may count to the server deadline", () => {
+  it("does not while the competition outlasts a full round", () => {
+    expect(serverDeadlineCutsRoundShort(13 * 60_000, 300)).toBe(false);
+  });
+
+  it("does once the competition ends before a full round could", () => {
+    expect(serverDeadlineCutsRoundShort(120_000, 300)).toBe(true);
+  });
+
+  it("never does when the round length is unknown", () => {
+    expect(serverDeadlineCutsRoundShort(10_000, null)).toBe(false);
+    expect(serverDeadlineCutsRoundShort(10_000, Number.NaN)).toBe(false);
+  });
+});
+
+it("the host remembers the game's clock per round and reads it back for the resume screen", async () => {
+  const { readFileSync } = await import("fs");
+  const host = readFileSync("components/games/ProviderRoundHost.tsx", "utf8");
+  expect(host).toMatch(/rememberGameClock\(phase\.roundId,\s*endsAtMs\)/);
+  expect(host).toMatch(/recallGameClock\(clockRoundId\)/);
 });

@@ -130,7 +130,12 @@ export function ArenaContestPanelView({
               label: `${terms.round} time`,
               // Counts down while a round of the player's is live (owner, 15 Oct 2026: one
               // clock, not a second "Round closes in" panel). The configured length otherwise.
-              value: <RoundTimeValue fallback={roundClock ?? "—"} />,
+              value: (
+                <RoundTimeValue
+                  fallback={roundClock ?? "—"}
+                  roundSeconds={state.maxRoundSeconds ?? presentation.maxDurationSeconds}
+                />
+              ),
             },
             // One grid since 15 Oct 2026 (arena brief): the player's own two figures sit in the
             // same set as the contest's four rather than in a second block below. Two columns

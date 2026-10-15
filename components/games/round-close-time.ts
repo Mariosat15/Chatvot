@@ -31,3 +31,19 @@ export function roundCloseRemainingMs(input: {
   if (!Number.isFinite(remaining) || remaining <= 0) return null;
   return gameRemaining <= serverRemaining ? Math.ceil(remaining / 1000) * 1000 : remaining;
 }
+
+/**
+ * Before the game has reported its own clock, should the tile count to the server's deadline?
+ * Only when that deadline leaves less than a whole round, because the deadline is capped at the
+ * competition end and otherwise reads the COMPETITION's time rather than the round's (owner,
+ * 15 Oct 2026). An unknown round length counts nothing: there is no round time to show.
+ */
+export function serverDeadlineCutsRoundShort(
+  serverRemainingMs: number,
+  roundSeconds: number | null | undefined,
+): boolean {
+  if (typeof roundSeconds !== "number" || !Number.isFinite(roundSeconds) || roundSeconds <= 0) {
+    return false;
+  }
+  return Number.isFinite(serverRemainingMs) && serverRemainingMs < roundSeconds * 1000;
+}

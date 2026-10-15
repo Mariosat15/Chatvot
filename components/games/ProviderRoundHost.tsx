@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ProviderGameFrame } from "./ProviderGameFrame";
+import { recallGameClock, rememberGameClock } from "./game-clock-memory";
 import { publishRoundClock } from "./round-clock-bus";
 import { RoundPreflight } from "./RoundPreflight";
 import { RoundResultPanel } from "./RoundResultPanel";
@@ -322,6 +323,7 @@ export function ProviderRoundHost({
     (endsAtMs: number) => {
       if (phase.name !== "playing") return;
       setGameClock({ roundId: phase.roundId, endsAtMs });
+      rememberGameClock(phase.roundId, endsAtMs);
     },
     [phase],
   );
@@ -339,23 +341,27 @@ export function ProviderRoundHost({
       : phase.name === "preflight"
         ? state.liveRound
         : null;
+  const clockRoundId = clockRound?.roundId ?? null;
   const clockExpiresAt = clockRound?.expiresAt ?? null;
-  const clockGameEndsAtMs =
-    playingRoundId !== null && gameClock?.roundId === playingRoundId
-      ? gameClock.endsAtMs
-      : null;
+  const liveGameEndsAtMs =
+    clockRoundId !== null && gameClock?.roundId === clockRoundId ? gameClock.endsAtMs : null;
 
   useEffect(() => {
+    // Reason: the game's clock is remembered per round, so the resume screen and a reload keep
+    // counting the GAME's time rather than falling back to the competition end. Read here, not
+    // during render, because localStorage does not exist on the server.
+    const gameEndsAtMs =
+      liveGameEndsAtMs ?? (clockRoundId !== null ? recallGameClock(clockRoundId) : null);
     publishRoundClock(
-      clockRound
+      clockRoundId !== null
         ? {
             expiresAt: clockExpiresAt,
             serverNow: state.serverNow,
-            gameEndsAtMs: clockGameEndsAtMs,
+            gameEndsAtMs,
           }
         : null,
     );
-  }, [clockRound, clockExpiresAt, clockGameEndsAtMs, state.serverNow]);
+  }, [clockRoundId, clockExpiresAt, liveGameEndsAtMs, state.serverNow]);
 
   useEffect(() => () => publishRoundClock(null), []);
 

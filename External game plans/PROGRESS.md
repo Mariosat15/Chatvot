@@ -996,6 +996,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - The Round time tile follows the game's clock, not the competition's
+
+**Never verified by eye.** Owner screenshot: on the resume screen, the Round time tile read 13:12, the same as "Competition ends in". The cause was that the game's clock exists only while its frame is open. Without it, the tile counted to `expiresAt`, which is clamped to `playWindowEnd`, the competition end. Fix:
+- `components/games/game-clock-memory.ts` stores the game's reported `endsAt` per round in localStorage. The host reads it back, so a resumed round shows the game's real time.
+- Before the game has reported its clock, the tile shows the round length.
+- It counts to the server deadline only when the competition ends before a full round could, via `serverDeadlineCutsRoundShort` in `round-close-time.ts`.
+- 4 new tests.
+
+Not built: on a different device that has never opened the frame for that round, the tile shows the round length until the game reports, because the platform stores no live game-clock start.
+
 ### 15 October 2026 - Nobody is ranked before they play; one round clock, not two
 
 Owner: lobby waiters were ranked by join order before anybody had played, and the arena showed two clocks. **Ranking:** `lib/services/games/unscored-rank.ts` (`levelUnscoredRanks`) gives every player without a finite score one shared place, `scored + 1`, so everyone is #1 until the first result and live ranking starts from finished rounds. It is applied in `getArenaStandings` (the single producer for lobby, arena and the standings poll) **only** while a provider contest is not `completed`, **after** `calculateRankings`, which is untouched because settlement uses it and it is mirrored. The comparator already orders an absent score last, so the order is unchanged and only the number moves. **Clock:** the separate "Round closes in" panel is removed from `RoundPreflight` and the playing phase. The sidebar's **Round time** tile now counts down (`RoundTimeValue`, `min(game clock, expiresAt)` exactly as before). `ProviderRoundHost` *publishes* the deadline through the module store `components/games/round-clock-bus.ts` rather than consuming the arena context, so it stays a child of `ArenaLiveProvider` (a consumer would re-render the paid game frame on every poll). The lobby's static tile is unchanged because no round host exists there. **Mobile competitions:** nothing to change in code. The phone tree reads the same `browseCompetitions` list as desktop (initial page and `/api/competitions` for load-more), and `scopeCompetitionStatusesToParticipant` (commit `0e0b101b`, 9 Oct) already limits `finalizing` / `completed` / `cancelled` / `emergency_ended` to contests the viewer joined. If a phone still shows other people's past contests, the server is running a build older than that commit. Tests: `__tests__/games/unscored-rank.test.ts` (4), and one `provider-play-ui` assertion flipped (not deleted), with one added. **Never verified by eye.**
