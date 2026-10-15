@@ -59,6 +59,7 @@ import { LobbyHeroFeaturePills } from "@/components/games/lobby/LobbyHeroFeature
 import { LobbyContestStatsGrid } from "@/components/games/lobby/LobbyContestStatsGrid";
 import { LobbyCenterStage } from "@/components/games/lobby/LobbyCenterStage";
 import { LobbyAttemptBadges } from "@/components/games/lobby/LobbyAttemptBadges";
+import { MobileGameLobbyLeaderboard } from "@/components/games/lobby/mobile/MobileGameLobbyLeaderboard";
 import { MobileGameCompetitionLobby } from "@/components/games/lobby/mobile/MobileGameCompetitionLobby";
 import {
   resolveHeroFeatures,
@@ -530,7 +531,13 @@ export default async function ProviderContestLobby({
             creditSymbol,
             funded: competition.fundingMode === "gm_funded",
           }}
-          leaderboard={leaderboard}
+          leaderboard={
+            <MobileGameLobbyLeaderboard
+              title={terms.leaderboard}
+              scoreLabel={scoreLabel}
+              playersLabel={terms.players}
+            />
+          }
           prizes={prizesPanel}
           howItWorks={howItWorks}
           tips={tips}

@@ -996,6 +996,9 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Phone game-lobby leaderboard: no gap, 5 per page, nothing cut off
+Owner: "the leaderboard has a big gup ... after 5 you have to add more pages ... some data are cutoff". The phone Leaderboard tab was reusing the desktop `NeonPanel` + `ProviderLeaderboard` five-column grid, which kept its desktop height (the empty gap) and truncated names and squeezed score/time on a 360px screen. New dedicated `components/games/lobby/mobile/MobileGameLobbyLeaderboard.tsx`: same `MobileLobbyCard` shell as the other phone cards, height comes only from its rows (1-5 per page), `LEADERBOARD_PAGE_SIZE = 5` with Prev/Next pager shown only when there are more than 5 players, page clamped when the polled board shrinks, "Go to my rank" jump. Names and activity wrap (`break-words`, no `truncate`); score and time never shrink. Rank is the server's `currentRank`, never the row index. Wired only into the phone tree via `ProviderContestLobby`; desktop board unchanged. Guard added in `game-lobby-mobile.test.ts`. **Never verified by eye.**
+
 ### 15 October 2026 - Phone lobby countdown overflowed its tile
 
 Owner: "the countdown clock numbers are too big and they fall out of the boxes". `InlineCountdown` renders up to `12d 5h 30m 12s` and inherited the tile's 16px value size, wider than a 360px half-width tile. Both phone tiles (game `MobileGameLobbyMetrics`, trading `MobileLobbyMetrics`) now pass `block whitespace-nowrap text-[12px] tracking-tight min-[390px]:text-[13px]` to the countdown only; other tile values unchanged. Guard added in `game-lobby-mobile.test.ts`. **Never verified by eye.**

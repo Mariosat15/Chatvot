@@ -72,6 +72,26 @@ describe("game competition lobby mobile (owner guide)", () => {
     expect(metrics).toContain("DATA_ICON.prizePool");
   });
 
+  it("phone leaderboard grows with its rows and pages at 5, with nothing cut off", () => {
+    const board = read("components/games/lobby/mobile/MobileGameLobbyLeaderboard.tsx");
+    expect(board).toContain("LEADERBOARD_PAGE_SIZE = 5");
+    expect(board).toContain("rows.slice(start, start + LEADERBOARD_PAGE_SIZE)");
+    expect(board).toMatch(/pageCount > 1 \?/);
+    expect(board).toContain("Math.min(page, pageCount - 1)");
+    // Same card shell as the trading phone board; no desktop panel or fixed heights.
+    expect(board).toContain("<MobileLobbyCard");
+    expect(board).not.toContain("NeonPanel");
+    expect(board).not.toMatch(/\bmin-h-\[|\bh-\[\d|max-h-/);
+    // Wrap, never truncate.
+    expect(board).not.toContain("truncate");
+    expect(board).toContain("break-words");
+    expect(board.match(/whitespace-nowrap/g)?.length).toBe(2);
+    // Rank from the server, not from the row index.
+    expect(board).toContain("rank={row.currentRank}");
+    expect(lobby).toContain("<MobileGameLobbyLeaderboard");
+    expect(phone).not.toContain("ProviderLeaderboard");
+  });
+
   it("sizes the tile countdown down so '12d 5h 30m 12s' fits a 360px half-width tile", () => {
     const tradingMetrics = read("components/competitions/lobby/mobile/MobileLobbyMetrics.tsx");
     for (const file of [metrics, tradingMetrics]) {
