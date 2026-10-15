@@ -23,6 +23,7 @@ const STYLES = new Map<CompetitionStatusKey, string>([
   ["refunded", "border-orange-500/50 bg-orange-600/30 text-orange-100"],
   ["full", "border-gray-500/40 bg-gray-600/40 text-gray-200"],
   ["in_progress", "border-cyan-400/40 bg-cyan-500/20 text-cyan-100"],
+  ["ended", "border-violet-400/45 bg-violet-600/30 text-violet-100"],
 ]);
 
 const ICONS = new Map<CompetitionStatusKey, string>([
@@ -33,6 +34,7 @@ const ICONS = new Map<CompetitionStatusKey, string>([
   ["private_gm", COMPETITION_ICON.bolt],
   ["gm_funded", COMPETITION_ICON.volts],
   ["completed", COMPETITION_ICON.trophyGold],
+  ["ended", COMPETITION_ICON.clock],
   ["full", COMPETITION_ICON.players],
 ]);
 

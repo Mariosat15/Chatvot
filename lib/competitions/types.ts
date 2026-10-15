@@ -10,7 +10,9 @@ export type CompetitionStatusKey =
   | "cancelled"
   | "refunded"
   | "full"
-  | "in_progress";
+  | "in_progress"
+  /** Past its end time, waiting for results to be finalized. */
+  | "ended";
 
 export type CtaVariant =
   | "join"

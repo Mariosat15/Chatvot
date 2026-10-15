@@ -291,3 +291,62 @@ describe("buildCompetitionPresentation", () => {
     ]);
   });
 });
+
+describe("card state follows the clock, not a stale stored status", () => {
+  const H = 3600_000;
+  const now = Date.parse("2026-10-15T12:00:00Z");
+  const at = (ms: number) => new Date(now + ms).toISOString();
+  const build = (c: Partial<CompetitionListItem>, o: { isRegistered?: boolean; registrationClosed?: boolean } = {}) =>
+    buildCompetitionPresentation(base(c), {
+      isRegistered: o.isRegistered ?? false,
+      userBalance: 1000,
+      registrationClosed: o.registrationClosed ?? false,
+      now,
+    });
+
+  it("a stored 'upcoming' contest past its end is ENDED with an enabled lobby link, no countdown", () => {
+    for (const isRegistered of [false, true]) {
+      const p = build(
+        { status: "upcoming", startTime: at(-49 * H), endTime: at(-1 * H) },
+        { isRegistered, registrationClosed: true },
+      );
+      expect(p.status).toBe("ended");
+      expect(p.countdown).toBeUndefined();
+      expect(p.countdownLabel).toBeUndefined();
+      expect(p.cta.disabled).toBe(false);
+      expect(p.cta.variant).toBe("details");
+      expect(p.cta.label).toBe(isRegistered ? "Results Pending" : "View Details");
+    }
+  });
+
+  it("a stored 'active' contest past its end is ENDED too, never Play Now", () => {
+    const p = build({ status: "active", startTime: at(-2 * H), endTime: at(-60_000) }, { isRegistered: true });
+    expect(p.status).toBe("ended");
+    expect(p.cta.variant).not.toBe("play");
+  });
+
+  it("a stored 'upcoming' contest past its start counts to the END and plays like a live one", () => {
+    const seated = build({ status: "upcoming", startTime: at(-H), endTime: at(5 * H) }, { isRegistered: true });
+    expect(seated.status).toBe("live");
+    expect(seated.countdown).toEqual({ kind: "ends", target: at(5 * H) });
+    expect(seated.cta.variant).toBe("play");
+    const open = build({ status: "upcoming", startTime: at(-H), endTime: at(5 * H) });
+    expect(open.cta.label).toBe("Join Competition");
+    const closed = build({ status: "upcoming", startTime: at(-H), endTime: at(5 * H) }, { registrationClosed: true });
+    expect(closed.cta.label).toBe("Registration Closed");
+    expect(closed.cta.disabled).toBe(true);
+  });
+
+  it("a genuinely upcoming contest still counts to the start and offers Reserve / Already In", () => {
+    const p = build({ status: "upcoming", startTime: at(H), endTime: at(5 * H) });
+    expect(p.status).toBe("starting_soon");
+    expect(p.countdown).toEqual({ kind: "starts", target: at(H) });
+    expect(p.cta.label).toBe("Reserve Spot");
+    expect(build({ status: "upcoming", startTime: at(H), endTime: at(5 * H) }, { isRegistered: true }).cta.variant).toBe("already_in");
+  });
+
+  it("settled contests keep their stored state whatever the clock says", () => {
+    expect(build({ status: "completed", endTime: at(-H) }).cta.variant).toBe("results");
+    expect(build({ status: "cancelled", endTime: at(H) }).status).toBe("cancelled");
+  });
+});

@@ -67,6 +67,15 @@ export function CompetitionCTA({
       <span className="sr-only">{cta.label}</span>
     </>
   );
+  // Reason: the greyed Join artwork has "Join Competition" baked in, and the in-grid cell has no
+  // room for a caption - so "Registration Closed" read as a broken Join button. Overlay the real
+  // label on the cell; the artwork is the only state cue left otherwise.
+  const overlay =
+    greyed && fillCell ? (
+      <span className="pointer-events-none absolute inset-x-1 top-1/2 -translate-y-1/2 rounded-md border border-white/15 bg-black/75 px-1.5 py-1 text-center text-[10px] font-extrabold uppercase leading-tight tracking-wide text-white/85">
+        {cta.label}
+      </span>
+    ) : null;
 
   return (
     <div
@@ -75,9 +84,12 @@ export function CompetitionCTA({
       } ${className}`}
     >
       {unavailable ? (
-        <button type="button" disabled className={shell}>
-          {inner}
-        </button>
+        <div className={`relative flex w-full justify-center ${fillCell ? "h-full" : ""}`}>
+          <button type="button" disabled className={shell}>
+            {inner}
+          </button>
+          {overlay}
+        </div>
       ) : (
         <Link href={cta.href} className={shell}>
           {inner}

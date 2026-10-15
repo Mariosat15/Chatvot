@@ -7,6 +7,7 @@
 
 import { privateContestCardCopy } from "@/lib/utils/private-contest-card-copy";
 import { isSponsoredContest } from "@/lib/utils/sponsored-contest-copy";
+import type { CompetitionPhase } from "./competition-phase";
 import type { CompetitionCta, CompetitionListItem } from "./types";
 
 export interface CompetitionCtaInput {
@@ -14,6 +15,8 @@ export interface CompetitionCtaInput {
   isRegistered: boolean;
   userBalance: number;
   registrationClosed: boolean;
+  /** Where the contest is in time; defaults to the stored status when omitted. */
+  phase?: CompetitionPhase;
 }
 
 function lobbyHref(id: string): string {
@@ -28,6 +31,13 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
   const { competition: c, isRegistered, userBalance, registrationClosed } = input;
   const id = String(c._id);
   const status = c.status;
+  const phase: CompetitionPhase =
+    input.phase ??
+    (status === "completed" || status === "cancelled"
+      ? "settled"
+      : status === "active"
+        ? "running"
+        : "upcoming");
   const entryFee = Number(c.entryFeeCredits ?? c.entryFee ?? 0) || 0;
   const current = Number(c.currentParticipants ?? 0);
   const max = Number(c.maxParticipants ?? 0);
@@ -60,6 +70,19 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
     };
   }
 
+  // Reason: past its end and not finalized yet - nobody can join or play any more, so a Join,
+  // Reserve or Registration Closed button is a promise about a contest that is over. Everyone
+  // (seated or not) gets the lobby, which shows the final standings while results settle.
+  if (phase === "ended") {
+    return {
+      label: isRegistered ? "Results Pending" : "View Details",
+      href: lobbyHref(id),
+      variant: "details",
+      disabled: false,
+      reason: "Ended - results are being finalized",
+    };
+  }
+
   // Private GM path — reuse existing copy; always link to lobby (never join from list).
   if (
     privateAccess &&
@@ -86,7 +109,7 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
   }
 
   if (isRegistered) {
-    if (status === "active") {
+    if (phase === "running") {
       return {
         label: "Play Now",
         href: lobbyHref(id),
@@ -132,7 +155,7 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
     };
   }
 
-  if (status === "upcoming") {
+  if (phase === "upcoming") {
     return {
       label: "Reserve Spot",
       href: lobbyHref(id),
@@ -141,7 +164,7 @@ export function getCompetitionCTA(input: CompetitionCtaInput): CompetitionCta {
     };
   }
 
-  if (status === "active") {
+  if (phase === "running") {
     return {
       label: "Join Competition",
       href: lobbyHref(id),

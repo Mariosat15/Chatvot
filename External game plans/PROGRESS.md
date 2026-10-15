@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - A finished competition no longer reads "Starting soon" with a greyed Join button
+
+**Owner report (screenshot):** a trading card that had already ended showed `STARTING SOON`, `Starts in: Starting now` and a greyed `Join Competition` button. **Cause:** the card trusted the stored `status`, which only moves when the every-minute cron starts, cancels or finalizes a contest. The countdown therefore aimed at a start already gone, and the button was the `Registration Closed` state drawn as the greyed Join artwork. That artwork has "Join Competition" baked in, and the in-grid cell has no caption. **Fix:** `lib/competitions/competition-phase.ts` works out where the contest is in time (`settled` / `upcoming` / `running` / `ended`), and the badge, the countdown and `getCompetitionCTA` all read it. A contest past its end, and not yet finalized, shows `ENDED • RESULTS PENDING` with no countdown. Its button is an enabled lobby link: `Results Pending` if you are seated, `View Details` if not. A stale `upcoming` contest past its start counts to the **end** and plays like a live one (Play Now / Join / Registration Closed). Completed and cancelled contests still follow the stored status. Any greyed button inside a card cell now overlays its real label (`Registration Closed`, `Competition Full`) on the artwork. Desktop and phone cards share the presentation, so both are covered. 5 new tests in `__tests__/competitions/competition-presentation.test.ts`; 102 competition tests green. **Not changed:** the browse tabs still filter on the stored status server-side. **Never verified by eye.**
+
 ### 15 October 2026 - The Round time tile no longer jumps up and down
 
 **Never verified by eye.** Owner report: during play the Round time tile went "up and down", then carried on, then did it again.

@@ -11,6 +11,7 @@ import {
 import { COMPETITION_ICON, resolveGameDefinition } from "./game-definitions";
 import { resolveCompetitionArtwork } from "./game-artwork";
 import { getCompetitionCTA } from "./competition-cta";
+import { resolveCompetitionPhase, type CompetitionPhase } from "./competition-phase";
 import type {
   CompetitionListItem,
   CompetitionMetric,
@@ -90,6 +91,7 @@ function gameCodeOf(c: CompetitionListItem): string | undefined {
 function resolveStatus(
   c: CompetitionListItem,
   isFull: boolean,
+  phase: CompetitionPhase,
 ): { status: CompetitionStatusKey; label: string } {
   if (c.status === "cancelled") {
     const refunded =
@@ -101,13 +103,16 @@ function resolveStatus(
   if (c.status === "completed") {
     return { status: "completed", label: "COMPLETED" };
   }
+  if (phase === "ended") {
+    return { status: "ended", label: "ENDED • RESULTS PENDING" };
+  }
   if (c.isPrivate || (c.privateAccess && c.privateAccess !== "member")) {
-    if (c.status === "active") {
+    if (phase === "running") {
       return { status: "live", label: "LIVE NOW" };
     }
     return { status: "private_gm", label: "PRIVATE • GM ONLY" };
   }
-  if (c.status === "active") {
+  if (phase === "running") {
     if (isFull) return { status: "full", label: "FULL" };
     return { status: "live", label: "LIVE NOW" };
   }
@@ -308,7 +313,8 @@ export function buildCompetitionPresentation(
   const current = Number(competition.currentParticipants ?? 0);
   const max = Number(competition.maxParticipants ?? 0);
   const isFull = max > 0 && current >= max;
-  const { status, label } = resolveStatus(competition, isFull);
+  const phase = resolveCompetitionPhase(competition, opts.now ?? Date.now());
+  const { status, label } = resolveStatus(competition, isFull, phase);
 
   const primaryMetrics = def.primaryMetrics
     .map((k) => buildMetric(k, competition, opts.creditSymbol, def.scoreRule))
@@ -372,6 +378,7 @@ export function buildCompetitionPresentation(
     isRegistered: opts.isRegistered,
     userBalance: opts.userBalance,
     registrationClosed: opts.registrationClosed,
+    phase,
   });
 
   const desc = (competition.description || "").trim();
@@ -401,13 +408,15 @@ export function buildCompetitionPresentation(
     status,
     statusLabel: label,
     countdownLabel:
-      competition.status === "upcoming"
+      phase === "upcoming"
         ? formatCountdown(competition.startTime, opts.now)
         : undefined,
+    // Reason: keyed on the phase, not the stored status - a stale "upcoming" past its start
+    // counted to a moment already gone and read "Starting now" over a finished contest.
     countdown:
-      competition.status === "upcoming"
+      phase === "upcoming"
         ? { kind: "starts", target: String(competition.startTime) }
-        : competition.status === "active"
+        : phase === "running"
           ? { kind: "ends", target: String(competition.endTime) }
           : undefined,
     tags,
