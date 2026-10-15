@@ -200,8 +200,13 @@ export function GameArenaLayout({
           `object-right` keeps the trophy side inside the box; a light left feather still
           joins copy to picture without eating the right edge.
         */}
+        {/*
+          52% WIDE SINCE 15 OCT 2026 (cinematic hero brief): the picture is the right half of
+          the banner rather than a 360px corner. `ArenaIdentity` holds an empty track of the same
+          proportion, so the copy still ends before the artwork starts.
+        */}
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[360px] overflow-hidden xl:block"
+          className="pointer-events-none absolute inset-y-0 right-0 hidden w-[52%] overflow-hidden xl:block"
           aria-hidden
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -210,7 +215,8 @@ export function GameArenaLayout({
             alt=""
             className="absolute inset-0 h-full w-full object-cover object-right"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/35 to-transparent to-55%" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/25 to-transparent to-40%" />
+          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#070C1A]/70 to-transparent" />
         </div>
 
         {/*
@@ -260,7 +266,23 @@ export function GameArenaLayout({
         the band starts under the fold. A fixed `h-` or `max-h-[calc]` was the squeeze and
         is forbidden by the arena-leaderboard-panel guard besides.
       */}
-      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:min-h-[calc(100dvh-14rem)]">
+      {/*
+        THE BAND MOVED INTO THE GRID ON 15 OCTOBER 2026 (owner's redesign brief: "How It Works
+        and Game Tips sit directly beneath the main content, no empty space"). At `xl` it is
+        the second row of the CENTRE column only, while the standings and the facts column each
+        span both rows, so Prize Breakdown stays under Contest Info on the right and the band
+        starts where the stage ends. The viewport `min-h` that pushed the band below the fold
+        (27 Sep) is gone - with the band beside the side columns instead of under them, that
+        floor only re-creates the empty gap the brief asked to remove.
+
+        PHONE ORDER (same brief): banner, stage (title, countdown, PLAY), stats, leaderboard,
+        prizes, band. The facts column dissolves into this grid below `lg` (`contents`) so its
+        two panels can be ordered either side of the standings. ONE TREE, NOT A MOBILE FORK,
+        and that is a recorded deviation from the player-mobile-ui rule: the stage hosts a live
+        round in an iframe that polls, so rendering it twice would run two rounds' worth of
+        state against one paid attempt.
+      */}
+      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[300px_minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)_auto]">
         {/*
           EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
           order-modified document order, so a rule that only fires at `xl` leaves the other two
@@ -277,7 +299,7 @@ export function GameArenaLayout({
           stretched grid item (s4.1t / s4.1y). No viewport max-height - that was what left the
           green-marked gap under the CTA while the prize column kept growing.
         */}
-        <div className="order-2 min-h-0 lg:order-3 xl:order-1 xl:[&>*]:h-full">
+        <div className="order-3 min-h-0 lg:order-3 xl:col-start-1 xl:row-span-2 xl:row-start-1 xl:order-1 xl:[&>*]:h-full">
           {standings}
         </div>
 
@@ -286,7 +308,7 @@ export function GameArenaLayout({
           the frame. Floor matches the row's min-h so a short prize sidebar still yields a
           tall board — the growth the owner marked with the green arrow under Soft Drop.
         */}
-        <div className="order-1 min-h-0 lg:order-1 xl:order-2 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+        <div className="order-1 min-h-0 lg:order-1 xl:order-2 xl:col-start-2 xl:row-start-1 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
           {stage}
         </div>
 
@@ -296,10 +318,9 @@ export function GameArenaLayout({
           breakdown) is the only `flex-1` so contest facts stay their natural height and the
           prize panel's foot lines up with Submit / the board frame.
         */}
-        <div className="order-3 flex flex-col gap-3 lg:order-2 xl:order-3 xl:h-full xl:min-h-0 [&>*:last-child]:xl:flex-1 [&>*:last-child]:xl:min-h-0">
+        <div className="max-lg:contents lg:order-2 lg:flex lg:flex-col lg:gap-3 xl:order-3 xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:h-full xl:min-h-0 max-lg:[&>*:nth-child(1)]:order-2 max-lg:[&>*:nth-child(2)]:order-4 [&>*:last-child]:xl:flex-1 [&>*:last-child]:xl:min-h-0">
           {sidebar}
         </div>
-      </div>
 
       {/*
         THE REFERENCE'S BOTTOM INFORMATION STRIP: two compact cards in one row after Recent
@@ -313,13 +334,14 @@ export function GameArenaLayout({
         Rules / tips sit quieter than the board stage (26 Sep 2026 hierarchy pass). Opacity on
         the wrappers, not inside the panels — lobby callers of the same panels stay full-bright.
       */}
-      <div className="mt-3 flex flex-wrap items-stretch gap-2.5 overflow-hidden opacity-85 has-[>:not(:empty)]:sm:h-[300px] [:not(:has(>:not(:empty)))]:hidden">
+      <div className="order-5 flex flex-wrap items-stretch gap-2.5 overflow-hidden has-[>:not(:empty)]:sm:h-[300px] lg:order-4 lg:col-span-2 xl:col-span-1 xl:col-start-2 xl:row-start-2 [:not(:has(>:not(:empty)))]:hidden">
         <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {rules}
         </div>
         <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {highlights}
         </div>
+      </div>
       </div>
     </div>
   );

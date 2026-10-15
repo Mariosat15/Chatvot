@@ -125,7 +125,15 @@ export async function ArenaIdentity({
       Logo track 200px / reserve 360px for right art (owner 26 Sep: bigger logo + end banner
       was cutoff). Numbers stay locked together in arena-hero.test.ts.
     */
-    <div className="grid h-full items-center gap-3 grid-cols-[64px_minmax(0,1fr)] sm:gap-5 sm:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,1fr)_360px]">
+    /*
+      CINEMATIC SINCE 15 OCTOBER 2026 (owner's Circuit Sprint redesign brief): the artwork is
+      no longer a small window at the right edge but the right half of the banner, with the
+      feature chips stacked over its far edge. Four tracks at `xl`: logo, copy, an EMPTY track
+      the artwork shows through, and the chips. The empty track is still the rule that keeps
+      the copy off the picture - it just got wider. The chips carry their own opaque face, so
+      nothing written sits on bare artwork.
+    */
+    <div className="grid h-full items-center gap-3 grid-cols-[64px_minmax(0,1fr)] sm:gap-5 sm:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[200px_minmax(0,0.9fr)_minmax(0,1fr)_190px]">
       <GameLogo url={presentation.logoUrl} name={presentation.gameName} />
 
       <div className="flex min-w-0 items-center gap-6">
@@ -147,7 +155,7 @@ export async function ArenaIdentity({
             hide them with nothing on screen to say so - and the full name is on the logo's
             alt text and on the lobby.
           */}
-          <h1 className="mt-1 truncate bg-gradient-to-r from-white via-sky-100 to-fuchsia-200 bg-clip-text text-[22px] font-black uppercase italic leading-tight tracking-wide text-transparent sm:text-[32px]">
+          <h1 className="mt-1 truncate bg-gradient-to-b from-white via-amber-100 to-amber-400 bg-clip-text text-[22px] font-black uppercase italic leading-tight tracking-wide text-transparent drop-shadow-[0_0_12px_rgba(34,211,238,0.45)] sm:text-[38px]">
             {title}
           </h1>
 
@@ -181,7 +189,7 @@ export async function ArenaIdentity({
           tablet width, and dropping them is better than wrapping them under the title - that
           is precisely how this hero grew the first time.
         */}
-        <div className="hidden shrink-0 items-start gap-5 lg:flex">
+        <div className="hidden shrink-0 items-start gap-5 lg:flex xl:hidden">
           {features.map((feature) => {
             const Icon = feature.icon
               ? FEATURE_ICONS.get(feature.icon) ?? NEUTRAL_ICON
@@ -207,6 +215,33 @@ export async function ArenaIdentity({
           })}
         </div>
       </div>
+
+      {/* The artwork shows through this track; nothing is written on it. */}
+      <div className="hidden xl:block" aria-hidden />
+
+      {/*
+        THE STACKED CHIPS, `xl` only (15 Oct 2026 brief). Boxed here, unlike the inline row
+        above, because they sit over the artwork and the opaque face is what keeps the label
+        legible on any uploaded picture. Same features, same order, same resolver.
+      */}
+      <ul className="hidden flex-col gap-1.5 xl:flex">
+        {features.map((feature) => {
+          const Icon = feature.icon
+            ? FEATURE_ICONS.get(feature.icon) ?? NEUTRAL_ICON
+            : NEUTRAL_ICON;
+          return (
+            <li
+              key={feature.label}
+              className="flex items-center gap-2.5 rounded-lg border border-cyan-400/35 bg-[#071331]/85 px-3 py-2 shadow-[0_0_12px_rgba(34,211,238,0.22)] backdrop-blur-sm"
+            >
+              <Icon className="h-5 w-5 shrink-0 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.85)]" />
+              <span className="truncate text-[11px] font-bold uppercase tracking-wide text-gray-100">
+                {feature.label}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

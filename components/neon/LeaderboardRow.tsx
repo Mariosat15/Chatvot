@@ -101,10 +101,11 @@ export function NeonRankBadge({
         </span>
       );
     }
+    // Silver since 15 Oct 2026 (redesign brief: gold, silver, bronze for the top three).
     if (rank === 2) {
       return (
         <span
-          className={`flex ${plate} items-center justify-center rounded-lg border border-[#2BB0FF]/60 bg-[#1B7DFF]/25 text-xs font-bold text-sky-100 shadow-[0_0_8px_rgba(43,176,255,0.35)]`}
+          className={`flex ${plate} items-center justify-center rounded-lg border border-slate-300/65 bg-slate-300/20 text-xs font-bold text-slate-100 shadow-[0_0_8px_rgba(203,213,225,0.35)]`}
         >
           {rank}
         </span>

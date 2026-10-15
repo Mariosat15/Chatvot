@@ -996,6 +996,29 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Arena (`/competitions/[id]/play`) visual redesign to the owner's lobby reference
+
+**What:** The owner supplied a target screenshot and a written spec ("Circuit Sprint Competition Lobby Redesign"). This was a **visual change only**: no logic, route, loader or money path changed, and no risk number applies.
+- **Hero:** the artwork now covers about half the width. Feature chips are stacked on the right at `xl`, and the title has a gold gradient.
+- **Centre stage:** a gamepad heading, amber attempts and cyan play-mode badges, the larger `arena` countdown, an info bar with the unchanged one-attempt sentence, and the **gold `ArenaPlayPlate`** as the Play control. It is still a native `<button>`, because creating a round spends an attempt.
+- **Bottom band:** How It Works and Game Tips now sit **inside the grid directly under the stage** at `xl`, instead of spanning the page. How It Works rows have neon connectors.
+- **Leaderboard:** rank 2 has a silver plate.
+- **Contest info:** six stacked stat tiles in one grid.
+- **Prize Breakdown:** still under Contest Info.
+- **Phone order:** banner, stage, contest info, leaderboard, prizes, band.
+
+**Recorded deviation from `player-mobile-ui.mdc` rule 1:** there is no separate mobile tree. The stage hosts a live round iframe and the live-standings provider, so it must be mounted exactly once; a second tree below `md` would mount a second round host. The phone order uses responsive `order` on one tree, with `max-lg:contents` on the facts column.
+
+**Four guard tests were flipped, not deleted, each with a dated reason:**
+- the hero's reserved art track
+- the per-breakpoint order counts, now four grid items at `lg`
+- the act-now button, where the pre-flight now borrows `ArenaPlayPlate`
+- the standings wrapper class order, which was kept adjacent
+
+**Checks:** the games, competitions, player and ui suites pass apart from the four failures that were already there before this work (`practice-ai-opponents` mirror, `arena-band` ×2, `start-wait` mirror). Lint and the typecheck are clean on the changed files.
+
+**Never verified by eye.** The arena is behind sign-in.
+
 ### 15 October 2026 - Join refuses when play/trade is impossible (charge-then-refuse closed)
 
 **What:** Players could agree terms, pay the entry fee, then hit Play and see "This race can no longer be joined" while Join Late stayed enabled. Root cause: registration deadline floored at play-window end (late-join rule) so entry stayed open after a scheduled race finished or the cancel-wait elapsed, and after the contest clock ended while cron had not yet marked `completed`.

@@ -247,8 +247,16 @@ describe("the arena hero stays one thin banner", () => {
       The banner's picture bleeds to the right edge. Without a track held back for it the copy
       runs underneath, so a player reads a tagline over a trophy - and the alternative fix,
       shortening the copy, is a guess that is wrong at the next viewport width.
+
+
+      FLIPPED 15 OCT 2026 (owner's cinematic-hero brief), claim unchanged: the reserve is now
+      an EMPTY fractional track between the copy and the stacked feature chips, sized to
+      match the layout's 52%-wide artwork. The track must exist and must hold nothing.
     */
-    expect(readCode(IDENTITY)).toMatch(/xl:grid-cols-\[[^\]]*_360px\]/);
+    const code = readCode(IDENTITY);
+    expect(code).toMatch(/xl:grid-cols-\[200px_minmax\(0,0\.9fr\)_minmax\(0,1fr\)_190px\]/);
+    expect(code).toMatch(/<div className="hidden xl:block" aria-hidden \/>/);
+    expect(readCode(LAYOUT)).toMatch(/w-\[52%\]/);
   });
 
   it("paints the full-width wash before the right-hand piece", () => {

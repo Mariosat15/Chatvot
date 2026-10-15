@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertCircle, Clock, Loader2, Play, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { neonButtonClasses } from "@/components/neon/Buttons";
+import { AlertCircle, Clock, Gamepad2, Info, Loader2, RotateCcw } from "lucide-react";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
+import { ArenaPlayPlate } from "@/components/games/lobby/ArenaPlayPlate";
 import CountdownPanel from "@/components/competitions/CountdownPanel";
 import { NEON_INSET, NEON_STAGE_PANEL } from "@/components/neon/tokens";
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
@@ -338,16 +338,26 @@ export function RoundPreflight({
 
   return (
     <div className={`space-y-4 p-6 ${NEON_STAGE_PANEL}`}>
+      {/*
+        STAGE HEADING (15 Oct 2026 redesign brief): a gamepad disc beside a large italic title,
+        then the rules as badges - attempts in gold, how the contest runs in cyan. The words are
+        unchanged; only their dress is.
+      */}
       <div>
-        <h2 className="text-xl font-bold uppercase tracking-wide text-white">
-          {gameName}
-        </h2>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-gray-200">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_16px_rgba(34,211,238,0.35)]">
+            <Gamepad2 aria-hidden className="h-5 w-5 text-cyan-300" />
+          </span>
+          <h2 className="min-w-0 truncate text-2xl font-black uppercase italic tracking-wide text-white drop-shadow-[0_0_10px_rgba(34,211,238,0.35)] sm:text-[28px]">
+            {gameName}
+          </h2>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200">
             {describeAttempts(state)}
           </span>
           {state.playMode && (
-            <span className="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
+            <span className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
               {playModePlayerRule(state.playMode, format).label}
             </span>
           )}
@@ -364,6 +374,7 @@ export function RoundPreflight({
           remainingMs={clock.targetMs - now}
           label={clock.label}
           variant={clock.label === "Play closes in" ? "end" : "start"}
+          size="arena"
           details={
             <div className="space-y-1">
               {clock.note && (
@@ -502,25 +513,39 @@ export function RoundPreflight({
         the path they take every time.
       */}
       {!resuming && !blocked && (
-        <p className="text-xs text-gray-500">
-          Starting uses one attempt, even if you leave before finishing.
-        </p>
+        <div className="flex items-start gap-2 rounded-lg border border-cyan-400/25 bg-cyan-500/5 p-3">
+          <Info aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
+          <p className="text-xs text-gray-300">
+            Starting uses one attempt, even if you leave before finishing.
+          </p>
+        </div>
       )}
 
-      <Button
+      {/*
+        THE GOLD PLATE (15 Oct 2026 redesign brief) inside a REAL `<button>`: starting a round
+        spends a paid attempt, so it stays a click with a handler and a `disabled` attribute -
+        never a link, and never a plate that merely looks refused. The press effect is the
+        shared one; the plate supplies hover and the disabled look.
+      */}
+      <button
+        type="button"
         onClick={onLaunch}
         disabled={launching || blocked}
-        className={`w-full ${neonButtonClasses("action")}`}
+        aria-busy={launching}
+        className={`block w-full cursor-pointer disabled:cursor-not-allowed ${PRESS_EFFECT}`}
       >
-        {launching ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : resuming ? (
-          <RotateCcw className="mr-2 h-4 w-4" />
-        ) : (
-          <Play className="mr-2 h-4 w-4" />
-        )}
-        {buttonLabel}
-      </Button>
+        <ArenaPlayPlate
+          label={buttonLabel}
+          disabled={blocked}
+          icon={
+            launching ? (
+              <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
+            ) : resuming ? (
+              <RotateCcw aria-hidden className="h-5 w-5" />
+            ) : undefined
+          }
+        />
+      </button>
 
       <PreflightRoundList rounds={state.rounds} />
     </div>

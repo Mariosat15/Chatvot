@@ -2087,15 +2087,25 @@ describe("the arena puts the board first at every width", () => {
   */
   const code = readCode(ARENA_LAYOUT);
 
-  it("gives all three columns an order at every breakpoint", () => {
-    // The base class only, so `lg:order-3` is not counted twice.
+  it("gives every grid item an order at every breakpoint", () => {
+    /*
+      FLIPPED 15 OCT 2026 (owner's arena redesign brief), claim unchanged: every item still has
+      an order at every width. What moved is the item count. The rules band joined the grid so
+      it can sit directly under the stage at `xl`, which makes four items at `lg`; and below
+      `lg` the facts column dissolves (`max-lg:contents`), so its two panels carry their own
+      phone orders instead of the wrapper carrying one. At `xl` the band is placed by
+      `col-start` / `row-start` rather than by order, so three orders there is still right.
+    */
     const base = code.match(/(?:^|["\s])order-\d/g) ?? [];
-    const lg = code.match(/lg:order-\d/g) ?? [];
+    const lg = code.match(/(?<!max-)lg:order-\d/g) ?? [];
     const xl = code.match(/xl:order-\d/g) ?? [];
 
     expect(base).toHaveLength(3);
-    expect(lg).toHaveLength(3);
+    expect(lg).toHaveLength(4);
     expect(xl).toHaveLength(3);
+    expect(code).toMatch(/max-lg:contents/);
+    expect(code).toMatch(/max-lg:\[&>\*:nth-child\(1\)\]:order-2/);
+    expect(code).toMatch(/max-lg:\[&>\*:nth-child\(2\)\]:order-4/);
   });
 
   it("puts the board first on a phone and on a laptop", () => {
@@ -2264,9 +2274,18 @@ describe("the stage is dressed in the same kit as the frame around it", () => {
       definition; the negative half is what stops a screen importing it and then styling the
       button itself anyway.
     */
-    for (const file of [PREFLIGHT, RESULT]) {
-      const code = readCode(file);
-      expect(code).toMatch(/neonButtonClasses\(["']action["']\)/);
+    /*
+      FLIPPED FOR THE PRE-FLIGHT ON 15 OCT 2026 (owner's arena redesign brief: a gold PLAY
+      button). Play now borrows the lobby's `ArenaPlayPlate` rather than `neonButtonClasses`,
+      so the one PLAY control looks the same on the lobby and in the arena. The claim is
+      unchanged - borrowed, never restated - which is why the negative half still applies to
+      both files.
+    */
+    const result = readCode(RESULT);
+    expect(result).toMatch(/neonButtonClasses\(["']action["']\)/);
+    const preflight = readCode(PREFLIGHT);
+    expect(preflight).toMatch(/<ArenaPlayPlate\b/);
+    for (const code of [preflight, result]) {
       expect(code).not.toMatch(/bg-gradient-to-r from-/);
     }
   });

@@ -619,6 +619,7 @@ export function NeonStatStrip({
 export function NeonStatTiles({
   items,
   columns = 2,
+  stacked = false,
 }: {
   items: {
     icon: LucideIcon;
@@ -628,6 +629,11 @@ export function NeonStatTiles({
     value: React.ReactNode;
   }[];
   columns?: 2 | 3;
+  /**
+   * Icon ABOVE the label rather than beside it (15 Oct 2026 arena brief). Needed for three
+   * columns in a 340px rail, where an icon and a label on one row truncate every caption.
+   */
+  stacked?: boolean;
 }) {
   return (
     <div
@@ -635,6 +641,22 @@ export function NeonStatTiles({
     >
       {items.map((item) => {
         const classes = accentClasses(item.accent);
+        if (stacked) {
+          return (
+            <div
+              key={item.label}
+              className={`${NEON_FACE_TILE} flex min-w-0 flex-col items-center gap-1 px-1.5 py-2.5 text-center`}
+            >
+              <IconTile icon={item.icon} accent={item.accent} size="sm" />
+              <span className={`w-full truncate text-[0.58rem] tracking-[0.1em] ${NEON_LABEL}`}>
+                {item.label}
+              </span>
+              <span className={`w-full truncate text-base font-bold leading-none ${classes.text}`}>
+                {item.value}
+              </span>
+            </div>
+          );
+        }
         return (
           <div
             key={item.label}

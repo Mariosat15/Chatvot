@@ -258,6 +258,20 @@ export default function GameRulesPanel({ presentation, layout }: Props) {
  * re-read the rule without leaving the board. The compact fallback below is why the panel is
  * not silent when a title has a scoring rule and no instructions.
  */
+/**
+ * The neon line joining one step's disc to the next (15 Oct 2026 arena brief). It spans the
+ * gap between two boxed rows, so it is drawn from the bottom edge of a row and is as tall as
+ * the list's `space-y-1.5`. `left` is the disc's centre, which differs between the two lists.
+ */
+function StepConnector({ left }: { left: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute top-full h-1.5 w-0.5 -translate-x-1/2 bg-gradient-to-b from-cyan-300 to-violet-400 shadow-[0_0_6px_rgba(34,211,238,0.8)] ${left}`}
+    />
+  );
+}
+
 function RulesStrip({
   authored,
   text,
@@ -281,7 +295,7 @@ function RulesStrip({
               return (
                 <li
                   key={index}
-                  className="flex min-h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-1"
+                  className="relative flex min-h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-1"
                 >
                   <span
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-cyan-400/60 bg-cyan-400/10 text-cyan-200 shadow-[0_0_8px_rgba(34,211,238,0.35)]"
@@ -289,6 +303,9 @@ function RulesStrip({
                   >
                     <Icon className="h-3.5 w-3.5" />
                   </span>
+                  {index < Math.min(authored.length, STRIP_STEP_LIMIT) - 1 && (
+                    <StepConnector left="left-[1.375rem]" />
+                  )}
                   <span className="min-w-0" title={`${step.title} — ${step.detail}`}>
                     <span className="block truncate text-[14px] font-semibold leading-snug text-gray-50">
                       {index + 1}. {step.title}
@@ -314,8 +331,9 @@ function RulesStrip({
             */
             <li
               key={index}
-              className="flex min-h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-1"
+              className="relative flex min-h-9 items-center gap-2.5 rounded-lg border border-sky-400/20 bg-sky-400/[0.06] px-2 py-1"
             >
+              {index < steps.length - 1 && <StepConnector left="left-[1.25rem]" />}
               {/*
                 The reference's small blue numbered disc. `aria-hidden` because the ordinal is
                 already carried by the `<ol>`, and read aloud it would announce every step

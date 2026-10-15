@@ -136,11 +136,8 @@ export function ArenaContestPanelView({
               label: `${terms.round} time`,
               value: roundClock ?? "—",
             },
-          ]}
-        />
-
-        <NeonStatTiles
-          items={[
+            // One 3x2 grid since 15 Oct 2026 (arena brief): the player's own two figures sit
+            // in the same set as the contest's four rather than in a second block below.
             {
               icon: Gauge,
               accent: "score",
@@ -154,6 +151,8 @@ export function ArenaContestPanelView({
               value: typeof rank === "number" ? `#${rank}` : "—",
             },
           ]}
+          columns={3}
+          stacked
         />
       </div>
 
