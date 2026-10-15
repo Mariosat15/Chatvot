@@ -55,6 +55,22 @@ describe("scopeCompetitionStatusesToParticipant", () => {
     ).toEqual({ _id: { $in: [] } });
   });
 
+  it("treats any status that is not open as history, never as public", () => {
+    expect(
+      scopeCompetitionStatusesToParticipant(["paused", "finalizing", "draft"], []),
+    ).toEqual({ _id: { $in: [] } });
+    expect(
+      scopeCompetitionStatusesToParticipant(["paused"], ["507f1f77bcf86cd799439011"]),
+    ).toEqual({
+      $or: [
+        {
+          status: { $in: ["paused"] },
+          _id: { $in: ["507f1f77bcf86cd799439011"] },
+        },
+      ],
+    });
+  });
+
   it("keeps the participation scope inside the server-side paginated query", () => {
     const source = readFileSync(
       "lib/competitions/browse-competitions.ts",

@@ -28,6 +28,7 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { PublishContestButton } from "@/components/admin/games/PublishContestButton";
+import StuckCompetitionsPanel from "@/components/admin/competitions/StuckCompetitionsPanel";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import { resolveCompetitionVisibility } from "@/lib/services/gamemaster/competition-visibility";
 import {
@@ -352,6 +353,9 @@ export default function CompetitionsListSection() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <StuckCompetitionsPanel onDone={fetchCompetitions} />
+      </div>
       {/* Stats Summary */}
       {/* Five cards, not four. This summary counts by status, so it is an aggregate that
           enumerates its cases - and a draft used to land in `Total` and in none of the

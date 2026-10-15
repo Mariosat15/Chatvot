@@ -20,6 +20,7 @@
 
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 
 export interface CompetitionStartResult {
   started: number;
@@ -46,8 +47,13 @@ function participantUserId(participant: unknown): string {
 }
 
 async function cancelReasonFor(comp: DueCompetition): Promise<string | null> {
-  const participantCount =
-    comp.currentParticipants || comp.participants?.length || 0;
+  // Reason: the seats are the fact, the `currentParticipants` counter is a cache of it. A
+  // stale-high counter would start a one-player paid contest; a stale-low one would cancel a
+  // full one. `competitionId` is declared String on the participant model.
+  const participantCount = await CompetitionParticipant.countDocuments({
+    competitionId: comp._id.toString(),
+    status: { $ne: "refunded" },
+  });
   const minRequired = comp.minParticipants || 2;
 
   if (comp.gameType === "provider") {

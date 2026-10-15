@@ -147,6 +147,19 @@ describe("startOrCancelDueCompetitions", () => {
     expect(started.sort()).toEqual([...players].sort());
   });
 
+  it("decides on the real seats, not a stale-high participant counter", async () => {
+    const lonely = "6500000000000000000000d5";
+    const id = await seedDue([lonely]);
+    await mongoose.connection.db!
+      .collection("competitions")
+      .updateOne({ _id: id }, { $set: { currentParticipants: 2 } });
+
+    const result = await startOrCancelDueCompetitions({ revalidate: false });
+
+    expect(result).toEqual({ started: 0, cancelled: 1, failed: [] });
+    expect(await statusOf(id)).toBe("cancelled");
+  });
+
   it("leaves a contest whose start is still in the future alone", async () => {
     const id = await seedDue(["6500000000000000000000d4"], 60 * 60 * 1000);
     const result = await startOrCancelDueCompetitions({ revalidate: false });
