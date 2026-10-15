@@ -29,9 +29,11 @@
 >
 > **Rules kept:** phone never imports `CompetitionDetailShell`’s two-column grid; same loaders, entry rules, neon graphics; safe-area padding; target width 360–430px (`max-w-[430px]`).
 >
-> **Not built:** provider-contest phone detail tree (still uses existing provider lobby path).
+> **Provider-contest phone detail:** BUILT 15 Oct 2026 per
+> `ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide (1).md` —
+> `components/games/lobby/mobile/`. Correct as history that it was missing before that date.
 >
-> **Guarded by:** `__tests__/competitions/contest-lobby-shell.test.ts` (+ provider-play-ui page/sections hand-off).
+> **Guarded by:** `__tests__/competitions/game-lobby-mobile.test.ts`, `contest-lobby-shell.test.ts` (+ provider-play-ui page/sections hand-off).
 >
 > Older `components/competitions/detail/mobile/` tree is superseded by `lobby/mobile/` (Complobyymobile).
 

@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Game Competition Lobby mobile redesign
+
+Owner guide: `ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide (1).md`. Rebuilt the phone provider-contest lobby as a dedicated tree (not a stacked desktop). Live code: `components/games/lobby/mobile/MobileGameCompetitionLobby.tsx` plus hero / status / Your Run / metrics / rounds; wired from `ProviderContestLobby` at `min-[769px]:hidden`. Order: back → cover hero → one status countdown → Your Run (score/rank/attempts/CTA) → prize/entry/players/round-time essentials → `MobileLobbyPages` tabs. Desktop `GameCompetitionArenaShell` unchanged. No new APIs. `__tests__/competitions/game-lobby-mobile.test.ts`. **Never verified by eye.**
+
 ### 15 October 2026 - Brand Icon is now the Google favicon (white-label)
 
 Owner: Google search showed a grey globe; asked to add a branding field so white-labels can set their own icon. **The field already existed** — admin Images → Brand Icon (`WhiteLabel.favicon`) — but it was only applied by client `DynamicFavicon` after JavaScript, which crawlers ignore. Fix: `generateMetadata` in `app/layout.tsx` now emits `icons` / `shortcut` / `apple` from `getFaviconAbsolute(siteUrl)` (`lib/admin/images.ts`), so the Brand Icon is in the first HTML. Admin copy renamed/clarified: Brand Icon = Google + browser tab + white-label; SEO `og:image` = Discord/WhatsApp 1200×630 only (and that URL is still 404 until `public/og-image.png` exists). `__tests__/seo/favicon-metadata.test.ts` pins it. After deploy: upload a square PNG on Brand Icon, then request indexing in Google Search Console — Google may take days/weeks to replace the globe. **Never verified by eye.**

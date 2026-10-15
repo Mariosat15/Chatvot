@@ -450,19 +450,76 @@ export default async function ProviderContestLobby({
         <ProviderClientWarmup gameCode={competition?.gameConfig?.gameCode} />
       ) : null}
 
-      {/* Phone: dedicated tree — never a squeezed three-column desktop. */}
+      {/*
+        Phone: dedicated Game Competition Lobby
+        (`ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide`). Never a
+        squeezed three-column desktop. Desktop shell below is unchanged.
+      */}
       <div className="min-[769px]:hidden min-w-0">
         <MobileGameCompetitionLobby
-          nav={nav}
-          hero={hero}
-          summary={summary}
-          center={centerStage}
-          stats={statsPanel}
+          contestsHref="/competitions"
+          contestsLabel={terms.contests}
+          hero={{
+            title: heroTitle,
+            tagline:
+              heroNameSubtitle ||
+              presentation.tagline ||
+              competition.description ||
+              presentation.description,
+            description: centerDescription,
+            banner: resolveProviderBanner({
+              bannerUrl: presentation?.bannerUrl,
+              gameName: presentation?.gameName ?? gameName,
+              gameCode: competition?.gameConfig?.gameCode,
+            }),
+            categoryLabel: presentation.category
+              ? `${presentation.category} competition`
+              : "Game competition",
+            status,
+            scoringNote,
+          }}
+          status={{
+            status,
+            isActive,
+            isCompleted,
+            isCancelled,
+            countdownTarget,
+            contestLabel: terms.contest,
+          }}
+          run={{
+            isUserIn,
+            isCompleted,
+            isUpcoming: status === "upcoming",
+            isCancelled,
+            state,
+            roundTimeLabel,
+            initialScore: myInitialScore,
+            initialRank: standings.yourRank,
+            entryControl,
+          }}
+          metrics={{
+            prizePool: Number(
+              competition.prizePool ?? competition.prizePoolCredits ?? 0,
+            ),
+            entryFee: Number(
+              competition.entryFee ?? competition.entryFeeCredits ?? 0,
+            ),
+            currentParticipants: Number(competition.currentParticipants ?? 0),
+            maxParticipants: Number(competition.maxParticipants ?? 0),
+            roundTimeLabel,
+            creditSymbol,
+            funded: competition.fundingMode === "gm_funded",
+          }}
           leaderboard={leaderboard}
           prizes={prizesPanel}
           howItWorks={howItWorks}
           tips={tips}
-          footer={
+          rounds={{
+            list: state?.rounds ?? [],
+            scoreType: presentation?.scoreType,
+            scoreLabel,
+          }}
+          details={
             <>
               <GameEventDetails sections={eventDetailSections} />
               <CompetitionRulesFairPlay />

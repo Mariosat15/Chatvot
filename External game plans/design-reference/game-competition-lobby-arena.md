@@ -26,7 +26,7 @@ Matched the clean neon center panel: gamepad circle + short game title (uppercas
 | Center stage (badges, showcase countdown, gold PLAY) | `components/games/lobby/LobbyCenterStage.tsx` |
 | Contest stats 2×3 | `components/games/lobby/LobbyContestStatsGrid.tsx` |
 | Hero feature pills | `components/games/lobby/LobbyHeroFeaturePills.tsx` |
-| Phone order | `components/games/lobby/mobile/MobileGameCompetitionLobby.tsx` |
+| Phone order | `components/games/lobby/mobile/MobileGameCompetitionLobby.tsx` — **rebuilt 15 Oct 2026** per `ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide (1).md`: back → cover hero → one status countdown → Your Run → essentials → tabs (Overview / Leaderboard / Prizes / Rounds / Tips). Not a stacked desktop. |
 | Wiring | `components/games/ProviderContestLobby.tsx` (`min-[769px]` split) |
 
 **Preserved:** real competition data, Join/Play, one-attempt rules, prize breakdown (`LobbyLivePrizePanel`), standings poll (`ArenaLiveProvider`), Global/Friends/Country filters, Volts formatting. How It Works / Game Tips sit under the main columns (no tall empty band). Anytime contests do not mention choosing a time slot.
