@@ -227,8 +227,11 @@ describe("the leader's gold row", () => {
 });
 
 describe("the rank marker and the score colour", () => {
-  it("the game board asks for plates and the trading board still gets medals", () => {
-    expect(readCode(BOARD)).toMatch(/<NeonRankBadge[^>]*style="plates"/);
+  it("the game board and the trading board both draw the medals", () => {
+    // Flipped 15 Oct 2026: the owner asked the game rail's "style and icons" to match the
+    // trading row, so it no longer asks for plates. The plates branch stays in the kit.
+    expect(readCode(BOARD)).not.toMatch(/<NeonRankBadge[^>]*style=/);
+    expect(readCode(BOARD)).toMatch(/row\.isTied\s*\?\s*"ring-2 ring-amber-400/);
     expect(readCode(TRADING_BOARD)).not.toMatch(/<NeonRankBadge[^>]*style=/);
 
     const kit = readCode(KIT_ROW);

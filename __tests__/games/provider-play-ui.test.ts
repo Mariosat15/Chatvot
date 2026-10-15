@@ -2209,8 +2209,12 @@ describe("the standings board fits the column it is given", () => {
     expect(nameBlock.length).toBeGreaterThan(0);
     expect(nameBlock).not.toMatch(/row\.isTied/);
 
-    expect(board.match(/row\.isTied/g) ?? []).toHaveLength(1);
-    expect(board.indexOf("row.isTied")).toBeGreaterThan(scoreCellAt);
+    // Two since 15 Oct 2026: the rank badge carries the trading board's gold tie ring
+    // (owner: "style and icons must match image 1"), BEFORE the name; the "=" stays
+    // beside the score. Neither may sit on the name line.
+    expect(board.match(/row\.isTied/g) ?? []).toHaveLength(2);
+    expect(board.indexOf("row.isTied")).toBeLessThan(nameAt);
+    expect(board.lastIndexOf("row.isTied")).toBeGreaterThan(scoreCellAt);
   });
 
   it("spends the rail on the name rather than on the numeric columns", () => {
@@ -2238,6 +2242,8 @@ describe("the standings board fits the column it is given", () => {
     expect(nameAt).toBeGreaterThan(0);
     expect(gmAt).toBeGreaterThan(clockAt);
     expect(board.match(/<GameMasterBadge/g) ?? []).toHaveLength(1);
+    // 15 Oct 2026: withheld on the narrow ranking rail, where it took the time's place.
+    expect(board).toMatch(/\{!ranking && \(\s*<div className="flex items-center justify-end">\s*<GameMasterBadge/);
     expect(board.match(/gap-x-1\.5/g) ?? []).toHaveLength(2);
     // One line, never a second: the name is fitted, not wrapped.
     expect(board).toMatch(/<NeonPlayerName[\s\S]*?\bfit\b[\s\S]*?\/>/);

@@ -229,7 +229,19 @@ export default function ProviderLeaderboard({
                 whether the game scores upward or downward, so a board numbering its own rows
                 would quietly disagree with the payout for every lower-is-better game.
               */}
-              <NeonRankBadge rank={row.currentRank} size="sm" style="plates" />
+              {/*
+                The trading board's marker since 15 Oct 2026 (owner: "style and icons must match"
+                its row) - trophy and medals, and the same gold ring when the place is shared.
+              */}
+              <span
+                className={`flex shrink-0 items-center justify-center rounded-full ${
+                  row.isTied
+                    ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-[#080C18]"
+                    : ""
+                }`}
+              >
+                <NeonRankBadge rank={row.currentRank} size="sm" />
+              </span>
 
               <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
                 {/*
@@ -348,9 +360,15 @@ export default function ProviderLeaderboard({
                 width from the one column with no upper bound; here it costs only its own glyph and
                 an empty `auto` track for everyone else.
               */}
-              <div className="flex items-center justify-end">
-                <GameMasterBadge userId={row.userId} compact />
-              </div>
+              {/*
+                Not on the narrow `ranking` rail (owner, 15 Oct 2026: the crown sat where the time
+                belongs - "remove the gm icon from here"). The lobby's detailed board keeps it.
+              */}
+              {!ranking && (
+                <div className="flex items-center justify-end">
+                  <GameMasterBadge userId={row.userId} compact />
+                </div>
+              )}
             </div>
           );
         })}

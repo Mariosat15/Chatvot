@@ -247,8 +247,9 @@ export function NeonAvatar({
 
 /** Font size that keeps a name of this length on one line of a 360px standings rail. */
 function fittedNameSize(name: string): string {
-  if (name.length <= 12) return "text-sm";
-  if (name.length <= 15) return "text-[13px] tracking-tight";
+  // Thresholds sized for the bold weight the fitted name is drawn in.
+  if (name.length <= 11) return "text-sm";
+  if (name.length <= 14) return "text-[13px] tracking-tight";
   return "text-xs tracking-tight";
 }
 
@@ -286,9 +287,9 @@ export function NeonPlayerName({
     <span className="flex min-w-0 items-center gap-1.5">
       <span
         className={`truncate whitespace-nowrap ${
-          fit ? fittedNameSize(name) : "text-sm"
-        } font-medium ${
-          isCurrentUser ? "text-sky-200" : "text-gray-200"
+          fit ? `${fittedNameSize(name)} font-bold` : "text-sm font-medium"
+        } ${
+          isCurrentUser ? "text-sky-200" : fit ? "text-gray-100" : "text-gray-200"
         }`}
       >
         {name}

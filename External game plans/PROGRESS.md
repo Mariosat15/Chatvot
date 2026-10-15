@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Arena standings row matches the trading row; GM badge off the rail
+
+Owner: "style and icons must match image 1" (the trading `CompetitionLeaderboard` row) and "the gm icon taking the time place remove the gm icon from here". In `components/games/ProviderLeaderboard.tsx` the rank marker is now `NeonRankBadge` in its default **medals** style (trophy for 1st, medals for 2nd and 3rd, numbers below) inside the same gold `ring-2 ring-amber-400` tie ring the trading board draws, replacing the crown plates. The fitted name in `components/neon/LeaderboardRow.tsx` is bold and `text-gray-100`, with the size steps tightened to 11 and 14 characters for the heavier weight. The `GameMasterBadge` cell is **withheld on the `ranking` variant only**, so the rail's time column is no longer pushed aside, and the lobby's detailed board keeps the badge. Tests: `leaderboard-avatars.test.ts` now asserts both boards draw medals plus the tie ring; `provider-play-ui.test.ts` pins the `!ranking` guard and counts two `row.isTied` (the ring before the name, the `=` after the score, none on the name line). Each change carries a dated reason. **Never verified by eye.**
+
 ### 15 October 2026 - Leaderboard names on ONE line
 
 Owner screenshot: names broke after a few characters (`Player_6AF5C` / `A`), because the same-day `wrap` mode on `NeonPlayerName` allowed a second line. Replaced by `fit` (`components/neon/LeaderboardRow.tsx`): the name is `whitespace-nowrap`, stepping from `text-sm` (12 characters or fewer) to 13px (up to 15) to `text-xs` beyond that, with the ellipsis kept only as a last resort. `ProviderLeaderboard.tsx` also gives the name back width the mostly-empty number columns held - score/time floors 3.25rem/2.75rem to 2.5rem/2.25rem (still `minmax`, so `21,911` and `48:22` grow their cells) and avatar gap 8px to 6px. The template test in `provider-play-ui.test.ts` was updated with a dated reason and now also asserts `fit` and forbids `wrap`. **Never verified by eye.**
