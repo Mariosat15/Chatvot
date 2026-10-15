@@ -68,7 +68,7 @@ function PlaceIcon({ rank, filled }: { rank: number; filled: boolean }) {
         src={NEON_ICON("trophy-green")}
         alt=""
         draggable={false}
-        className={`h-14 w-14 shrink-0 object-contain ${filled ? "" : "opacity-60"}`}
+        className={`h-11 w-11 shrink-0 object-contain ${filled ? "" : "opacity-60"}`}
       />
     );
   }
@@ -80,7 +80,7 @@ function PlaceIcon({ rank, filled }: { rank: number; filled: boolean }) {
         : "border-sky-400/40 bg-sky-500/10 text-sky-200";
   return (
     <span
-      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 text-lg font-black ${tone}`}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 text-base font-black ${tone}`}
     >
       {rank}
     </span>
@@ -141,33 +141,33 @@ export default function PrizeTable({
           rows={rows.map((row, index) => (
             <div
               key={index}
-              className={`flex items-center gap-4 rounded-xl border px-4 py-3.5 ${
+              className={`flex items-center gap-2.5 rounded-xl border px-3 py-3 ${
                 row.filled
                   ? "border-cyan-400/50 bg-gradient-to-r from-cyan-500/10 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.22)]"
                   : NEON_FACE_TILE_MUTED
               }`}
             >
               <PlaceIcon rank={row.rank} filled={row.filled} />
-              <span className="h-10 w-px shrink-0 bg-white/10" aria-hidden />
+              <span className="h-9 w-px shrink-0 bg-white/10" aria-hidden />
               <div className="min-w-0 flex-1">
                 <div
-                  className={`text-base font-bold leading-tight ${row.filled ? "text-gray-100" : "text-gray-400"}`}
+                  className={`truncate whitespace-nowrap text-sm font-bold leading-tight ${row.filled ? "text-gray-100" : "text-gray-400"}`}
                 >
                   {ordinal(row.rank)} place
                 </div>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300">
+                <div className="mt-1.5 flex items-center gap-1 whitespace-nowrap">
+                  <span className="rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300">
                     {row.configuredPercentage}%
                   </span>
                   {row.bonusPercentage > 0 && (
-                    <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-300">
+                    <span className="rounded-md bg-emerald-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-300">
                       +{row.bonusPercentage.toFixed(1)}%
                     </span>
                   )}
                 </div>
               </div>
               <span
-                className={`shrink-0 text-2xl font-black tabular-nums ${row.filled ? "text-amber-300" : "text-gray-500"}`}
+                className={`shrink-0 whitespace-nowrap text-lg font-black tabular-nums ${row.filled ? "text-amber-300" : "text-gray-500"}`}
               >
                 {row.filled
                   ? formatVolts(row.netAmount, { symbol: creditSymbol })

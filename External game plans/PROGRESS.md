@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - "Who wins what" place cards no longer squeezed
+
+Owner screenshot: in a narrow column the `size="lg"` place cards wrapped "1st place" onto two lines and crowded the amount. `components/competitions/PrizeTable.tsx` (showcase branch only): place icon 56px to 44px, row gap 16px to 10px and padding 16px to 12px, place label `text-base` to `text-sm` with `whitespace-nowrap truncate`, percentage chips `text-xs` to 11px on one line, amount `text-2xl` to `text-lg` with `whitespace-nowrap`. Markup only - the payout expressions in `lib/utils/prize-projection.ts` are untouched. **Never verified by eye.**
+
 ### 15 October 2026 - Arena standings row matches the trading row; GM badge off the rail
 
 Owner: "style and icons must match image 1" (the trading `CompetitionLeaderboard` row) and "the gm icon taking the time place remove the gm icon from here". In `components/games/ProviderLeaderboard.tsx` the rank marker is now `NeonRankBadge` in its default **medals** style (trophy for 1st, medals for 2nd and 3rd, numbers below) inside the same gold `ring-2 ring-amber-400` tie ring the trading board draws, replacing the crown plates. The fitted name in `components/neon/LeaderboardRow.tsx` is bold and `text-gray-100`, with the size steps tightened to 11 and 14 characters for the heavier weight. The `GameMasterBadge` cell is **withheld on the `ranking` variant only**, so the rail's time column is no longer pushed aside, and the lobby's detailed board keeps the badge. Tests: `leaderboard-avatars.test.ts` now asserts both boards draw medals plus the tie ring; `provider-play-ui.test.ts` pins the `!ranking` guard and counts two `row.isTied` (the ring before the name, the `=` after the score, none on the name line). Each change carries a dated reason. **Never verified by eye.**
