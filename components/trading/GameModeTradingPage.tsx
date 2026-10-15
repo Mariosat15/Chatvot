@@ -1,6 +1,7 @@
 "use client";
 
 import { useChartSymbol } from "@/contexts/ChartSymbolContext";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import { usePrices } from "@/contexts/PriceProvider";
 import { useTradingMode } from "./TradingInterface";
 import Image from "next/image";
@@ -182,7 +183,7 @@ export default function GameModeTradingPage({
               </div>
               <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
                 <Image
-                  src="/game-icons/treasure.png"
+                  src={DATA_ICON.prizePool}
                   alt="Prize"
                   width={20}
                   height={20}

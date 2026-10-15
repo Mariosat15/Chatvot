@@ -12,4 +12,6 @@
 export const DATA_ICON = {
   /** Entry fee - the red wallet with the up arrow (Menuitems `withdrwal.png`). */
   entryFee: "/assets/neon/icons/withdrawal.webp",
+  /** Prize pool - the gold trophy on a navy tile (owner's `goldTrophy`, 15 Oct 2026). */
+  prizePool: "/assets/neon/icons/prize-pool.webp",
 } as const;

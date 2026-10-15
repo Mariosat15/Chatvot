@@ -3,6 +3,7 @@
 import {
   ChevronRight,
 } from "lucide-react";
+import { PrizePoolIcon } from "@/components/neon/PrizePoolIcon";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
@@ -431,7 +432,7 @@ export default function CompetitionCard({
                 </div>
                 <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
                   <div className="flex items-center gap-1 text-yellow-500">
-                    <GameIcon name="trophy" size={18} />
+                    <PrizePoolIcon className="h-[18px] w-[18px]" />
                     <span className="text-xl font-black">
                       {getPrizePool().toFixed(0)}
                     </span>
@@ -475,7 +476,7 @@ export default function CompetitionCard({
             {/* Mobile-only compact stats row */}
             <div className="lg:hidden flex items-center gap-2 px-3 pb-2 flex-wrap">
               <div className="flex items-center gap-1 text-yellow-500">
-                <GameIcon name="trophy" size={14} />
+                <PrizePoolIcon className="h-3.5 w-3.5" />
                 <span className="text-sm font-black">
                   {formatVolts(getPrizePool(), { symbol: settings?.credits?.symbol })}
                 </span>

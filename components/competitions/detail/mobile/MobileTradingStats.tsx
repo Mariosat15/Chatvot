@@ -5,6 +5,7 @@ import InlineCountdown from "@/components/trading/InlineCountdown";
 import UTCClock from "@/components/trading/UTCClock";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
 import { contestPlayersLabel } from "@/components/competitions/lobby/contest-lobby-copy";
 
@@ -39,7 +40,7 @@ export function MobileTradingStats({
       <StatCard
         size="lg"
         icon={Trophy}
-        imageSrc={COMPETITION_ICON.volts}
+        imageSrc={DATA_ICON.prizePool}
         accent="prize"
         label="Prize pool"
         value={formatVolts(maxPool, { symbol: creditSymbol })}

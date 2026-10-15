@@ -160,7 +160,9 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(mobileStats).not.toContain('size="lg"');
     expect(mobileStats).not.toContain('size="showcase"');
     expect(mobileStats).toContain("COMPETITION_ICON.entryFee");
-    expect(mobileStats).toContain("COMPETITION_ICON.volts");
+    // Flipped 15 Oct 2026, not deleted: the prize-pool tile wears the owner's
+    // goldTrophy (one icon per data, platform-wide), no longer the Volt bolt.
+    expect(mobileStats).toContain("DATA_ICON.prizePool");
     // Reason: fundingMode check must stay local — free-private-entry imports mongoose (R58).
     expect(mobileStats).not.toContain("free-private-entry");
     expect(mobileStats).toContain('fundingMode === "gm_funded"');
@@ -281,10 +283,11 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(gameStats).not.toContain("COMPETITION_ICON.volts");
     expect(gameStats).not.toContain("COMPETITION_ICON.entryFee");
     const gameSummary = readCode("components/games/lobby/GameLobbySummary.tsx");
-    expect(gameSummary).toContain("COMPETITION_ICON.volts");
+    // Prize pool flipped 15 Oct 2026 to the goldTrophy data icon on both summaries.
+    expect(gameSummary).toContain("DATA_ICON.prizePool");
     expect(gameSummary).toContain("COMPETITION_ICON.entryFee");
     expect(gameLobby).toContain("<GameLobbySummary");
-    expect(tradingSummary).toContain("COMPETITION_ICON.volts");
+    expect(tradingSummary).toContain("DATA_ICON.prizePool");
     // Flipped 12 Oct 2026: Entry fee uses owner wallet-up art; Simulated funds keep wallet.
     expect(tradingSummary).toContain("COMPETITION_ICON.entryFee");
     expect(tradingSummary).not.toContain("COMPETITION_ICON.wallet");

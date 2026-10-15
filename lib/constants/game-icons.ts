@@ -52,6 +52,9 @@ export const GAME_ICONS = {
   medal7: '/game-icons/medal 7.png',
   
   trophy: '/game-icons/nav/nav-competitions.png',
+  // Reason: the one prize-pool mark on every page (owner, 15 Oct 2026). Kept
+  // separate from `trophy`, which also draws the Competitions nav and badges.
+  prizePool: '/game-icons/prize-pool-gold-trophy.webp',
   trophyStar: '/game-icons/2. STAR TROPHY.png',
   trophyGame: '/game-icons/16. GAME TROPHY.png',
   trophyFootball: '/game-icons/15. FOOTBALL TROPHY.png',
@@ -833,7 +836,7 @@ export const ICON_CATEGORIES = {
     'joystick1', 'joystick2', 'joystick3', 'headset', 'keyboard', 'wasd', 'mic',
   ],
   'Rewards & Misc': [
-    'reward1', 'reward2', 'reward3', 'reward4', 'reward5',
+    'prizePool', 'reward1', 'reward2', 'reward3', 'reward4', 'reward5',
     'meat', 'heart', 'dream', 'medKit1', 'medKit2', 'crisisRecovery',
   ],
   'Pirate Theme': [

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PrizePoolIcon } from "@/components/neon/PrizePoolIcon";
 import { cn } from "@/lib/utils";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { GameIcon } from "@/components/ui/GameIcon";
@@ -103,8 +104,7 @@ export function CompetitionInfoHeader({
       <div className="group relative bg-gradient-to-br from-amber-500/10 to-amber-500/5 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 rounded-xl border border-amber-500/30 hover:border-amber-500/50 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-amber-500/20 min-w-[160px] sm:min-w-[200px]">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
         <div className="relative flex items-center gap-2 sm:gap-3">
-          <GameIcon name="trophy" size={24} className="sm:hidden" />
-          <GameIcon name="trophy" size={32} className="hidden sm:block" />
+          <PrizePoolIcon className="h-6 w-6 sm:h-8 sm:w-8" />
           <div>
             <p className="text-[11px] sm:text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
               Prize Pool

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { PrizePoolIcon } from "@/components/neon/PrizePoolIcon";
 import {
   Trophy,
   Target,
@@ -325,7 +326,7 @@ export default function LiveRankingPanel({
         <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-lg p-2.5 border border-yellow-500/20">
           <div className="flex items-center justify-between text-xs">
             <span className="text-yellow-400/80 flex items-center gap-1">
-              <Trophy className="h-3 w-3" />
+              <PrizePoolIcon className="h-3.5 w-3.5" />
               Prize Pool
             </span>
             <span className="font-bold text-yellow-400">

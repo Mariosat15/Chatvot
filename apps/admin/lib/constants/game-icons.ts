@@ -65,6 +65,8 @@ const GAME_ICON_PATHS = {
   medal7: '/game-icons/medal 7.png',
   
   trophy: '/game-icons/nav/nav-competitions.png',
+  // Reason: the one prize-pool mark on every page (owner, 15 Oct 2026).
+  prizePool: '/game-icons/prize-pool-gold-trophy.webp',
   trophyStar: '/game-icons/2. STAR TROPHY.png',
   trophyGame: '/game-icons/16. GAME TROPHY.png',
   trophyFootball: '/game-icons/15. FOOTBALL TROPHY.png',

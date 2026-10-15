@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { PrizePoolIcon } from "@/components/neon/PrizePoolIcon";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
@@ -745,8 +746,8 @@ export default function ContestsSidebar({
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[11px] text-gray-500">
-                      🏆 ${comp.prizePool.toLocaleString()}
+                    <span className="flex items-center gap-1 text-[11px] text-gray-500">
+                      <PrizePoolIcon className="h-3.5 w-3.5" /> ${comp.prizePool.toLocaleString()}
                     </span>
                     <TimeLeft endTime={comp.endTime} />
                   </div>

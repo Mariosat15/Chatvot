@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import { contestPlayersLabel } from "@/components/competitions/lobby/contest-lobby-copy";
 import { MobileIcon } from "./MobileLobbyCard";
 
@@ -69,7 +70,7 @@ export function MobileLobbyMetrics({
     <div className="grid min-w-0 grid-cols-2 gap-3">
       <Tile
         tone="gold"
-        iconSrc={COMPETITION_ICON.volts}
+        iconSrc={DATA_ICON.prizePool}
         label="Prize pool"
         value={formatVolts(maxPool, { symbol: creditSymbol })}
         sub={`${filledPct}% filled`}

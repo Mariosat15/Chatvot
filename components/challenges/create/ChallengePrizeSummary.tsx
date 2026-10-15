@@ -1,6 +1,7 @@
 "use client";
 
-import { Trophy, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
+import { PrizePoolIcon } from "@/components/neon/PrizePoolIcon";
 
 interface ChallengePrizeSummaryProps {
   prizePool: number;
@@ -29,9 +30,7 @@ export default function ChallengePrizeSummary({
       <div className="p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-500/20">
-              <Trophy className="h-5 w-5 text-white" />
-            </div>
+            <PrizePoolIcon className="h-10 w-10" />
             <div>
               <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">
                 Total Prize Pool

@@ -100,7 +100,7 @@ export function ArenaContestPanelView({
         <NeonStatTiles
           items={[
             {
-              iconSrc: NEON_ICON("trophy-gold"),
+              iconSrc: DATA_ICON.prizePool,
               accent: "prize",
               label: terms.prizePool,
               value: formatVolts(facts.prizePool, {

@@ -9,6 +9,7 @@ import {
   sponsoredContestCopy,
 } from "@/lib/utils/sponsored-contest-copy";
 import { COMPETITION_ICON, resolveGameDefinition } from "./game-definitions";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import { resolveCompetitionArtwork } from "./game-artwork";
 import { getCompetitionCTA } from "./competition-cta";
 import { resolveCompetitionPhase, type CompetitionPhase } from "./competition-phase";
@@ -147,7 +148,7 @@ function metricOrNull(
     ["scoring", "SCORING"],
   ]);
   const iconMap = new Map<MetricKey, string>([
-    ["prizePool", COMPETITION_ICON.trophyGold],
+    ["prizePool", DATA_ICON.prizePool],
     ["players", COMPETITION_ICON.players],
     ["duration", COMPETITION_ICON.clock],
     ["assets", COMPETITION_ICON.candles],

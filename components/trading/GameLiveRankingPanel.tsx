@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Skull, Swords, Crown, Loader2 } from "lucide-react";
@@ -298,7 +299,7 @@ export default function GameLiveRankingPanel({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Image
-                src="/game-icons/treasure.png"
+                src={DATA_ICON.prizePool}
                 alt="Prize"
                 width={24}
                 height={24}

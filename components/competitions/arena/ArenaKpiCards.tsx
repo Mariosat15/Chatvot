@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 
 export interface ArenaKpiValues {
   liveNow: number;
@@ -37,7 +38,7 @@ const CARDS = [
     key: "prize" as const,
     label: "PRIZE POOL",
     description: "Total value across all competitions",
-    icon: COMPETITION_ICON.prize,
+    icon: DATA_ICON.prizePool,
     art: `${ICON_BASE}/icon-trophy-purple.png`,
     rgb: "196,80,255",
     labelClass: "text-[#e9b8ff]",

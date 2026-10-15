@@ -7,6 +7,7 @@ import InlineCountdown from "@/components/trading/InlineCountdown";
 import UTCClock from "@/components/trading/UTCClock";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import { LobbyFillBar } from "@/components/competitions/lobby/LobbyFillBar";
 import { useArenaLive } from "@/components/games/arena/ArenaLiveStandings";
 
@@ -70,7 +71,7 @@ export function GameLobbySummary({
       <StatCard
         size="showcase"
         icon={Trophy}
-        imageSrc={COMPETITION_ICON.volts}
+        imageSrc={DATA_ICON.prizePool}
         accent="prize"
         label={prizePoolLabel}
         value={formatVolts(maxPool, { symbol: creditSymbol })}
