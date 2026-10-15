@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.25</span></div>
+      <div><b>Version</b><span>1.26</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -735,7 +735,7 @@
     <tbody>
       <tr><td>Must work embedded</td><td>No <code>X-Frame-Options: DENY</code>, and a <code>frame-ancestors</code> policy that permits our domain. Tell us the exact play domain so we can allow it in our own security policy</td></tr>
       <tr><td>Responsive</td><td>Must fill a variable-height container and work on mobile portrait. Most of our traffic is mobile</td></tr>
-      <tr><td>Messages to the parent</td><td>You may post <code>ready</code>, <code>finished</code>, <code>exit</code> and <code>resize</code>. We act on those as UI hints only. <b>Target origin (1.18):</b> use the <code>parentOrigin</code> we sent on create. Do not derive it from <code>returnUrl</code></td></tr>
+      <tr><td>Messages to the parent</td><td>You may post <code>ready</code>, <code>finished</code>, <code>exit</code>, <code>resize</code>, <code>progress</code> and, <b>new in 1.26 and optional</b>, <code>clock</code> with <code>endsAt</code> (epoch milliseconds when your round timer ends), so our &ldquo;Round closes in&rdquo; panel counts to the same moment as your timer. A value later than <code>expiresAt</code> is ignored and no message may carry a score. We act on those as UI hints only. <b>Target origin (1.18):</b> use the <code>parentOrigin</code> we sent on create. Do not derive it from <code>returnUrl</code></td></tr>
       <tr><td><b>Never send us a score this way</b></td><td>We will ignore any score arriving from the browser. Scores decide real money and are accepted only from your servers, signed</td></tr>
       <tr><td>Self-contained</td><td>No login screen, no account creation, no external links out. The player is already authenticated by us</td></tr>
     </tbody>
@@ -1370,6 +1370,7 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.26</b></td><td>15 Oct 2026</td><td><b>One optional browser message, backward compatible.</b> A game may post <code>{ type: "clock", endsAt }</code> to the page so the &ldquo;Round closes in&rdquo; panel above the frame matches its own timer exactly. Display only, never later than <code>expiresAt</code>, never a score. A game that does not send it is fully conformant</td></tr>
       <tr><td><b>1.25</b></td><td>13 Oct 2026</td><td><b>One optional endpoint, backward compatible.</b> Section 8b: a <code>standingsUrl</code> on create-round where you may ask how many settled points each seated player holds in your game, so a start grid can be ordered by skill rather than at random. Same credentials as the result callback. Ignore it and you remain fully conformant</td></tr>
       <tr><td><b>1.24</b></td><td>28 Sep 2026</td><td><b>One optional field, backward compatible.</b> <code>startWaitSeconds</code> on create-round (section 4), sent only beside <code>scheduledStartAt</code>: how long a game that needs two ready players may wait for them. Past it we cancel and refund in full; end every open round at the same moment. A game that starts on time regardless is unaffected</td></tr>
       <tr><td><b>1.23</b></td><td>28 Sep 2026</td><td><b>One optional addition, backward compatible.</b> A second play-clock format, <code>duration-units</code>, with <code>secondsPerUnit</code> and <code>secondsExtra</code> (sections 3.1b and 3.2), for titles whose length is set in laps, questions or levels rather than seconds. A title that declares nothing is unaffected</td></tr>
@@ -1405,7 +1406,7 @@ $headers = [
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.25 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.26 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

@@ -160,6 +160,8 @@ let countUpTimer = null;
 let tickedSecond = -1;
 /** Whether the one-shot low-time warning has already fired this urgent stretch. */
 let warnedUrgent = false;
+/** The `endsAt` last reported to the platform as a `clock` message, so it is sent once per change. */
+let reportedEndsAt = null;
 /** Last painted clock string, so digit sprites are not rebuilt every 250ms for the same second. */
 let lastClockDisplay = "";
 
@@ -762,7 +764,18 @@ function renderClock() {
     paintClockDigits("");
     return;
   }
-  const remaining = Math.max(0, new Date(state.endsAt).getTime() - Date.now());
+  const endsAtMs = new Date(state.endsAt).getTime();
+  /*
+   * Tell the platform when this clock ends (requirements HTML v1.26, optional `clock` message),
+   * so its "Round closes in" panel above the frame counts to the same moment as these digits.
+   * Display only: the round still ends when the server says so. Sent once per change, not on
+   * every repaint, and only a time - never a score.
+   */
+  if (Number.isFinite(endsAtMs) && endsAtMs !== reportedEndsAt) {
+    reportedEndsAt = endsAtMs;
+    tellPlatform("clock", { endsAt: endsAtMs });
+  }
+  const remaining = Math.max(0, endsAtMs - Date.now());
   const seconds = Math.ceil(remaining / 1000);
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;

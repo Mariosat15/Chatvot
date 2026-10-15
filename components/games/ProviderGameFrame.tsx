@@ -68,6 +68,8 @@ interface ProviderGameFrameProps {
    * score. Optional: the frame also broadcasts `chartvolt:arena-standings-refresh`.
    */
   onProgress?: () => void;
+  /** Called when the game reports when its own round clock ends (epoch ms). Display only. */
+  onClock?: (endsAtMs: number) => void;
   /** Called when the frame reports an origin we did not expect - a real integration fault. */
   onUntrustedOrigin?: (origin: string) => void;
 }
@@ -78,6 +80,7 @@ export function ProviderGameFrame({
   onFinished,
   onExit,
   onProgress,
+  onClock,
   onUntrustedOrigin,
 }: ProviderGameFrameProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -175,12 +178,15 @@ export function ProviderGameFrame({
             setHeight(clampFrameHeight(message.height));
           }
           break;
+        case "clock":
+          if (typeof message.endsAt === "number") onClock?.(message.endsAt);
+          break;
       }
     };
 
     window.addEventListener("message", handle);
     return () => window.removeEventListener("message", handle);
-  }, [expectedOrigin, onFinished, onExit, onProgress, onUntrustedOrigin]);
+  }, [expectedOrigin, onFinished, onExit, onProgress, onClock, onUntrustedOrigin]);
 
   // Reason this refuses rather than rendering anyway: a launch URL we cannot parse into an
   // http(s) origin is one we cannot verify messages against, so the frame would be

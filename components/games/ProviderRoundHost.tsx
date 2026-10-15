@@ -97,6 +97,11 @@ export function ProviderRoundHost({
   const [phase, setPhase] = useState<Phase>({ name: "preflight" });
   const [refusal, setRefusal] = useState<string | null>(null);
   const [refusalCode, setRefusalCode] = useState<string | null>(null);
+  // Reason it carries the round id: a clock reported for an earlier round must never be shown
+  // over the next one, and keying it is cheaper than remembering to clear it on every path.
+  const [gameClock, setGameClock] = useState<{ roundId: string; endsAtMs: number } | null>(
+    null,
+  );
 
   // Reason for the ref: the poll loop is started from an effect and must be cancellable when
   // the component unmounts mid-round, or it keeps fetching against a page nobody is looking at.
@@ -313,6 +318,14 @@ export function ProviderRoundHost({
     }
   }, [phase, confirmResult]);
 
+  const handleClock = useCallback(
+    (endsAtMs: number) => {
+      if (phase.name !== "playing") return;
+      setGameClock({ roundId: phase.roundId, endsAtMs });
+    },
+    [phase],
+  );
+
   const handleUntrustedOrigin = useCallback((origin: string) => {
     console.error(
       `❌ The game frame sent a message from an unexpected origin (${origin}). Ignored.`,
@@ -328,6 +341,9 @@ export function ProviderRoundHost({
           <RoundCloseClock
             expiresAt={playingRound.expiresAt}
             serverNow={state.serverNow}
+            gameEndsAtMs={
+              gameClock?.roundId === phase.roundId ? gameClock.endsAtMs : null
+            }
           />
         )}
         <ProviderGameFrame
@@ -335,6 +351,7 @@ export function ProviderRoundHost({
           gameName={gameName}
           onFinished={handleFinished}
           onExit={handleExit}
+          onClock={handleClock}
           onUntrustedOrigin={handleUntrustedOrigin}
         />
       </div>

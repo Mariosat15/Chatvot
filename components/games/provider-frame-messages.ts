@@ -1,5 +1,5 @@
 /**
- * The only five things a provider's game may tell the browser, and what we do about them.
+ * The only six things a provider's game may tell the browser, and what we do about them.
  *
  * THE WHOLE FILE EXISTS TO MAKE ONE RULE UNMISSABLE: **a score never arrives this way.**
  * `ChartVolt-Game-API-Requirements.html` section 7 states it to providers as "we will ignore
@@ -34,6 +34,13 @@ export const PROVIDER_FRAME_MESSAGE_TYPES = [
    * score, board count, or prize. The server remains the only source of those figures.
    */
   "progress",
+  /**
+   * The round's own clock is running and ends at `endsAt` (epoch ms). Optional, and display
+   * only: it lets the "Round closes in" panel above the frame count to the same moment as the
+   * game's own timer. The server's `expiresAt` still decides when the round closes, so the
+   * panel never shows later than that - a frame can only make the panel run EARLY, never late.
+   */
+  "clock",
 ] as const;
 
 export type ProviderFrameMessageType =
@@ -42,13 +49,15 @@ export type ProviderFrameMessageType =
 /**
  * A message we are willing to act on.
  *
- * Note what is absent: no score, no rank, no prize, no player id. `height` is the only number
- * that crosses this boundary, and it is clamped before use.
+ * Note what is absent: no score, no rank, no prize, no player id. Two numbers cross this
+ * boundary: `height`, clamped before use, and `endsAt`, which only ever shortens a display.
  */
 export interface ProviderFrameMessage {
   type: ProviderFrameMessageType;
   /** Only meaningful for `resize`. Clamped by `clampFrameHeight`. */
   height?: number;
+  /** Only meaningful for `clock`. Epoch milliseconds; absent when not a finite number. */
+  endsAt?: number;
 }
 
 /**
@@ -81,7 +90,7 @@ export function parseProviderFrameMessage(
 ): ProviderFrameMessage | null {
   if (typeof data !== "object" || data === null) return null;
 
-  const candidate = data as { type?: unknown; height?: unknown };
+  const candidate = data as { type?: unknown; height?: unknown; endsAt?: unknown };
   if (typeof candidate.type !== "string") return null;
 
   // Reason for the array rather than a `Set` or an object lookup: an object keyed by the
@@ -98,6 +107,10 @@ export function parseProviderFrameMessage(
   return {
     type: candidate.type as ProviderFrameMessageType,
     height: typeof candidate.height === "number" ? candidate.height : undefined,
+    endsAt:
+      typeof candidate.endsAt === "number" && Number.isFinite(candidate.endsAt)
+        ? candidate.endsAt
+        : undefined,
   };
 }
 

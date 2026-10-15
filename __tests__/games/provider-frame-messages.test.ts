@@ -18,13 +18,16 @@ import {
  */
 
 describe("what a provider's game frame is allowed to tell us", () => {
-  it("accepts exactly the five agreed message types and nothing else", () => {
+  // Reason the count moved from five to six (15 Oct 2026): the optional `clock` message, so the
+  // "Round closes in" panel can count to the game's own timer. It carries a time, never a score.
+  it("accepts exactly the six agreed message types and nothing else", () => {
     expect(PROVIDER_FRAME_MESSAGE_TYPES).toEqual([
       "ready",
       "finished",
       "exit",
       "resize",
       "progress",
+      "clock",
     ]);
 
     for (const type of PROVIDER_FRAME_MESSAGE_TYPES) {
@@ -46,7 +49,24 @@ describe("what a provider's game frame is allowed to tell us", () => {
     });
     expect(parsed).not.toBeNull();
     expect(parsed?.type).toBe("progress");
-    expect(Object.keys(parsed as object).sort()).toEqual(["height", "type"]);
+    expect(Object.keys(parsed as object).sort()).toEqual(["endsAt", "height", "type"]);
+    expect(parsed?.endsAt).toBeUndefined();
+  });
+
+  it("keeps a clock message's end time and nothing else", () => {
+    const parsed = parseProviderFrameMessage({
+      type: "clock",
+      endsAt: 1_760_000_000_000,
+      score: 999,
+      rank: 1,
+    });
+    expect(parsed).toEqual({ type: "clock", height: undefined, endsAt: 1_760_000_000_000 });
+  });
+
+  it("drops an end time that is not a finite number", () => {
+    for (const endsAt of ["1760000000000", Number.NaN, Number.POSITIVE_INFINITY, null, {}]) {
+      expect(parseProviderFrameMessage({ type: "clock", endsAt })?.endsAt).toBeUndefined();
+    }
   });
 
   /**
@@ -71,10 +91,10 @@ describe("what a provider's game frame is allowed to tell us", () => {
     expect(parsed).not.toBeNull();
     expect(parsed?.type).toBe("finished");
 
-    // Nothing but the type and a height survives. Asserting the whole object rather than a few
-    // fields is deliberate: a field we did not think to check is exactly the one that would
-    // slip through, which is how the admin credential rotation bug was caught.
-    expect(Object.keys(parsed as object).sort()).toEqual(["height", "type"]);
+    // Nothing but the type, a height and a clock time survives. Asserting the whole object
+    // rather than a few fields is deliberate: a field we did not think to check is exactly the
+    // one that would slip through, which is how the admin credential rotation bug was caught.
+    expect(Object.keys(parsed as object).sort()).toEqual(["endsAt", "height", "type"]);
     expect((parsed as unknown as Record<string, unknown>).score).toBeUndefined();
   });
 

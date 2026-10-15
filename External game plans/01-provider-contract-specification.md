@@ -433,6 +433,15 @@ Use it as the `postMessage` target origin. It is **not** the same fact as `retur
 from `returnUrl` fails silently — the browser drops the message and ChartVolt never
 receives `ready`.
 
+**Messages a game may post to the page (requirements HTML v1.26).** `ready`, `finished`,
+`exit`, `resize` (with `height`), `progress`, and - **new in 1.26, optional** - `clock`
+with `endsAt`, the epoch-millisecond moment the game's own round timer ends. ChartVolt
+uses `clock` only to make the "Round closes in" panel above the frame count to the same
+moment as the game's timer; until it arrives, or for a game that never sends it, the
+panel counts to `expiresAt`. It is display only: a value later than `expiresAt` is
+ignored, the round still closes when the server says so, and like every frame message it
+must never carry a score. Send it when the clock starts and again if its end moves.
+
 `scheduledStartAt` is **sent only for a contest run with `playMode: "scheduled"`**
 (requirements HTML **v1.21**). It is the moment the race starts for everyone, and every
 round of one contest carries the same value. ChartVolt opens a **lobby** before it - by

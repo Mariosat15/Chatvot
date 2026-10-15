@@ -2,7 +2,7 @@
  * ChartVolt Games host for Volt Stack.
  *
  * Boots from the launch token (same credential Circuit uses), talks to `/play/api/*`,
- * and posts Circuit-compatible `{ type: 'ready' | 'finished' | 'exit' }` messages so
+ * and posts Circuit-compatible `{ type: 'ready' | 'finished' | 'exit' | 'progress' | 'clock' }` messages so
  * ProviderGameFrame works unchanged. Never puts a score in postMessage.
  *
  * WHY READY FIRES FIRST, BEFORE THE NETWORK
@@ -195,7 +195,11 @@
         watchTheGun();
         throw new Error("The competition has not started yet.");
       }
-      return sessionFromState(hostState);
+      const session = sessionFromState(hostState);
+      // Display only (requirements HTML v1.26): the moment this run's own timer ends, so the
+      // platform's "Round closes in" panel counts to the same instant. A time, never a score.
+      tellPlatform("clock", { endsAt: session.endsAt });
+      return session;
     },
     async reportEvent(event) {
       if (!event || event.type !== "piece_lock" || !event.lock) return;
