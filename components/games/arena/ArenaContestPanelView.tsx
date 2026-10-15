@@ -8,6 +8,7 @@ import { attemptProgress, clock, scoreText, scoringSummary } from "./arena-facts
 import { formatVolts } from "@/lib/utils/format-volts";
 import ArenaEndsIn from "./ArenaEndsIn";
 import type { TerminologyPack } from "@/lib/constants/terminology";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 
 /**
  * Contest info tiles beside the board (sync view).
@@ -106,7 +107,7 @@ export function ArenaContestPanelView({
               }),
             },
             {
-              iconSrc: NEON_ICON("credits"),
+              iconSrc: DATA_ICON.entryFee,
               accent: "entry",
               label: terms.entryFee,
               value: formatVolts(facts.entryFee, {

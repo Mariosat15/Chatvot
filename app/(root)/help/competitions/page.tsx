@@ -12,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { EntryFeeIcon } from "@/components/neon/EntryFeeIcon";
 
 export default function CompetitionsHelpPage() {
   return (
@@ -46,7 +47,7 @@ export default function CompetitionsHelpPage() {
           </p>
           <div className="grid sm:grid-cols-3 gap-4 mt-6">
             <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-600">
-              <div className="text-2xl mb-2">💰</div>
+              <EntryFeeIcon className="mb-2 h-8 w-8" />
               <h3 className="font-semibold text-white mb-1">Entry Fee</h3>
               <p className="text-sm text-dark-300">
                 Pay credits to enter. Entry fees form the prize pool.
@@ -329,12 +330,12 @@ export default function CompetitionsHelpPage() {
                 <li>• Understand the ranking method before entering</li>
                 <li>• Meet minimum trade requirements</li>
                 <li>• Manage risk to avoid liquidation</li>
-                <li>• Trade according to the competition's goals</li>
+                <li>• Trade according to the competition&apos;s goals</li>
                 <li>• Check the leaderboard regularly</li>
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold text-white mb-2">❌ Don't:</h3>
+              <h3 className="font-semibold text-white mb-2">❌ Don&apos;t:</h3>
               <ul className="space-y-2 text-sm text-dark-200">
                 <li>• Over-leverage and risk liquidation</li>
                 <li>• Ignore minimum trade requirements</li>

@@ -7,7 +7,6 @@ import {
   X,
   Clock,
   Trophy,
-  Coins,
   Timer,
   EyeOff,
 } from "lucide-react";
@@ -18,6 +17,7 @@ import NotificationPopupCard, {
   popupHref,
   type PushedNotification,
 } from "@/components/notifications/NotificationPopupCard";
+import { EntryFeeIcon } from "@/components/neon/EntryFeeIcon";
 import {
   broadcastLiveEvent,
   broadcastNotificationPush,
@@ -475,7 +475,7 @@ export default function ChallengePopup({ userId }: ChallengePopupProps) {
                 {/* Stats row */}
                 <div className="flex items-center gap-3 mt-2 text-xs">
                   <div className="flex items-center gap-1 text-yellow-400">
-                    <Coins className="h-3.5 w-3.5" />
+                    <EntryFeeIcon className="h-4 w-4" />
                     <span className="font-medium">
                       {challenge.entryFee} credits
                     </span>

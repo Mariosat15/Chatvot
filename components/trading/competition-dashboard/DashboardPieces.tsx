@@ -164,6 +164,8 @@ export function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; child
 export interface PanelRow {
   key: string;
   icon: LucideIcon;
+  /** Canonical art (`DATA_ICON`) - drawn in place of `icon` when set. */
+  iconSrc?: string;
   label: string;
   value: ReactNode;
   valueTone?: string;
@@ -194,7 +196,12 @@ export function RowsPanel({
                 align === "inline" ? "grid-cols-[20px_110px_minmax(0,1fr)]" : "grid-cols-[20px_minmax(0,1fr)_auto]"
               }`}
             >
-              <Icon className="h-4 w-4 text-sky-400" />
+              {row.iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={row.iconSrc} alt="" aria-hidden className="h-5 w-5 object-contain" />
+              ) : (
+                <Icon className="h-4 w-4 text-sky-400" />
+              )}
               <span className="text-sm text-slate-300">{row.label}</span>
               <span
                 className={`truncate text-sm font-semibold tabular-nums ${

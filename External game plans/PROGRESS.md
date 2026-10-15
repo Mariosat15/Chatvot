@@ -996,6 +996,17 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - One entry-fee icon everywhere (the red wallet), and a registry so one piece of data has one icon
+
+Owner: "entry fee replace with the red wallet here for all places ... the icon used for other pages must match the same icons for all not different icons for the same data". **Visual only; no money logic, no route, no model changed; nothing backfilled.**
+
+- **`lib/constants/data-icons.ts` (`DATA_ICON`) is the registry** for "same icon for the same data" platform-wide. `DATA_ICON.entryFee` is `/assets/neon/icons/withdrawal.webp`, the Menuitems red wallet (`withdrwal.png`). `components/neon/EntryFeeIcon.tsx` is the one renderer for inline use. When another page shows a fact that already has an entry here, it must use the registry entry, not its own icon.
+- `COMPETITION_ICON.entryFee` now points at `DATA_ICON.entryFee`, so the four lobby/mobile sites that already used it change with no edit.
+- Swapped the sites that drew a **different** icon for entry fee: the competition dashboard sidebar row (`Ticket`; `RowsPanel` gained `iconSrc`), the arena contest tiles (`NEON_ICON("credits")`), the challenge lobby stat card (`Swords` → `imageSrc`), `CompetitionCard` (`coin`), `ChallengeCard` (`Zap`), `ChallengePopup` (`Coins`), challenge create settings (`DollarSign`), the Game Master create form (`DollarSign`) and the help page (💰). Prize-pool and support-ticket icons were checked and left alone, since they are different data.
+- Incidental: two unescaped apostrophes on `app/(root)/help/competitions/page.tsx` were escaped, because the pre-commit hook's `--max-warnings=0` blocks any edit to that file otherwise.
+- Three failures in `__tests__/games` (the admin highlights-limit hint and two admin byte-identical mirror checks) are in files this change does not touch. They are recorded here, not fixed.
+- **Never verified by eye.**
+
 ### 15 October 2026 - Arena third pass: bottom band grows to its content, whole pictures, Menuitems step/tip icons, GM crown at row end
 
 Owner: "the page is cutoff in the end ... make the boxes auto adjust to show the images like image 3 ... the icons must come from Menuitems ... the leaderboard cuts off names, move the gm icon to the end". Visual only; no logic, data or money path changed, nothing backfilled.

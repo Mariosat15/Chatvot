@@ -6,6 +6,8 @@
  * Metric keys are only shown when the competition actually carries a value.
  */
 
+import { DATA_ICON } from "../constants/data-icons";
+
 export type CompetitionGameId =
   | "trading"
   | "circuitSprint"
@@ -216,7 +218,8 @@ export const COMPETITION_ICON = {
   wallet: `${ICON_BASE}/icon-wallet.png`,
   // Reason: ASSETS and ENTRY FEE used to share volts; candles = market, entryFee = ticket cost.
   candles: `${ICON_BASE}/icon-candles.png`,
-  entryFee: `${ICON_BASE}/icon-entry-fee.png`,
+  // Reason: one entry-fee icon platform-wide (owner 15 Oct 2026) - see DATA_ICON.
+  entryFee: DATA_ICON.entryFee,
   topup: `${ICON_BASE}/icon-topup.png`,
   bolt: `${ICON_BASE}/icon-bolt.png`,
   trophyGold: `${ICON_BASE}/icon-trophy-gold.png`,

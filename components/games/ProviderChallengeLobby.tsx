@@ -48,6 +48,7 @@ import {
 } from "@/lib/services/games/game-presentation.service";
 import { getChallengeRoundHistory } from "@/lib/services/games/challenge-results.service";
 import { playModePlayerRule } from "@/lib/services/games/play-shape";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import {
   contestReservesFullRound,
   fullRoundCutoffMs,
@@ -320,6 +321,7 @@ export default async function ProviderChallengeLobby({
           />
           <StatCard
             icon={Swords}
+            imageSrc={DATA_ICON.entryFee}
             accent="entry"
             label="Entry fee"
             value={

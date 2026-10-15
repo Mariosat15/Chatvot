@@ -54,6 +54,7 @@ import {
   type GameMasterDefaultsLookup,
 } from "@/components/gamemaster/competition-defaults-lookup";
 import { NeonBackLink } from "@/components/neon/Buttons";
+import { EntryFeeIcon } from "@/components/neon/EntryFeeIcon";
 
 interface GMSubscription {
   limits: {
@@ -1065,7 +1066,7 @@ export default function GMCreateCompetitionContent({
                   </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30">
                     <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-green-400" />
+                      <EntryFeeIcon className="h-4 w-4" />
                       <span className="text-xs text-gray-400">Entry Fee</span>
                     </div>
                     <span className="text-sm font-bold text-gray-200">

@@ -7,6 +7,7 @@ import ChallengeSettingsFields from "@/components/challenges/ChallengeSettingsFi
 import ChallengeDurationClock from "./ChallengeDurationClock";
 import type { ChallengeGameSelection } from "@/lib/services/games/challenge-game-copy";
 import type { ChallengeFormData, ChallengeSettings } from "./types";
+import { EntryFeeIcon } from "@/components/neon/EntryFeeIcon";
 
 interface ChallengeBattleSettingsProps {
   settings: ChallengeSettings | null;
@@ -48,7 +49,7 @@ export default function ChallengeBattleSettings({
       {/* Entry Fee */}
       <div className="space-y-1.5">
         <Label className="text-gray-300 flex items-center gap-2 text-sm">
-          <DollarSign className="h-3.5 w-3.5 text-green-400" />
+          <EntryFeeIcon className="h-4 w-4" />
           Entry Fee (Credits)
         </Label>
         <Input

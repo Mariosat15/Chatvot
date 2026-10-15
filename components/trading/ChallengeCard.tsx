@@ -15,6 +15,7 @@ import { GameIcon } from "@/components/ui/GameIcon";
 import { useState, useEffect } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { EntryFeeIcon } from "@/components/neon/EntryFeeIcon";
 import {
   challengeOpponentLabel,
   isUnclaimedOpenChallenge,
@@ -527,7 +528,7 @@ export default function ChallengeCard({
             <div className="absolute top-0 right-0 w-8 h-8 bg-green-500/10 rounded-full blur-lg"></div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
-                <Zap className="h-4 w-4 text-green-400" />
+                <EntryFeeIcon className="h-6 w-6" />
               </div>
               <div>
                 <p className="text-[11px] text-gray-500 uppercase">Entry Fee</p>

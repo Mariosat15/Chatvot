@@ -30,6 +30,7 @@ import {
 } from "@/components/gamemaster/PrivateContestCardParts";
 import SponsoredContestBanner from "@/components/gamemaster/SponsoredContestBanner";
 import { isSponsoredContest } from "@/lib/utils/sponsored-contest-copy";
+import { EntryFeeIcon } from "@/components/neon/EntryFeeIcon";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionCardProps {
@@ -759,7 +760,7 @@ export default function CompetitionCard({
               <div
                 className={`w-8 h-8 rounded-lg ${isCancelled ? "bg-red-500/20" : "bg-green-500/20"} flex items-center justify-center`}
               >
-                <GameIcon name="coin" size={16} />
+                <EntryFeeIcon className="h-6 w-6" />
               </div>
               <div>
                 <p className="text-[11px] text-gray-500 uppercase">Entry Fee</p>

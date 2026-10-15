@@ -37,6 +37,7 @@ import {
   type PanelRow,
   type PlayTileData,
 } from "./competition-dashboard/DashboardPieces";
+import { DATA_ICON } from "@/lib/constants/data-icons";
 import {
   equityPolyline,
   formatCash,
@@ -290,7 +291,7 @@ export default function CompetitionDashboard({
     { key: "competition", icon: Trophy, label: "Competition", value: name },
     { key: "ranked", icon: Gauge, label: "Ranked on", value: methodLabel },
     ...(typeof entryFee === "number"
-      ? [{ key: "fee", icon: Ticket, label: "Entry fee", value: entryFee > 0 ? formatVolts(entryFee, { symbol }) : "Free" }]
+      ? [{ key: "fee", icon: Ticket, iconSrc: DATA_ICON.entryFee, label: "Entry fee", value: entryFee > 0 ? formatVolts(entryFee, { symbol }) : "Free" }]
       : []),
     { key: "start", icon: Wallet, label: "Started with", value: formatCash(stats.startingCapital ?? startingCapital) },
     { key: "equity", icon: BarChart3, label: "Equity now", value: formatCash(stats.equity) },
