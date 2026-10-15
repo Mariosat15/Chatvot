@@ -996,6 +996,40 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Starting or cancelling a due contest no longer depends on Inngest
+
+**Never verified by eye.** The owner reported a trading contest at 1/50 players sitting at
+"upcoming" an hour past its start: nobody could join, nobody was refunded, the admin card said
+"Starting...". **Nothing was computed wrongly and there is no risk number**; a step simply did not run.
+
+- **Cause 1, the only scheduler was Inngest.** Cancelling an undersubscribed contest (and starting a
+  full one) lived inline in the Inngest every-minute cron, and `checkAndFinalizeCompetitions` is also
+  only called from Inngest, so it was no fallback. When Inngest did not fire, nothing did. The step is
+  now `lib/services/competition-start.service.ts`, called by the Inngest cron **and** a new every-minute
+  Agenda job `competition-start` (`worker/jobs/competition-start.job.ts`). Running both is safe: start
+  is a conditional update on `status: "upcoming"`, and the refund is idempotent per player through its
+  ledger rows. R43 holds: the service never writes `cancelled` before the refund; the R43 guards in
+  `competition-cancel-refund.test.ts` were re-pointed at the service, with the claims unchanged.
+- **Cause 2, the admin view's backup cancel reported a committed refund as a failure.** The admin
+  `cancelCompetitionAndRefund` called `revalidatePath` after the commit; that throws during a page
+  render, so the view skipped re-reading the contest and kept showing it as upcoming. Now wrapped in
+  `revalidateAfterCommit`, which logs and carries on. **The reported contest is most likely already
+  cancelled and refunded in the database**; it could not be checked from here (Atlas IP not whitelisted).
+- **Incidental:** the Game Master "contest started" notification read `gameMasterId` from a query that
+  did not select it, so it never fired; the service selects it.
+- **Admin screen:** a contest still upcoming after its start shows a red "Start overdue" warning
+  (`OverdueStartNotice.tsx`) naming what should have happened and pointing to Incident Management;
+  the tile reads "Overdue" instead of a "Starts In" that counted to the **end** time, and the card's
+  countdown says "Start overdue" instead of "Starting...".
+- **Backup chain, all on the same idempotent refund:** Inngest cron, the Agenda worker job, the check
+  run when the contest page is opened, and manual Cancel & Refund in Incident Management.
+- `__tests__/services/competition-start.test.ts` (5 tests): a 1-player contest is cancelled and
+  refunded with no Next request; two schedulers racing start a full contest exactly once; a future
+  contest is untouched; the worker schedule exists; the admin cancel calls `revalidatePath` only inside
+  the guarded helper.
+- **Deploy:** the worker must be rebuilt and restarted (`npm run worker:build`, then
+  `pm2 restart chartvolt-worker`), or the new job does not run.
+
 ### 15 October 2026 - A finished competition no longer reads "Starting soon" with a greyed Join button
 
 **Owner report (screenshot):** a trading card that had already ended showed `STARTING SOON`, `Starts in: Starting now` and a greyed `Join Competition` button. **Cause:** the card trusted the stored `status`, which only moves when the every-minute cron starts, cancels or finalizes a contest. The countdown therefore aimed at a start already gone, and the button was the `Registration Closed` state drawn as the greyed Join artwork. That artwork has "Join Competition" baked in, and the in-grid cell has no caption. **Fix:** `lib/competitions/competition-phase.ts` works out where the contest is in time (`settled` / `upcoming` / `running` / `ended`), and the badge, the countdown and `getCompetitionCTA` all read it. A contest past its end, and not yet finalized, shows `ENDED • RESULTS PENDING` with no countdown. Its button is an enabled lobby link: `Results Pending` if you are seated, `View Details` if not. A stale `upcoming` contest past its start counts to the **end** and plays like a live one (Play Now / Join / Registration Closed). Completed and cancelled contests still follow the stored status. Any greyed button inside a card cell now overlays its real label (`Registration Closed`, `Competition Full`) on the artwork. Desktop and phone cards share the presentation, so both are covered. 5 new tests in `__tests__/competitions/competition-presentation.test.ts`; 102 competition tests green. **Not changed:** the browse tabs still filter on the stored status server-side. **Never verified by eye.**

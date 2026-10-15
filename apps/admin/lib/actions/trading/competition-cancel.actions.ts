@@ -30,6 +30,23 @@ import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
  * Cancel a competition and refund ALL participants their FULL entry fee
  * This includes the platform fee portion - users get a complete refund
  */
+// Reason: this runs AFTER the refund has committed. `revalidatePath` throws when the cancel
+// is reached during a page render (the admin view's auto-cancel backup does exactly that),
+// and the throw turned a completed refund into a reported failure - the view then skipped
+// re-reading the contest and kept showing it as "upcoming / Starting...".
+function revalidateAfterCommit(competitionId: string): void {
+  try {
+    revalidatePath(`/competitions/${competitionId}`);
+    revalidatePath(`/competitions/${competitionId}/trade`);
+    revalidatePath("/competitions");
+  } catch (error) {
+    console.warn(
+      `⚠️ Competition ${competitionId} cancelled and refunded; page revalidation skipped:`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
 export async function cancelCompetitionAndRefund(
   competitionId: string,
   reason: string,
@@ -330,10 +347,7 @@ export async function cancelCompetitionAndRefund(
     }
 
     // Revalidate pages to show updated status
-    revalidatePath(`/competitions/${competitionId}`);
-    revalidatePath(`/competitions/${competitionId}/trade`);
-    revalidatePath("/competitions");
-    revalidatePath("/competitions");
+    revalidateAfterCommit(competitionId);
 
     return {
       success: true,
@@ -829,9 +843,7 @@ export async function emergencyCancelActiveCompetition(
     console.log(`   Total refunded: ${totalRefunded} credits`);
 
     // Revalidate pages
-    revalidatePath(`/competitions/${competitionId}`);
-    revalidatePath(`/competitions/${competitionId}/trade`);
-    revalidatePath("/competitions");
+    revalidateAfterCommit(competitionId);
 
     return {
       success: true,

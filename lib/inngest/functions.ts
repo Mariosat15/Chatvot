@@ -232,145 +232,15 @@ export const updateCompetitionStatuses = inngest.createFunction(
         }
       }
 
-      // Find competitions that should start
-      const competitionsToStart = await Competition.find({
-        status: "upcoming",
-        startTime: { $lte: now },
-      }).select(
-        "_id name participants minParticipants currentParticipants entryFee prizePool gameType gameConfig",
-      );
-
-      let cancelledCount = 0;
-      let startedCount = 0;
-      const competitionsStarting: typeof competitionsToStart = [];
-
-      // Check each competition for minimum participants
-      for (const comp of competitionsToStart) {
-        const participantCount =
-          comp.currentParticipants || comp.participants?.length || 0;
-        const minRequired = comp.minParticipants || 2;
-
-        console.log(
-          `📊 Competition "${comp.name}": ${participantCount}/${minRequired} participants`,
-        );
-
-        // Reason: chapter 07 s3.2 — registration-open outage response. If the provider is
-        // still down when play would open, cancel and refund rather than starting a contest
-        // nobody can play. Same money path as the min-participants cancel below.
-        let cancelForOutage = false;
-        if (comp.gameType === "provider") {
-          const { providerKeyFromContest, providerBlocksContestEntry } =
-            await import(
-              "@/lib/services/game-providers/provider-entry-gate"
-            );
-          const key = providerKeyFromContest(comp);
-          if (key && (await providerBlocksContestEntry(key))) {
-            cancelForOutage = true;
-          }
-        }
-
-        if (cancelForOutage || participantCount < minRequired) {
-          const reason = cancelForOutage
-            ? (
-                await import(
-                  "@/lib/services/game-providers/provider-entry-gate"
-                )
-              ).PROVIDER_OUTAGE_CANCEL_REASON
-            : `Competition cancelled - did not meet minimum ${minRequired} participants (${participantCount}/${minRequired})`;
-
-          console.log(
-            cancelForOutage
-              ? `🚫 CANCELLING "${comp.name}" - provider outage at play open`
-              : `🚫 CANCELLING "${comp.name}" - only ${participantCount} participants, need ${minRequired}`,
-          );
-
-          // R43: this used to set `status: "cancelled"` here, BEFORE calling the refund.
-          // That single write cost every player their entry fee. The refund action claims
-          // its competition with `status: { $ne: "cancelled" }` - the lock that stops a
-          // double refund - so pre-setting the status made the claim match nothing, and the
-          // action returned success having refunded no one.
-          //
-          // Cancelling is the refund action's job and it does it inside the same
-          // transaction as the money, which is the only way the two can't disagree. Do not
-          // reintroduce a status write here: it fails silently, with a cancelled
-          // competition and a log line that says the refunds went out.
-          try {
-            const { cancelCompetitionAndRefund } =
-              await import("@/lib/actions/trading/competition-cancel.actions");
-            const refund = await cancelCompetitionAndRefund(
-              comp._id.toString(),
-              reason,
-            );
-
-            // Report what actually happened, not what was asked for. The old log printed
-            // `participantCount` unconditionally, so the run that refunded nobody logged a
-            // full payout and nothing anywhere contradicted it.
-            if (refund.refundedCount > 0) {
-              console.log(
-                `💰 Refunded ${refund.refundedCount} participants (${refund.totalRefunded} credits) for "${comp.name}"`,
-              );
-            } else if (participantCount > 0) {
-              console.warn(
-                `⚠️ Cancelled "${comp.name}" with ${participantCount} participants but refunded none - check for existing refunds`,
-              );
-            }
-          } catch (refundError) {
-            console.error(
-              `❌ Error refunding participants for "${comp.name}":`,
-              refundError,
-            );
-          }
-
-          cancelledCount++;
-        } else {
-          // Start the competition normally
-          await Competition.findByIdAndUpdate(comp._id, {
-            $set: { status: "active" },
-          });
-          competitionsStarting.push(comp);
-          startedCount++;
-          console.log(
-            `✅ Started "${comp.name}" with ${participantCount} participants`,
-          );
-        }
-      }
-
+      // Reason: start-or-cancel lives in one shared service so the Agenda worker can run
+      // it too - this cron alone was the only thing cancelling undersubscribed contests,
+      // and when it did not fire they sat at `upcoming` past their start, unrefunded.
+      const { startOrCancelDueCompetitions } =
+        await import("@/lib/services/competition-start.service");
+      const startResult = await startOrCancelDueCompetitions({ revalidate: true });
+      let cancelledCount = startResult.cancelled;
+      const startedCount = startResult.started;
       _updatedCount += startedCount;
-
-      // Send competition_started notifications to all participants
-      if (competitionsStarting.length > 0) {
-        try {
-          const { notificationService } =
-            await import("@/lib/services/notification.service");
-          for (const comp of competitionsStarting) {
-            const participants = comp.participants || [];
-            for (const participant of participants) {
-              const userId =
-                typeof participant === "string"
-                  ? participant
-                  : participant.userId?.toString() || participant.toString();
-              await notificationService.notifyCompetitionStarted(
-                userId,
-                comp.name,
-              );
-            }
-            console.log(
-              `🔔 Sent competition_started notifications to ${participants.length} participants for ${comp.name}`,
-            );
-          }
-          // The Game Master who created a contest hears that it started and how full it is.
-          const { notifyGmContestStarted } =
-            await import("@/lib/services/gamemaster/gm-contest-notifications");
-          for (const comp of competitionsStarting) {
-            if (comp.gameMasterId) await notifyGmContestStarted(comp.toObject?.() ?? comp);
-          }
-        } catch (notifError) {
-          console.error(
-            "Error sending competition started notifications:",
-            notifError,
-          );
-        }
-      }
 
       // Reason: a together-start contest that never began within its waiting limit is
       // cancelled and refunded in full. It runs BEFORE finalization so a short contest is

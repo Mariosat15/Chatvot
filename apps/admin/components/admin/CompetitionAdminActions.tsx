@@ -103,7 +103,9 @@ export default function CompetitionAdminActions({
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setCountdown(isUpcoming ? "Starting..." : "Ended");
+        // Reason: still "upcoming" after the start means the automatic start-or-cancel has
+        // not run for it; "Starting..." read as normal and hid that.
+        setCountdown(isUpcoming ? "Start overdue" : "Ended");
         return;
       }
 

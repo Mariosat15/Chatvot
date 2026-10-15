@@ -34,6 +34,9 @@ import {
 } from "@/lib/admin/contest-result-presentation";
 import ContestPrizePanel from "@/components/admin/competitions/ContestPrizePanel";
 import SettledResultPanel from "@/components/admin/competitions/SettledResultPanel";
+import OverdueStartNotice, {
+  isStartOverdue,
+} from "@/components/admin/competitions/OverdueStartNotice";
 import AdjustResultsPanel, {
   type AdjustableSeat,
 } from "@/components/admin/competitions/AdjustResultsPanel";
@@ -118,7 +121,7 @@ const AdminCompetitionViewPage = async ({
     const isProviderGame = hasProviderGameLabel(competition);
 
     const isActive = competition.status === "active";
-    const _isUpcoming = competition.status === "upcoming";
+    const isStartLate = isStartOverdue(competition.status, competition.startTime);
     const isCompleted = competition.status === "completed";
     const isCancelled = competition.status === "cancelled";
 
@@ -263,9 +266,11 @@ const AdminCompetitionViewPage = async ({
       return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
     };
 
+    // Reason: an upcoming contest counts down to its START; this used to count to the end
+    // under a "Starts In" label, so a contest past its start read "Starts In 1d 22h".
     const getTimeRemaining = () => {
       const now = new Date();
-      const end = new Date(competition.endTime);
+      const end = new Date(isActive ? competition.endTime : competition.startTime);
       const diff = end.getTime() - now.getTime();
 
       if (diff < 0) return "Ended";
@@ -325,6 +330,14 @@ const AdminCompetitionViewPage = async ({
               </Link>
             </div>
           </div>
+
+          {isStartLate && (
+            <OverdueStartNotice
+              startLabel={formatUTCDate(new Date(competition.startTime))}
+              players={competition.currentParticipants || 0}
+              minPlayers={competition.minParticipants || 2}
+            />
+          )}
 
           {/* Competition Header */}
           <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-orange-500/50 rounded-2xl shadow-2xl shadow-orange-500/10 overflow-hidden">
@@ -433,16 +446,20 @@ const AdminCompetitionViewPage = async ({
                         ? "Time Remaining"
                         : isCompleted
                           ? "Status"
-                          : "Starts In"}
+                          : isStartLate
+                            ? "Start"
+                            : "Starts In"}
                   </p>
                   <p
-                    className={`text-2xl font-bold ${isCancelled ? "text-red-400" : "text-purple-400"}`}
+                    className={`text-2xl font-bold ${isCancelled || isStartLate ? "text-red-400" : "text-purple-400"}`}
                   >
                     {isCancelled
                       ? "Cancelled"
                       : isCompleted
                         ? "Completed"
-                        : getTimeRemaining()}
+                        : isStartLate
+                          ? "Overdue"
+                          : getTimeRemaining()}
                   </p>
                 </div>
               </div>

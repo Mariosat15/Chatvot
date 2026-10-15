@@ -378,8 +378,11 @@ describe("competition cancellation and refunds", () => {
  * No database, so this describe deliberately does not start the test mongo above.
  */
 describe("R43: the undersubscribed sweep must not cancel before refunding", () => {
+  // Reason: since 15 Oct 2026 the main app's sweep lives in competition-start.service.ts,
+  // shared by the Inngest cron and the Agenda worker. The claims are unchanged; only the
+  // location moved.
   const CRON_COPIES = [
-    "lib/inngest/functions.ts",
+    "lib/services/competition-start.service.ts",
     "apps/admin/lib/inngest/functions.ts",
   ];
 
@@ -409,7 +412,9 @@ describe("R43: the undersubscribed sweep must not cancel before refunding", () =
       const branch = code.slice(Math.max(0, callIndex - 1200), callIndex);
 
       // Assert the slice actually captured the branch, or a test examining nothing passes.
-      expect(branch).toContain("minRequired");
+      expect(branch).toContain(
+        relativePath.endsWith(".service.ts") ? "cancelReasonFor(" : "minRequired",
+      );
 
       expect(branch).not.toMatch(/\$set\s*:\s*\{[^}]*status\s*:\s*["']cancelled["']/);
       expect(branch).not.toContain("cancellationReason:");

@@ -9,6 +9,7 @@
  *
  * Jobs:
  * - margin-check: Backup margin monitoring (every 1 minute, covers competitions + challenges)
+ * - competition-start: Start due competitions, or cancel + refund below minimum players (every 1 minute)
  * - competition-end: Check for expired competitions (every 1 minute)
  * - challenge-finalize: Check for expired challenges (every 1 minute)
  * - round-reconciliation: Poll lost provider results / apply unresolved policy (every 1 minute)
@@ -43,6 +44,7 @@ process.env.IS_WORKER = "true";
 
 import { connectToDatabase, disconnectFromDatabase } from "./config/database";
 import { runMarginCheck } from "./jobs/margin-check.job";
+import { runCompetitionStartCheck } from "./jobs/competition-start.job";
 import { runCompetitionEndCheck } from "./jobs/competition-end.job";
 import { runChallengeFinalizeCheck } from "./jobs/challenge-finalize.job";
 import { runRoundReconciliationCheck } from "./jobs/round-reconciliation.job";
@@ -139,6 +141,25 @@ agenda.define("margin-check", async () => {
     }
   } catch (error) {
     console.error(`📊 [MARGIN CHECK] Failed:`, error);
+  }
+});
+
+/**
+ * Competition Start Job
+ * Runs every minute: start due contests, or cancel and refund those below minimum players
+ */
+agenda.define("competition-start", async () => {
+  try {
+    const result = await runCompetitionStartCheck();
+    if (result.started > 0 || result.cancelled > 0) {
+      console.log(`🏁 [COMPETITION START] Started: ${result.started}, cancelled+refunded: ${result.cancelled}`);
+    }
+    if (result.failed.length > 0) {
+      console.error(`🏁 [COMPETITION START] Failed: ${result.failed.length}`);
+      result.failed.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`🏁 [COMPETITION START] Failed:`, error);
   }
 });
 
@@ -600,6 +621,7 @@ async function startWorker(): Promise<void> {
 
     // Schedule recurring jobs
     await agenda.every("1 minute", "margin-check");
+    await agenda.every("1 minute", "competition-start");
     await agenda.every("1 minute", "competition-end");
     await agenda.every("1 minute", "challenge-finalize");
     await agenda.every("1 minute", "round-reconciliation");
