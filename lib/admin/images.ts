@@ -76,6 +76,26 @@ export async function getFavicon() {
   return images.favicon;
 }
 
+/**
+ * Reason (15 Oct 2026): Google and other crawlers read the favicon from the
+ * first HTML (`generateMetadata` → `<link rel="icon">`). Relative paths work
+ * for browsers on our origin; crawlers prefer an absolute URL. White-label
+ * Brand Icon (`WhiteLabel.favicon`) is the single source — each deployment
+ * uploads its own square mark in admin Images.
+ */
+export function toAbsoluteAssetUrl(pathOrUrl: string, siteUrl: string): string {
+  const trimmed = (pathOrUrl || "").trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const base = siteUrl.replace(/\/$/, "") || "https://chartvolt.com";
+  return `${base}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+}
+
+export async function getFaviconAbsolute(siteUrl: string): Promise<string> {
+  const favicon = await getFavicon();
+  return toAbsoluteAssetUrl(favicon, siteUrl);
+}
+
 // Get specific image type
 export async function getAppLogo() {
   const images = await getWhiteLabelImages();

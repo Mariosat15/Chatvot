@@ -3,6 +3,11 @@
 import { useEffect } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 
+/**
+ * Client follow-up after a Brand Icon upload without a full reload.
+ * Reason: Google/Bing read the server `icons` from generateMetadata in
+ * app/layout.tsx — this component alone is not enough for search results.
+ */
 export default function DynamicFavicon() {
   const { settings, loading } = useAppSettings();
 

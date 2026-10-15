@@ -549,11 +549,11 @@ export default function ImagesSection() {
           />
 
           <ImageUploadCard
-            title="Brand Icon"
-            description="Square mark for collapsed sidebar, browser tab, and default avatar when a user has no personal photo"
+            title="Brand Icon (Google / browser favicon)"
+            description="Square mark for Google search results, the browser tab, collapsed sidebar, and the default avatar when a user has no personal photo. Each white-label uploads its own icon here — it is written into the first HTML so crawlers can see it (not only after JavaScript)."
             field="favicon"
             currentPath={images.favicon}
-            recommendations="MUST be square — controller + chart + bolt only, NEVER the full ChartVolt wordmark. Ideal 256×256 or 512×512 PNG/JPG on black. This is what appears in the collapsed menu and as the default user avatar."
+            recommendations="MUST be square — icon mark only, NEVER the full wordmark. Ideal 256×256 or 512×512 PNG (Google wants at least 48×48). This is NOT the SEO Link Preview image (og:image) below — that is the large 1200×630 share card for Discord/WhatsApp."
             isUploading={uploading.favicon}
             onFileSelect={handleFileSelect("favicon")}
             lastUploadedName={uploadedNames.favicon}
@@ -727,6 +727,8 @@ export default function ImagesSection() {
               <code className="bg-gray-700 px-1.5 py-0.5 rounded text-emerald-300">
                 {seoSettings.siteUrl || "https://yourdomain.com"}/og-image.png
               </code>
+              . This is the Discord/WhatsApp share picture only — the small icon
+              beside Google results is <strong className="text-gray-400">Brand Icon</strong> above.
             </p>
 
             {/* Live preview */}

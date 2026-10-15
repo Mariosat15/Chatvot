@@ -6,10 +6,16 @@ import DynamicFavicon from "@/components/DynamicFavicon";
 import SiteTracker from "@/components/tracking/SiteTracker";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import {
+  getFaviconAbsolute,
+  toAbsoluteAssetUrl,
+} from "@/lib/admin/images";
 import Script from "next/script";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
 import MobileViewportLock from "@/components/MobileViewportLock";
 import "./globals.css";
+
+const DEFAULT_FAVICON = "/assets/images/brand-icon.jpg";
 
 /**
  * Reason (7 Oct 2026): client useEffect runs after first paint, so a stuck
@@ -53,10 +59,19 @@ export async function generateMetadata(): Promise<Metadata> {
     const description = wl?.seoDescription || DEFAULT_DESC;
     const siteUrl = wl?.siteUrl || DEFAULT_URL;
     const ogImage = wl?.ogImageUrl || DEFAULT_OG_IMAGE;
+    // Reason: Brand Icon from admin Images — not SEO og:image. Must be in the
+    // first HTML so Google can show it beside search results (JS-only inject
+    // is ignored by crawlers). White-label uploads replace this per tenant.
+    const faviconUrl = await getFaviconAbsolute(siteUrl);
 
     return {
       title,
       description,
+      icons: {
+        icon: [{ url: faviconUrl }],
+        shortcut: faviconUrl,
+        apple: [{ url: faviconUrl }],
+      },
       openGraph: {
         title,
         description,
@@ -75,9 +90,15 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   } catch {
     // Fallback to hardcoded defaults if DB is unavailable during build
+    const fallbackIcon = toAbsoluteAssetUrl(DEFAULT_FAVICON, DEFAULT_URL);
     return {
       title: DEFAULT_TITLE,
       description: DEFAULT_DESC,
+      icons: {
+        icon: [{ url: fallbackIcon }],
+        shortcut: fallbackIcon,
+        apple: [{ url: fallbackIcon }],
+      },
       openGraph: {
         title: DEFAULT_TITLE,
         description: DEFAULT_DESC,
