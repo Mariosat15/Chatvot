@@ -275,8 +275,15 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     const gameStats = readCode(
       "components/games/lobby/LobbyContestStatsGrid.tsx",
     );
-    expect(gameStats).toContain("COMPETITION_ICON.volts");
-    expect(gameStats).toContain("COMPETITION_ICON.entryFee");
+    // Flipped again 15 Oct 2026 (owner: "prize pool etc must be like trading lobby"):
+    // prize and entry moved to the trading-style GameLobbySummary row, so the right
+    // column no longer repeats them.
+    expect(gameStats).not.toContain("COMPETITION_ICON.volts");
+    expect(gameStats).not.toContain("COMPETITION_ICON.entryFee");
+    const gameSummary = readCode("components/games/lobby/GameLobbySummary.tsx");
+    expect(gameSummary).toContain("COMPETITION_ICON.volts");
+    expect(gameSummary).toContain("COMPETITION_ICON.entryFee");
+    expect(gameLobby).toContain("<GameLobbySummary");
     expect(tradingSummary).toContain("COMPETITION_ICON.volts");
     // Flipped 12 Oct 2026: Entry fee uses owner wallet-up art; Simulated funds keep wallet.
     expect(tradingSummary).toContain("COMPETITION_ICON.entryFee");

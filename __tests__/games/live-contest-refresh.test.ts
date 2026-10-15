@@ -116,8 +116,14 @@ describe("both lobbies refresh while the contest is running", () => {
     expect(lobby).toMatch(/<ArenaLiveProvider/);
     expect(lobby).toMatch(/LobbyLiveLeaderboard/);
     expect(lobby).toMatch(/LobbyLivePrizePanel/);
-    expect(lobby).toMatch(/LobbyLivePlayersValue/);
-    expect(lobby).toMatch(/LobbyLivePrizePoolValue/);
+    // Amended 15 Oct 2026: the pot and seat count moved into the trading-style summary
+    // row, which reads both straight off the live provider instead of through the two
+    // single-value components.
+    expect(lobby).toMatch(/<GameLobbySummary/);
+    const summary = readCode("components/games/lobby/GameLobbySummary.tsx");
+    expect(summary).toMatch(/useArenaLive\(\)/);
+    expect(summary).toMatch(/contest\.currentParticipants/);
+    expect(summary).toMatch(/contest\.prizePool/);
     expect(lobby).toMatch(/LobbyLiveEntryButton/);
     // Frozen page-refresh entry control would leave Join offered after the last seat fills.
     expect(lobby).not.toMatch(/<CompetitionEntryButton/);

@@ -2,18 +2,16 @@
 
 import Image from "next/image";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
-import {
-  LobbyLivePlayersValue,
-  LobbyLivePrizePoolValue,
-  LobbyLiveYourScoreValue,
-} from "@/components/games/LobbyLiveParts";
+import { LobbyLiveYourScoreValue } from "@/components/games/LobbyLiveParts";
 import { useArenaLive } from "@/components/games/arena/ArenaLiveStandings";
-import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
- * Six contest statistic tiles for the game arena lobby (right column / mobile).
+ * The player's own contest figures for the game arena lobby (right column / mobile):
+ * round time, attempts, score and rank.
  *
- * Values stay on the live standings poll — never example data.
+ * Prize pool, entry fee and players moved to `GameLobbySummary` under the hero on
+ * 15 Oct 2026 (owner: "the prize pool etc must be like trading lobby"), so the same
+ * figure is never drawn twice on one screen. Values stay on the live standings poll.
  */
 
 function StatTile({
@@ -29,12 +27,12 @@ function StatTile({
 }) {
   const glow =
     accent === "gold"
-      ? "border-amber-400/40 shadow-[0_0_18px_rgba(251,191,36,0.12)]"
+      ? "border-amber-400/55 shadow-[0_0_22px_-4px_rgba(251,191,36,0.45),inset_0_0_14px_rgba(251,191,36,0.10)]"
       : accent === "violet"
-        ? "border-violet-400/35 shadow-[0_0_18px_rgba(167,139,250,0.12)]"
+        ? "border-violet-400/55 shadow-[0_0_22px_-4px_rgba(167,139,250,0.45),inset_0_0_14px_rgba(167,139,250,0.10)]"
         : accent === "emerald"
-          ? "border-emerald-400/35 shadow-[0_0_18px_rgba(52,211,153,0.12)]"
-          : "border-cyan-400/35 shadow-[0_0_18px_rgba(34,211,238,0.12)]";
+          ? "border-emerald-400/55 shadow-[0_0_22px_-4px_rgba(52,211,153,0.45),inset_0_0_14px_rgba(52,211,153,0.10)]"
+          : "border-cyan-400/55 shadow-[0_0_22px_-4px_rgba(34,211,238,0.45),inset_0_0_14px_rgba(34,211,238,0.10)]";
 
   return (
     <div
@@ -47,7 +45,7 @@ function StatTile({
             alt=""
             width={28}
             height={28}
-            className="h-7 w-7 object-contain"
+            className="h-7 w-7 object-contain drop-shadow-[0_0_8px_rgba(34,211,238,0.55)]"
           />
         </span>
         <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
@@ -69,29 +67,16 @@ function LobbyLiveRankValue({ initialRank }: { initialRank?: number }) {
 }
 
 export function LobbyContestStatsGrid({
-  prizePool,
-  entryFee,
-  currentParticipants,
-  maxParticipants,
   roundTimeLabel,
-  creditSymbol,
-  playersLabel,
-  prizePoolLabel,
-  entryFeeLabel,
+  attemptsLabel,
   initialScore,
   initialRank,
   showScore,
   scoringNote,
 }: {
-  prizePool: number;
-  entryFee: number;
-  currentParticipants: number;
-  maxParticipants: number;
   roundTimeLabel: string;
-  creditSymbol?: string;
-  playersLabel: string;
-  prizePoolLabel: string;
-  entryFeeLabel: string;
+  /** "2 of 3" once seated; the policy in words ("One attempt") before. Absent hides nothing - shows a dash. */
+  attemptsLabel?: string;
   initialScore?: number;
   initialRank?: number;
   showScore: boolean;
@@ -101,45 +86,20 @@ export function LobbyContestStatsGrid({
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2.5">
         <StatTile
-          iconSrc={COMPETITION_ICON.volts}
-          label={prizePoolLabel}
-          accent="gold"
-          value={
-            <LobbyLivePrizePoolValue
-              initialPool={prizePool}
-              creditSymbol={creditSymbol}
-            />
-          }
-        />
-        <StatTile
-          iconSrc={COMPETITION_ICON.entryFee}
-          label={entryFeeLabel}
-          accent="violet"
-          value={
-            entryFee
-              ? formatVolts(entryFee, { symbol: creditSymbol })
-              : "Free"
-          }
-        />
-        <StatTile
-          iconSrc={COMPETITION_ICON.players}
-          label={playersLabel}
-          value={
-            <LobbyLivePlayersValue
-              initialCurrent={currentParticipants}
-              initialMax={maxParticipants}
-            />
-          }
-        />
-        <StatTile
           iconSrc={COMPETITION_ICON.clock}
           label="Round time"
           value={roundTimeLabel}
         />
         <StatTile
+          iconSrc={COMPETITION_ICON.bolt}
+          label="Attempts"
+          accent="violet"
+          value={attemptsLabel ?? "—"}
+        />
+        <StatTile
           iconSrc={COMPETITION_ICON.gamepad}
           label="Your score"
-          accent="cyan"
+          accent="emerald"
           value={
             showScore ? (
               <LobbyLiveYourScoreValue initialScore={initialScore} />

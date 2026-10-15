@@ -1635,9 +1635,16 @@ describe("the game lobby shows a joined player the clock", () => {
       InlineCountdown for "Ends in" (not a second four-cell panel); the other InlineCountdown
       is still the last-attempt cut-off under reserve_full_round. If this rises above two, a
       third clock has crept back; if it falls to zero, the attempt cut-off is gone.
+
+      Amended later 15 Oct 2026: the "Ends in" clock moved with the prize/entry/players row
+      into GameLobbySummary (trading-style summary), so the two are counted across both
+      files. The lobby keeps exactly one: the attempt cut-off.
     */
-    const countdowns = code.match(/<InlineCountdown/g) ?? [];
-    expect(countdowns.length).toBe(2);
+    const summary = readCode("components/games/lobby/GameLobbySummary.tsx");
+    const lobbyCount = (code.match(/<InlineCountdown/g) ?? []).length;
+    const summaryCount = (summary.match(/<InlineCountdown/g) ?? []).length;
+    expect(lobbyCount).toBe(1);
+    expect(lobbyCount + summaryCount).toBe(2);
 
     // Reused, not re-implemented. A second place that formats "2d 4h" is a second place for the
     // wording to drift, which is the shape behind several defects here.

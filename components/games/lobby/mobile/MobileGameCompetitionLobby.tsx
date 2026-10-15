@@ -12,6 +12,7 @@ import { COMPETITIONS_ARENA_BG } from "@/lib/competitions/game-definitions";
 export function MobileGameCompetitionLobby({
   nav,
   hero,
+  summary,
   center,
   stats,
   leaderboard,
@@ -22,6 +23,8 @@ export function MobileGameCompetitionLobby({
 }: {
   nav?: React.ReactNode;
   hero: React.ReactNode;
+  /** Same prize / entry / players / clock cards as desktop (one shared component). */
+  summary?: React.ReactNode;
   center: React.ReactNode;
   stats: React.ReactNode;
   leaderboard: React.ReactNode;
@@ -49,6 +52,7 @@ export function MobileGameCompetitionLobby({
       >
         {nav}
         {hero}
+        {summary}
         {center}
         {stats}
         {leaderboard}

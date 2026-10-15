@@ -1,13 +1,28 @@
-import { Gamepad2, Info } from "lucide-react";
-import { NeonPanel } from "@/components/neon/Cards";
+import { Clock, Gamepad2, PlayCircle, RotateCcw, type LucideIcon } from "lucide-react";
 import ContestCountdown from "@/components/games/ContestCountdown";
 
 /**
  * Center column of the game arena lobby (owner target, 15 Oct 2026 image 1):
- * gamepad + short title, rule badges, blurb, cyan neon countdown, info bar, gold PLAY.
+ * gamepad + short title, rule badges, blurb, cyan neon countdown, fact chips, gold PLAY.
  *
  * Kind-agnostic: title/description/badges are handed in from catalogue + contest facts.
+ * The old one-paragraph info bar became three short chips (owner, 15 Oct 2026: "organise
+ * into categories"). Icons are picked by a string kind so the facts stay plain data.
  */
+
+export type LobbyStageFactKind = "clock" | "start" | "attempt";
+
+export interface LobbyStageFact {
+  kind: LobbyStageFactKind;
+  label: string;
+  value: string;
+}
+
+const FACT_ICON = new Map<LobbyStageFactKind, LucideIcon>([
+  ["clock", Clock],
+  ["start", PlayCircle],
+  ["attempt", RotateCcw],
+]);
 
 export function LobbyRuleBadge({
   children,
@@ -39,7 +54,7 @@ export function LobbyCenterStage({
   countdownLabel,
   countdownVariant,
   scheduleDetails,
-  attemptNote,
+  facts,
   entryControl,
   attemptsPanel,
 }: {
@@ -53,13 +68,16 @@ export function LobbyCenterStage({
   countdownLabel: string;
   countdownVariant: "start" | "end";
   scheduleDetails?: React.ReactNode;
-  attemptNote?: string | null;
+  /** Short round facts drawn as chips (round length, when to start, attempt cost). */
+  facts?: LobbyStageFact[];
   entryControl: React.ReactNode;
   attemptsPanel?: React.ReactNode;
 }) {
   return (
-    <NeonPanel accent="score" size="lg" className="!p-0 overflow-hidden">
-      <div className="relative space-y-4 border border-cyan-400/40 bg-gradient-to-b from-[#0B1834]/95 via-[#080F22] to-[#050A16] p-5 shadow-[0_0_28px_rgba(34,211,238,0.12),inset_0_0_40px_rgba(56,189,248,0.06)] sm:p-6">
+    // Reason: no NeonPanel / overflow-hidden wrapper here - it clipped the outer glow,
+    // which is why the stage looked flat beside the owner's target.
+    <div>
+      <div className="relative space-y-4 rounded-xl border border-cyan-400/60 bg-gradient-to-b from-[#0B1834]/95 via-[#080F22] to-[#050A16] p-5 shadow-[0_0_36px_-2px_rgba(34,211,238,0.38),inset_0_0_48px_rgba(56,189,248,0.10)] sm:p-6">
         <div className="relative space-y-4">
           <div>
             <div className="flex items-center gap-3">
@@ -98,15 +116,23 @@ export function LobbyCenterStage({
             </div>
           ) : null}
 
-          {attemptNote ? (
-            <div className="flex items-start gap-2.5 rounded-lg border border-cyan-400/40 bg-[#061820]/80 px-3 py-2.5 shadow-[0_0_14px_rgba(34,211,238,0.12)]">
-              <Info
-                className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300"
-                aria-hidden
-              />
-              <p className="text-xs leading-relaxed text-gray-100/95">
-                {attemptNote}
-              </p>
+          {facts && facts.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2">
+              {facts.map((fact) => {
+                const Icon = FACT_ICON.get(fact.kind) ?? Clock;
+                return (
+                  <div
+                    key={fact.label}
+                    className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-cyan-400/45 bg-[#061820]/85 px-2 py-2.5 text-center shadow-[0_0_16px_-2px_rgba(34,211,238,0.35),inset_0_0_12px_rgba(34,211,238,0.08)]"
+                  >
+                    <Icon className="h-4 w-4 text-cyan-300" aria-hidden />
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/80">
+                      {fact.label}
+                    </span>
+                    <span className="text-xs font-bold text-white">{fact.value}</span>
+                  </div>
+                );
+              })}
             </div>
           ) : null}
 
@@ -114,6 +140,6 @@ export function LobbyCenterStage({
           {attemptsPanel}
         </div>
       </div>
-    </NeonPanel>
+    </div>
   );
 }
