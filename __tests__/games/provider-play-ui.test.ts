@@ -1538,19 +1538,26 @@ describe("the play screen counts down on the server's clock", () => {
     expect(blockedList).toMatch(/tooLateToStart/);
   });
 
-  it("shows a countdown beside the absolute time, not instead of it", () => {
+  it("shows a countdown to the window, and a second one to the live round's close", () => {
     const code = readCode(PREFLIGHT);
 
     // The remaining figure is what decides whether to press Play now; the absolute time is what
     // a player planning to come back needs. The report was that only the second was shown.
     // Re-aimed 2 Oct 2026, claim unchanged: the two small text clocks became ONE large
     // `CountdownPanel` (owner: "make the clocks more prominent like the competition area"), so
-    // both targets now feed one countdown, and the absolute time is printed from that SAME
-    // target - two sources here is how the clock and the time beneath it could disagree.
+    // both targets now feed one countdown.
+    // Flipped 15 Oct 2026 (owner, screenshot with the date line crossed out): the UTC date under
+    // the clock is GONE, and the window-end clock reads "Competition closes in" with a second
+    // "Round closes in" clock below it once a round is live. The original claim - the
+    // countdown is the primary figure - survives; the absolute-time half is what the owner
+    // removed, so it is now asserted ABSENT under the clock rather than present.
     expect(code).toMatch(/targetMs:\s*windowStartMs/);
     expect(code).toMatch(/targetMs:\s*windowEndMs/);
     expect(code).toMatch(/remainingMs=\{clock\.targetMs\s*-\s*now\}/);
-    expect(code).toMatch(/formatShortUtc\(clock\.targetMs\)/);
+    expect(code).not.toMatch(/formatShortUtc\(clock\.targetMs\)/);
+    expect(code).toMatch(/label:\s*"Competition closes in"/);
+    expect(code).not.toMatch(/"Play closes in"/);
+    expect(code).toMatch(/<RoundCloseClock\s+expiresAt=\{state\.liveRound\.expiresAt\}/);
   });
 
   it("counts down to the lobby opening on a play-together contest, and says the spot is saved", () => {

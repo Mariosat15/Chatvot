@@ -16,6 +16,7 @@ import {
   StageIcon,
 } from "./preflight-parts";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
+import { RoundCloseClock } from "./RoundCloseClock";
 import { playModePlayerRule, LATE_ENTRY_NOTICE } from "@/lib/services/games/play-shape";
 
 /**
@@ -270,7 +271,7 @@ export function RoundPreflight({
               note: "Your spot is saved. Play unlocks by itself - no need to refresh.",
             }
           : !windowNotOpen && windowEndMs !== null
-            ? { label: "Play closes in", targetMs: windowEndMs, note: "" }
+            ? { label: "Competition closes in", targetMs: windowEndMs, note: "" }
             : null;
   // The clock's own line says why Play is not open yet, so a second panel would repeat it.
   const clockExplainsWait = clock !== null && (notStartedYet || windowNotOpen);
@@ -378,21 +379,24 @@ export function RoundPreflight({
         <CountdownPanel
           remainingMs={clock.targetMs - now}
           label={clock.label}
-          variant={clock.label === "Play closes in" ? "end" : "start"}
+          variant={clock.label === "Competition closes in" ? "end" : "start"}
           // The trading lobby's showcase clock (owner, 15 Oct 2026: "use the same from
           // competition trading lobby for the clock"). Appearance only - the server clock above
-          // still decides `now`.
+          // still decides `now`. The UTC date line under it was removed on the owner's
+          // instruction the same day; the cells already say when.
           size="showcase"
           details={
-            <div className="space-y-1">
-              {clock.note && (
-                <p className="text-sm font-medium text-gray-100">{clock.note}</p>
-              )}
-              <p className="text-xs tabular-nums text-gray-500">
-                {formatShortUtc(clock.targetMs)}
-              </p>
-            </div>
+            clock.note ? (
+              <p className="text-sm font-medium text-gray-100">{clock.note}</p>
+            ) : undefined
           }
+        />
+      )}
+
+      {state.liveRound && (
+        <RoundCloseClock
+          expiresAt={state.liveRound.expiresAt}
+          serverNow={state.serverNow}
         />
       )}
 

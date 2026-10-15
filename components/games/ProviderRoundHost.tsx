@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ProviderGameFrame } from "./ProviderGameFrame";
+import { RoundCloseClock } from "./RoundCloseClock";
 import { RoundPreflight } from "./RoundPreflight";
 import { RoundResultPanel } from "./RoundResultPanel";
 import type { PlayState, PlayerRoundView } from "./play-state";
@@ -230,6 +231,12 @@ export function ProviderRoundHost({
         resumed: Boolean(data.resumed),
       });
 
+      // Reason: the "Round closes in" clock above the frame counts to the new round's
+      // `expiresAt`, which only the server knows - the launch response does not carry it.
+      void readState().then((refreshed) => {
+        if (refreshed) setState(refreshed);
+      });
+
       // Reason the wording differs: a double-click must not announce a new attempt. The route
       // returns `resumed` precisely so the UI can tell the two apart.
       if (data.resumed) {
@@ -313,14 +320,24 @@ export function ProviderRoundHost({
   }, []);
 
   if (phase.name === "playing") {
+    const playingRound =
+      state.rounds.find((r) => r.roundId === phase.roundId) ?? state.liveRound;
     return (
-      <ProviderGameFrame
-        launchUrl={phase.launchUrl}
-        gameName={gameName}
-        onFinished={handleFinished}
-        onExit={handleExit}
-        onUntrustedOrigin={handleUntrustedOrigin}
-      />
+      <div className="space-y-4">
+        {playingRound && (
+          <RoundCloseClock
+            expiresAt={playingRound.expiresAt}
+            serverNow={state.serverNow}
+          />
+        )}
+        <ProviderGameFrame
+          launchUrl={phase.launchUrl}
+          gameName={gameName}
+          onFinished={handleFinished}
+          onExit={handleExit}
+          onUntrustedOrigin={handleUntrustedOrigin}
+        />
+      </div>
     );
   }
 

@@ -996,6 +996,16 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 15 October 2026 - Play screen: "Competition closes in" plus a "Round closes in" clock
+
+Owner, with a screenshot: *"change the wording to competition close in and below another clock say Round close in when the user start the round"*. The date line under the clock was crossed out in the screenshot.
+
+- `RoundPreflight.tsx`: the window-end clock now reads **Competition closes in** instead of "Play closes in". The UTC date line under it is removed. When a round is live, a second showcase clock, **Round closes in**, sits below it.
+- New `components/games/RoundCloseClock.tsx` counts to the round's `expiresAt` on the server clock and renders nothing once that time has passed or if it cannot be parsed. `ProviderRoundHost.tsx` shows it above the game frame while the player is playing, and re-reads the play state after launch, because the launch response does not carry `expiresAt`.
+- `ProviderContestLobby.tsx`: the active-contest countdown reads `${terms.contest} closes in` to match.
+- **Caveat that must not be glossed:** `expiresAt` is the server's hard close. It includes 120 seconds of headroom and is based on the title's ceiling, so the game's own clock inside the frame can finish first. The label therefore says when the round *closes*, not how long is left to score.
+- Test flipped, not deleted: `provider-play-ui` "shows a countdown beside the absolute time" now asserts the date line is absent, the new label is present, and the round clock is mounted. The three pre-existing failures are unchanged. **Never verified by eye.**
+
 ### 15 October 2026 - Trading lobby Overview: About and Battle plan as two full-width bands
 
 Owner screenshot of the trading lobby's Overview tab: side by side, the Battle plan's four steps ran taller than the About card and spilled below it. `components/competitions/detail/TradingOverview.tsx` now stacks two full-width bands - "About this competition" with its text beside the two fact tiles (`xl`), then "Battle plan" with its steps in one row (`xl:grid-cols-4`, two columns at `sm`, one on phones). The vertical rail is removed because the steps no longer stack. Copy comes from `buildTradingOverviewCopy` unchanged. Layout only. **Never verified by eye.**

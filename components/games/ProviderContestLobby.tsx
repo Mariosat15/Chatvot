@@ -334,7 +334,7 @@ export default async function ProviderContestLobby({
       countdownTarget={countdownTarget}
       serverNow={state?.serverNow}
       countdownLabel={
-        isActive ? "Play closes in" : `${terms.contest} starts in`
+        isActive ? `${terms.contest} closes in` : `${terms.contest} starts in`
       }
       countdownVariant={isActive ? "end" : "start"}
       scheduleDetails={scheduleDetails}
