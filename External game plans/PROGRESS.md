@@ -996,6 +996,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 16 October 2026 - Mobile countdown digits still overflowed their boxes
+
+Owner: "still the numbers are falling out of the box reduce the numbers size". The earlier pass left arena cells at `1.625rem` and play-screen `showcase` (RoundPreflight) still at `text-4xl` on every width. Both now use `text-[1.125rem]` on phone (`1.25rem` from 390px, `sm:text-2xl`), with the large look only from `lg` up; captions and padding tightened to match. Desktop lobby/trading clocks unchanged at large sizes. **Never verified by eye.**
+
 ### 16 October 2026 - Phone game lobby + play arena polish (timer, banner, contest info, leaderboard gap)
 
 Owner screenshots: timer digits larger than their boxes, "NOT STARTED YET" nearly invisible, contest-info labels truncated (`PRIZE PO…`), banner copy washed out, leaderboard with a tall empty gap under three players and score/time clipped. Root cause for the lobby half: CSS `min-[769px]` alone left Safari on a wide layout viewport, so phones kept rendering the stacked desktop shell. Fix: `LobbyViewportSwitch` (`matchMedia("(min-width: 769px)"`, same cut as auth) wraps mobile/desktop in `ProviderContestLobby` so the dedicated phone tree always wins on a real device. Arena (still one tree, stacked below `xl`): `CountdownPanel` arena cells use smaller digits + tighter padding under `xl`; `ArenaPlayPlate` disabled state is a readable slate plate with dark label (no grayscale washout); `NeonStatTiles` iconSrc branch wraps labels instead of truncating; `NeonHero` / `MobileLobbyHero` stronger phone scrim + drop-shadow; `ArenaEndsIn` wraps and shrinks the clock; `ArenaLeaderboardPanel` on phone is `h-auto` with no `min-h-[400px]`, pages of five (`ARENA_LEADERBOARD_PAGE_SIZE`), Prev/Next when over five — desktop rail height unchanged. Tests: `game-lobby-mobile` (11) + `arena-leaderboard-panel` (10). **Never verified by eye.**
