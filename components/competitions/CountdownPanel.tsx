@@ -84,19 +84,22 @@ function Cell({
   if (size === "arena") {
     const secondsTint = caption.toLowerCase() === "secs";
     return (
+      // Reason (16 Oct 2026): on a phone-width column, text-4xl / sm:text-5xl overflowed
+      // the cell boxes (owner screenshots). Digits stay inside the box; desktop keeps the
+      // large arena look from lg up.
       <div
-        className={`text-center rounded-xl border bg-[#040914]/90 px-2 py-4 ${
+        className={`text-center rounded-xl border bg-[#040914]/90 px-1.5 py-2.5 sm:px-2 sm:py-3 lg:py-4 ${
           secondsTint
             ? "border-amber-400/55 shadow-[inset_0_0_18px_rgba(251,191,36,0.12)]"
             : "border-cyan-400/50 shadow-[inset_0_0_16px_rgba(34,211,238,0.08)]"
         }`}
       >
         <div
-          className={`text-4xl font-black tabular-nums leading-none sm:text-5xl ${valueClassName}`}
+          className={`text-[1.625rem] font-black tabular-nums leading-none tracking-tight sm:text-3xl lg:text-4xl xl:text-5xl ${valueClassName}`}
         >
           {value.toString().padStart(2, "0")}
         </div>
-        <div className="mt-2 text-[11px] font-bold uppercase tracking-[0.18em] text-gray-300">
+        <div className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-gray-300 sm:mt-2 sm:text-[11px] sm:tracking-[0.18em]">
           {caption}
         </div>
       </div>

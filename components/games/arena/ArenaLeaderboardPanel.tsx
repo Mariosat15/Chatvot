@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ArrowRight, Trophy, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ArrowRight, ChevronLeft, ChevronRight, Trophy, Users } from "lucide-react";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
 import { NeonButton } from "@/components/neon/Buttons";
 import { NeonScopeStrip } from "@/components/neon/Cards";
@@ -25,6 +25,7 @@ import {
 } from "@/lib/utils/arena-scope";
 import { useTerms } from "@/contexts/TerminologyContext";
 import { useArenaLive } from "./ArenaLiveStandings";
+import { LOBBY_DESKTOP_MQ } from "@/components/competitions/lobby/LobbyViewportSwitch";
 
 /**
  * The arena's leaderboard rail: two heading tabs, three scope pills, a four-column ranking
@@ -45,10 +46,17 @@ import { useArenaLive } from "./ArenaLiveStandings";
  * exactly the split: the layout owned the heading, the scope strip and the button, while a
  * separate consumer owned the rows, so nothing owned the panel's HEIGHT.
  *
- * THE HEIGHT RULE: the panel is `h-full` with a column body, the rows area is the only
- * `flex-1`, and everything else is its natural height. `min-h` on the rows is room for about
- * ten compact rows, never a cap.
+ * THE HEIGHT RULE (desktop / xl rail): the panel is `h-full` with a column body, the rows
+ * area is the only `flex-1`, and everything else is its natural height. `min-h` on the rows
+ * is room for about ten compact rows, never a cap.
+ *
+ * ON A PHONE (16 Oct 2026): the same panel used to keep `min-h-[400px]` under three players
+ * and leave a tall empty gap. Below the desktop cut it grows with its rows (1–5), then pages
+ * of five — same rule as the phone lobby board.
  */
+
+/** Pages of five on a stacked (phone) arena — matches MobileGameLobbyLeaderboard. */
+export const ARENA_LEADERBOARD_PAGE_SIZE = 5;
 
 type Tab = "ranking" | "players";
 
@@ -101,6 +109,17 @@ export default function ArenaLeaderboardPanel({
   const { rows, friendIds, countries, currentUserId } = useArenaLive();
   const [tab, setTab] = useState<Tab>("ranking");
   const [scope, setScope] = useState<ArenaBoardScope>("global");
+  const [page, setPage] = useState(0);
+  // Reason: null until matchMedia runs — treat as phone so we never flash a 400px gap.
+  const [isDesktop, setIsDesktop] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia(LOBBY_DESKTOP_MQ);
+    const apply = () => setIsDesktop(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   const visibleRows = useMemo(
     () =>
@@ -108,8 +127,27 @@ export default function ArenaLeaderboardPanel({
     [rows, scope, currentUserId, friendIds, countries],
   );
 
+  // Phone: pages of five. Desktop rail: show everyone and scroll inside the tall cell.
+  const paginate = isDesktop !== true;
+  const pageCount = paginate
+    ? Math.max(1, Math.ceil(visibleRows.length / ARENA_LEADERBOARD_PAGE_SIZE))
+    : 1;
+  const current = Math.min(page, pageCount - 1);
+  const start = current * ARENA_LEADERBOARD_PAGE_SIZE;
+  const pagedRows = paginate
+    ? visibleRows.slice(start, start + ARENA_LEADERBOARD_PAGE_SIZE)
+    : visibleRows;
+
+  useEffect(() => {
+    setPage(0);
+  }, [scope, tab]);
+
   return (
-    <div className={`${NEON_PANEL_SIDE} flex h-full flex-col overflow-hidden`}>
+    <div
+      className={`${NEON_PANEL_SIDE} flex flex-col overflow-hidden ${
+        isDesktop ? "h-full" : "h-auto"
+      }`}
+    >
       <div className={NEON_TABS_STRIP}>
         {/*
           A real pair of tabs, not a title and a pill. `aria-pressed` rather than a tablist
@@ -151,18 +189,44 @@ export default function ArenaLeaderboardPanel({
       />
 
       {/*
-        THE ONLY `flex-1`, and the only scroller. `min-h` is room for about ten rows at the
-        reference's height; the panel grows past it to fill the row and the overflow scrolls.
-
+        Desktop: THE ONLY `flex-1`, and the only scroller. `min-h` is room for about ten rows.
+        Phone: height follows the rows (no empty gap); pages of five above five players.
         Horizontal padding must leave room for each row's full border + gold glow (owner
         26 Sep: right edge was clipped when this was only `px-1.5`).
       */}
-      <div className="min-h-[400px] flex-1 overflow-y-auto px-2.5 py-2 [scrollbar-width:thin] [scrollbar-color:rgba(64,150,240,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(64,150,240,0.4)]">
+      <div
+        className={
+          isDesktop
+            ? "min-h-[400px] flex-1 overflow-y-auto px-2.5 py-2 [scrollbar-width:thin] [scrollbar-color:rgba(64,150,240,0.45)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[rgba(64,150,240,0.4)]"
+            : "min-h-0 px-2.5 py-2"
+        }
+      >
         {tab === "ranking" ? (
-          <BoardTab scoreLabel={scoreLabel} rows={visibleRows} scope={scope} />
+          <BoardTab scoreLabel={scoreLabel} rows={pagedRows} scope={scope} />
         ) : (
-          <PlayersTab rows={visibleRows} scope={scope} />
+          <PlayersTab rows={pagedRows} scope={scope} />
         )}
+        {paginate && pageCount > 1 ? (
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <PagerButton
+              label="Previous"
+              disabled={current === 0}
+              onPress={() => setPage(current - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </PagerButton>
+            <span className="text-center text-[12px] font-semibold text-gray-200">
+              {start + 1}–{start + pagedRows.length} of {visibleRows.length}
+            </span>
+            <PagerButton
+              label="Next"
+              disabled={current >= pageCount - 1}
+              onPress={() => setPage(current + 1)}
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden />
+            </PagerButton>
+          </div>
+        ) : null}
       </div>
 
       <div className={`border-t p-3 ${NEON_DIVIDER}`}>
@@ -174,6 +238,34 @@ export default function ArenaLeaderboardPanel({
         />
       </div>
     </div>
+  );
+}
+
+function PagerButton({
+  label,
+  disabled,
+  onPress,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onPress}
+      className={`flex min-h-11 min-w-11 items-center justify-center rounded-xl border px-3 text-[12px] font-semibold ${
+        disabled
+          ? "border-white/[0.05] text-gray-600 opacity-50"
+          : "border-cyan-300/30 bg-cyan-500/10 text-cyan-200"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

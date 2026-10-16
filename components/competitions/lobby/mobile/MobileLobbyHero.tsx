@@ -57,10 +57,12 @@ export function MobileLobbyHero({
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#12183A] to-violet-900/40" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#060A18] via-[#060A18]/80 to-transparent" />
+        {/* Reason (16 Oct 2026): art on the right was washing out white title letters. */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#060A18] from-35% via-[#060A18]/95 via-55% to-[#060A18]/35" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#060A18]/40 via-transparent to-[#060A18]/50" />
       </div>
 
-      <div className="relative space-y-3 p-4 pr-[26%]">
+      <div className="relative space-y-3 p-4 pr-[22%]">
         <div className="flex flex-wrap items-center gap-2">
           <NeonStatusBadge status={status} />
           <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-violet-200">
@@ -69,7 +71,7 @@ export function MobileLobbyHero({
           </span>
         </div>
 
-        <h1 className="text-[22px] font-extrabold leading-tight break-words">
+        <h1 className="text-[22px] font-extrabold leading-tight break-words drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)]">
           {name.subtitle ? (
             <>
               <span className="block text-white">{name.title}:</span>
@@ -83,7 +85,7 @@ export function MobileLobbyHero({
         {text ? (
           <div>
             <p
-              className={`text-[13px] leading-relaxed text-gray-300 ${
+              className={`text-[13px] leading-relaxed text-gray-100 drop-shadow-[0_1px_8px_rgba(0,0,0,0.9)] ${
                 !expanded && needsClamp ? "line-clamp-3" : ""
               }`}
             >

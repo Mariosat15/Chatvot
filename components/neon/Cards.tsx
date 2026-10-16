@@ -708,22 +708,27 @@ export function NeonStatTiles({
         const classes = accentClasses(item.accent);
         if (item.iconSrc) {
           return (
+            // Reason (16 Oct 2026): truncate turned "Prize pool" / "Round time" /
+            // "Your score" into "PRIZE PO..." on a phone-width contest-info column.
+            // Labels wrap; values stay one line with tabular figures.
             <div
               key={item.label}
-              className={`${NEON_FACE_TILE} flex min-w-0 items-center gap-2.5 px-2.5 py-2.5`}
+              className={`${NEON_FACE_TILE} flex min-w-0 items-center gap-2 px-2 py-2.5 sm:gap-2.5 sm:px-2.5`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
               <img
                 src={item.iconSrc}
                 alt=""
                 draggable={false}
-                className="h-10 w-10 shrink-0 object-contain"
+                className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10"
               />
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className={`truncate text-[0.6rem] tracking-[0.12em] ${NEON_LABEL}`}>
+              <div className="flex min-w-0 flex-col gap-0.5 sm:gap-1">
+                <span className="text-[0.58rem] font-semibold uppercase leading-snug tracking-[0.08em] text-gray-400 sm:text-[0.65rem] sm:tracking-[0.12em]">
                   {item.label}
                 </span>
-                <span className={`truncate text-lg font-bold leading-none ${classes.text}`}>
+                <span
+                  className={`break-words text-base font-bold leading-tight sm:truncate sm:text-lg sm:leading-none ${classes.text}`}
+                >
                   {item.value}
                 </span>
               </div>

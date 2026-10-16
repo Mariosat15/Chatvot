@@ -61,6 +61,7 @@ import { LobbyCenterStage } from "@/components/games/lobby/LobbyCenterStage";
 import { LobbyAttemptBadges } from "@/components/games/lobby/LobbyAttemptBadges";
 import { MobileGameLobbyLeaderboard } from "@/components/games/lobby/mobile/MobileGameLobbyLeaderboard";
 import { MobileGameCompetitionLobby } from "@/components/games/lobby/mobile/MobileGameCompetitionLobby";
+import LobbyViewportSwitch from "@/components/competitions/lobby/LobbyViewportSwitch";
 import {
   resolveHeroFeatures,
   scoringSummary,
@@ -482,100 +483,107 @@ export default async function ProviderContestLobby({
       {/*
         Phone: dedicated Game Competition Lobby
         (`ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide`). Never a
-        squeezed three-column desktop. Desktop shell below is unchanged.
-      */}
-      <div className="min-[769px]:hidden min-w-0">
-        <MobileGameCompetitionLobby
-          competitionId={String(competition._id)}
-          contestsHref="/competitions"
-          contestsLabel={terms.contests}
-          hero={{
-            title: heroTitle,
-            description: centerDescription,
-            banner: resolveProviderBanner({
-              bannerUrl: presentation?.bannerUrl,
-              gameName: presentation?.gameName ?? gameName,
-              gameCode: competition?.gameConfig?.gameCode,
-            }),
-            categoryLabel: presentation.category ?? null,
-            status,
-            cancellationReason: competition.cancellationReason ?? null,
-          }}
-          contest={{
-            isActive,
-            isUpcoming: status === "upcoming",
-            isCompleted,
-            isCancelled,
-            countdownTarget,
-          }}
-          run={{
-            isUserIn,
-            state,
-            roundTimeLabel,
-            scoringNote,
-            initialScore: myInitialScore,
-            initialRank: standings.yourRank,
-            entryControl: mobileEntryControl,
-          }}
-          metrics={{
-            prizePool: Number(
-              competition.prizePool ?? competition.prizePoolCredits ?? 0,
-            ),
-            entryFee: Number(
-              competition.entryFee ?? competition.entryFeeCredits ?? 0,
-            ),
-            currentParticipants: Number(competition.currentParticipants ?? 0),
-            maxParticipants: Number(competition.maxParticipants ?? 0),
-            minParticipants: Number(competition.minParticipants ?? 0),
-            playersLabel: terms.players,
-            creditSymbol,
-            funded: competition.fundingMode === "gm_funded",
-          }}
-          leaderboard={
-            <MobileGameLobbyLeaderboard
-              title={terms.leaderboard}
-              scoreLabel={scoreLabel}
-              playersLabel={terms.players}
-            />
-          }
-          prizes={prizesPanel}
-          howItWorks={howItWorks}
-          tips={tips}
-          rounds={{
-            list: state?.rounds ?? [],
-            scoreType: presentation?.scoreType,
-            scoreLabel,
-          }}
-          details={
-            <>
-              <GameEventDetails sections={eventDetailSections} />
-              <CompetitionRulesFairPlay />
-              <LobbyHelpFooter />
-            </>
-          }
-        />
-      </div>
+        squeezed three-column desktop. Desktop shell is unchanged.
 
-      {/* Desktop / tablet arena: leaderboard | play stage | contest info. */}
-      <div className="hidden min-[769px]:block">
-        <GameCompetitionArenaShell
-          nav={nav}
-          hero={hero}
-          summary={summary}
-          left={leaderboard}
-          center={centerStage}
-          right={rightColumn}
-          footer={
-            <>
-              {howItWorks}
-              {tips ?? <LobbyTipsPlaceholder />}
-            </>
-          }
-        />
-        <div className="mx-auto max-w-[1600px] px-5 pb-8 sm:px-7 md:px-8">
-          <LobbyHelpFooter />
-        </div>
-      </div>
+        Reason (16 Oct 2026): matchMedia switch, not CSS alone — phones were
+        still painting the desktop shell when Safari's layout width stayed wide.
+      */}
+      <LobbyViewportSwitch
+        mobile={
+          <div className="min-w-0">
+            <MobileGameCompetitionLobby
+              competitionId={String(competition._id)}
+              contestsHref="/competitions"
+              contestsLabel={terms.contests}
+              hero={{
+                title: heroTitle,
+                description: centerDescription,
+                banner: resolveProviderBanner({
+                  bannerUrl: presentation?.bannerUrl,
+                  gameName: presentation?.gameName ?? gameName,
+                  gameCode: competition?.gameConfig?.gameCode,
+                }),
+                categoryLabel: presentation.category ?? null,
+                status,
+                cancellationReason: competition.cancellationReason ?? null,
+              }}
+              contest={{
+                isActive,
+                isUpcoming: status === "upcoming",
+                isCompleted,
+                isCancelled,
+                countdownTarget,
+              }}
+              run={{
+                isUserIn,
+                state,
+                roundTimeLabel,
+                scoringNote,
+                initialScore: myInitialScore,
+                initialRank: standings.yourRank,
+                entryControl: mobileEntryControl,
+              }}
+              metrics={{
+                prizePool: Number(
+                  competition.prizePool ?? competition.prizePoolCredits ?? 0,
+                ),
+                entryFee: Number(
+                  competition.entryFee ?? competition.entryFeeCredits ?? 0,
+                ),
+                currentParticipants: Number(competition.currentParticipants ?? 0),
+                maxParticipants: Number(competition.maxParticipants ?? 0),
+                minParticipants: Number(competition.minParticipants ?? 0),
+                playersLabel: terms.players,
+                creditSymbol,
+                funded: competition.fundingMode === "gm_funded",
+              }}
+              leaderboard={
+                <MobileGameLobbyLeaderboard
+                  title={terms.leaderboard}
+                  scoreLabel={scoreLabel}
+                  playersLabel={terms.players}
+                />
+              }
+              prizes={prizesPanel}
+              howItWorks={howItWorks}
+              tips={tips}
+              rounds={{
+                list: state?.rounds ?? [],
+                scoreType: presentation?.scoreType,
+                scoreLabel,
+              }}
+              details={
+                <>
+                  <GameEventDetails sections={eventDetailSections} />
+                  <CompetitionRulesFairPlay />
+                  <LobbyHelpFooter />
+                </>
+              }
+            />
+          </div>
+        }
+        desktop={
+          <div>
+            <GameCompetitionArenaShell
+              nav={nav}
+              hero={hero}
+              summary={summary}
+              left={leaderboard}
+              center={centerStage}
+              right={rightColumn}
+              footer={
+                <>
+                  {howItWorks}
+                  {tips ?? <LobbyTipsPlaceholder />}
+                </>
+              }
+            />
+            <div className="mx-auto max-w-[1600px] px-5 pb-8 sm:px-7 md:px-8">
+              <LobbyHelpFooter />
+            </div>
+          </div>
+        }
+      />
     </ArenaLiveProvider>
   );
 }

@@ -69,8 +69,13 @@ export function NeonHero({
         Drawn over the art whether or not there is any: with a banner it guarantees the text is
         legible, and without one it IS the hero. The violet-to-transparent wash on the right is
         the sheet's glow treatment.
+
+        Reason (16 Oct 2026): on phone widths the art filled the whole card and the old
+        lighter right edge left white title letters washed out ("invisible"). Keep the left
+        copy field opaque on small screens; ease the right wash only from md up.
       */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#05070F] via-[#05070F]/92 to-[#05070F]/45" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#05070F] via-[#05070F]/95 to-[#05070F]/85 md:via-[#05070F]/92 md:to-[#05070F]/45" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[#05070F]/55 via-transparent to-[#05070F]/70 md:from-transparent md:to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-violet-600/25" />
 
       <div className="relative z-10 flex flex-col justify-end gap-4 p-6 sm:p-8 md:min-h-[280px] md:p-10">
@@ -88,12 +93,12 @@ export function NeonHero({
               )}
             </div>
 
-            <h1 className="text-3xl font-bold leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-4xl md:text-[42px]">
+            <h1 className="text-3xl font-bold leading-tight text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.95)] sm:text-4xl md:text-[42px]">
               {title}
             </h1>
 
             {subtitle && (
-              <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-200 drop-shadow-[0_1px_8px_rgba(0,0,0,0.85)] sm:text-[17px]">
+              <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-100 drop-shadow-[0_1px_10px_rgba(0,0,0,0.95)] line-clamp-3 sm:line-clamp-none sm:text-[17px] sm:text-gray-200">
                 {subtitle}
               </p>
             )}

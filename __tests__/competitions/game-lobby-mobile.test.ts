@@ -26,11 +26,20 @@ describe("game competition lobby mobile (owner guide)", () => {
   it("keeps desktop on the three-column shell and phone on its own tree", () => {
     expect(lobby).toContain("<GameCompetitionArenaShell");
     expect(lobby).toContain("<MobileGameCompetitionLobby");
-    expect(lobby).toContain('className="min-[769px]:hidden min-w-0"');
-    expect(lobby).toContain('className="hidden min-[769px]:block"');
+    // Reason (16 Oct 2026): matchMedia switch so Safari cannot leave a phone on the
+    // desktop shell when CSS media width is stuck wide.
+    expect(lobby).toContain("<LobbyViewportSwitch");
+    expect(lobby).toContain("mobile={");
+    expect(lobby).toContain("desktop={");
     expect(phone).not.toContain("xl:grid-cols-[");
     expect(phone).not.toContain("GameCompetitionArenaShell");
     expect(desktopShell).toContain("xl:grid-cols-[");
+  });
+
+  it("LobbyViewportSwitch uses the same 769px cut as auth", () => {
+    const sw = read("components/competitions/lobby/LobbyViewportSwitch.tsx");
+    expect(sw).toContain('"(min-width: 769px)"');
+    expect(sw).toContain("matchMedia");
   });
 
   it("reads like the trading phone lobby: hero → tiles → one action card → tabs", () => {

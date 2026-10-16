@@ -57,11 +57,22 @@ describe("the rail is as tall as the board beside it", () => {
     const layout = readCode(LAYOUT);
     expect(layout).toMatch(/xl:order-1 xl:\[&>\*\]:h-full/);
 
-    // And the panel takes the height it is offered.
+    // Desktop takes the height it is offered; phone uses h-auto so three rows leave no gap
+    // (owner, 16 Oct 2026). Both halves are asserted — a bare `h-full` alone is the old defect.
     const panel = readCode(PANEL);
-    expect(panel).toMatch(/\$\{NEON_PANEL_SIDE\} flex h-full flex-col/);
+    expect(panel).toMatch(/NEON_PANEL_SIDE\} flex flex-col/);
+    expect(panel).toMatch(/isDesktop \? "h-full" : "h-auto"/);
     // Reason: owner 26 Sep — row gold rims were clipped at `px-1.5`; keep breathing room.
     expect(panel).toMatch(/overflow-y-auto px-2\.5 /);
+  });
+
+  it("on a phone grows with its rows and pages at 5, with no empty min-height", () => {
+    const panel = readCode(PANEL);
+    expect(panel).toContain("ARENA_LEADERBOARD_PAGE_SIZE = 5");
+    expect(panel).toMatch(/paginate = isDesktop !== true/);
+    expect(panel).toMatch(/visibleRows\.slice\(start, start \+ ARENA_LEADERBOARD_PAGE_SIZE\)/);
+    // Phone branch must not force the 400px empty band.
+    expect(panel).toMatch(/: "min-h-0 px-2\.5 py-2"/);
   });
 
   it("caps nothing, and grows in exactly one place", () => {
@@ -108,8 +119,10 @@ describe("the rail is as tall as the board beside it", () => {
       The service's limit is asserted with it, because room for ten rows and a query that returns
       five is a panel that can never fill - and the two numbers are in different files.
     */
+    // Desktop rail only — phone pages instead of filling a 400px empty cell.
     const panel = readCode(PANEL);
     expect(panel).toMatch(/min-h-\[400px\] flex-1 overflow-y-auto/);
+    expect(panel).toMatch(/isDesktop\s*\n\s*\? "min-h-\[400px\]/);
 
     const service = readCode(SERVICE);
     const limit = /options\?\.limit \?\? (\d+)/.exec(service);
@@ -150,12 +163,20 @@ describe("the rail's two heading tabs", () => {
       BUTTONS WITH `aria-pressed`, never a heading and a pill. The pair the reference draws are
       the same shape and the same size, and either can be the chosen one - a title beside a count
       says one of them is furniture, which is what the previous version was.
+
+      Reason (16 Oct 2026): pager Prev/Next also use type="button", so count tab presses by
+      aria-pressed rather than every button in the file.
     */
     const panel = readCode(PANEL);
-    expect(countOf(panel, 'type="button"')).toBe(2);
     expect(countOf(panel, "aria-pressed")).toBe(2);
     expect(panel).toMatch(/setTab\("ranking"\)/);
     expect(panel).toMatch(/setTab\("players"\)/);
+    // Reason: import names NeonScopeStrip earlier — slice the JSX usage only.
+    const tabsStripAt = panel.indexOf("className={NEON_TABS_STRIP}");
+    const scopeAt = panel.indexOf("<NeonScopeStrip");
+    expect(tabsStripAt).toBeGreaterThan(-1);
+    expect(scopeAt).toBeGreaterThan(tabsStripAt);
+    expect(countOf(panel.slice(tabsStripAt, scopeAt), 'type="button"')).toBe(2);
   });
 
   // Reason: no apostrophe and no brackets in this name. vitest's `-t` is a regular expression,

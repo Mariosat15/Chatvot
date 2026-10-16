@@ -25,8 +25,11 @@ export function ArenaPlayPlate({
   icon?: ReactNode;
   disabled?: boolean;
 }) {
+  // Reason (16 Oct 2026): disabled used to be grayscale + opacity-60, which made
+  // "NOT STARTED YET" nearly invisible on phones (dark text on washed-out gold).
+  // Refused state stays clearly readable: slate plate, light label.
   const chevron = disabled
-    ? "h-7 w-7 shrink-0 text-gray-600"
+    ? "h-7 w-7 shrink-0 text-slate-400"
     : "h-7 w-7 shrink-0 text-cyan-300 drop-shadow-[0_0_10px_rgba(34,211,238,0.95)] motion-safe:animate-pulse";
   return (
     <span className="group flex w-full items-center justify-center gap-2 sm:gap-3">
@@ -34,21 +37,25 @@ export function ArenaPlayPlate({
       <span
         className={`relative block min-w-0 flex-1 transition-transform duration-150 ${
           disabled
-            ? "opacity-60 grayscale"
+            ? ""
             : "drop-shadow-[0_0_18px_rgba(251,191,36,0.6)] group-hover:scale-[1.02] group-active:scale-[0.98]"
         }`}
       >
-        {/* Bevel: a darker gold rim the face sits inside. */}
+        {/* Bevel: a darker gold rim the face sits inside (slate when refused). */}
         <span
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700"
+          className={
+            disabled
+              ? "absolute inset-0 bg-gradient-to-b from-slate-400 via-slate-500 to-slate-700"
+              : "absolute inset-0 bg-gradient-to-b from-amber-200 via-amber-500 to-amber-700"
+          }
           style={{ clipPath: PLATE_SHAPE }}
         />
         <span
-          className={`relative m-[3px] flex min-h-[3.25rem] items-center justify-center overflow-hidden bg-gradient-to-b from-yellow-200 via-amber-300 to-amber-500 px-6 ${
+          className={`relative m-[3px] flex min-h-[3.25rem] items-center justify-center overflow-hidden px-4 sm:px-6 ${
             disabled
-              ? ""
-              : "group-hover:from-yellow-100 group-hover:via-amber-200 group-hover:to-amber-400"
+              ? "bg-gradient-to-b from-slate-300 via-slate-400 to-slate-500"
+              : "bg-gradient-to-b from-yellow-200 via-amber-300 to-amber-500 group-hover:from-yellow-100 group-hover:via-amber-200 group-hover:to-amber-400"
           }`}
           style={{ clipPath: PLATE_SHAPE }}
         >
@@ -57,14 +64,24 @@ export function ArenaPlayPlate({
             aria-hidden
             className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/55 to-white/0"
           />
-          <span className="relative inline-flex items-center gap-2.5 text-center text-lg font-black uppercase tracking-[0.2em] text-[#0a1628] [text-shadow:0_1px_0_rgba(255,255,255,0.45)]">
+          <span
+            className={`relative inline-flex max-w-full items-center justify-center gap-2 text-center text-[13px] font-black uppercase leading-tight tracking-[0.12em] sm:gap-2.5 sm:text-lg sm:tracking-[0.2em] ${
+              disabled
+                ? "text-[#0b1220] [text-shadow:0_1px_0_rgba(255,255,255,0.35)]"
+                : "text-[#0a1628] [text-shadow:0_1px_0_rgba(255,255,255,0.45)]"
+            }`}
+          >
             {icon ?? (
               <Play
                 aria-hidden
-                className="h-5 w-5 fill-cyan-500 text-cyan-600 drop-shadow-[0_0_6px_rgba(34,211,238,0.9)]"
+                className={
+                  disabled
+                    ? "h-5 w-5 shrink-0 fill-[#0b1220] text-[#0b1220]"
+                    : "h-5 w-5 shrink-0 fill-cyan-500 text-cyan-600 drop-shadow-[0_0_6px_rgba(34,211,238,0.9)]"
+                }
               />
             )}
-            {label}
+            <span className="min-w-0 break-words">{label}</span>
           </span>
         </span>
       </span>
