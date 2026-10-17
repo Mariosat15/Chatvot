@@ -48,6 +48,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { toast } from "sonner";
 import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
@@ -1261,10 +1262,11 @@ function ItemCard({
   return (
     <div
       className={cn(
-        "group relative rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer",
+        "group relative rounded-2xl overflow-hidden",
         "bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm",
         "border border-gray-700/50 hover:border-gray-600/50",
-        "hover:shadow-2xl hover:shadow-black/20 hover:-translate-y-1",
+        "hover:shadow-2xl hover:shadow-black/20",
+        PRESS_EFFECT,
         featured && "ring-2 ring-yellow-500/30",
         item.owned && "ring-2 ring-emerald-500/30",
       )}
@@ -1575,10 +1577,11 @@ function CosmeticCard({
   return (
     <div
       className={cn(
-        "group relative rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer",
+        "group relative rounded-2xl overflow-hidden",
         "bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm",
         "border border-gray-700/50 hover:border-pink-500/50",
-        "hover:shadow-2xl hover:shadow-pink-500/10 hover:-translate-y-1",
+        "hover:shadow-2xl hover:shadow-pink-500/10",
+        PRESS_EFFECT,
         item.owned && "ring-2 ring-pink-500/30",
       )}
       onClick={onView}
@@ -1788,10 +1791,11 @@ function GameMasterCard({
   return (
     <div
       className={cn(
-        "group relative rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer",
+        "group relative rounded-2xl overflow-hidden",
         "bg-gradient-to-b from-gray-800/50 to-gray-900/50 backdrop-blur-sm",
         "border border-yellow-500/30 hover:border-yellow-500/50",
-        "hover:shadow-2xl hover:shadow-yellow-500/10 hover:-translate-y-1",
+        "hover:shadow-2xl hover:shadow-yellow-500/10",
+        PRESS_EFFECT,
         item.owned && "ring-2 ring-yellow-500/50",
       )}
       onClick={onView}

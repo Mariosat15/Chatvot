@@ -8,6 +8,7 @@ import {
   type GameDefinition,
 } from "@/lib/competitions/game-definitions";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { splitArenaTitle } from "../ArenaHeader";
 
 type Tone = "cyan" | "gold";
@@ -140,7 +141,11 @@ export function MobileArenaHeader({
           label="Your Volts"
           value={formatVolts(balance, { bare: true })}
         />
-        <Link href="/wallet" className="block" aria-label={`Add ${creditSymbol ?? "Volts"}`}>
+        <Link
+          href="/wallet"
+          className={`block ${PRESS_EFFECT}`}
+          aria-label={`Add ${creditSymbol ?? "Volts"}`}
+        >
           <UtilityTile
             tone="gold"
             icon={COMPETITION_ICON.topup}

@@ -5,6 +5,7 @@ import {
   resolveCtaAsset,
 } from "@/lib/competitions/game-artwork";
 import type { CompetitionCta } from "@/lib/competitions/types";
+import { ART_BUTTON_HOVER, PRESS_EFFECT } from "@/components/ui/press-effect";
 
 /**
  * Owner-supplied CTA PNGs â€” text and icon are baked into the asset.
@@ -44,7 +45,7 @@ export function CompetitionCTA({
   } ${
     greyed
       ? "cursor-not-allowed opacity-45 grayscale"
-      : "transition hover:-translate-y-px hover:brightness-110"
+      : `${PRESS_EFFECT} ${ART_BUTTON_HOVER}`
   }`;
 
   const inner = (

@@ -156,7 +156,7 @@ export default function ResponsiveTable<T>({
               className={cn(
                 "rounded-xl p-3 bg-gray-800/50 border border-gray-700/50 transition-all",
                 onRowClick &&
-                  "cursor-pointer hover:bg-gray-800/70 active:scale-[0.99]",
+                  "press-effect cursor-pointer hover:bg-gray-800/70 transition-all duration-150 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100",
                 cardClasses,
               )}
               onClick={() => onRowClick?.(item, index)}
@@ -281,6 +281,23 @@ export default function ResponsiveTable<T>({
 }
 
 // Utility sub-components for common patterns
+// Reason: Map lookup has no prototype chain — object indexing trips
+// security/detect-object-injection even when `variant` is a typed union.
+const TABLE_BADGE_VARIANTS = new Map<
+  "default" | "success" | "warning" | "danger" | "info" | "premium",
+  string
+>([
+  ["default", "bg-gray-700/50 text-gray-300 border-gray-600/50"],
+  ["success", "bg-green-500/20 text-green-400 border-green-500/30"],
+  ["warning", "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"],
+  ["danger", "bg-red-500/20 text-red-400 border-red-500/30"],
+  ["info", "bg-blue-500/20 text-blue-400 border-blue-500/30"],
+  [
+    "premium",
+    "bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30",
+  ],
+]);
+
 export function TableBadge({
   children,
   variant = "default",
@@ -290,21 +307,14 @@ export function TableBadge({
   variant?: "default" | "success" | "warning" | "danger" | "info" | "premium";
   className?: string;
 }) {
-  const variants = {
-    default: "bg-gray-700/50 text-gray-300 border-gray-600/50",
-    success: "bg-green-500/20 text-green-400 border-green-500/30",
-    warning: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    danger: "bg-red-500/20 text-red-400 border-red-500/30",
-    info: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    premium:
-      "bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30",
-  };
+  const variantClass =
+    TABLE_BADGE_VARIANTS.get(variant) ?? TABLE_BADGE_VARIANTS.get("default")!;
 
   return (
     <span
       className={cn(
         "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border",
-        variants[variant],
+        variantClass,
         className,
       )}
     >

@@ -536,7 +536,7 @@ export function RoundPreflight({
         onClick={onLaunch}
         disabled={launching || blocked}
         aria-busy={launching}
-        className={`block w-full cursor-pointer disabled:cursor-not-allowed ${PRESS_EFFECT}`}
+        className={`group block w-full disabled:cursor-not-allowed ${PRESS_EFFECT}`}
       >
         <ArenaPlayPlate
           label={buttonLabel}

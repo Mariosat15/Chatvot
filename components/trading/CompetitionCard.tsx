@@ -583,7 +583,7 @@ export default function CompetitionCard({
   // CARD VIEW (Default)
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl ${isCancelled ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900" : theme.bgPattern} border ${isCancelled ? "border-red-700/50 hover:border-red-500/50" : "border-gray-700/50 hover:border-yellow-500/50"} transition-all duration-500 hover:shadow-2xl ${isCancelled ? "hover:shadow-red-500/50" : `hover:${theme.glow}`} hover:-translate-y-2`}
+      className={`group relative overflow-hidden rounded-2xl ${isCancelled ? "bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-red-900/40 via-gray-900 to-gray-900" : theme.bgPattern} border ${isCancelled ? "border-red-700/50 hover:border-red-500/50" : "border-gray-700/50 hover:border-yellow-500/50"} transition-all duration-300 hover:shadow-2xl ${isCancelled ? "hover:shadow-red-500/50" : `hover:${theme.glow}`}`}
     >
       {/* Animated Background Effects */}
       <div className="absolute inset-0 opacity-30">

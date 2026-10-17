@@ -10,11 +10,12 @@
  * (each variant's own `hover:bg-*`, or `ART_BUTTON_HOVER` for an image button).
  *
  * Prefer this constant on any `<button>`, `<Link>` styled as a button, or `role="button"`.
- * `app/globals.css` also applies the same press + hand to native `<button>` elements so a
- * hand-rolled control that forgets the class still behaves.
+ * `app/globals.css` also applies the same press + hand to native `<button>` elements and to
+ * `a.press-effect` / `a.competitionCta`, with `!important` on active scale so a stray
+ * `active:scale-[0.99]` cannot quietly weaken the shared 5% press.
  */
 export const PRESS_EFFECT =
-  "cursor-pointer transition-all duration-150 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100";
+  "press-effect cursor-pointer transition-all duration-150 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100";
 
 /** Hover/press colour for a button drawn as an image, where there is no `bg-*` to shift. */
 export const ART_BUTTON_HOVER = "hover:brightness-125 active:brightness-90";

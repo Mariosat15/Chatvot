@@ -998,6 +998,14 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 17 October 2026 - Sitewide button press (competition + mobile)
+
+Owner: fix all button animation in all areas including competition buttons and mobile. `PRESS_EFFECT` now carries the `press-effect` marker class; player + admin `globals.css` apply hand + `scale(0.95) !important` on native buttons and on `a.press-effect` / `a.competitionCta` so weak `active:scale-[0.98/0.99]` cannot win. Swept competition/challenge card lifts, catalogue + mobile game cards, wallet/perf phone CTAs, sidebar nav, marketplace tiles, LP CTAs, arena wallet Links, FAQ/help CTAs. Admin `button.tsx` imports the mirrored `PRESS_EFFECT`. Guards: `__tests__/ui/press-effect.test.ts`. **Never verified by eye.**
+
+### 17 October 2026 - Battle plan roadmap + Play press fix
+
+Owner screenshot (Battle plan as progress/roadmap) + Play plate with no push: Overview Battle plan is a connected roadmap on **game and trading** lobbies (shared `TradingOverview`) — cyan track + dashed connector, Menuitems `swords` header instead of Lucide Flag; track inset is `100/(2n)` so trading's **four** nodes sit on the line (not a hard-coded 16.7% for three). Play press: `ArenaPlayPlate` no longer nests its own `group`; lobby Play / Start Trading `Link` and RoundPreflight carry `group` + `PRESS_EFFECT`; catalogue `CompetitionCTA` and trading run-dashboard Links (desktop `DashboardPieces` + mobile score tabs) use the same press. Guards: `contest-lobby-shell.test.ts`, `press-effect.test.ts`. **Never verified by eye.**
+
 ### 17 October 2026 - Game lobby leaderboard matches trading lobby chrome
 
 Owner screenshots (game board left-packed with a dead gap vs trading gold cards): lobby `ProviderLeaderboard` `detailed` path now reuses trading's card shell — large rank badge, avatar, name + You/GM/tie badges, Score/Time columns on a shared `LOBBY_GRID`, prize-position footer, five-per-page `LeaderboardPager`, sideways drag. `LobbyLiveLeaderboard` uses the same `NeonPanel` chrome as trading (`trophy-blue`, `size="lg"`). Arena `ranking` variant stays the compact fluid rail. Guards flipped in `provider-play-ui.test.ts`. **Never verified by eye.**

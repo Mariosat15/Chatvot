@@ -116,7 +116,7 @@ export default function ActiveCompetitionCard({
   const daysRemaining = Math.floor(hoursRemaining / 24);
 
   return (
-    <div className="bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-gray-700 rounded-2xl overflow-hidden hover:border-yellow-500/70 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/20 hover:scale-[1.02]">
+    <div className="bg-gradient-to-br from-gray-800 via-gray-800 to-gray-900 border border-gray-700 rounded-2xl overflow-hidden hover:border-yellow-500/70 transition-all duration-300 hover:shadow-xl hover:shadow-yellow-500/20">
       {/* Header with Gradient */}
       <div className="relative bg-gradient-to-r from-yellow-500/20 via-yellow-500/10 to-transparent p-6 border-b border-gray-700/50">
         {/* Decorative Elements */}

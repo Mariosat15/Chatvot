@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useWhiteLabelImages } from "@/hooks/useWhiteLabelImages";
 import { useUserProfileImage } from "@/hooks/useUserProfileImage";
@@ -323,11 +324,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const NavLink = ({ item }: { item: NavItem }) => {
     const active = isActive(item.href);
     return (
-      <Link href={item.href} className="block cursor-pointer">
+      <Link href={item.href} className={cn("block", PRESS_EFFECT)}>
         <div
           className={cn(
-            "group relative flex cursor-pointer items-center rounded-xl transition-all duration-200",
-            "active:scale-[0.98]",
+            "group relative flex cursor-pointer items-center rounded-xl transition-all duration-150",
             isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
             active
               ? cn(
@@ -647,10 +647,10 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           onClick={handleSignOut}
           variant="ghost"
           className={cn(
-            "group flex w-full cursor-pointer items-center rounded-xl border border-transparent",
+            "group flex w-full items-center rounded-xl border border-transparent",
             "text-slate-300 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300",
             "hover:shadow-[0_0_14px_rgba(239,68,68,0.25)]",
-            "active:scale-[0.98] transition-all duration-200",
+            PRESS_EFFECT,
             isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
           )}
         >

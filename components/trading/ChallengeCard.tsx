@@ -399,7 +399,7 @@ export default function ChallengeCard({
         : isCompleted && isLoser ? "border-red-700/50 hover:border-red-500/50"
         : isCompleted && isWinner ? "border-green-700/50 hover:border-green-500/50"
         : "border-gray-700/50 hover:border-orange-500/50"
-      } transition-all duration-500 hover:shadow-2xl hover:${theme.glow} hover:-translate-y-2`}
+      } transition-all duration-300 hover:shadow-2xl hover:${theme.glow}`}
     >
       {/* Animated Background Effects */}
       <div className="absolute inset-0 opacity-30">

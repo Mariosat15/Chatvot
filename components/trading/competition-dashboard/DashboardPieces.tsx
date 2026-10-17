@@ -229,7 +229,7 @@ export function DashboardActions({
     <div className="grid grid-cols-2 gap-5">
       <Link
         href={back.href}
-        className="flex items-center gap-4 rounded-2xl border-2 border-sky-500/45 bg-[#0A1734]/90 px-6 py-4 transition-colors hover:border-sky-400/70 hover:bg-[#0E1F44]"
+        className={`flex items-center gap-4 rounded-2xl border-2 border-sky-500/45 bg-[#0A1734]/90 px-6 py-4 transition-colors hover:border-sky-400/70 hover:bg-[#0E1F44] ${PRESS_EFFECT}`}
       >
         <ChevronLeft className="h-7 w-7 text-sky-400" />
         <span>

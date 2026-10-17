@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { Sparkline } from "@/components/dashboard/wallet/AnalyticsCard";
 import { overviewPlayCardArt } from "@/lib/services/games/overview-assets";
 import { NeonIcon, TrendDelta, accentHex } from "../PerformanceChrome";
@@ -149,7 +150,7 @@ function MobileGameCard({ card }: { card: GameCardView }) {
           </div>
           <Link
             href={card.href}
-            className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-500/10 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
+            className={`mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-500/10 text-sm font-semibold text-cyan-100 ${PRESS_EFFECT}`}
           >
             View details
           </Link>

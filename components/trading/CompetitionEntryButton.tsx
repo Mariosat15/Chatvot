@@ -14,6 +14,7 @@ import {
   Clock,
 } from "lucide-react";
 import { ArenaPlayPlate } from "@/components/games/lobby/ArenaPlayPlate";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { enterCompetition } from "@/lib/actions/trading/competition.actions";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -534,7 +535,7 @@ export default function CompetitionEntryButton({
                       ? `/competitions/${competition._id}/play`
                       : `/competitions/${competition._id}/trade`
                   }
-                  className="group block w-full cursor-pointer"
+                  className={`group block w-full ${PRESS_EFFECT}`}
                 >
                   {/*
                     Reason (owner, 17 Oct 2026): gold chevron plate (ArenaPlayPlate) for

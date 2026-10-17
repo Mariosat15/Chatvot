@@ -40,7 +40,7 @@ const SECTION_FRAME =
   "rounded-2xl border border-cyan-400/65 bg-gradient-to-b from-[rgba(5,18,42,0.98)] to-[rgba(2,9,24,0.98)] p-3.5 shadow-[0_0_28px_-6px_rgba(0,200,255,0.35),inset_0_0_20px_rgba(56,189,248,0.08)] sm:p-6";
 
 const CARD =
-  "group relative flex h-full flex-col overflow-hidden rounded-xl border border-[rgba(0,220,255,0.65)] bg-gradient-to-b from-[rgba(5,18,42,0.98)] to-[rgba(2,9,24,0.98)] shadow-[0_0_18px_rgba(0,200,255,0.12)] transition hover:-translate-y-0.5 hover:border-cyan-300/90 hover:shadow-[0_0_22px_rgba(0,200,255,0.22)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+  "press-effect group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-xl border border-[rgba(0,220,255,0.65)] bg-gradient-to-b from-[rgba(5,18,42,0.98)] to-[rgba(2,9,24,0.98)] shadow-[0_0_18px_rgba(0,200,255,0.12)] transition-all duration-150 hover:border-cyan-300/90 hover:shadow-[0_0_22px_rgba(0,200,255,0.22)] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 motion-reduce:transition-none motion-reduce:active:scale-100";
 
 /**
  * Phone: a swipe row of Image-2-sized cards. From `sm`: 2 columns, `xl`: 4.

@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
 
 /**
@@ -20,8 +21,7 @@ export interface CatalogueFilterOption {
   label: string;
 }
 
-const CHIP =
-  "inline-flex h-11 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full border px-[22px] text-[14px] font-semibold tracking-wide transition-[transform,border-color,color,box-shadow,background-color] duration-200 hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0";
+const CHIP = `inline-flex h-11 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full border px-[22px] text-[14px] font-semibold tracking-wide ${PRESS_EFFECT}`;
 const CHIP_ACTIVE =
   "border-[#00d8ff] bg-[linear-gradient(180deg,rgba(0,216,255,.18),rgba(0,120,255,.10))] text-white shadow-[0_0_12px_rgba(0,210,255,.28)]";
 const CHIP_IDLE =

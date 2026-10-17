@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { ArrowRight } from "lucide-react";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { providerBanner } from "@/components/neon/banners";
 import type { CatalogueCardStats } from "@/lib/services/games/catalogue-card-stats.service";
 import { GameCategoryBadge } from "./GameCategoryBadge";
@@ -40,7 +41,7 @@ export function GameCard({
     <Link
       href={`/games/${game.slug}`}
       aria-label={`Open ${game.displayName}`}
-      className="group flex h-full rounded-[16px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00d8ff]/70 touch-manipulation"
+      className={`group flex h-full rounded-[16px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00d8ff]/70 touch-manipulation ${PRESS_EFFECT}`}
       style={
         {
           "--game-accent": accent.accent,
@@ -49,7 +50,7 @@ export function GameCard({
       }
     >
       <article
-        className="flex h-full w-full flex-col overflow-hidden rounded-[16px] border bg-[linear-gradient(180deg,rgba(7,20,50,.88),rgba(2,12,32,.94))] transition-[transform,box-shadow] duration-[220ms] ease-out group-hover:-translate-y-1 motion-reduce:transition-none motion-reduce:group-hover:translate-y-0"
+        className="flex h-full w-full flex-col overflow-hidden rounded-[16px] border bg-[linear-gradient(180deg,rgba(7,20,50,.88),rgba(2,12,32,.94))] transition-[box-shadow] duration-[220ms] ease-out"
         style={{
           borderColor: "color-mix(in srgb, var(--game-accent) 55%, transparent)",
           boxShadow: `
@@ -110,7 +111,7 @@ export function GameCard({
             </div>
             <span
               aria-hidden
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border bg-[rgba(0,0,0,.2)] text-white transition-[transform,background-color,box-shadow] duration-[220ms] group-hover:scale-105 motion-reduce:transition-none sm:h-14 sm:w-14 sm:border-2"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border bg-[rgba(0,0,0,.2)] text-white transition-[background-color,box-shadow] duration-[220ms] motion-reduce:transition-none sm:h-14 sm:w-14 sm:border-2"
               style={{
                 borderColor: "var(--game-accent)",
                 boxShadow: "0 0 14px color-mix(in srgb, var(--game-accent) 32%, transparent)",

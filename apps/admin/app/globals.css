@@ -141,29 +141,33 @@
   }
 
   /*
-   * ONE press + hand for every native button (owner, 17 Oct 2026). Same contract as the
-   * player app `globals.css` / `PRESS_EFFECT` — hand on hover, 5% shrink on press, no
-   * motion when reduced-motion is on. Links styled as buttons still need the class.
+   * ONE press + hand for every control (owner, 17 Oct 2026). Same contract as the player
+   * app — hand on hover, 5% shrink on press (`!important` so weak active:scale utilities
+   * cannot override), no motion when reduced-motion is on. Anchors only when `.press-effect`.
    */
   button:enabled:not([aria-disabled="true"]),
-  [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+  [role="button"]:not([aria-disabled="true"]):not([disabled]),
+  a.press-effect:not([aria-disabled="true"]) {
     cursor: pointer;
     transition-property: transform, color, background-color, border-color, opacity,
       box-shadow, filter, brightness;
     transition-duration: 150ms;
   }
   button:enabled:not([aria-disabled="true"]):active,
-  [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
-    transform: scale(0.95);
+  [role="button"]:not([aria-disabled="true"]):not([disabled]):active,
+  a.press-effect:not([aria-disabled="true"]):active {
+    transform: scale(0.95) !important;
   }
   @media (prefers-reduced-motion: reduce) {
     button:enabled:not([aria-disabled="true"]),
-    [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+    [role="button"]:not([aria-disabled="true"]):not([disabled]),
+    a.press-effect:not([aria-disabled="true"]) {
       transition: none;
     }
     button:enabled:not([aria-disabled="true"]):active,
-    [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
-      transform: none;
+    [role="button"]:not([aria-disabled="true"]):not([disabled]):active,
+    a.press-effect:not([aria-disabled="true"]):active {
+      transform: none !important;
     }
   }
 }

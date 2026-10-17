@@ -232,7 +232,7 @@ function ViewTab({
       role="tab"
       aria-selected={selected}
       onClick={() => onSelect(id)}
-      className={`flex min-h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[11px] font-bold ${
+      className={`flex min-h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[11px] font-bold ${PRESS_EFFECT} ${
         selected ? "bg-cyan-500/15 text-cyan-200" : "text-gray-400"
       }`}
     >

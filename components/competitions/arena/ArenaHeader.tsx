@@ -5,6 +5,7 @@ import Link from "next/link";
 import { COMPETITION_ICON } from "@/lib/competitions/game-definitions";
 import type { GameDefinition } from "@/lib/competitions/game-definitions";
 import { formatVolts } from "@/lib/utils/format-volts";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { ArenaUtilityCard } from "./ArenaUtilityCard";
 
 /** Shared with the phone header so the arena title cannot drift between layouts. */
@@ -86,7 +87,7 @@ export function ArenaHeader({
             label="Your Balance"
             value={formatVolts(balance, { symbol: creditSymbol })}
           />
-          <Link href="/wallet" className="block">
+          <Link href="/wallet" className={`block ${PRESS_EFFECT}`}>
             <ArenaUtilityCard
               tone="gold"
               icon={COMPETITION_ICON.topup}

@@ -270,7 +270,7 @@ export default function TestimonialsSection({
                 setAutoPlay(false);
                 setCurrentIndex(index);
               }}
-              className="p-4 rounded-xl cursor-pointer transition-all hover:scale-[1.02]"
+              className="press-effect cursor-pointer rounded-xl p-4 transition-all duration-150 active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100"
               style={{
                 backgroundColor:
                   index === currentIndex

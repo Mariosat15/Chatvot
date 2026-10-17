@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import {
   calculateWinProbability,
   formatMetricValue,
@@ -165,8 +166,9 @@ export default function WinPotentialCard({
     <Link
       href={`/competitions/${competition._id}`}
       className={cn(
-        "block bg-gradient-to-br rounded-xl border overflow-hidden transition-all duration-300",
-        "hover:shadow-lg hover:shadow-black/20 hover:border-opacity-60 hover:-translate-y-0.5",
+        "block bg-gradient-to-br rounded-xl border overflow-hidden",
+        "hover:shadow-lg hover:shadow-black/20 hover:border-opacity-60",
+        PRESS_EFFECT,
         config.gradient,
         config.border,
       )}

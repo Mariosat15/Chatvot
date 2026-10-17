@@ -245,8 +245,17 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(tradingOverview).not.toContain('grid grid-cols-2 gap-3');
     // Amended 17 Oct 2026: Battle plan steps fill the card (cols = step count) and
     // centre number + title + detail — not a left-packed 4-column row with a dead gap.
+    // Amended again the same day: roadmap track + Menuitems swords header (not Flag).
+    // Trading has four steps — track inset is 100/(2n), never a hard-coded 16.666%.
     expect(tradingOverview).toContain('sm:grid-cols-3');
     expect(tradingOverview).toContain("items-center text-center");
+    expect(tradingOverview).toContain("BATTLE_PLAN_ICON");
+    expect(tradingOverview).toContain('NEON_ICON("swords")');
+    expect(tradingOverview).not.toContain("<Flag");
+    expect(tradingOverview).toContain("trackInsetPct");
+    expect(tradingOverview).toContain("100 / (2 * stepCount)");
+    expect(tradingOverview).not.toContain("left-[16.666%]");
+    expect(tradingOverview).toContain("via-cyan-300/90");
     expect(tradingOverview).not.toContain(
       "grid-cols-[36px_minmax(0,1fr)]",
     );

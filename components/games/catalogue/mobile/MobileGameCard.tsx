@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
 import { ArrowRight } from "lucide-react";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { providerBanner } from "@/components/neon/banners";
 import type { CatalogueCardStats } from "@/lib/services/games/catalogue-card-stats.service";
 import { GameCategoryBadge } from "../GameCategoryBadge";
@@ -104,7 +105,7 @@ export function MobileGameCard({
         <Link
           href={`/games/${game.slug}`}
           aria-label={`View ${game.displayName}`}
-          className="inline-flex h-[50px] w-full touch-manipulation items-center justify-center gap-2 rounded-xl border-2 text-[15px] font-bold uppercase tracking-[0.06em] text-white transition-[transform,box-shadow] active:scale-[0.99] motion-reduce:transition-none"
+          className={`inline-flex h-[50px] w-full touch-manipulation items-center justify-center gap-2 rounded-xl border-2 text-[15px] font-bold uppercase tracking-[0.06em] text-white ${PRESS_EFFECT}`}
           style={{
             borderColor: "var(--game-accent)",
             background:

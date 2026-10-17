@@ -190,7 +190,7 @@ export function RecentVictors({
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.05 }}
-            className="flex items-center gap-3 p-3 rounded-xl hover:scale-[1.01] transition-transform"
+            className="flex items-center gap-3 rounded-xl p-3 transition-colors"
             style={{
               backgroundColor: theme?.colors?.backgroundCard,
               border: `1px solid ${theme?.colors?.border}`,

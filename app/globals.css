@@ -163,31 +163,40 @@ body {
   }
 
   /*
-   * ONE press + hand for every native button (owner, 17 Oct 2026). Tailwind v4's preflight
-   * left `<button>` on the arrow cursor; hand-rolled controls also forgot `active:scale-95`.
-   * Match `PRESS_EFFECT` in `components/ui/press-effect.ts`. Disabled / aria-disabled keep
-   * the default cursor and do not shrink. Prefer the shared class on Links styled as buttons
-   * — anchors are not covered here on purpose (not every link should press).
+   * ONE press + hand for every control (owner, 17 Oct 2026). Tailwind v4's preflight left
+   * `<button>` on the arrow cursor; hand-rolled controls also forgot `active:scale-95`.
+   * Match `PRESS_EFFECT` in `components/ui/press-effect.ts`. `!important` on active scale
+   * beats stray `active:scale-[0.98]` / `[0.99]` utilities that were quietly weakening the
+   * shared press on competition CTAs and mobile. Anchors only press when marked
+   * `.press-effect` or `.competitionCta` — not every link should shrink.
    */
   button:enabled:not([aria-disabled="true"]),
-  [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+  [role="button"]:not([aria-disabled="true"]):not([disabled]),
+  a.press-effect:not([aria-disabled="true"]),
+  a.competitionCta:not(.cursor-not-allowed):not([aria-disabled="true"]) {
     cursor: pointer;
     transition-property: transform, color, background-color, border-color, opacity,
       box-shadow, filter, brightness;
     transition-duration: 150ms;
   }
   button:enabled:not([aria-disabled="true"]):active,
-  [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
-    transform: scale(0.95);
+  [role="button"]:not([aria-disabled="true"]):not([disabled]):active,
+  a.press-effect:not([aria-disabled="true"]):active,
+  a.competitionCta:not(.cursor-not-allowed):not([aria-disabled="true"]):active {
+    transform: scale(0.95) !important;
   }
   @media (prefers-reduced-motion: reduce) {
     button:enabled:not([aria-disabled="true"]),
-    [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+    [role="button"]:not([aria-disabled="true"]):not([disabled]),
+    a.press-effect:not([aria-disabled="true"]),
+    a.competitionCta:not(.cursor-not-allowed):not([aria-disabled="true"]) {
       transition: none;
     }
     button:enabled:not([aria-disabled="true"]):active,
-    [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
-      transform: none;
+    [role="button"]:not([aria-disabled="true"]):not([disabled]):active,
+    a.press-effect:not([aria-disabled="true"]):active,
+    a.competitionCta:not(.cursor-not-allowed):not([aria-disabled="true"]):active {
+      transform: none !important;
     }
   }
 }

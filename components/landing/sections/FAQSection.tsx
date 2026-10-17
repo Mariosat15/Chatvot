@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, HelpCircle } from "lucide-react";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 import { LandingTheme } from "@/lib/themes/landing-themes";
 import SectionWrapper from "./SectionWrapper";
 
@@ -208,9 +210,9 @@ export default function FAQSection({
         <p className="text-lg mb-4" style={{ color: theme?.colors?.textMuted }}>
           Still have questions?
         </p>
-        <a
+        <Link
           href="/help"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all hover:scale-105"
+          className={`inline-flex items-center gap-2 rounded-full px-6 py-3 font-bold ${PRESS_EFFECT}`}
           style={{
             backgroundColor: `${effectiveColors.primary}15`,
             color: effectiveColors.primary,
@@ -219,7 +221,7 @@ export default function FAQSection({
         >
           <HelpCircle className="h-5 w-5" />
           Visit Help Center
-        </a>
+        </Link>
       </motion.div>
     </SectionWrapper>
   );

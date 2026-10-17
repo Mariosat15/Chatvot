@@ -653,7 +653,7 @@ function HeroSection({ content }: { content: Record<string, unknown> }) {
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <a
             href={ctaUrl}
-            className={`inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-300 shadow-xl ${accent.shadow} ${accent.shadowHover} hover:scale-105 hover:-translate-y-0.5 lp-pulse lp-btn lp-cta`}
+            className={`press-effect inline-flex cursor-pointer items-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-150 shadow-xl ${accent.shadow} ${accent.shadowHover} active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 lp-pulse lp-btn lp-cta`}
           >
             {ctaText}
             <ArrowRight className="h-5 w-5" />
@@ -1029,7 +1029,7 @@ function CTASection({ content }: { content: Record<string, unknown> }) {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <a
             href={ctaUrl}
-            className={`inline-flex items-center justify-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-300 shadow-xl ${accent.shadow} ${accent.shadowHover} hover:scale-105 lp-pulse lp-btn lp-cta`}
+            className={`press-effect inline-flex cursor-pointer items-center justify-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-150 shadow-xl ${accent.shadow} ${accent.shadowHover} active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 lp-pulse lp-btn lp-cta`}
           >
             {ctaText}
             <ArrowRight className="h-5 w-5" />
@@ -1132,7 +1132,7 @@ function ImageTextSection({ content }: { content: Record<string, unknown> }) {
           {ctaText && (
             <a
               href={ctaUrl}
-              className={`inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all shadow-lg ${accent.shadow} hover:scale-105 mt-4`}
+              className={`press-effect inline-flex cursor-pointer items-center gap-2 px-8 py-4 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-150 shadow-lg ${accent.shadow} active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100 mt-4`}
             >
               {ctaText}
               <ArrowRight className="h-5 w-5" />
@@ -1166,7 +1166,7 @@ function BannerSection({ content }: { content: Record<string, unknown> }) {
         {ctaText && (
           <a
             href={ctaUrl}
-            className={`inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all shadow-xl ${accent.shadow} hover:scale-105`}
+            className={`press-effect inline-flex cursor-pointer items-center gap-3 px-10 py-5 bg-gradient-to-r ${accent.gradientBtn} text-black font-bold rounded-2xl text-lg ${accent.gradientBtnHover} transition-all duration-150 shadow-xl ${accent.shadow} active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100`}
           >
             {ctaText}
             <ArrowRight className="h-5 w-5" />
