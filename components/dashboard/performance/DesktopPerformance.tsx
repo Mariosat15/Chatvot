@@ -35,7 +35,11 @@ export default function DesktopPerformance({
       {model.showTradingSection ? (
         <TradingPerformanceSection metrics={model.tradingMetrics} />
       ) : null}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      {/*
+        Equal-height row: grid stretch + each PerfSection/PerfCard filling the cell.
+        Tallest of the three sets the row; the others grow with it (no fixed px height).
+      */}
+      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
         <PerformanceSummaryPanel
           kind="challenges"
           summary={model.challengeSummary}

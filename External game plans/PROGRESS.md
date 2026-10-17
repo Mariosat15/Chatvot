@@ -999,6 +999,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 
 ## WORK LOG
 
+### 17 October 2026 - Performance row equal height (1v1 / Competition / Holidays)
+
+Owner: all three desktop Performance cards must always align; height dynamic from the tallest. Live: `DesktopPerformance` `items-stretch` grid; `PerfSection` fills the cell (`h-full flex-col` + `[&>*]:flex-1`); summary cards pin "Volts won" with `mt-auto`; holidays list `flex-1 overflow-y-auto` so a long calendar does not leave short neighbours. Guard: `performance-analytics.test.ts`. **Never verified by eye.**
+
 ### 17 October 2026 - Competition lobby data-agnostic (game + trading)
 
 Owner: make sure game and trading competition lobbies are data-agnostic for competitions/rules. Live Overview already comes from `buildTradingOverviewCopy` / `buildGameOverviewCopy` + catalogue `rulesSummary` / `howToPlay`; kind fallbacks in `contest-lobby-copy` no longer hard-code P&L as the ranking rule. Guard: `__tests__/competitions/lobby-data-agnostic.test.ts`. **Never verified by eye.**

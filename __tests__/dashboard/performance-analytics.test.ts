@@ -324,6 +324,19 @@ describe("performance page structure", () => {
     expect(code).not.toMatch(/Guide|Reusable/);
   });
 
+  it("keeps the 1v1 / competition / holidays row equal height without a fixed px", () => {
+    // Owner, 17 Oct 2026: all three must always align — tallest sets the row.
+    const desktop = stripComments(read(`${DIR}/DesktopPerformance.tsx`));
+    const chrome = stripComments(read(`${DIR}/PerformanceChrome.tsx`));
+    const holidays = stripComments(read(`${DIR}/MarketHolidaysSection.tsx`));
+    expect(desktop).toMatch(/items-stretch/);
+    expect(desktop).toMatch(/lg:grid-cols-3/);
+    expect(chrome).toMatch(/flex h-full min-w-0 flex-col/);
+    expect(chrome).toMatch(/\[&>\*\]:flex-1/);
+    expect(holidays).toMatch(/flex-1 space-y-2 overflow-y-auto/);
+    expect(desktop).not.toMatch(/min-h-\[\d+px\].*holidays|holidays.*min-h-\[\d+px\]/);
+  });
+
   it("names no game in code (R29)", () => {
     for (const rel of performanceFiles()) {
       expect(stripComments(read(rel)), rel).not.toMatch(

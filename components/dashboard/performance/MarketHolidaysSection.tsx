@@ -102,8 +102,8 @@ export default function MarketHolidaysSection({ state }: { state: MarketHolidays
       controls={controls}
       testId="holidays"
     >
-      <PerfCard accent="gold" className="h-full">
-        <div className="flex h-full flex-col gap-2 p-4">
+      <PerfCard accent="gold" className="flex h-full flex-col">
+        <div className="flex h-full min-h-0 flex-col gap-2 p-4">
           {state.live ? (
             <span className="self-start rounded-md bg-[#00e6a3]/10 px-2 py-0.5 text-[10px] font-bold uppercase text-[#00e6a3]">
               Live calendar
@@ -114,19 +114,23 @@ export default function MarketHolidaysSection({ state }: { state: MarketHolidays
           ) : state.error ? (
             <p className="text-xs text-[#ff4b67]">{state.error}</p>
           ) : list.length === 0 ? (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-1 items-center gap-3">
               <NeonIcon src={PERF_SECTION_ICON.holidays} size={32} />
               <p className="text-xs text-[#8ea4c5]">No market holidays in this window.</p>
             </div>
           ) : (
-            <ul className="space-y-2">
+            // Reason: flex-1 fills leftover height when siblings are taller; overflow when
+            // this list is the tall one so the three cards stay one row height.
+            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto">
               {list.slice(0, VISIBLE_LIMIT).map((h) => (
                 <HolidayRow key={h.id} holiday={h} />
               ))}
             </ul>
           )}
           {list.length > VISIBLE_LIMIT ? (
-            <p className="text-[11px] text-[#8ea4c5]">+{list.length - VISIBLE_LIMIT} more</p>
+            <p className="shrink-0 text-[11px] text-[#8ea4c5]">
+              +{list.length - VISIBLE_LIMIT} more
+            </p>
           ) : null}
         </div>
       </PerfCard>

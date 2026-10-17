@@ -58,8 +58,8 @@ export default function PerformanceSummaryPanel({
 
   return (
     <PerfSection title={meta.title} subtitle={meta.subtitle} icon={meta.icon} testId={kind}>
-      <PerfCard accent={meta.accent} className="h-full min-h-[280px]">
-        <div className="flex h-full flex-col gap-4 p-5">
+      <PerfCard accent={meta.accent} className="flex h-full min-h-[280px] flex-col">
+        <div className="flex h-full min-h-0 flex-col gap-4 p-5">
           {empty ? (
             <p className="text-sm text-[#8ea4c5]">
               {filteredOut
@@ -68,7 +68,7 @@ export default function PerformanceSummaryPanel({
             </p>
           ) : null}
           <div
-            className="flex items-center gap-3 rounded-2xl border px-3.5 py-3"
+            className="flex shrink-0 items-center gap-3 rounded-2xl border px-3.5 py-3"
             style={{
               borderColor: `${hex}35`,
               background: `linear-gradient(120deg, ${hex}14 0%, rgba(0,0,0,0.2) 70%)`,
@@ -86,7 +86,7 @@ export default function PerformanceSummaryPanel({
             </div>
           </div>
           <PerfMetricGrid rows={summary.rows} accent={meta.accent} empty={empty} />
-          <div className="space-y-3">
+          <div className="min-h-0 flex-1 space-y-3">
             {summary.bars.map((b) => (
               <div key={b.label}>
                 <div className="mb-1.5 flex justify-between text-sm">
@@ -99,7 +99,7 @@ export default function PerformanceSummaryPanel({
               </div>
             ))}
           </div>
-          <div className="mt-auto flex items-center justify-between border-t border-white/[0.08] pt-3 text-sm">
+          <div className="mt-auto flex shrink-0 items-center justify-between border-t border-white/[0.08] pt-3 text-sm">
             <span className="text-[#8ea4c5]">Volts won</span>
             <span className="text-base font-black tabular-nums text-[#ffc51b]">
               {empty
