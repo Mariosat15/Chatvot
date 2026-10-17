@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 /**
  * ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide (15 Oct 2026), rebuilt the same day
  * after the owner found the first pass "too busy, no flow, needs consistency with other
- * pages". Desktop three-column shell stays; the phone tree now reads in the same order as
- * the trading phone lobby and shares its hero, tiles, card shell and tabs.
+ * pages". Desktop matches trading via DesktopGameLobby; the phone tree reads in the same
+ * order as the trading phone lobby and shares its hero, tiles, card shell and tabs.
  */
 function read(relativePath: string): string {
   return readFileSync(join(process.cwd(), relativePath), "utf8")
@@ -20,20 +20,20 @@ const metrics = read("components/games/lobby/mobile/MobileGameLobbyMetrics.tsx")
 const rounds = read("components/games/lobby/mobile/MobileGameLobbyRounds.tsx");
 const lobby = read("components/games/ProviderContestLobby.tsx");
 const tradingPhone = read("components/competitions/lobby/mobile/MobileCompetitionLobby.tsx");
-const desktopShell = read("components/games/lobby/GameCompetitionArenaShell.tsx");
+const desktopGame = read("components/competitions/detail/DesktopGameLobby.tsx");
 
 describe("game competition lobby mobile (owner guide)", () => {
-  it("keeps desktop on the three-column shell and phone on its own tree", () => {
-    expect(lobby).toContain("<GameCompetitionArenaShell");
+  it("keeps desktop on the shared trading shell and phone on its own tree", () => {
+    // Flipped 16 Oct 2026: desktop left the three-column arena for CompetitionDetailShell.
+    expect(lobby).toContain("<DesktopGameLobby");
     expect(lobby).toContain("<MobileGameCompetitionLobby");
-    // Reason (16 Oct 2026): matchMedia switch so Safari cannot leave a phone on the
-    // desktop shell when CSS media width is stuck wide.
+    expect(lobby).not.toContain("<GameCompetitionArenaShell");
     expect(lobby).toContain("<LobbyViewportSwitch");
     expect(lobby).toContain("mobile={");
     expect(lobby).toContain("desktop={");
     expect(phone).not.toContain("xl:grid-cols-[");
-    expect(phone).not.toContain("GameCompetitionArenaShell");
-    expect(desktopShell).toContain("xl:grid-cols-[");
+    expect(phone).not.toContain("DesktopGameLobby");
+    expect(desktopGame).toContain("<CompetitionDetailShell");
   });
 
   it("LobbyViewportSwitch uses the same 769px cut as auth", () => {

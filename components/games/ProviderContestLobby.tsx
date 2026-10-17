@@ -1,7 +1,5 @@
-import { Gamepad2, RotateCcw, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { connectToDatabase } from "@/database/mongoose";
-import UTCClock from "@/components/trading/UTCClock";
-import InlineCountdown from "@/components/trading/InlineCountdown";
 import ProviderClientWarmup from "@/components/games/ProviderClientWarmup";
 import {
   LobbyLiveEntryButton,
@@ -10,35 +8,30 @@ import {
 } from "@/components/games/LobbyLiveParts";
 import { ArenaLiveProvider } from "@/components/games/arena/ArenaLiveStandings";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
-import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { resolveProviderBanner } from "@/components/neon/banners";
-import { NeonBackLink } from "@/components/neon/Buttons";
-import { NeonNote, NeonPanel, NeonRow, StatusCard } from "@/components/neon/Cards";
-import { NEON_LABEL } from "@/components/neon/tokens";
+import { StatusCard } from "@/components/neon/Cards";
 import {
   LobbyHelpFooter,
   LobbyTipsPlaceholder,
 } from "@/components/games/lobby/LobbyFooterParts";
+import { GameLobbyScheduleNote } from "@/components/games/lobby/GameLobbyScheduleNote";
 import { toInitialContest } from "@/components/games/lobby/lobby-initial-contest";
-import { CompetitionRulesFairPlay } from "@/components/competitions/detail/CompetitionRulesFairPlay";
-import {
-  GameEventDetails,
-  type GameEventSection,
-} from "@/components/competitions/detail/GameEventDetails";
-import { NEON_ICON } from "@/lib/services/games/overview-assets";
+import { GameEventDetails } from "@/components/competitions/detail/GameEventDetails";
 import { GameLobbySummary } from "@/components/games/lobby/GameLobbySummary";
 import {
   ATTEMPTS_POLICY_COPY,
   ATTEMPTS_POLICY_SHORT,
   UNRESOLVED_POLICY_COPY,
-  UNRESOLVED_POLICY_SHORT,
   ANYTIME_STAGE_BLURB,
-  buildStageFacts,
   toHowItWorksSteps,
   formatRoundClock,
   formatUTC,
-  formatUTCShort,
 } from "@/components/games/lobby/game-lobby-copy";
+import { buildGameOverviewCopy } from "@/components/games/lobby/game-overview-copy";
+import {
+  buildGameEventSections,
+  buildGameLobbySections,
+} from "@/components/games/lobby/game-lobby-sections";
 import { ContestHowItWorks } from "@/components/competitions/lobby/ContestHowItWorks";
 import { getTerms } from "@/lib/services/terminology.service";
 import { getPlayState } from "@/lib/services/games/round-status.service";
@@ -54,11 +47,10 @@ import {
   contestReservesFullRound,
   fullRoundCutoffMs,
 } from "@/components/games/round-window";
-import { GameCompetitionArenaShell } from "@/components/games/lobby/GameCompetitionArenaShell";
-import { LobbyHeroFeaturePills } from "@/components/games/lobby/LobbyHeroFeaturePills";
-import { LobbyContestStatsGrid } from "@/components/games/lobby/LobbyContestStatsGrid";
-import { LobbyCenterStage } from "@/components/games/lobby/LobbyCenterStage";
-import { LobbyAttemptBadges } from "@/components/games/lobby/LobbyAttemptBadges";
+import {
+  DesktopGameLobby,
+  GameLobbyYourRun,
+} from "@/components/competitions/detail/DesktopGameLobby";
 import { MobileGameLobbyLeaderboard } from "@/components/games/lobby/mobile/MobileGameLobbyLeaderboard";
 import { MobileGameCompetitionLobby } from "@/components/games/lobby/mobile/MobileGameCompetitionLobby";
 import LobbyViewportSwitch from "@/components/competitions/lobby/LobbyViewportSwitch";
@@ -67,13 +59,14 @@ import {
   scoringSummary,
   splitGameTitle,
 } from "@/components/games/arena/arena-facts";
+import { CompetitionRulesFairPlay } from "@/components/competitions/detail/CompetitionRulesFairPlay";
 
 /**
  * The lobby a player sees for a contest played through a game provider.
  *
- * Desktop uses the three-column arena shell (leaderboard | play stage | contest
- * info). Phone uses a dedicated vertical tree under 769px. Trading stays on
- * `CompetitionDetailShell` and is untouched.
+ * Desktop uses the same `CompetitionDetailShell` layout as trading
+ * (`DesktopGameLobby`: hero → KPIs → tabs + leaderboard | sidebar). Phone uses
+ * a dedicated vertical tree under 769px. Trading is untouched.
  */
 
 interface ProviderContestLobbyProps {
@@ -149,45 +142,6 @@ export default async function ProviderContestLobby({
   const playMode = competition.playMode === "scheduled" ? "scheduled" : "anytime";
   const modeRule = playModePlayerRule(playMode, "competition");
 
-  const scheduleDetails =
-    playWindowStart || playWindowEnd ? (
-      <>
-        <p className={NEON_LABEL}>Play window</p>
-        <div className="mt-2 space-y-2">
-          {playWindowStart && <NeonRow label="Opens" value={playWindowStart} />}
-          {playWindowEnd && <NeonRow label="Closes" value={playWindowEnd} />}
-          {isActive &&
-            reservesFullRound &&
-            attemptCutoffMs !== null &&
-            attemptCutoffMs > Date.now() && (
-              <NeonRow
-                label="Last attempt can start in"
-                accent="waiting"
-                value={
-                  <InlineCountdown
-                    targetDate={new Date(attemptCutoffMs).toISOString()}
-                    type="end"
-                    zeroLabel="Passed"
-                  />
-                }
-              />
-            )}
-        </div>
-        <NeonNote>
-          <span className="font-semibold text-gray-100">{modeRule.label}</span>{" "}
-          {modeRule.detail}
-          {playMode === "anytime" && (
-            <>
-              {" "}
-              {reservesFullRound
-                ? "An attempt has to begin early enough to finish inside the window, so the last one starts before it shuts."
-                : "Anything still running when the window shuts is closed with the competition and scored on what you managed."}
-            </>
-          )}
-        </NeonNote>
-      </>
-    ) : null;
-
   const showCountdown = Boolean(countdownTarget) && !isCompleted && !isCancelled;
 
   const pollStandings = status === "active" || status === "upcoming";
@@ -209,50 +163,22 @@ export default async function ProviderContestLobby({
       ? "1"
       : undefined;
 
-  // Owner, 15 Oct 2026: the long sentences became categories like the trading lobby's rule
-  // cards - a short value per row, the full sentence on its ? tip. Nothing is dropped.
-  const eventDetailSections: GameEventSection[] = [
-    {
-      title: "How you play",
-      subtitle: "Format and rounds",
-      iconSrc: NEON_ICON("swords"),
-      accent: "sky",
-      rows: [
-        { icon: "format", label: "Format", value: modeRule.label, tone: "cyan", tip: modeRule.detail },
-        { icon: "clock", label: "Round length", value: roundSeconds ? `Up to ${roundTimeLabel}` : null, tone: "cyan" },
-        { icon: "attempt", label: "Attempts", value: ATTEMPTS_POLICY_SHORT.get(attemptsPolicy), tone: "purple", tip: attemptsCopy },
-      ],
-    },
-    {
-      title: "Scoring",
-      subtitle: "Who wins",
-      iconSrc: NEON_ICON("target-purple"),
-      accent: "violet",
-      rows: [
-        { icon: "winner", label: "Winner", value: scoreLabel === "Time" ? "Fastest time" : "Highest score", tone: "yellow", tip: scoringNote },
-      ],
-    },
-    {
-      title: "Play window",
-      subtitle: "Times in UTC",
-      iconSrc: NEON_ICON("calendar-blue"),
-      accent: "sky",
-      rows: [
-        { icon: "opens", label: "Opens", value: formatUTCShort(competition.playWindowStart), tip: playWindowStart ?? undefined },
-        { icon: "closes", label: "Closes", value: formatUTCShort(competition.playWindowEnd), tip: playWindowEnd ?? undefined },
-      ],
-    },
-    {
-      title: "If something goes wrong",
-      subtitle: "Stalled or abandoned rounds",
-      iconSrc: NEON_ICON("shield"),
-      accent: "rose",
-      rows: [
-        { icon: "stall", label: "If a round stalls", value: UNRESOLVED_POLICY_SHORT.get(unresolvedPolicy), tone: "orange", tip: unresolvedCopy },
-        { icon: "leave", label: "Leaving mid-round", value: "Attempt used", tone: "red", tip: "An attempt is used the moment a round opens, even if you leave before finishing." },
-      ],
-    },
-  ];
+  const eventDetailSections = buildGameEventSections({
+    modeLabel: modeRule.label,
+    modeDetail: modeRule.detail,
+    roundTimeLabel,
+    roundSeconds,
+    attemptsPolicy,
+    attemptsTip: attemptsCopy,
+    scoreLabel,
+    scoringNote,
+    playWindowStart: competition.playWindowStart,
+    playWindowEnd: competition.playWindowEnd,
+    playWindowStartTip: playWindowStart ?? undefined,
+    playWindowEndTip: playWindowEnd ?? undefined,
+    unresolvedPolicy,
+    unresolvedTip: unresolvedCopy,
+  });
 
   const heroFeaturePills = resolveHeroFeatures(
     presentation.heroFeatures,
@@ -264,15 +190,26 @@ export default async function ProviderContestLobby({
 
   const { title: heroTitle, subtitle: heroNameSubtitle } = splitGameTitle(gameName);
 
-  // The long description left the hero (owner, 15 Oct 2026) and is read here once, under
-  // the game name; the hero keeps the short subtitle only.
   const centerDescription =
     presentation.description ||
     competition.description ||
     presentation.tagline ||
     (playMode === "anytime" ? ANYTIME_STAGE_BLURB : null);
 
-  const entryControl = (
+  const launchBlocked =
+    isUserIn && !canLaunch ? (
+      <div className="mt-3">
+        <StatusCard
+          icon={TriangleAlert}
+          accent="waiting"
+          title="This competition cannot start a round yet"
+          detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
+        />
+      </div>
+    ) : null;
+
+  // Phone: same entry rules, arranged like the trading phone entry card (CTA beside heading).
+  const mobileEntryControl = (
     <>
       <LobbyLiveEntryButton
         competition={competition}
@@ -284,94 +221,10 @@ export default async function ProviderContestLobby({
         levelLadder={levelLadder}
         currentUserId={userId}
         appearance="arena"
+        layout="mobile"
       />
-      {isUserIn && !canLaunch && (
-        <div className="mt-3">
-          <StatusCard
-            icon={TriangleAlert}
-            accent="waiting"
-            title="This competition cannot start a round yet"
-            detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
-          />
-        </div>
-      )}
+      {launchBlocked}
     </>
-  );
-
-  // Phone: same entry rules, arranged like the trading phone entry card (CTA beside heading).
-  const mobileEntryControl = (
-    <>
-    <LobbyLiveEntryButton
-      competition={competition}
-      userBalance={walletBalance}
-      isUserIn={isUserIn}
-      isFull={isFull}
-      participantStatus={participantStatus}
-      registrationClosed={registrationClosed}
-      levelLadder={levelLadder}
-      currentUserId={userId}
-      appearance="arena"
-      layout="mobile"
-    />
-      {isUserIn && !canLaunch && (
-        <div className="mt-3">
-          <StatusCard
-            icon={TriangleAlert}
-            accent="waiting"
-            title="This competition cannot start a round yet"
-            detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
-          />
-        </div>
-      )}
-    </>
-  );
-
-  const attemptsPanel =
-    state != null ? (
-      <NeonPanel
-        icon={RotateCcw}
-        accent="score"
-        title="Your attempts"
-        size="lg"
-        className="mt-3"
-      >
-        <NeonRow
-          label="Remaining"
-          accent="score"
-          value={`${state.attemptsRemaining} of ${state.attemptsPermitted}`}
-        />
-        {attemptsCopy && <NeonNote>{attemptsCopy}</NeonNote>}
-        <NeonNote>
-          An attempt is used the moment a round opens, even if you leave before
-          finishing.
-        </NeonNote>
-      </NeonPanel>
-    ) : null;
-
-  const centerStage = (
-    <LobbyCenterStage
-      title={heroTitle}
-      description={centerDescription}
-      badges={
-        <LobbyAttemptBadges
-          state={state}
-          attemptsPolicy={attemptsPolicy}
-          playMode={playMode}
-          modeLabel={modeRule.label}
-        />
-      }
-      showCountdown={showCountdown}
-      countdownTarget={countdownTarget}
-      serverNow={state?.serverNow}
-      countdownLabel={
-        isActive ? `${terms.contest} closes in` : `${terms.contest} starts in`
-      }
-      countdownVariant={isActive ? "end" : "start"}
-      scheduleDetails={scheduleDetails}
-      facts={buildStageFacts(roundSeconds, playMode)}
-      entryControl={entryControl}
-      attemptsPanel={attemptsPanel}
-    />
   );
 
   const summary = (
@@ -392,34 +245,10 @@ export default async function ProviderContestLobby({
     />
   );
 
-  const statsPanel = (
-    <NeonPanel accent="players" size="lg" title="Your contest">
-      <LobbyContestStatsGrid
-        roundTimeLabel={roundTimeLabel}
-        attemptsLabel={attemptsLabel}
-        initialScore={myInitialScore}
-        initialRank={standings.yourRank}
-        showScore={isUserIn}
-        scoringNote={scoringNote}
-      />
-    </NeonPanel>
-  );
-
   const prizesPanel =
     (competition.prizeDistribution?.length ?? 0) > 0 ? (
       <LobbyLivePrizePanel initialCompetition={competition} creditSymbol={creditSymbol} />
     ) : null;
-
-  const rightColumn = (
-    <>
-      {/* The clock lives in the summary row under the hero now; one countdown per state. */}
-      {statsPanel}
-      {prizesPanel}
-
-      <GameEventDetails sections={eventDetailSections} />
-      <CompetitionRulesFairPlay />
-    </>
-  );
 
   const leaderboard = (
     <LobbyLiveLeaderboard title={terms.leaderboard} scoreLabel={scoreLabel} />
@@ -437,29 +266,46 @@ export default async function ProviderContestLobby({
       />
     ) : null;
 
-  const nav = (
-    <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-      <NeonBackLink href="/competitions" label={terms.contests} />
-      <div className="hidden sm:block">
-        <UTCClock />
-      </div>
-    </div>
-  );
+  const overview = buildGameOverviewCopy({
+    playModeLabel: modeRule.label,
+    playModeDetail: modeRule.detail,
+    scoreLabel,
+    scoringNote,
+    roundSeconds,
+    attemptsShort: ATTEMPTS_POLICY_SHORT.get(attemptsPolicy) ?? null,
+    howItWorksSteps: toHowItWorksSteps(presentation.howItWorksSteps),
+  });
 
-  const hero = (
-    <NeonHero
-      banner={resolveProviderBanner({
-        bannerUrl: presentation?.bannerUrl,
-        gameName: presentation?.gameName ?? gameName,
-        gameCode: competition?.gameConfig?.gameCode,
-      })}
-      badge={{ icon: Gamepad2, label: heroTitle }}
-      title={heroTitle}
-      subtitle={heroNameSubtitle || presentation.tagline || competition.description || presentation.description}
-      status={<NeonStatusBadge status={status} />}
-      meta={<LobbyHeroFeaturePills features={heroFeaturePills} />}
+  const sections = buildGameLobbySections({
+    eventSections: eventDetailSections,
+    rulesSummary: presentation.rulesSummary,
+    howToPlay: presentation.howToPlay,
+  });
+
+  const scheduleNote = (
+    <GameLobbyScheduleNote
+      modeLabel={modeRule.label}
+      modeDetail={modeRule.detail}
+      playMode={playMode}
+      reservesFullRound={reservesFullRound}
+      showAttemptCutoff={
+        isActive &&
+        reservesFullRound &&
+        attemptCutoffMs !== null &&
+        attemptCutoffMs > Date.now()
+      }
+      attemptCutoffMs={attemptCutoffMs}
     />
   );
+
+  const banner = resolveProviderBanner({
+    bannerUrl: presentation?.bannerUrl,
+    gameName: presentation?.gameName ?? gameName,
+    gameCode: competition?.gameConfig?.gameCode,
+  });
+
+  const startLabel = formatUTC(competition.startTime);
+  const endLabel = formatUTC(competition.endTime);
 
   return (
     <ArenaLiveProvider
@@ -483,7 +329,7 @@ export default async function ProviderContestLobby({
       {/*
         Phone: dedicated Game Competition Lobby
         (`ChartVolt_Game_Competition_Lobby_Mobile_Cursor_Guide`). Never a
-        squeezed three-column desktop. Desktop shell is unchanged.
+        squeezed desktop. Desktop matches trading via CompetitionDetailShell.
 
         Reason (16 Oct 2026): matchMedia switch, not CSS alone — phones were
         still painting the desktop shell when Safari's layout width stayed wide.
@@ -498,11 +344,7 @@ export default async function ProviderContestLobby({
               hero={{
                 title: heroTitle,
                 description: centerDescription,
-                banner: resolveProviderBanner({
-                  bannerUrl: presentation?.bannerUrl,
-                  gameName: presentation?.gameName ?? gameName,
-                  gameCode: competition?.gameConfig?.gameCode,
-                }),
+                banner,
                 categoryLabel: presentation.category ?? null,
                 status,
                 cancellationReason: competition.cancellationReason ?? null,
@@ -564,16 +406,69 @@ export default async function ProviderContestLobby({
         }
         desktop={
           <div>
-            <GameCompetitionArenaShell
-              nav={nav}
-              hero={hero}
+            <DesktopGameLobby
+              contestsHref="/competitions"
+              contestsLabel={terms.contests}
+              competitionId={String(competition._id)}
+              isCompleted={isCompleted}
+              isUserIn={isUserIn}
+              banner={banner}
+              heroBadgeLabel={heroTitle}
+              heroTitle={heroTitle}
+              heroSubtitle={
+                heroNameSubtitle ||
+                presentation.tagline ||
+                competition.description ||
+                presentation.description
+              }
+              heroFeatures={heroFeaturePills}
+              status={status}
+              cancellationReason={competition.cancellationReason ?? null}
               summary={summary}
-              left={leaderboard}
-              center={centerStage}
-              right={rightColumn}
+              description={centerDescription}
+              sections={sections}
+              overview={overview}
+              leaderboard={leaderboard}
+              yourRun={
+                isUserIn ? (
+                  <GameLobbyYourRun
+                    roundTimeLabel={roundTimeLabel}
+                    attemptsLabel={attemptsLabel}
+                    attemptsNote={attemptsCopy}
+                    initialScore={myInitialScore}
+                    initialRank={standings.yourRank}
+                    scoringNote={scoringNote}
+                    showScore
+                  />
+                ) : undefined
+              }
+              sidebar={{
+                competition,
+                creditSymbol,
+                walletBalance,
+                isUserIn,
+                isFull,
+                isActive,
+                isUpcoming: status === "upcoming",
+                isCompleted,
+                participantStatus,
+                registrationClosed,
+                levelLadder,
+                currentUserId: userId,
+                startLabel,
+                endLabel,
+                countdownTarget,
+                countdownLabel: isActive
+                  ? `${terms.contest} closes in`
+                  : `${terms.contest} starts in`,
+                countdownVariant: isActive ? "end" : "start",
+                serverNow: state?.serverNow,
+                showCountdown,
+                scheduleNote,
+                launchBlocked,
+              }}
               footer={
                 <>
-                  {howItWorks}
                   {tips ?? <LobbyTipsPlaceholder />}
                 </>
               }

@@ -6,7 +6,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NeonPanel } from "@/components/neon/Cards";
 import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
-import { contestAboutFallback } from "@/components/competitions/lobby/contest-lobby-copy";
+import {
+  contestAboutFallback,
+  type ContestLobbyKind,
+} from "@/components/competitions/lobby/contest-lobby-copy";
 import { TradingOverview } from "@/components/competitions/detail/TradingOverview";
 import type { TradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
 
@@ -105,17 +108,23 @@ export function TradingDetailTabs({
   description,
   sections,
   overview,
+  kind = "trading",
 }: {
   description?: string | null;
   sections: NeonAccordionSection[];
   overview: TradingOverviewCopy;
+  /**
+   * About-fallback voice only. Game lobbies reuse this strip so the chrome stays
+   * identical; `kind="game"` picks the game about sentence when description is empty.
+   */
+  kind?: ContestLobbyKind;
 }) {
   const [tab, setTab] = useState<string>(OVERVIEW_ID);
   const dragScroll = useDragScroll();
   const about =
     typeof description === "string" && description.trim()
       ? description.trim()
-      : contestAboutFallback("trading");
+      : contestAboutFallback(kind);
   const active = sections.find((s) => s.id === tab);
 
   /*

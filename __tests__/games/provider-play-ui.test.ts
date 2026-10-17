@@ -569,19 +569,23 @@ describe("a provider contest gets its own lobby, not the trading one", () => {
   });
 
   it("shows the three things a provider lobby must answer", () => {
-    const code = readCode(PROVIDER_LOBBY);
+    const lobby = readCode(PROVIDER_LOBBY);
+    const sections = readCode("components/games/lobby/game-lobby-sections.tsx");
+    const yourRun = readCode(
+      "components/competitions/detail/DesktopGameLobby.tsx",
+    );
 
     // `13` s4: players hit all three, and the third is the one nobody thinks to show and the one
     // that costs money when it happens.
     //
-    // 12 Oct 2026 — unresolved policy moved into GameEventDetails as "If a round stalls"
-    // (Cursor Spec sidebar Event details) rather than a standalone thin panel titled
-    // "If a round does not finish". Flipped rather than deleted; UNRESOLVED_POLICY_COPY still
-    // supplies the money-adjacent sentence.
-    expect(code).toMatch(/Play window/);
-    expect(code).toMatch(/Your attempts/);
-    expect(code).toMatch(/If a round stalls/);
-    expect(code).toMatch(/UNRESOLVED_POLICY_COPY/);
+    // 12 Oct 2026 — unresolved policy moved into GameEventDetails as "If a round stalls".
+    // 16 Oct 2026 — Play window / stall copy live in buildGameEventSections; attempts in
+    // GameLobbyYourRun. Flipped rather than deleted; UNRESOLVED_POLICY_COPY still supplies
+    // the money-adjacent sentence on the page.
+    expect(sections).toMatch(/Play window/);
+    expect(sections).toMatch(/If a round stalls/);
+    expect(yourRun).toMatch(/Your arena run|Attempts remaining/);
+    expect(lobby).toMatch(/UNRESOLVED_POLICY_COPY/);
   });
 
   it("refuses Play with a reason when the contest cannot launch a round", () => {
@@ -811,10 +815,17 @@ describe("the two lobbies are built from one design kit", () => {
       here, after the fixed-character Edit guard, `canTransitionRound`, `MIN_REASON_LENGTH` and
       the duplicated `!expectedOrigin`.
     */
-    expect(readCode(PROVIDER_LOBBY)).toMatch(/<NeonHero[\s>]/);
+    // 16 Oct 2026 — NeonHero mounts inside DesktopGameLobby (shared shell), not the page.
+    const desktopGame = readCode(
+      "components/competitions/detail/DesktopGameLobby.tsx",
+    );
+    expect(desktopGame).toMatch(/<NeonHero[\s>]/);
     expect(readCode(TRADING_HERO)).toMatch(/<NeonHero[\s>]/);
 
-    for (const hero of [PROVIDER_LOBBY, TRADING_HERO]) {
+    for (const hero of [
+      "components/competitions/detail/DesktopGameLobby.tsx",
+      TRADING_HERO,
+    ]) {
       expect(readCode(hero)).toMatch(
         /from "@\/components\/neon\/Hero"/,
       );
@@ -837,9 +848,14 @@ describe("the two lobbies are built from one design kit", () => {
 
       15 Oct 2026 — game arena redesign: provider lobby stats are a 2x3 grid in
       LobbyContestStatsGrid (six contest figures). Trading summary keeps four StatCards.
+
+      16 Oct 2026 — LobbyContestStatsGrid mounts from DesktopGameLobby / GameLobbyYourRun.
     */
     const gameStats = readCode("components/games/lobby/LobbyContestStatsGrid.tsx");
-    expect(readCode(PROVIDER_LOBBY)).toMatch(/LobbyContestStatsGrid/);
+    const desktopGame = readCode(
+      "components/competitions/detail/DesktopGameLobby.tsx",
+    );
+    expect(desktopGame).toMatch(/LobbyContestStatsGrid/);
     expect(gameStats).toMatch(/grid-cols-2/);
     expect(gameStats).not.toMatch(/grid-cols-4/);
 
@@ -898,16 +914,20 @@ describe("the two lobbies are built from one design kit", () => {
   });
 
   it("reuses the trading lobby's time components instead of formatting time itself", () => {
-    const code = readCode(PROVIDER_LOBBY);
+    const lobby = readCode(PROVIDER_LOBBY);
+    const scheduleNote = readCode(
+      "components/games/lobby/GameLobbyScheduleNote.tsx",
+    );
+    const summary = readCode("components/games/lobby/GameLobbySummary.tsx");
 
-    // A game lobby that renders "2d 4h" differently from the trading lobby is the same
-    // inconsistency as a different card radius - and it would be a second place for the
-    // "Started"/"Ended" wording to drift.
-    expect(code).toMatch(/<UTCClock\s*\/>/);
-    // Trading Starts-In lives on the summary strip under the hero, not inside NeonHero.
+    // 16 Oct 2026 — layout parity dropped the UTCClock chrome (trading desktop
+    // DesktopTradingLobby never mounts one). Countdowns stay on shared InlineCountdown /
+    // ContestCountdown. Flipped rather than deleted so the old nav-clock claim stays on record.
+    expect(lobby).not.toMatch(/<UTCClock\s*\/>/);
     expect(readCode(TRADING_SUMMARY)).toMatch(/<InlineCountdown/);
-    expect(code).toMatch(/<InlineCountdown[\s\S]{0,200}targetDate=/);
-    expect(code).not.toMatch(/1000 \* 60 \* 60/);
+    expect(summary).toMatch(/<InlineCountdown/);
+    expect(scheduleNote).toMatch(/<InlineCountdown[\s\S]{0,200}targetDate=/);
+    expect(lobby).not.toMatch(/1000 \* 60 \* 60/);
   });
 
   it("says players, never traders", () => {
@@ -1651,31 +1671,30 @@ describe("the game lobby shows a joined player the clock", () => {
       green on a file that imports the component and never mounts it.
 
       IT WAS THREE FROM 7 SEPTEMBER 2026, TWO FROM 11 SEPTEMBER, ONE FROM 12 OCTOBER 2026,
-      AND TWO FROM 15 OCTOBER 2026 (arena redesign): the four-cell contest end clock lives in
-      LobbyCenterStage via ContestCountdown; the right-column status strip uses a compact
-      InlineCountdown for "Ends in" (not a second four-cell panel); the other InlineCountdown
-      is still the last-attempt cut-off under reserve_full_round. If this rises above two, a
-      third clock has crept back; if it falls to zero, the attempt cut-off is gone.
-
-      Amended later 15 Oct 2026: the "Ends in" clock moved with the prize/entry/players row
-      into GameLobbySummary (trading-style summary), so the two are counted across both
-      files. The lobby keeps exactly one: the attempt cut-off.
+      AND TWO FROM 15 OCTOBER 2026 (arena redesign). Amended 16 Oct 2026 (layout parity):
+      the four-cell contest clock lives in GameLobbySidebar via ContestCountdown (showcase,
+      trading order); GameLobbySummary keeps the compact "Ends in" InlineCountdown; the
+      last-attempt cut-off lives in GameLobbyScheduleNote. Count across those three files.
     */
     const summary = readCode("components/games/lobby/GameLobbySummary.tsx");
+    const scheduleNote = readCode(
+      "components/games/lobby/GameLobbyScheduleNote.tsx",
+    );
     const lobbyCount = (code.match(/<InlineCountdown/g) ?? []).length;
     const summaryCount = (summary.match(/<InlineCountdown/g) ?? []).length;
-    expect(lobbyCount).toBe(1);
-    expect(lobbyCount + summaryCount).toBe(2);
+    const cutoffCount = (scheduleNote.match(/<InlineCountdown/g) ?? []).length;
+    expect(lobbyCount).toBe(0);
+    expect(summaryCount).toBe(1);
+    expect(cutoffCount).toBe(1);
+    expect(summaryCount + cutoffCount).toBe(2);
 
-    // Reused, not re-implemented. A second place that formats "2d 4h" is a second place for the
-    // wording to drift, which is the shape behind several defects here.
-    expect(code).toMatch(/from "@\/components\/trading\/InlineCountdown"/);
-    // Arena four-cell clock is composed through LobbyCenterStage (server clock).
-    // Flipped 15 Oct 2026 (image-1 polish): size is `arena`, not trading's `showcase`.
-    expect(code).toMatch(/LobbyCenterStage/);
+    expect(scheduleNote).toMatch(
+      /from "@\/components\/trading\/InlineCountdown"/,
+    );
+    expect(code).toMatch(/DesktopGameLobby/);
     expect(code).toMatch(/playModePlayerRule/);
-    expect(readCode("components/games/lobby/LobbyCenterStage.tsx")).toMatch(
-      /size="arena"/,
+    expect(readCode("components/games/lobby/GameLobbySidebar.tsx")).toMatch(
+      /size="showcase"/,
     );
   });
 
@@ -1909,44 +1928,26 @@ describe("the last moment to start an attempt has one producer", () => {
   });
 
   it("shows the lobby countdown only where a cut-off really exists", () => {
+    // 16 Oct 2026 — cut-off row lives in GameLobbyScheduleNote; the page wires
+    // showAttemptCutoff from isActive && reservesFullRound && attemptCutoffMs.
     const lobby = readCode(PROVIDER_LOBBY);
+    const note = readCode("components/games/lobby/GameLobbyScheduleNote.tsx");
 
-    /*
-      SLICED BY INDEX, NOT SCANNED TOWARDS. A leftmost-first regex over the whole file opens at
-      an unrelated construct hundreds of characters earlier and swallows legitimate markup, and
-      the guard then fails on correct code - which is the fastest way to have it deleted. The
-      length assertions exist because a slice that found nothing passes every match against it.
-    */
-    const labelAt = lobby.indexOf("Last attempt can start in");
-    expect(labelAt).toBeGreaterThan(-1);
-    const guardAt = lobby.lastIndexOf("{isActive &&", labelAt);
-    expect(guardAt).toBeGreaterThan(-1);
+    expect(note.indexOf("Last attempt can start in")).toBeGreaterThan(-1);
+    expect(note).toMatch(/showAttemptCutoff/);
+    expect(note).toMatch(/zeroLabel="Passed"/);
 
-    const guard = lobby.slice(guardAt, labelAt);
-    const row = lobby.slice(labelAt, labelAt + 400);
-    expect(guard.length).toBeGreaterThan(60);
-
-    /*
-      Three conditions, and dropping any one of them states something false. Without
-      `reservesFullRound` a permissive contest is given a deadline it does not have, and a
-      player leaves believing they have missed it. Without `isActive` the row appears on an
-      upcoming contest, where the countdown is to a moment inside a window that has not
-      opened. Without the null check there is no cut-off to count down to.
-    */
-    expect(guard).toMatch(/reservesFullRound/);
-    expect(guard).toMatch(/attemptCutoffMs !== null/);
-
-    /*
-      "Passed", not "Ended". The contest has not ended - only the chance to open a new round
-      has, and a player already inside a round may still finish it. This is the same class of
-      correction as the play-window note that had become false: a word that is right about one
-      clock and wrong about the one it is attached to.
-    */
-    expect(row).toMatch(/zeroLabel="Passed"/);
+    const cutoffWire = lobby.match(
+      /showAttemptCutoff=\{[\s\S]*?\}/,
+    );
+    expect(cutoffWire).not.toBeNull();
+    expect(cutoffWire![0]).toMatch(/isActive/);
+    expect(cutoffWire![0]).toMatch(/reservesFullRound/);
+    expect(cutoffWire![0]).toMatch(/attemptCutoffMs/);
   });
 
   it("tells a joined player what happens to a round still running at the close, per policy", () => {
-    const lobby = readCode(PROVIDER_LOBBY);
+    const note = readCode("components/games/lobby/GameLobbyScheduleNote.tsx");
 
     /*
       THE SENTENCE HAS TO GO BOTH WAYS. Under `reserve_full_round` a round CANNOT still be
@@ -1955,12 +1956,7 @@ describe("the last moment to start an attempt has one producer", () => {
       start whenever they like. Under `until_window_closes` the opposite is true and is exactly
       what makes a shortened attempt worth taking.
     */
-    // Re-anchored 28 Sep 2026 on the mode rule that now opens the note; the per-policy half is
-    // unchanged and only shown for an anytime contest (a together-game has no late start).
-    const noteStart = lobby.indexOf("{modeRule.label}");
-    expect(noteStart).toBeGreaterThan(-1);
-    const note = lobby.slice(noteStart, lobby.indexOf("</NeonNote>", noteStart));
-    expect(note.length).toBeGreaterThan(200);
+    // 16 Oct 2026 — note extracted to GameLobbyScheduleNote; claims unchanged.
     expect(note).toMatch(/playMode === "anytime"/);
     expect(note).toMatch(/reservesFullRound/);
     expect(note).toMatch(/finish inside the window/);

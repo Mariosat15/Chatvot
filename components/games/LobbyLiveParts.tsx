@@ -125,13 +125,17 @@ export function LobbyLiveLeaderboard({
 }
 
 export function LobbyLivePrizePanel({
-   
   initialCompetition,
   creditSymbol,
+  title = "Prize distribution",
+  size,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   initialCompetition: any;
   creditSymbol?: string;
+  /** Defaults to "Prize distribution"; desktop sidebar uses "Who wins what" like trading. */
+  title?: string;
+  size?: "sm" | "md" | "lg";
 }) {
   const { contest } = useArenaLive();
 
@@ -157,8 +161,12 @@ export function LobbyLivePrizePanel({
   if (prizePositions === 0) return null;
 
   return (
-    <NeonPanel icon={Gift} accent="prize" title="Prize distribution">
-      <PrizeTable competition={competition} creditSymbol={creditSymbol} />
+    <NeonPanel icon={Gift} accent="prize" title={title} size={size}>
+      <PrizeTable
+        competition={competition}
+        creditSymbol={creditSymbol}
+        size={size === "lg" ? "lg" : undefined}
+      />
     </NeonPanel>
   );
 }

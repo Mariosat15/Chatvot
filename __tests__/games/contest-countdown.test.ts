@@ -38,7 +38,7 @@ const PANEL = "components/competitions/CountdownPanel.tsx";
 const LIVE_COUNTDOWN = "components/trading/LiveCountdown.tsx";
 const GAME_COUNTDOWN = "components/games/ContestCountdown.tsx";
 const GAME_LOBBY = "components/games/ProviderContestLobby.tsx";
-const GAME_CENTER = "components/games/lobby/LobbyCenterStage.tsx";
+const GAME_SIDEBAR = "components/games/lobby/GameLobbySidebar.tsx";
 const TRADING_SIDEBAR = "components/trading/lobby/TradingLobbySidebar.tsx";
 const TRADING_SUMMARY = "components/trading/lobby/TradingLobbySummary.tsx";
 const CHALLENGE_PAGE = "app/(root)/challenges/[id]/page.tsx";
@@ -85,7 +85,7 @@ describe("the four-cell contest countdown", () => {
       LIVE_COUNTDOWN,
       GAME_COUNTDOWN,
       GAME_LOBBY,
-      GAME_CENTER,
+      GAME_SIDEBAR,
       TRADING_SIDEBAR,
       TRADING_SUMMARY,
       CHALLENGE_PAGE,
@@ -199,54 +199,38 @@ describe("splitDuration", () => {
 
 describe("the game lobby's contest clock", () => {
   it("sits where the trading lobby's sits - under the entry control", () => {
-    // Flipped 15 Oct 2026 (arena redesign): the four-cell clock lives in
-    // LobbyCenterStage above the Join/Play control (reference order). The lobby
-    // wires LobbyLiveEntryButton into that stage; prizes stay in the right column.
+    // Flipped 16 Oct 2026 (layout parity): four-cell clock lives in GameLobbySidebar
+    // after LobbyLiveEntryButton — same order as TradingLobbySidebar.
     const lobby = readCode(GAME_LOBBY);
-    const center = readCode(GAME_CENTER);
+    const sidebar = readCode(GAME_SIDEBAR);
 
-    expect(lobby).toContain("<LobbyCenterStage");
-    expect(lobby).toContain("<LobbyLiveEntryButton");
-    expect(lobby).toContain("<LobbyLivePrizePanel");
-    expect(center).toContain("<ContestCountdown");
+    expect(lobby).toContain("<DesktopGameLobby");
+    expect(lobby).toContain("scheduleNote");
+    expect(sidebar).toContain("<LobbyLiveEntryButton");
+    expect(sidebar).toContain("<ContestCountdown");
+    expect(sidebar).toContain("<LobbyLivePrizePanel");
 
-    const countdown = center.indexOf("<ContestCountdown");
-    const entrySlot = center.indexOf("{entryControl}");
-    expect(countdown).toBeGreaterThan(-1);
-    expect(entrySlot).toBeGreaterThan(-1);
-    // Reference: illuminated countdown, then the gold PLAY / join control.
-    expect(entrySlot).toBeGreaterThan(countdown);
+    const entryAt = sidebar.indexOf("<LobbyLiveEntryButton");
+    const countdownAt = sidebar.indexOf("<ContestCountdown");
+    expect(entryAt).toBeGreaterThan(-1);
+    expect(countdownAt).toBeGreaterThan(entryAt);
   });
 
-  it("carries the schedule inside itself rather than in a second card", () => {
+  it("keeps contest start/end on the Schedule card beside the clock", () => {
+    // Flipped 16 Oct 2026: trading-parity Schedule (UTC) card with Start/End rows.
+    // Play-window Opens/Closes stay in the Rules tabs (buildGameEventSections), not a
+    // second countdown to the same contest close.
     const lobby = readCode(GAME_LOBBY);
-    const center = readCode(GAME_CENTER);
+    const sidebar = readCode(GAME_SIDEBAR);
+    const sections = readCode("components/games/lobby/game-lobby-sections.tsx");
 
-    /*
-      FLIPPED RATHER THAN DELETED (owner instruction, 11 September 2026: "no need to have 2,
-      merge them into the big one"). This test used to assert the clock sat ABOVE a separate card
-      headed "Play window" - correct about the order, and the order was the lesser problem.
-
-      That card counted down to the contest's close in a small row, directly under a panel
-      counting down to the same close in four large cells, because `12` s2.3 derives the window
-      from the contest clock and `playWindowEnd` IS `endTime`. **Two statements of one clock**,
-      which is the class of defect this codebase keeps finding, not a layout preference.
-
-      The schedule is now one node with two hosts: inside the countdown while there is a clock to
-      show, and in its own card when there is not. Asserting the node is built ONCE is the
-      load-bearing half - the obvious way to write a fallback is to paste the rows twice, and two
-      copies of a player-facing deadline is how one of them stops being updated.
-    */
-    expect(lobby).toMatch(/const scheduleDetails =/);
-    expect(lobby).toMatch(/scheduleDetails=\{scheduleDetails\}/);
-    expect(lobby.match(/const scheduleDetails =/g) ?? []).toHaveLength(1);
-
-    expect(lobby.match(/label="Opens"/g) ?? []).toHaveLength(1);
-    expect(lobby.match(/label="Closes"/g) ?? []).toHaveLength(1);
-
-    // Second host is in the center stage when the countdown is withheld.
-    expect(center).toMatch(/showCountdown && countdownTarget/);
-    expect(center).toMatch(/scheduleDetails \?/);
+    expect(sidebar).toContain('title="Schedule (UTC)"');
+    expect(sidebar).toContain('label="Start"');
+    expect(sidebar).toContain('label="End"');
+    expect(lobby).toMatch(/startLabel/);
+    expect(lobby).toMatch(/endLabel/);
+    expect(sections).toContain('label: "Opens"');
+    expect(sections).toContain('label: "Closes"');
   });
 
   it("no longer counts down twice to the same moment", () => {
@@ -263,7 +247,7 @@ describe("the game lobby's contest clock", () => {
 
   it("is rendered once, not once per contest state", () => {
     const lobby = readCode(GAME_LOBBY);
-    const center = readCode(GAME_CENTER);
+    const sidebar = readCode(GAME_SIDEBAR);
 
     /*
       Two blocks - one for upcoming, one for active - is the obvious way to write this and is
@@ -271,9 +255,9 @@ describe("the game lobby's contest clock", () => {
       target is already resolved once as `countdownTarget`; a second copy is a second chance for
       this screen to count down to a different moment from its own hero tile.
     */
-    expect(center.match(/<ContestCountdown/g) ?? []).toHaveLength(1);
-    expect(lobby).toMatch(/countdownTarget=\{countdownTarget\}/);
-    expect(lobby).toContain("<LobbyCenterStage");
+    expect(sidebar.match(/<ContestCountdown/g) ?? []).toHaveLength(1);
+    expect(lobby).toMatch(/countdownTarget/);
+    expect(lobby).toContain("<DesktopGameLobby");
   });
 
   it("hands the countdown the server's time rather than letting it guess", () => {
@@ -282,12 +266,12 @@ describe("the game lobby's contest clock", () => {
       half-fix: every assertion about the component passes while every player is back on their
       own computer's clock.
     */
-    expect(readCode(GAME_LOBBY)).toMatch(/serverNow=\{state\?\.serverNow\}/);
+    expect(readCode(GAME_LOBBY)).toMatch(/serverNow: state\?\.serverNow/);
   });
 
   it("is withheld from a contest that has finished or been called off", () => {
     const lobby = readCode(GAME_LOBBY);
-    const center = readCode(GAME_CENTER);
+    const sidebar = readCode(GAME_SIDEBAR);
 
     /*
       RE-AIMED AT THE NAMED CONSTANT, and the reason generalises: this used to scan the 200
@@ -307,9 +291,9 @@ describe("the game lobby's contest clock", () => {
     expect(definition![0]).toMatch(/!isCompleted/);
     expect(definition![0]).toMatch(/!isCancelled/);
     expect(definition![0]).toMatch(/countdownTarget/);
-    expect(lobby).toMatch(/showCountdown=\{showCountdown\}/);
-    expect(center).toMatch(/showCountdown && countdownTarget/);
-    expect(center).toContain("<ContestCountdown");
+    expect(lobby).toMatch(/showCountdown/);
+    expect(sidebar).toMatch(/showCountdown && countdownTarget/);
+    expect(sidebar).toContain("<ContestCountdown");
   });
 });
 
