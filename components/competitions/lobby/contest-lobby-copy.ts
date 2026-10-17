@@ -54,7 +54,9 @@ const HOW_IT_WORKS = new Map<ContestLobbyKind, ContestHowItStep[]>([
       },
       {
         title: "Climb the ranks",
-        detail: "Your P&L decides the order — every tick counts.",
+        // Reason: ranking method is per-contest (pnl / roi / win rate…). Never claim P&L here;
+        // the live Overview uses `buildTradingOverviewCopy` from the stored rule.
+        detail: "Climb by this contest's ranking rule — every move counts.",
       },
       {
         title: "Take the pot",
@@ -79,7 +81,10 @@ const FEATURES = new Map<ContestLobbyKind, ContestFeature[]>([
     [
       { title: "Live markets", detail: "Trade real price action in the arena." },
       { title: "Global rivals", detail: "Compete with traders worldwide." },
-      { title: "Climb for glory", detail: "Rank by P&L — prove your edge." },
+      {
+        title: "Climb for glory",
+        detail: "Rank by this contest's scoring rule — prove your edge.",
+      },
       { title: "Prize drops", detail: "Top spots take home the Volts." },
     ],
   ],

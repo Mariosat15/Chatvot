@@ -325,6 +325,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Lobby data-agnostic CHECKED 17 Oct (eng)** — game + trading competition lobbies: Overview/rules from contest + catalogue fields only (`buildTradingOverviewCopy` / `buildGameOverviewCopy` / `buildGameLobbySections`); kind fallbacks no longer claim P&L for every trading contest; pinned by `__tests__/competitions/lobby-data-agnostic.test.ts`. **Never verified by eye.**
 - **Lobby Overview stack + Play plate CODE-COMPLETE 17 Oct (eng)** — owner mark-up: Overview About / How you play / How you win are **full-width stacked bands** on game **and** trading (`TradingOverview`); tab strip no longer doubles "How you play" + catalogue "How to play" (merged in `buildGameLobbySections`); in-contest Play / Start Trading both use gold `ArenaPlayPlate` (wording by page). **Never verified by eye.**
 - **Game competition lobby LAYOUT PARITY CODE-COMPLETE 16 Oct (eng)** — owner: desktop Game lobby must match Trading lobby layout exactly, with games data. Desktop returns to `CompetitionDetailShell` via `DesktopGameLobby` (hero → KPI summary → tabs + leaderboard + your-run | sidebar: entry → `ContestCountdown` showcase → Schedule UTC → level → prizes → fair play). Overview/rules from `buildGameOverviewCopy` + `buildGameLobbySections`. Phone `MobileGameCompetitionLobby` unchanged. Trading untouched. **Supersedes the 15 Oct three-column `GameCompetitionArenaShell` path — say which.** Tests: lobby suites 205 green. **Never verified by eye.**
 - **Game competition lobby ARENA redesign CODE-COMPLETE 15 Oct (eng)** — **superseded same day+1 by layout parity above — say which.** Was: three-column arena shell. Phone tree from that day still lives.
@@ -997,6 +998,10 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ---
 
 ## WORK LOG
+
+### 17 October 2026 - Competition lobby data-agnostic (game + trading)
+
+Owner: make sure game and trading competition lobbies are data-agnostic for competitions/rules. Live Overview already comes from `buildTradingOverviewCopy` / `buildGameOverviewCopy` + catalogue `rulesSummary` / `howToPlay`; kind fallbacks in `contest-lobby-copy` no longer hard-code P&L as the ranking rule. Guard: `__tests__/competitions/lobby-data-agnostic.test.ts`. **Never verified by eye.**
 
 ### 17 October 2026 - Sitewide button press (competition + mobile)
 
