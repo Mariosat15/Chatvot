@@ -5,36 +5,36 @@
 
 // EU Member States (ISO 3166-1 alpha-2 codes)
 export const EU_COUNTRIES = [
-  'AT', // Austria
-  'BE', // Belgium
-  'BG', // Bulgaria
-  'HR', // Croatia
-  'CY', // Cyprus
-  'CZ', // Czech Republic
-  'DK', // Denmark
-  'EE', // Estonia
-  'FI', // Finland
-  'FR', // France
-  'DE', // Germany
-  'GR', // Greece
-  'HU', // Hungary
-  'IE', // Ireland
-  'IT', // Italy
-  'LV', // Latvia
-  'LT', // Lithuania
-  'LU', // Luxembourg
-  'MT', // Malta
-  'NL', // Netherlands
-  'PL', // Poland
-  'PT', // Portugal
-  'RO', // Romania
-  'SK', // Slovakia
-  'SI', // Slovenia
-  'ES', // Spain
-  'SE', // Sweden
+  "AT", // Austria
+  "BE", // Belgium
+  "BG", // Bulgaria
+  "HR", // Croatia
+  "CY", // Cyprus
+  "CZ", // Czech Republic
+  "DK", // Denmark
+  "EE", // Estonia
+  "FI", // Finland
+  "FR", // France
+  "DE", // Germany
+  "GR", // Greece
+  "HU", // Hungary
+  "IE", // Ireland
+  "IT", // Italy
+  "LV", // Latvia
+  "LT", // Lithuania
+  "LU", // Luxembourg
+  "MT", // Malta
+  "NL", // Netherlands
+  "PL", // Poland
+  "PT", // Portugal
+  "RO", // Romania
+  "SK", // Slovakia
+  "SI", // Slovenia
+  "ES", // Spain
+  "SE", // Sweden
 ] as const;
 
-export type EUCountryCode = typeof EU_COUNTRIES[number];
+export type EUCountryCode = (typeof EU_COUNTRIES)[number];
 
 /**
  * Check if a country code is an EU member state
@@ -50,33 +50,33 @@ export function isEUCountry(countryCode: string | null | undefined): boolean {
  * Get country name from code
  */
 export const COUNTRY_NAMES: Record<string, string> = {
-  'AT': 'Austria',
-  'BE': 'Belgium',
-  'BG': 'Bulgaria',
-  'HR': 'Croatia',
-  'CY': 'Cyprus',
-  'CZ': 'Czech Republic',
-  'DK': 'Denmark',
-  'EE': 'Estonia',
-  'FI': 'Finland',
-  'FR': 'France',
-  'DE': 'Germany',
-  'GR': 'Greece',
-  'HU': 'Hungary',
-  'IE': 'Ireland',
-  'IT': 'Italy',
-  'LV': 'Latvia',
-  'LT': 'Lithuania',
-  'LU': 'Luxembourg',
-  'MT': 'Malta',
-  'NL': 'Netherlands',
-  'PL': 'Poland',
-  'PT': 'Portugal',
-  'RO': 'Romania',
-  'SK': 'Slovakia',
-  'SI': 'Slovenia',
-  'ES': 'Spain',
-  'SE': 'Sweden',
+  AT: "Austria",
+  BE: "Belgium",
+  BG: "Bulgaria",
+  HR: "Croatia",
+  CY: "Cyprus",
+  CZ: "Czech Republic",
+  DK: "Denmark",
+  EE: "Estonia",
+  FI: "Finland",
+  FR: "France",
+  DE: "Germany",
+  GR: "Greece",
+  HU: "Hungary",
+  IE: "Ireland",
+  IT: "Italy",
+  LV: "Latvia",
+  LT: "Lithuania",
+  LU: "Luxembourg",
+  MT: "Malta",
+  NL: "Netherlands",
+  PL: "Poland",
+  PT: "Portugal",
+  RO: "Romania",
+  SK: "Slovakia",
+  SI: "Slovenia",
+  ES: "Spain",
+  SE: "Sweden",
 };
 
 /**
@@ -95,7 +95,9 @@ export function calculateVAT(baseAmount: number, vatRate: number): number {
  * @param vatRate - VAT rate as percentage (e.g., 20 for 20%)
  * @returns Total amount including VAT
  */
-export function calculateTotalWithVAT(baseAmount: number, vatRate: number): number {
+export function calculateTotalWithVAT(
+  baseAmount: number,
+  vatRate: number,
+): number {
   return baseAmount + calculateVAT(baseAmount, vatRate);
 }
-

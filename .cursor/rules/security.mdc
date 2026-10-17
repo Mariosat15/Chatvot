@@ -1,0 +1,132 @@
+---
+description: Security rules — OWASP Top 10, input validation, auth, secrets, CSP, rate limiting
+globs:
+  - "lib/actions/**"
+  - "app/api/**"
+  - "apps/admin/app/api/**"
+  - "apps/admin/lib/actions/**"
+  - "middleware.ts"
+  - "lib/services/**"
+  - "lib/better-auth/**"
+---
+
+# Security — ChartVolt
+
+## 🔐 OWASP Top 10 Checks (Apply on Every Change)
+
+### A01 — Broken Access Control
+- Every server action MUST call `getSession()` / `auth.api.getSession()` before any data operation.
+- After authentication, verify **authorization** — does THIS user own THIS resource?
+- Never trust client-sent `userId`. Always derive from the server session.
+- Admin actions must verify `user.role === "admin"` server-side.
+- Competition/challenge actions must verify the user is a participant.
+
+### A02 — Cryptographic Failures
+- Passwords are handled by `better-auth` — never implement custom password hashing.
+- JWT secrets come from environment variables (`AUTH_SECRET`).
+- Never log tokens, passwords, or session IDs.
+- Use HTTPS in production. Redirect HTTP → HTTPS via middleware or hosting config.
+
+### A03 — Injection
+- **MongoDB**: Always use Mongoose methods (`.find()`, `.findOne()`, `.updateOne()`). Never build query objects from raw user input.
+- **NoSQL injection**: Validate that user-supplied filter values are strings/numbers, not objects (`{ $gt: "" }`).
+- **XSS**: React auto-escapes JSX. Never use `dangerouslySetInnerHTML` unless content is sanitized with DOMPurify.
+- **Command injection**: Never pass user input to `child_process.exec()`. Use `execFile()` with argument arrays if needed.
+
+### A04 — Insecure Design
+- Trading operations (place order, close position, enter competition) must have guard chains:
+  1. Auth check → 2. Market hours → 3. User restrictions → 4. Balance/margin → 5. Competition rules → 6. Execute
+- Never skip guards even for admin operations — log the override instead.
+- Rate-limit sensitive endpoints (see below).
+
+### A05 — Security Misconfiguration
+- Remove all debug endpoints before production deploy.
+- Set `NODE_ENV=production` in production.
+- Disable source maps in production builds.
+- Set secure cookie flags: `httpOnly`, `secure`, `sameSite: "lax"`.
+
+### A06 — Vulnerable Components
+- Run `npm audit` before each release.
+- Never introduce packages with known critical CVEs.
+- Prefer well-maintained packages (>1000 GitHub stars, recent commits).
+- Pin major versions in `package.json` to avoid surprise breaking changes.
+
+### A07 — Authentication Failures
+- `better-auth` handles sessions and tokens.
+- Account lockout is implemented via `AccountLockout` model — respect it.
+- Password reset tokens must expire (check `better-auth` config).
+- Never reveal whether an email exists during login/signup error messages.
+
+### A08 — Data Integrity Failures
+- Validate all inputs with Zod or manual checks before processing.
+- Trading amounts: must be positive numbers, within min/max bounds.
+- Symbol names: must exist in `FOREX_PAIRS` map.
+- Competition IDs: must be valid ObjectIds and exist in the database.
+
+### A09 — Logging & Monitoring
+- Log all failed authentication attempts with IP (for fraud detection).
+- Log all trading operations with user ID, amount, symbol, timestamp.
+- Never log sensitive data: passwords, full card numbers, session tokens.
+- Use structured logging with emoji prefixes (see debugging.mdc).
+
+### A10 — Server-Side Request Forgery (SSRF)
+- Never allow user input to specify URLs for server-side fetching.
+- If fetching external resources, use an allowlist of domains.
+- The Massive.com WebSocket URL is hardcoded — keep it that way.
+
+---
+
+## 🛡️ Input Validation Patterns
+
+```typescript
+// GOOD — validate before use
+const amount = Number(rawAmount);
+if (!amount || amount <= 0 || amount > MAX_TRADE_AMOUNT || !Number.isFinite(amount)) {
+  return { success: false, error: "Invalid trade amount." };
+}
+
+// GOOD — validate ObjectId
+import mongoose from "mongoose";
+if (!mongoose.Types.ObjectId.isValid(competitionId)) {
+  return { success: false, error: "Invalid competition." };
+}
+
+// BAD — trusting client data
+const { userId, amount } = body; // userId should come from session, not body
+```
+
+---
+
+## 🚦 Rate Limiting Checklist
+
+These endpoints MUST be rate-limited (via middleware or service layer):
+- `/api/auth/*` — login, register, password reset (5 req/min)
+- `placeOrder` server action — (30 req/min per user)
+- `enterCompetition` — (5 req/min per user)
+- `/api/kyc/*` — (3 req/min per user)
+- `/api/payment/*` — deposit, withdraw (10 req/min per user)
+
+---
+
+## 🔑 Secrets Management
+
+- All secrets in `.env` / `.env.local` — never in code.
+- Environment variables: `MONGODB_URI`, `AUTH_SECRET`, `REDIS_URL`, `MASSIVE_API_KEY`, etc.
+- The `.env` file is in `.gitignore` and `.cursorignore` — verify this.
+- Admin API keys: validate server-side, never send to client.
+- When reviewing code, search for hardcoded strings that look like keys/tokens/passwords.
+
+---
+
+## 🌐 Security Headers (Next.js Middleware)
+
+Ensure these headers are set in production:
+```
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+```

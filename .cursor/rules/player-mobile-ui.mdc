@@ -1,0 +1,72 @@
+---
+description: Dedicated player mobile UI trees — do not stack or scale desktop
+alwaysApply: true
+---
+
+# Player Mobile UI — ChartVolt
+
+When the owner supplies a **mobile** design-reference, Rebuild brief, or asks to
+fix a player screen on phone, follow this. It applies to Practice, Wallet,
+Performance, Games Catalogue, auth, and any future player surface with a
+`components/**/mobile/` tree.
+
+## Hard rules
+
+1. **Dedicated tree below `md`.** Split with `hidden md:block` (desktop) and
+   `md:hidden` (mobile). Do **not** shrink the desktop layout, stack desktop
+   cards vertically, or use `scale` / `zoom` / `transform: scale` to force
+   desktop onto a phone.
+2. **Desktop stays unchanged** unless the brief explicitly asks to change it.
+   Extract a desktop shell if needed so phone work cannot rewrite desktop markup.
+3. **Share data and routes.** Same loaders, `searchParams`, game IDs, and filter
+   query keys (`?category=`). Layout and touch chrome may differ; behaviour must not.
+4. **Share identity chrome when it must match.** Titles, page icons, and metric
+   strips that should look like desktop belong in **one** shared component
+   (`GamesHero`, `AnalyticsPageHeadline`, `GameStatistics`, wallet/performance
+   headers) with a `compact` prop if needed — **not** a second mobile-only fork
+   that drifts (3D wordmark vs "Games Catalog", stacked stats vs inline).
+5. **Card / hero artwork:** use a fixed aspect box and **`object-contain`** so
+   banners show whole, unless the brief explicitly asks for `object-cover`.
+   Equal-height frames come from the aspect box, not from cropping.
+6. **Metrics:** value **beside** the label on one line (e.g. `4 Players`), never
+   value above and label below. Use shared formatters (`formatCatalogueCount`,
+   volts helpers) so counts grow as `1K` / `12.4K`, not raw `1000`.
+7. **Safe areas.** Pad with `env(safe-area-inset-*)`. Do **not** assume a phone
+   bottom nav exists — the layout removed it (29 Sep 2026); only add bottom
+   clearance if a live bar is present.
+8. **Test width band:** design and sanity-check at **360–430px** width.
+
+## Where the target lives
+
+- Owner briefs and captures: `External game plans/design-reference/`
+- Rebuild / task docs: `External game plans/Rebuild*` and related task markdown
+- Read the brief **before** inventing layout. The reference is the target, not
+  "make the existing page slightly nicer."
+
+## Docs (same piece of work)
+
+When shipping or polishing a mobile player surface covered by those plans:
+
+1. Add or update a **BUILT** note at the top of the design-reference / Rebuild doc
+2. Add a short status + work-log line in `External game plans/PROGRESS.md`
+3. Say **Never verified by eye** until the owner reviews on a real device
+
+Do **not** bury these UI rules inside `games-plan-docs-sync.mdc` — that file is
+the external-games programme and money/provider register, not player layout.
+
+## Live examples (read these, do not re-invent)
+
+| Surface | Desktop shell | Mobile tree |
+|---|---|---|
+| Games catalogue | `DesktopGamesCatalogue.tsx` | `components/games/catalogue/mobile/` |
+| Practice | desktop lobby under `md` | dedicated Practice mobile lobby |
+| Wallet / Performance / Dashboard | desktop sections | `components/dashboard/**/mobile/` |
+| Auth | desktop forms | `components/auth/mobile/` |
+
+## Anti-patterns (refuse these)
+
+- Importing the desktop card/grid into the mobile tree "for speed"
+- A second title asset or heading that is not the desktop chrome
+- `object-cover` that crops game banners after desktop was fixed to contain
+- Inventing placeholder stats when real metrics are missing — omit instead
+- Claiming visual sign-off without owner review on a phone

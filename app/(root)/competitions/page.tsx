@@ -1,48 +1,45 @@
-import { getCompetitions, isUserInCompetition } from '@/lib/actions/trading/competition.actions';
-import { getWalletBalance } from '@/lib/actions/trading/wallet.actions';
-import CompetitionsPageContent from './page-content';
+import { headers } from "next/headers";
+import { auth } from "@/lib/better-auth/auth";
+import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
+import CompetitionsPageContent from "./page-content";
+import { redirectIfRestricted } from "@/lib/services/restriction-guard.service";
+import { getTitleLevels } from "@/lib/services/xp-config.service";
+import { resolveContestViewer } from "@/lib/services/gamemaster/contest-viewer.service";
+import {
+  browseCompetitions,
+  COMPETITIONS_PAGE_SIZE,
+} from "@/lib/competitions/browse-competitions";
+import { connectToDatabase } from "@/database/mongoose";
 
 // Force dynamic rendering - this page uses authentication
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const CompetitionsPage = async () => {
-  // Fetch all competitions on server
-  const [upcomingCompetitions, activeCompetitions, completedCompetitions, cancelledCompetitions] = await Promise.all([
-    getCompetitions({ status: 'upcoming' }),
-    getCompetitions({ status: 'active' }),
-    getCompetitions({ status: 'completed', limit: 10 }),
-    getCompetitions({ status: 'cancelled', limit: 5 }),
-  ]);
+  // Reason: bounce restricted users to /account/review instead of showing
+  // a list of competitions they cannot enter.
+  await redirectIfRestricted("enterCompetition");
+  await connectToDatabase();
 
-  // Combine all competitions
-  const allCompetitions = [
-    ...activeCompetitions,
-    ...upcomingCompetitions,
-    ...completedCompetitions,
-    ...cancelledCompetitions,
-  ];
+  const session = await auth.api.getSession({ headers: await headers() });
+  const viewer = await resolveContestViewer(session?.user?.id ?? null);
 
-  // Get user wallet balance (server action)
+  // Reason: never seed the browser with hundreds of historical contests — page 1 only.
+  const browse = await browseCompetitions({
+    page: 1,
+    limit: COMPETITIONS_PAGE_SIZE,
+    status: "active,upcoming",
+    sort: "featured",
+    viewer,
+  });
+
   const walletBalance = await getWalletBalance();
-
-  // Check which competitions user has entered (parallel requests)
-  const userCompetitionChecks = await Promise.all(
-    allCompetitions.map(async (comp) => ({
-      id: comp._id.toString(),
-      isUserIn: await isUserInCompetition(comp._id.toString()),
-    }))
-  );
-
-  // Create a map for quick lookup
-  const userInCompetitionIds = userCompetitionChecks
-    .filter((check) => check.isUserIn)
-    .map((check) => check.id);
+  const levelLadder = await getTitleLevels();
 
   return (
-    <CompetitionsPageContent 
-      initialCompetitions={allCompetitions}
+    <CompetitionsPageContent
+      initialBrowse={browse}
       initialBalance={walletBalance.balance}
-      userInCompetitionIds={userInCompetitionIds}
+      levelLadder={levelLadder}
     />
   );
 };

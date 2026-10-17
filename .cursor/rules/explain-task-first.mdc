@@ -1,0 +1,20 @@
+---
+description: Before starting any task, explain it in one simple novice sentence
+alwaysApply: true
+---
+
+# Explain the next task first
+
+**Before you begin any task** (coding, docs, investigation, deploy steps — every
+item on a list or a new request), write **exactly one sentence** in simple
+English a novice can understand: what you are about to do and why it matters.
+
+Rules:
+
+- One sentence only for that explanation — no jargon dump, no multi-paragraph
+  preamble, no “I'll continue where we left off”.
+- Then do the work.
+- Do this for **every** new task you start, including each item when working
+  through a numbered list.
+- If the owner skips or blocks a task, confirm briefly and move on — still use
+  one sentence for the **next** task you actually start.

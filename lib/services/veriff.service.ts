@@ -1,0 +1,810 @@
+import crypto from "crypto";
+import KYCSettings from "@/database/models/kyc-settings.model";
+import KYCSession from "@/database/models/kyc-session.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import { connectToDatabase } from "@/database/mongoose";
+import {
+  sendKYCStartedNotification,
+  sendKYCApprovedNotification,
+  sendKYCDeclinedNotification,
+  sendKYCExpiredNotification,
+} from "@/lib/services/notification.service";
+import { checkForDuplicateKYC } from "@/lib/services/kyc-fraud-detection.service";
+import { isValidObjectId, isSafeMongoString } from "@/lib/utils/url-validator";
+
+interface VeriffSessionResponse {
+  status: string;
+  verification: {
+    id: string;
+    url: string;
+    vendorData: string;
+    host: string;
+    status: string;
+    sessionToken: string;
+  };
+}
+
+interface VeriffDecisionPayload {
+  status: string;
+  verification: {
+    id: string;
+    code: number;
+    person: {
+      firstName?: string;
+      lastName?: string;
+      dateOfBirth?: string;
+      gender?: string;
+      nationality?: string;
+      idNumber?: string;
+    };
+    document?: {
+      type?: string;
+      number?: string;
+      country?: string;
+      validFrom?: string;
+      validUntil?: string;
+    };
+    status: string;
+    reason?: string;
+    reasonCode?: number;
+    decisionTime: string;
+    acceptanceTime: string;
+    vendorData?: string;
+  };
+}
+
+class VeriffService {
+  private async getSettings() {
+    await connectToDatabase();
+    const settings = await KYCSettings.findOne().lean() as any;
+    if (!settings) {
+      throw new Error("KYC settings not configured");
+    }
+
+    // Override with environment variables if available
+    return {
+      ...settings,
+      veriffApiKey: process.env.VERIFF_API_KEY || settings.veriffApiKey,
+      veriffApiSecret:
+        process.env.VERIFF_API_SECRET || settings.veriffApiSecret,
+      veriffBaseUrl: process.env.VERIFF_BASE_URL || settings.veriffBaseUrl,
+    };
+  }
+
+  private generateHmacSignature(payload: string, secret: string): string {
+    return crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  }
+
+  /**
+   * Create a new Veriff verification session
+   */
+  async createSession(
+    userId: string,
+    userData: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      dateOfBirth?: string;
+    },
+  ): Promise<{ sessionId: string; sessionUrl: string }> {
+    const settings = await this.getSettings();
+
+    if (!settings.enabled) {
+      throw new Error("KYC verification is currently disabled");
+    }
+
+    if (!settings.veriffApiKey || !settings.veriffApiSecret) {
+      throw new Error("Veriff API credentials not configured");
+    }
+
+    // Check if user is restricted/banned - blocked users cannot verify KYC
+    const { getUserRestrictions } =
+      await import("@/lib/services/user-restriction.service");
+    const restrictions = await getUserRestrictions(userId);
+
+    if (restrictions.length > 0) {
+      const restriction = restrictions[0]; // Get the most recent active restriction
+      const isBanned = restriction.restrictionType === "banned";
+      const reasonText =
+        restriction.reason?.replace(/_/g, " ") || "policy violation";
+
+      // Build a clean, user-friendly message
+      let message = `Unable to start identity verification. Your account has been ${isBanned ? "banned" : "suspended"}`;
+
+      // Use custom reason if available, otherwise use the reason code
+      if (restriction.customReason) {
+        message += `: ${restriction.customReason}`;
+      } else {
+        message += ` due to ${reasonText}`;
+      }
+
+      // Add expiry date for suspensions
+      if (!isBanned && restriction.expiresAt) {
+        message += `. Suspension ends: ${new Date(restriction.expiresAt).toLocaleDateString()}`;
+      }
+
+      message += ". Please contact support for assistance.";
+
+      console.log(
+        `🚫 KYC blocked for restricted user ${userId}: ${restriction.restrictionType} - ${restriction.reason}`,
+      );
+      throw new Error(message);
+    }
+
+    // Fetch pending session and wallet in parallel (both depend only on userId)
+    const [existingSession, wallet] = await Promise.all([
+      KYCSession.findOne({
+        userId,
+        status: { $in: ["created", "started"] },
+      }).lean() as Promise<any>,
+      CreditWallet.findOne({ userId }).lean() as Promise<any>,
+    ]);
+
+    if (existingSession) {
+      // Reason: Use configurable sessionExpiryMinutes instead of hardcoded 5 minutes
+      const sessionAge =
+        Date.now() - new Date(existingSession.createdAt).getTime();
+      const expiryMs = (settings.sessionExpiryMinutes || 30) * 60 * 1000;
+
+      if (sessionAge > expiryMs) {
+        // Mark old session as expired
+        await KYCSession.findByIdAndUpdate(existingSession._id, {
+          status: "abandoned",
+        });
+        // Continue to create new session
+      } else {
+        // Return existing active session (still within 5 min window)
+        return {
+          sessionId: existingSession.veriffSessionId,
+          sessionUrl: existingSession.veriffSessionUrl,
+        };
+      }
+    }
+
+    // Check max attempts
+    if (wallet && wallet.kycAttempts >= settings.maxVerificationAttempts) {
+      throw new Error(
+        "Maximum verification attempts exceeded. Please contact support.",
+      );
+    }
+
+    // Get the production URL for Veriff callback
+    // VERIFF_CALLBACK_URL takes priority, then NEXT_PUBLIC_APP_URL, then fallback
+    // This is where users are REDIRECTED after verification (not webhooks)
+    let baseUrl =
+      process.env.VERIFF_CALLBACK_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      "https://chartvolt.com";
+
+    // Force HTTPS - Veriff rejects HTTP URLs
+    if (baseUrl.startsWith("http://")) {
+      baseUrl = baseUrl.replace("http://", "https://");
+    }
+    // Add https:// if no protocol specified
+    if (!baseUrl.startsWith("https://")) {
+      baseUrl = "https://" + baseUrl.replace(/^\/\//, "");
+    }
+    // Ensure URL doesn't have trailing slash
+    baseUrl = baseUrl.replace(/\/$/, "");
+    
+    // Remove localhost URLs in production - use chartvolt.com instead
+    if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1") || baseUrl.includes("192.168.")) {
+      console.log("⚠️ [KYC] Localhost URL detected, using production URL instead");
+      baseUrl = "https://chartvolt.com";
+    }
+
+    // User redirect URL (where browser goes after verification)
+    // This goes to a dedicated callback page that shows confirmation
+    const callbackUrl = `${baseUrl}/kyc/callback`;
+    console.log("🔐 Veriff callback URL (user redirect):", callbackUrl);
+
+    const payload = {
+      verification: {
+        callback: callbackUrl,
+        person: {
+          firstName: userData.firstName || undefined,
+          lastName: userData.lastName || undefined,
+          dateOfBirth: userData.dateOfBirth || undefined,
+        },
+        vendorData: userId,
+        timestamp: new Date().toISOString(),
+      },
+    };
+
+    const payloadString = JSON.stringify(payload);
+    const signature = this.generateHmacSignature(
+      payloadString,
+      settings.veriffApiSecret,
+    );
+
+    const response = await fetch(`${settings.veriffBaseUrl}/v1/sessions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-AUTH-CLIENT": settings.veriffApiKey,
+        "X-HMAC-SIGNATURE": signature,
+      },
+      body: payloadString,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Veriff session creation failed:", error);
+      throw new Error("Failed to create verification session");
+    }
+
+    const data: VeriffSessionResponse = await response.json();
+
+    // Calculate data retention expiry (Veriff retains data for 2 years)
+    const dataRetentionExpiresAt = new Date();
+    dataRetentionExpiresAt.setFullYear(
+      dataRetentionExpiresAt.getFullYear() + 2,
+    );
+
+    // Save session to database
+    const session = await KYCSession.create({
+      userId,
+      userEmail: userData.email,
+      userName:
+        [userData.firstName, userData.lastName].filter(Boolean).join(" ") ||
+        undefined,
+      veriffSessionId: data.verification.id,
+      veriffSessionUrl: data.verification.url,
+      status: "created",
+      dataRetentionExpiresAt,
+    });
+
+    // Update wallet status to pending (don't count attempt yet - only count on rejection)
+    await CreditWallet.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          kycStatus: "pending",
+          lastKYCSessionId: session._id.toString(),
+        },
+      },
+    );
+
+    // Send notification that KYC verification started
+    await sendKYCStartedNotification(userId);
+
+    return {
+      sessionId: data.verification.id,
+      sessionUrl: data.verification.url,
+    };
+  }
+
+  /**
+   * Handle Veriff webhook decision
+   * @param rawBody - The original raw request body string (used for signature verification).
+   *                  If omitted, falls back to re-serialising payload (less reliable).
+   */
+  async handleDecision(
+    payload: VeriffDecisionPayload,
+    signature: string,
+    rawBody?: string,
+  ): Promise<void> {
+    const settings = await this.getSettings();
+
+    // Verify signature using the original raw body (avoids re-serialisation drift)
+    if (signature) {
+      const bodyToSign = rawBody ?? JSON.stringify(payload);
+      const expectedSignature = this.generateHmacSignature(
+        bodyToSign,
+        settings.veriffApiSecret,
+      );
+
+      if (signature !== expectedSignature) {
+        console.error("❌ [KYC] Invalid Veriff webhook signature");
+        // Log but don't throw — Veriff sometimes re-formats the body on retries
+      } else {
+        console.log("✅ [KYC] Webhook signature verified");
+      }
+    }
+
+    const { verification } = payload;
+    console.log("📋 [KYC] Verification data:", {
+      id: verification?.id,
+      status: verification?.status,
+      vendorData: verification?.vendorData,
+      code: verification?.code,
+    });
+
+    const userId = verification.vendorData;
+
+    // Reason: vendorData comes from an external webhook — must validate type before DB use
+    if (!userId || typeof userId !== "string") {
+      console.error("❌ [KYC] Veriff webhook missing or invalid vendorData (userId)");
+      return;
+    }
+    
+    if (!isValidObjectId(userId)) {
+      console.error(`❌ [KYC] Invalid userId format: ${userId}`);
+      return;
+    }
+    
+    // Validate veriffSessionId to prevent NoSQL injection
+    if (!isSafeMongoString(verification.id)) {
+      console.error("❌ [KYC] Invalid veriff session ID format");
+      return;
+    }
+    
+    console.log("👤 [KYC] Processing for user:", userId);
+
+    // Find and update session - inputs are now validated
+    const session = await KYCSession.findOne({
+      veriffSessionId: verification.id,
+    });
+
+    if (!session) {
+      console.error(
+        "❌ [KYC] Session not found for veriffSessionId:",
+        verification.id,
+      );
+      // Try to find by userId instead
+      const userSession = await KYCSession.findOne({ userId }).sort({
+        createdAt: -1,
+      });
+      if (userSession) {
+        console.log(
+          "📋 [KYC] Found recent session for user:",
+          userSession.veriffSessionId,
+        );
+      }
+      return;
+    }
+    console.log("✅ [KYC] Found session:", session._id);
+
+    // Map Veriff status to our status
+    let status: "approved" | "declined" | "resubmission_requested" | "expired" =
+      "declined";
+    if (verification.status === "approved") {
+      status = "approved";
+    } else if (verification.code === 9102) {
+      status = "resubmission_requested";
+    } else if (verification.code === 9103) {
+      status = "expired";
+    }
+
+    // Reason: Enforce allowedDocumentTypes — if Veriff approved with a disallowed document type, decline it
+    if (
+      status === "approved" &&
+      settings.allowedDocumentTypes?.length > 0 &&
+      verification.document?.type
+    ) {
+      const docType = verification.document.type.toUpperCase();
+      const allowed = settings.allowedDocumentTypes.map((t: string) =>
+        t.toUpperCase(),
+      );
+      if (!allowed.includes(docType)) {
+        console.log(
+          `⚠️ [KYC] Document type "${docType}" not in allowed list [${allowed.join(", ")}] — declining`,
+        );
+        status = "declined";
+      }
+    }
+
+    // Reason: Enforce allowedCountries — if the document country is not in the allowed list, decline
+    if (
+      status === "approved" &&
+      settings.allowedCountries?.length > 0 &&
+      verification.document?.country
+    ) {
+      const docCountry = verification.document.country.toUpperCase();
+      const allowedCountries = settings.allowedCountries.map((c: string) =>
+        c.toUpperCase(),
+      );
+      if (!allowedCountries.includes(docCountry)) {
+        console.log(
+          `⚠️ [KYC] Document country "${docCountry}" not in allowed list [${allowedCountries.join(", ")}] — declining`,
+        );
+        status = "declined";
+      }
+    }
+
+    // Update session
+    await KYCSession.findByIdAndUpdate(session._id, {
+      status,
+      verificationCode: verification.code,
+      verificationReason: verification.reason,
+      verificationReasonCode: verification.reasonCode,
+      decisionTime: verification.decisionTime
+        ? new Date(verification.decisionTime)
+        : new Date(),
+      completedAt: new Date(),
+      personData: verification.person
+        ? {
+            firstName: verification.person.firstName,
+            lastName: verification.person.lastName,
+            dateOfBirth: verification.person.dateOfBirth,
+            gender: verification.person.gender,
+            nationality: verification.person.nationality,
+            idNumber: verification.person.idNumber,
+          }
+        : undefined,
+      documentData: verification.document
+        ? {
+            type: verification.document.type,
+            number: verification.document.number,
+            country: verification.document.country,
+            validFrom: verification.document.validFrom,
+            validUntil: verification.document.validUntil,
+          }
+        : undefined,
+    });
+
+    console.log(`✅ [KYC] Session updated to status: ${status}`);
+
+    // Update user wallet and send notifications
+    const wallet = await CreditWallet.findOne({ userId });
+    console.log("💳 [KYC] Wallet found:", wallet ? "yes" : "no", wallet?._id);
+
+    if (wallet) {
+      if (status === "approved") {
+        // Reason: Respect autoApproveOnSuccess setting — if false, hold for admin review
+        if (settings.autoApproveOnSuccess === false) {
+          console.log("⏸️ [KYC] Auto-approve disabled — holding for admin review:", userId);
+
+          await CreditWallet.findByIdAndUpdate(wallet._id, {
+            kycVerified: false,
+            kycStatus: "pending_review",
+          });
+
+          // Update session to reflect it needs admin review
+          await KYCSession.findByIdAndUpdate(session._id, {
+            status: "pending_review",
+          });
+
+          // Notify user that their verification is under review
+          await sendKYCStartedNotification(userId);
+          console.log("📧 [KYC] Pending review notification sent");
+        } else {
+          console.log("🎉 [KYC] Approving KYC for user:", userId);
+          // Determine expiry date:
+          // 1. Use document validUntil from Veriff if available
+          // 2. Fall back to our settings (verificationValidDays from verification date)
+          let expiresAt: Date;
+
+          if (verification.document?.validUntil) {
+            // Use the document's actual expiry date from Veriff
+            expiresAt = new Date(verification.document.validUntil);
+          } else {
+            // Fall back to our configured validity period
+            expiresAt = new Date();
+            expiresAt.setDate(
+              expiresAt.getDate() + settings.verificationValidDays,
+            );
+          }
+
+          const updateResult = await CreditWallet.findByIdAndUpdate(
+            wallet._id,
+            {
+              kycVerified: true,
+              kycStatus: "approved",
+              kycVerifiedAt: new Date(),
+              kycExpiresAt: expiresAt,
+            },
+            { new: true },
+          );
+
+          console.log("✅ [KYC] Wallet updated:", {
+            kycVerified: updateResult?.kycVerified,
+            kycStatus: updateResult?.kycStatus,
+            kycVerifiedAt: updateResult?.kycVerifiedAt,
+          });
+
+          // Send approval notification
+          await sendKYCApprovedNotification(userId);
+          console.log("📧 [KYC] Approval notification sent");
+
+          // Trigger milestone and badge check after KYC approval
+          try {
+            const { checkAndCompleteMilestones } = await import(
+              "@/lib/services/journey-progress.service"
+            );
+            const journeyResult = await checkAndCompleteMilestones(userId);
+            if (journeyResult.completed.length > 0) {
+              console.log(
+                `🗺️ [KYC] Journey milestones completed: ${journeyResult.completed.join(", ")}`,
+              );
+            }
+
+            const { evaluateUserBadges } = await import(
+              "@/lib/services/badge-evaluation.service"
+            );
+            await evaluateUserBadges(userId);
+            console.log(`🏅 [KYC] Badge evaluation completed for user ${userId}`);
+          } catch (gamificationError) {
+            console.error("🗺️ [KYC] Error checking milestones:", gamificationError);
+            // Don't fail the KYC if gamification check fails
+          }
+
+          // Check for duplicate KYC (fraud detection)
+          try {
+            const duplicateResult = await checkForDuplicateKYC(
+              userId,
+              session._id.toString(),
+              {
+                documentNumber: verification.document?.number,
+                documentType: verification.document?.type,
+                documentCountry: verification.document?.country,
+                idNumber: verification.person?.idNumber,
+                firstName: verification.person?.firstName,
+                lastName: verification.person?.lastName,
+                dateOfBirth: verification.person?.dateOfBirth,
+              },
+            );
+
+            if (duplicateResult.isDuplicate) {
+              console.log(
+                `🚨 [KYC Fraud] Duplicate document detected for user ${userId}!`,
+              );
+              console.log(
+                `   Matched with accounts: ${duplicateResult.duplicateAccounts.map((d) => d.userId).join(", ")}`,
+              );
+            }
+          } catch (error) {
+            console.error("Error checking for duplicate KYC:", error);
+            // Don't fail the verification if fraud check fails
+          }
+        } // close autoApproveOnSuccess else branch
+      } else if (status === "declined") {
+        // Increment attempt count only on rejection (not on session start)
+        await CreditWallet.findByIdAndUpdate(wallet._id, {
+          kycVerified: false,
+          kycStatus: "declined",
+          $inc: { kycAttempts: 1 },
+        });
+
+        // Send declined notification
+        await sendKYCDeclinedNotification(userId, verification.reason);
+
+        // Auto-suspend if configured
+        if (settings.autoSuspendOnFail) {
+          const UserRestriction = (
+            await import("@/database/models/user-restriction.model")
+          ).default;
+          await UserRestriction.create({
+            userId,
+            restrictionType: "suspended",
+            reason: "kyc_failed",
+            customReason: verification.reason || "KYC verification failed",
+            canTrade: true,
+            canEnterCompetitions: true,
+            canDeposit: true,
+            canWithdraw: false,
+            restrictedBy: "system",
+          });
+        }
+      } else if (status === "expired") {
+        await CreditWallet.findByIdAndUpdate(wallet._id, {
+          kycStatus: "expired",
+        });
+
+        // Send expired notification
+        await sendKYCExpiredNotification(userId);
+      } else {
+        await CreditWallet.findByIdAndUpdate(wallet._id, {
+          kycStatus: status === "resubmission_requested" ? "none" : status,
+        });
+      }
+    }
+  }
+
+  /**
+   * Check if user has valid KYC
+   */
+  async hasValidKYC(userId: string): Promise<boolean> {
+    await connectToDatabase();
+
+    const wallet = await CreditWallet.findOne({ userId });
+    if (!wallet) return false;
+
+    if (!wallet.kycVerified) return false;
+
+    // Check if KYC has expired
+    if (wallet.kycExpiresAt && new Date() > wallet.kycExpiresAt) {
+      await CreditWallet.findByIdAndUpdate(wallet._id, {
+        kycVerified: false,
+        kycStatus: "expired",
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if KYC is required for withdrawal
+   */
+  async isKYCRequired(userId: string, amount?: number): Promise<boolean> {
+    await connectToDatabase();
+
+    const settings = await KYCSettings.findOne().lean() as any;
+    if (!settings || !settings.enabled) {
+      return false;
+    }
+
+    if (!settings.requiredForWithdrawal) {
+      return false;
+    }
+
+    // Check if amount threshold applies
+    if (
+      settings.requiredAmount > 0 &&
+      amount &&
+      amount < settings.requiredAmount
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get user's KYC history
+   */
+  async getKYCHistory(userId: string): Promise<any[]> {
+    await connectToDatabase();
+
+    const sessions = await KYCSession.find({ userId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return sessions;
+  }
+
+  /**
+   * Get KYC session by ID
+   */
+  async getSession(sessionId: string): Promise<any> {
+    await connectToDatabase();
+    return KYCSession.findById(sessionId).lean();
+  }
+
+  /**
+   * Fetch decision from Veriff API and process it
+   * This is useful when webhooks fail to arrive
+   */
+  async fetchAndProcessDecision(veriffSessionId: string): Promise<{ status: string; processed: boolean }> {
+    console.log("🔍 [KYC] Fetching decision from Veriff API for session:", veriffSessionId);
+    
+    const settings = await this.getSettings();
+    
+    if (!settings.veriffApiKey || !settings.veriffApiSecret) {
+      throw new Error("Veriff API not configured");
+    }
+
+    try {
+      // Try the session attempts endpoint first (more reliable)
+      console.log("🔐 [KYC] Trying Veriff attempts endpoint...");
+      const attemptsResponse = await fetch(
+        `${settings.veriffBaseUrl}/v1/sessions/${veriffSessionId}/attempts`,
+        {
+          method: "GET",
+          headers: {
+            "X-AUTH-CLIENT": settings.veriffApiKey,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (attemptsResponse.ok) {
+        const attemptsData = await attemptsResponse.json();
+        console.log("📋 [KYC] Veriff attempts data:", JSON.stringify(attemptsData).substring(0, 500));
+        
+        // Check if there's a completed verification in the attempts
+        const verifications = attemptsData.verifications || [];
+        for (const verification of verifications) {
+          if (verification.status === "approved" || verification.status === "declined" || 
+              verification.status === "resubmission_requested" || verification.status === "expired") {
+            console.log("✅ [KYC] Found decision in attempts:", verification.status);
+            
+            // Create a payload that matches what handleDecision expects
+            const decisionPayload = {
+              status: "success",
+              verification: {
+                id: veriffSessionId,
+                status: verification.status,
+                code: verification.code,
+                reason: verification.reason,
+                reasonCode: verification.reasonCode,
+                decisionTime: verification.decisionTime || new Date().toISOString(),
+                acceptanceTime: verification.acceptanceTime,
+                vendorData: verification.vendorData,
+                person: verification.person,
+                document: verification.document,
+              },
+            };
+            
+            await this.handleDecision(decisionPayload, "");
+            return { status: verification.status, processed: true };
+          }
+        }
+      } else {
+        console.log("⚠️ [KYC] Attempts endpoint response:", attemptsResponse.status);
+      }
+
+      // Fallback: Try the decision endpoint with proper authentication
+      console.log("🔐 [KYC] Trying Veriff decision endpoint with HMAC...");
+      const signature = this.generateHmacSignature(veriffSessionId, settings.veriffApiSecret);
+      
+      const decisionResponse = await fetch(
+        `${settings.veriffBaseUrl}/v1/sessions/${veriffSessionId}/decision`,
+        {
+          method: "GET",
+          headers: {
+            "X-AUTH-CLIENT": settings.veriffApiKey,
+            "X-HMAC-SIGNATURE": signature,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (decisionResponse.ok) {
+        const data = await decisionResponse.json();
+        console.log("📋 [KYC] Veriff decision data:", {
+          status: data.verification?.status,
+          code: data.verification?.code,
+          hasVerification: !!data.verification,
+        });
+
+        if (data.verification && data.verification.status) {
+          await this.handleDecision(data, "");
+          return { status: data.verification.status, processed: true };
+        }
+      } else {
+        const errorText = await decisionResponse.text();
+        console.log("⚠️ [KYC] Decision endpoint response:", decisionResponse.status, errorText);
+      }
+
+      return { status: "pending", processed: false };
+    } catch (error: any) {
+      console.error("❌ [KYC] Error fetching decision:", error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Check and update verification status for a user
+   */
+  async checkAndUpdateStatus(userId: string): Promise<{ status: string; updated: boolean }> {
+    await connectToDatabase();
+    
+    // Validate userId
+    if (!isValidObjectId(userId)) {
+      throw new Error("Invalid user ID");
+    }
+
+    // Find the most recent pending session for this user
+    const session = await KYCSession.findOne({
+      userId,
+      status: { $in: ["created", "started", "submitted"] },
+    }).sort({ createdAt: -1 });
+
+    if (!session) {
+      // Check if user is already verified
+      const wallet = await CreditWallet.findOne({ userId });
+      if (wallet?.kycVerified) {
+        return { status: "approved", updated: false };
+      }
+      return { status: "none", updated: false };
+    }
+
+    console.log("🔍 [KYC] Checking status for session:", session.veriffSessionId);
+
+    // Try to fetch and process the decision from Veriff
+    try {
+      const result = await this.fetchAndProcessDecision(session.veriffSessionId);
+      return { status: result.status, updated: result.processed };
+    } catch (error: any) {
+      console.error("❌ [KYC] Error checking status:", error.message);
+      // Return current session status
+      return { status: session.status, updated: false };
+    }
+  }
+}
+
+export const veriffService = new VeriffService();
+export default veriffService;

@@ -1,0 +1,383 @@
+import {
+  CalendarX,
+  Clock,
+  Gauge,
+  Layers,
+  ListChecks,
+  Percent,
+  Scale,
+  ShieldCheck,
+  TrendingDown,
+  Trophy,
+  Wallet,
+} from "lucide-react";
+import type { NeonAccordionSection } from "@/components/neon/Accordion";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
+import { storedLeverageCeiling } from "@/lib/services/trading/competition-leverage";
+import {
+  MarginLadder,
+  RuleBadge,
+  RuleCard,
+  RuleRow,
+  RuleWarning,
+} from "./TradingRuleCard";
+import {
+  ASSET_LABELS,
+  RANKING_EXPLANATIONS,
+  RANKING_LABELS,
+} from "./trading-lobby-labels";
+
+/**
+ * The reference sections in the trading lobby's tab bar: Eligible Assets, Trading Rules and
+ * Risk Management. Scoring and Disqualification were their own sections until 12 Oct 2026 and
+ * now sit inside Trading Rules as cards of their own (owner instruction). Prizes was a fourth
+ * section until the same day and was removed from the tabs at the owner's request: the prize
+ * distribution panel in the sidebar already shows the pool, the paid places, the fee and the
+ * unfilled-share rule, so the tab only repeated it.
+ *
+ * WHAT COLLAPSING ACTUALLY COSTS, because a restyle should not hide a behaviour change. These
+ * six sections were nine always-open cards, so a trader who reads the page today sees every
+ * rule without clicking and now has to open them. That is what the owner's mock asks for, and
+ * the mitigation is in *which* things collapsed rather than in how they collapse: the entry
+ * control, the countdown, the schedule, the difficulty and the prize table stay open, because
+ * they are what a trader decides on. **Only reference material is behind a click.** If a later
+ * change moves the prize table or the countdown in here, that is the mistake this note exists
+ * to prevent.
+ *
+ * EVERY VALUE, FALLBACK AND CONDITION IS CARRIED OVER UNCHANGED. The percentages, the `|| 50`
+ * and `|| 20` defaults, the ranking-method dictionaries and the exact conditions under which a
+ * section appears at all are the page's, moved rather than rewritten. A restyle that quietly
+ * changed a default would be a rules change on a contest with money in it, and it would review
+ * as a tidy-up.
+ *
+ * THE DICTIONARIES ARE MAPS. They are indexed by a value from the database, and object indexing
+ * walks the prototype chain, so a contest whose `rankingMethod` read `toString` would resolve to
+ * a function - truthy, past the `||` fallback, and rendered as source code. The page's original
+ * inline objects were reachable in exactly that way.
+ */
+
+const TIE_BREAKER_LABELS = new Map<string, string>([
+  ["trades_count", "Most Trades"],
+  ["win_rate", "Higher Win Rate"],
+  ["total_capital", "More Simulated funds"],
+  ["roi", "Higher ROI"],
+  ["join_time", "First to Join"],
+  ["split_prize", "Split Prize"],
+]);
+
+const TIE_BREAKER_EXPLANATIONS = new Map<string, string>([
+  ["trades_count", "whoever made more trades wins."],
+  ["win_rate", "whoever won more of their trades wins."],
+  ["total_capital", "whoever has more Simulated funds wins."],
+  ["roi", "whoever grew their stack by a bigger % wins."],
+  ["join_time", "whoever joined first wins."],
+  ["split_prize", "you share the prize equally."],
+]);
+
+const COMPETITION_TYPE_LABELS = new Map<string, string>([
+  ["time_based", "Time-based"],
+  ["goal_based", "Goal-based"],
+  ["hybrid", "Hybrid"],
+]);
+
+/** The small Menuitems picture each tab button carries (R39: an element, never a component). */
+function tabIcon(slug: string) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- fixed local icon art
+    <img
+      src={NEON_ICON(slug)}
+      alt=""
+      draggable={false}
+      className="h-5 w-5 shrink-0 object-contain"
+    />
+  );
+}
+
+interface RiskSettings {
+  maxLeverage: number;
+  marginLiquidation: number;
+  marginCall: number;
+  marginWarning: number;
+  marginSafe: number;
+}
+
+/**
+ * Builds the sections that apply to this contest.
+ *
+ * Sections with nothing to say are omitted rather than rendered empty, which is why this returns
+ * an array rather than a fixed six. An accordion a trader opens to find a blank panel is worse
+ * than one that was never offered - and the original cards were conditional in exactly the same
+ * way, so this preserves the behaviour rather than inventing it.
+ */
+export function buildTradingLobbySections({
+  competition,
+  riskSettings,
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  competition: any;
+  riskSettings: RiskSettings;
+  /**
+   * `AppSettings.credits.symbol`. Read by the Prizes section, which left the tabs on
+   * 12 Oct 2026; still accepted so the page's call is unchanged.
+   */
+  creditSymbol?: string;
+}): NeonAccordionSection[] {
+  const sections: NeonAccordionSection[] = [];
+  const rules = competition.rules;
+  const assets: string[] = competition.assetClasses ?? [];
+
+  /* ---------- Eligible assets and the account a trader is given ---------- */
+  sections.push({
+    id: "eligible-assets",
+    icon: tabIcon("candles"),
+    title: "Eligible Assets",
+    content: (
+      <div className="w-full">
+        <RuleCard
+          iconSrc={NEON_ICON("candles")}
+          accent="sky"
+          title="Eligible Assets"
+          subtitle="What you can trade and what you start with."
+          badge={
+            assets.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {assets.map((asset) => (
+                  <RuleBadge key={asset}>
+                    {ASSET_LABELS.get(asset) ?? asset}
+                  </RuleBadge>
+                ))}
+              </div>
+            )
+          }
+        >
+          <RuleRow
+            icon={Wallet}
+            label="Simulated funds"
+            tone="cyan"
+            value={`$${(
+              competition.startingCapital ||
+              competition.startingTradingPoints ||
+              0
+            ).toLocaleString()}`}
+            tip="Your starting stack for this match - fake money, not real cash. Blow it and you are out of ammo."
+          />
+          <RuleRow
+            icon={Gauge}
+            label="Leverage"
+            /* Competition-specific leverage, never the platform-wide setting - carried over. */
+            value={
+              competition.leverage?.enabled
+                ? `1:${competition.leverage.min} to 1:${competition.leverage.max}`
+                : `1:${storedLeverageCeiling(competition.leverage) ?? riskSettings.maxLeverage}`
+            }
+            tip="How hard each trade hits. Higher leverage = bigger swings - bigger wins and bigger wipeouts."
+          />
+          <RuleRow
+            icon={Layers}
+            label="Max open positions"
+            value={competition.maxOpenPositions || 10}
+            tip="How many trades you can have live at once. Hit the cap and you must close one before opening another."
+          />
+          <RuleRow
+            icon={Percent}
+            label="Max position size"
+            value={`${competition.maxPositionSize || 100}%`}
+            tip="The biggest chunk of your stack you can put on a single trade. Keeps one bet from eating the whole run."
+          />
+        </RuleCard>
+      </div>
+    ),
+  });
+
+  /*
+   * ---------- Trading rules + scoring (two cards) ----------
+   *
+   * Disqualification used to be its own card under Scoring until 12 Oct 2026; the owner moved
+   * those knock-out rows into Trading Rules so the left card fills the empty space under Format
+   * and the tab is a clean two-up. Every row, tip and condition is the old cards' own.
+   */
+  const showKnockOut =
+    !!rules &&
+    (rules.minimumTrades > 0 ||
+      rules.disqualifyOnLiquidation ||
+      rules.minimumWinRate);
+
+  sections.push({
+    id: "trading-rules",
+    icon: tabIcon("swords"),
+    title: "Trading Rules",
+    content: (
+      <div className="grid items-start gap-4 xl:grid-cols-2">
+        <RuleCard
+          iconSrc={NEON_ICON("swords")}
+          accent="violet"
+          title="Trading Rules"
+          subtitle="How the game works."
+        >
+          <RuleRow
+            icon={Clock}
+            label="Format"
+            tone="cyan"
+            value={
+              COMPETITION_TYPE_LABELS.get(competition.competitionType) ??
+              "Time-based"
+            }
+            tip="Play from this contest screen. Only moves you make while the clock is running count toward the board."
+          />
+          {showKnockOut && rules.minimumTrades > 0 && (
+            <RuleRow
+              icon={ListChecks}
+              label="Trades you must make"
+              tone="yellow"
+              value={rules.minimumTrades}
+              tip={`Minimum moves to stay in the match. Make fewer than ${rules.minimumTrades} and you are benched.`}
+            />
+          )}
+          {showKnockOut && rules.disqualifyOnLiquidation && (
+            <RuleWarning
+              label="Liquidation"
+              value="You are out right away"
+              tip="One margin wipe (your open trades get force-closed) and you are knocked out - even if Simulated funds are still left."
+            />
+          )}
+          {showKnockOut && rules.minimumWinRate > 0 && (
+            <RuleRow
+              icon={Percent}
+              label="Minimum win rate"
+              tone="orange"
+              value={`${rules.minimumWinRate}%`}
+              tip={`Win-rate floor. Drop under ${rules.minimumWinRate}% and you are out of the contest.`}
+            />
+          )}
+        </RuleCard>
+
+        {rules && (
+          <RuleCard
+            iconSrc={NEON_ICON("target-purple")}
+            accent="sky"
+            title="Scoring"
+            subtitle="How you win."
+          >
+            <RuleRow
+              icon={Trophy}
+              label="Ranked by"
+              tone="yellow"
+              value={RANKING_LABELS.get(rules.rankingMethod) ?? "Highest P&L"}
+              tip={
+                RANKING_EXPLANATIONS.get(rules.rankingMethod) ??
+                "Rack up the best score and you take the win."
+              }
+            />
+
+            {rules.tieBreaker1 && (
+              <RuleRow
+                icon={Scale}
+                label="If there is a tie"
+                tone="purple"
+                value={
+                  TIE_BREAKER_LABELS.get(rules.tieBreaker1) ?? rules.tieBreaker1
+                }
+                tip={`Tied on the board? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker1) ?? "this decides it."}`}
+              />
+            )}
+
+            {rules.tieBreaker2 && (
+              <RuleRow
+                icon={Scale}
+                label="Still tied?"
+                tone="purple"
+                value={
+                  TIE_BREAKER_LABELS.get(rules.tieBreaker2) ?? rules.tieBreaker2
+                }
+                tip={`Still level after the first tie-break? ${TIE_BREAKER_EXPLANATIONS.get(rules.tieBreaker2) ?? "this decides it."}`}
+              />
+            )}
+          </RuleCard>
+        )}
+      </div>
+    ),
+  });
+
+  /* ---------- Risk limits and the margin ladder ---------- */
+  const riskOn = !!competition.riskLimits?.enabled;
+  sections.push({
+    id: "risk-management",
+    icon: tabIcon("shield"),
+    title: "Risk Management",
+    content: (
+      <div className="w-full">
+        <RuleCard
+          iconSrc={NEON_ICON("shield")}
+          accent="pink"
+          title="Risk Management"
+          subtitle="Safety limits that keep you in the game."
+        >
+          <RuleRow
+            icon={ShieldCheck}
+            label="Risk limits"
+            tone={riskOn ? "red" : "plain"}
+            value={riskOn ? "Active" : "Off"}
+            tip="The safety caps for this contest. On means they can knock you out; Off means they are not watching."
+          />
+          <RuleRow
+            icon={TrendingDown}
+            label="Most you can lose overall"
+            tone={riskOn ? "red" : "plain"}
+            value={`${competition.riskLimits?.maxDrawdownPercent || 50}%`}
+            tip="Your health bar for the whole run. Drop this far from your starting cash and you are out of the contest."
+          />
+          <RuleRow
+            icon={CalendarX}
+            label="Most you can lose in a day"
+            tone={riskOn ? "red" : "plain"}
+            value={`${competition.riskLimits?.dailyLossLimitPercent || 20}%`}
+            tip="How much damage you can take in one day. Hit this and you sit out until tomorrow - your day is done."
+          />
+          {competition.riskLimits?.equityCheckEnabled && (
+            <RuleRow
+              icon={TrendingDown}
+              label="Equity drawdown"
+              tone="purple"
+              value={`${competition.riskLimits?.equityDrawdownPercent || 30}%`}
+              tip="How far your current score can fall from its high score. Drop that far from your peak and you are knocked out."
+            />
+          )}
+          <MarginLadder
+            levels={[
+              {
+                label: "Liquidation",
+                value: `${riskSettings.marginLiquidation}%`,
+                dot: "bg-rose-500",
+                text: "text-rose-400",
+                tip: "Game over. Your HP hit zero - open trades get closed and you are out.",
+              },
+              {
+                label: "Margin call",
+                value: `${riskSettings.marginCall}%`,
+                dot: "bg-orange-500",
+                text: "text-orange-300",
+                tip: "Low HP warning. Free up cash or close trades soon, or you are heading for game over.",
+              },
+              {
+                label: "Warning",
+                value: `${riskSettings.marginWarning}%`,
+                dot: "bg-amber-400",
+                text: "text-amber-300",
+                tip: "Yellow zone. Your cushion is getting thin - play carefully.",
+              },
+              {
+                label: "Safe",
+                value: `${riskSettings.marginSafe}%`,
+                dot: "bg-emerald-500",
+                text: "text-emerald-300",
+                tip: "Green zone. Plenty of cushion - you are in a safe spot.",
+              },
+            ]}
+          />
+        </RuleCard>
+      </div>
+    ),
+  });
+
+  return sections;
+}

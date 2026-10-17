@@ -1,23 +1,23 @@
-import { Schema, model, models, type Document, type Model } from 'mongoose';
+import { Schema, model, models, type Document, type Model } from "mongoose";
 
 export interface IInvoiceSettings extends Document {
   // VAT Configuration
   vatEnabled: boolean;
   vatPercentage: number; // e.g., 21 for 21%
   vatLabel: string; // e.g., "VAT", "BTW", "MwSt"
-  
+
   // Invoice Numbering
   invoicePrefix: string; // e.g., "INV-"
   nextInvoiceNumber: number;
   invoiceNumberPadding: number; // e.g., 5 for INV-00001
-  
+
   // Invoice Template Settings
   showLogo: boolean;
   showCompanyAddress: boolean;
   showBankDetails: boolean;
   showVatNumber: boolean;
   showRegistrationNumber: boolean;
-  
+
   // Custom Text
   invoiceTitle: string; // e.g., "INVOICE" or "TAX INVOICE"
   invoiceFooter: string;
@@ -25,20 +25,20 @@ export interface IInvoiceSettings extends Document {
   thankYouMessage: string;
   legalDisclaimer: string; // Legal disclaimer for EU/non-EU customers
   showLegalDisclaimer: boolean;
-  
+
   // Email Settings
   sendInvoiceOnPurchase: boolean;
   invoiceEmailSubject: string;
   invoiceEmailBody: string;
-  
+
   // Currency Display
   currencySymbol: string;
-  currencyPosition: 'before' | 'after';
-  
+  currencyPosition: "before" | "after";
+
   // Styling
   primaryColor: string;
   accentColor: string;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,13 +63,13 @@ const InvoiceSettingsSchema = new Schema<IInvoiceSettings>(
     },
     vatLabel: {
       type: String,
-      default: 'VAT',
+      default: "VAT",
     },
-    
+
     // Invoice Numbering
     invoicePrefix: {
       type: String,
-      default: 'INV-',
+      default: "INV-",
     },
     nextInvoiceNumber: {
       type: Number,
@@ -81,7 +81,7 @@ const InvoiceSettingsSchema = new Schema<IInvoiceSettings>(
       min: 1,
       max: 10,
     },
-    
+
     // Invoice Template Settings
     showLogo: {
       type: Boolean,
@@ -103,23 +103,23 @@ const InvoiceSettingsSchema = new Schema<IInvoiceSettings>(
       type: Boolean,
       default: true,
     },
-    
+
     // Custom Text
     invoiceTitle: {
       type: String,
-      default: 'INVOICE',
+      default: "INVOICE",
     },
     invoiceFooter: {
       type: String,
-      default: 'Thank you for your purchase!',
+      default: "Thank you for your purchase!",
     },
     paymentTerms: {
       type: String,
-      default: 'Payment received via credit card.',
+      default: "Payment received via credit card.",
     },
     thankYouMessage: {
       type: String,
-      default: 'Thank you for your business!',
+      default: "Thank you for your business!",
     },
     legalDisclaimer: {
       type: String,
@@ -145,7 +145,7 @@ const InvoiceSettingsSchema = new Schema<IInvoiceSettings>(
       type: Boolean,
       default: true,
     },
-    
+
     // Email Settings
     sendInvoiceOnPurchase: {
       type: Boolean,
@@ -153,66 +153,71 @@ const InvoiceSettingsSchema = new Schema<IInvoiceSettings>(
     },
     invoiceEmailSubject: {
       type: String,
-      default: 'Your Invoice from {{companyName}} - {{invoiceNumber}}',
+      default: "Your Invoice from {{companyName}} - {{invoiceNumber}}",
     },
     invoiceEmailBody: {
       type: String,
-      default: 'Dear {{customerName}},\n\nThank you for your purchase! Please find your invoice attached.\n\nBest regards,\n{{companyName}}',
+      default:
+        "Dear {{customerName}},\n\nThank you for your purchase! Please find your invoice attached.\n\nBest regards,\n{{companyName}}",
     },
-    
+
     // Currency Display
     currencySymbol: {
       type: String,
-      default: '€',
+      default: "€",
     },
     currencyPosition: {
       type: String,
-      enum: ['before', 'after'],
-      default: 'before',
+      enum: ["before", "after"],
+      default: "before",
     },
-    
+
     // Styling
     primaryColor: {
       type: String,
-      default: '#FDD458', // Brand yellow
+      default: "#FDD458", // Brand yellow
     },
     accentColor: {
       type: String,
-      default: '#141414',
+      default: "#141414",
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Static method to get singleton instance
-InvoiceSettingsSchema.statics.getSingleton = async function (): Promise<IInvoiceSettings> {
-  let settings = await this.findOne();
-  if (!settings) {
-    settings = await this.create({});
-  }
-  return settings;
-};
+InvoiceSettingsSchema.statics.getSingleton =
+  async function (): Promise<IInvoiceSettings> {
+    let settings = await this.findOne();
+    if (!settings) {
+      settings = await this.create({});
+    }
+    return settings;
+  };
 
 // Static method to get next invoice number and increment
-InvoiceSettingsSchema.statics.getNextInvoiceNumber = async function (): Promise<string> {
-  const settings = await this.findOneAndUpdate(
-    {},
-    { $inc: { nextInvoiceNumber: 1 } },
-    { new: false, upsert: true }
-  );
-  
-  const currentNumber = settings?.nextInvoiceNumber || 1;
-  const padding = settings?.invoiceNumberPadding || 6;
-  const prefix = settings?.invoicePrefix || 'INV-';
-  
-  return `${prefix}${currentNumber.toString().padStart(padding, '0')}`;
-};
+InvoiceSettingsSchema.statics.getNextInvoiceNumber =
+  async function (): Promise<string> {
+    const settings = await this.findOneAndUpdate(
+      {},
+      { $inc: { nextInvoiceNumber: 1 } },
+      { new: false, upsert: true },
+    );
+
+    const currentNumber = settings?.nextInvoiceNumber || 1;
+    const padding = settings?.invoiceNumberPadding || 6;
+    const prefix = settings?.invoicePrefix || "INV-";
+
+    return `${prefix}${currentNumber.toString().padStart(padding, "0")}`;
+  };
 
 const InvoiceSettings: IInvoiceSettingsModel =
   (models?.InvoiceSettings as IInvoiceSettingsModel) ||
-  model<IInvoiceSettings, IInvoiceSettingsModel>('InvoiceSettings', InvoiceSettingsSchema);
+  model<IInvoiceSettings, IInvoiceSettingsModel>(
+    "InvoiceSettings",
+    InvoiceSettingsSchema,
+  );
 
 export default InvoiceSettings;
-

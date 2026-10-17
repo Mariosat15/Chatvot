@@ -1,14 +1,18 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IXPConfig extends Document {
-  configType: 'badge_xp' | 'level_progression';
+  configType:
+    | "badge_xp"
+    | "level_progression"
+    | "leaderboard_weights"
+    | "journey_settings";
   data: {
     // For badge_xp type
     common?: number;
     rare?: number;
     epic?: number;
     legendary?: number;
-    
+
     // For level_progression type
     levels?: Array<{
       level: number;
@@ -19,6 +23,15 @@ export interface IXPConfig extends Document {
       color: string;
       description: string;
     }>;
+
+    // For leaderboard_weights type: the seven global-rank components, each a
+    // percentage. Stored raw as the operator typed them; the reader rescales to
+    // 100, so a set that does not add up is corrected rather than refused.
+    // See `lib/services/leaderboard/global-score.ts` for the definition.
+    weights?: Record<string, number>;
+
+    // For journey_settings — master switch for the player journey system.
+    enabled?: boolean;
   };
   isActive: boolean;
   createdAt: Date;
@@ -30,7 +43,14 @@ const XPConfigSchema = new Schema<IXPConfig>(
     configType: {
       type: String,
       required: true,
-      enum: ['badge_xp', 'level_progression'],
+      // Reason: a Mongoose enum is ADD-ONLY. Removing a value orphans every
+      // document already storing it.
+      enum: [
+        "badge_xp",
+        "level_progression",
+        "leaderboard_weights",
+        "journey_settings",
+      ],
       unique: true,
     },
     data: {
@@ -44,12 +64,12 @@ const XPConfigSchema = new Schema<IXPConfig>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Create or get the model
 const XPConfig: Model<IXPConfig> =
-  mongoose.models.XPConfig || mongoose.model<IXPConfig>('XPConfig', XPConfigSchema);
+  mongoose.models.XPConfig ||
+  mongoose.model<IXPConfig>("XPConfig", XPConfigSchema);
 
 export default XPConfig;
-

@@ -1,9 +1,9 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
+import { connectToDatabase } from "@/database/mongoose";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
 
 /**
  * Get trade history for a user in a specific competition
@@ -12,9 +12,9 @@ export async function getCompetitionTradeHistory(competitionId: string) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
-      throw new Error('Unauthorized');
+      throw new Error("Unauthorized");
     }
-    
+
     const userId = session.user.id;
 
     await connectToDatabase();
@@ -33,7 +33,7 @@ export async function getCompetitionTradeHistory(competitionId: string) {
       symbol: trade.symbol,
       side: trade.side,
       quantity: trade.quantity,
-      orderType: trade.orderType || 'market',
+      orderType: trade.orderType || "market",
       limitPrice: trade.limitPrice,
       entryPrice: trade.entryPrice,
       exitPrice: trade.exitPrice,
@@ -53,11 +53,14 @@ export async function getCompetitionTradeHistory(competitionId: string) {
       trades: formattedTrades,
     };
   } catch (error) {
-    console.error('❌ Error fetching trade history:', error);
+    console.error("❌ Error fetching trade history:", error);
     return {
       success: false,
       trades: [],
-      error: error instanceof Error ? error.message : 'Failed to fetch trade history',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch trade history",
     };
   }
 }
@@ -69,9 +72,9 @@ export async function getCompetitionTradeStats(competitionId: string) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) {
-      throw new Error('Unauthorized');
+      throw new Error("Unauthorized");
     }
-    
+
     const userId = session.user.id;
 
     await connectToDatabase();
@@ -86,16 +89,21 @@ export async function getCompetitionTradeStats(competitionId: string) {
     const losingTrades = totalTrades - winningTrades;
     const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
-    const totalPnl = trades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0);
+    const totalPnl = trades.reduce(
+      (sum: number, t: any) => sum + t.realizedPnl,
+      0,
+    );
     const avgPnl = totalTrades > 0 ? totalPnl / totalTrades : 0;
 
-    const bestTrade = trades.length > 0 
-      ? Math.max(...trades.map((t: any) => t.realizedPnl))
-      : 0;
-    
-    const worstTrade = trades.length > 0 
-      ? Math.min(...trades.map((t: any) => t.realizedPnl))
-      : 0;
+    const bestTrade =
+      trades.length > 0
+        ? Math.max(...trades.map((t: any) => t.realizedPnl))
+        : 0;
+
+    const worstTrade =
+      trades.length > 0
+        ? Math.min(...trades.map((t: any) => t.realizedPnl))
+        : 0;
 
     return {
       success: true,
@@ -111,29 +119,31 @@ export async function getCompetitionTradeStats(competitionId: string) {
       },
     };
   } catch (error) {
-    console.error('❌ Error fetching trade stats:', error);
+    console.error("❌ Error fetching trade stats:", error);
     return {
       success: false,
       stats: null,
-      error: error instanceof Error ? error.message : 'Failed to fetch trade stats',
+      error:
+        error instanceof Error ? error.message : "Failed to fetch trade stats",
     };
   }
 }
 
 // Helper function to map close reasons
-function mapCloseReason(reason: string): 'manual' | 'stop_loss' | 'take_profit' | 'liquidation' {
+function mapCloseReason(
+  reason: string,
+): "manual" | "stop_loss" | "take_profit" | "liquidation" {
   switch (reason) {
-    case 'user':
-      return 'manual';
-    case 'stop_loss':
-      return 'stop_loss';
-    case 'take_profit':
-      return 'take_profit';
-    case 'margin_call':
-    case 'competition_end':
-      return 'liquidation';
+    case "user":
+      return "manual";
+    case "stop_loss":
+      return "stop_loss";
+    case "take_profit":
+      return "take_profit";
+    case "margin_call":
+    case "competition_end":
+      return "liquidation";
     default:
-      return 'manual';
+      return "manual";
   }
 }
-

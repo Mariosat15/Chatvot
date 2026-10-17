@@ -1,6 +1,6 @@
-import { headers } from 'next/headers';
-import { auth } from '@/lib/better-auth/auth';
-import HelpPageContent from './page-content';
+import { headers } from "next/headers";
+import { auth } from "@/lib/better-auth/auth";
+import HelpPageContent from "./page-content";
 
 export default async function HelpPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -11,4 +11,3 @@ export default async function HelpPage() {
     </div>
   );
 }
-

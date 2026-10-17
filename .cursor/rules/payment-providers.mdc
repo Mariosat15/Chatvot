@@ -1,0 +1,191 @@
+---
+description: Payment providers (PSP) architecture — multi-PSP support, where Nuvei is coupled, what is provider-agnostic, how to add a new PSP safely
+globs:
+  - "app/api/nuvei/**"
+  - "app/api/stripe/**"
+  - "app/api/paddle/**"
+  - "app/payment/**"
+  - "lib/services/nuvei.service.ts"
+  - "lib/services/withdrawal-validator.service.ts"
+  - "lib/services/security/chargeback-handler.ts"
+  - "lib/services/security/chargeback-evidence.service.ts"
+  - "lib/services/security/chargeback-lookup.service.ts"
+  - "lib/services/security/chargeback-case.*"
+  - "lib/services/security/webhook-signature-failure.ts"
+  - "lib/services/fraud/payment-fraud.service.ts"
+  - "database/models/payment-provider.model.ts"
+  - "database/models/nuvei-user-payment-option.model.ts"
+  - "database/models/withdrawal-settings.model.ts"
+  - "database/models/withdrawal-request.model.ts"
+  - "database/models/trading/wallet-transaction.model.ts"
+  - "database/models/fraud/payment-fingerprint.model.ts"
+  - "components/trading/DepositModal.tsx"
+  - "components/trading/WithdrawalModal.tsx"
+  - "components/wallet/BankAccountsSection.tsx"
+  - "apps/admin/components/admin/PaymentProvidersSection.tsx"
+  - "apps/admin/components/admin/WithdrawalSettingsSection.tsx"
+  - "apps/admin/components/admin/PendingPaymentsSection.tsx"
+  - "apps/admin/components/admin/PendingWithdrawalsSection.tsx"
+  - "apps/admin/components/admin/FailedDepositsSection.tsx"
+  - "apps/admin/components/admin/chargebacks/**"
+  - "lib/services/simulator/attack-tests/**"
+---
+
+# Payment Providers (PSP) Architecture — ChartVolt
+
+## 📐 The Big Picture
+
+ChartVolt was designed for **multi-PSP from day one**. The architecture has two layers:
+
+1. **PSP-agnostic spine** — generic models, services, and abstractions that key off a free-string `provider` field.
+2. **PSP-specific implementations** — concrete adapters for each gateway (Nuvei is the primary one; Stripe and Paddle are partially integrated alongside).
+
+Currently active gateways:
+
+| Provider | Deposits | Auto-withdrawals | Saved cards (UPO) | Chargebacks | Status |
+|---|---|---|---|---|---|
+| **Nuvei** | ✅ | ✅ | ✅ | ✅ | Primary, full-featured |
+| **Stripe** | ✅ (partial) | ➖ | ➖ | ⚠️ adapter needed | Deposit path exists |
+| **Paddle** | ✅ (stub) | ➖ | ➖ | ➖ | Skeleton only |
+
+## 🟢 What is Already PSP-Agnostic (Do Not Re-implement Per PSP)
+
+Treat these as **shared infrastructure** — they accept any `provider` string. Adding a new PSP must NOT fork or duplicate them.
+
+| Component | File | Why it's agnostic |
+|---|---|---|
+| Generic provider table | `database/models/payment-provider.model.ts` | `slug` + `credentials[]` + `webhookUrl` + `testMode` + `processingFee` for any PSP |
+| Wallet transaction provider tag | `database/models/trading/wallet-transaction.model.ts` (`provider` field, indexed) | Free string; reports/queues filter on it |
+| Chargeback ingestion | `lib/services/security/chargeback-handler.ts` | Module doc explicitly says "PSP-agnostic: callers (Nuvei / Stripe / Paddle / future providers) pass a normalized input here" |
+| Chargeback case lifecycle | `lib/services/security/chargeback-case.service.ts` + `chargeback-case.writers.ts` | Stores `provider` string only; transitions are PSP-independent |
+| Fraud payment fingerprint | `lib/services/fraud/payment-fraud.service.ts` | `paymentProvider: "stripe" \| "paypal" \| "nuvei" \| "custom" \| string` |
+| Withdrawal validator gates (KYC, caps, cooldown, hold period, 2FA, allowed methods, etc.) | `lib/services/withdrawal-validator.service.ts` | `PayoutCategory` enum already includes `stripe_payout`, `stripe_refund`; every gate is PSP-agnostic |
+| Provider availability API | `app/api/payment-config/route.ts` | Already enumerates Stripe/Paddle/Nuvei to the client |
+| Reconciliation | `lib/services/platform-financials.service.ts` + `PlatformTransaction` model | Keys on `provider` + `sourceType`, not hard-coded names |
+| Security alerts / audit log / restrictions / live-ops dashboard | All services | Read `provider` string from `WalletTransaction` |
+| Front-end provider switcher | `components/trading/DepositModal.tsx` (`type PaymentProvider = "stripe" \| "paddle" \| "nuvei"`) | Selection UI already exists |
+
+**Rule:** when touching any of the above, keep them PSP-agnostic. Never add `if (provider === "nuvei")` branches in the spine — push provider-specific behavior into adapters.
+
+## 🔴 What is Tightly Coupled to Nuvei (Do Not Change Without a Plan)
+
+These files contain Nuvei-specific knowledge. Adding a peer PSP means writing **parallel** files for the new gateway, NOT modifying these.
+
+| Layer | File(s) | What it does |
+|---|---|---|
+| SDK wrapper | `lib/services/nuvei.service.ts` (~2143 lines) | open-order, payment-status, withdrawal, refund, account-capture, UPO management |
+| Webhook (DMN) | `app/api/nuvei/webhook/route.ts` (~1648 lines) | `advanceResponseChecksum` HMAC verify, deposit + withdrawal lifecycle, idempotent claim |
+| Auto-withdrawal | `app/api/nuvei/withdrawal/route.ts` (~1097 lines) | UPO refund → original-method → bank payout fallback chain |
+| Saved-card store | `database/models/nuvei-user-payment-option.model.ts` | UPO IDs needed for automated card refunds |
+| Account capture (KYC bank account) | `app/api/nuvei/account-capture*` + `app/payment/nuvei/page.tsx` | Nuvei iframe flow |
+| Withdrawal settings flag | `database/models/withdrawal-settings.model.ts` (`nuveiWithdrawalEnabled`) | Single boolean — needs to generalize to a per-provider map when adding peers |
+| Front-end deposit/withdrawal flows | `components/trading/DepositModal.tsx`, `WithdrawalModal.tsx`, `components/wallet/BankAccountsSection.tsx` | Nuvei SDK iframe / popup / mobile redirect logic |
+| Chargeback evidence enrichment | `lib/services/security/chargeback-evidence.service.ts` (line ~95) | Reaches into `NuveiUserPaymentOption` for card brand/last4 — needs PSP-aware switch when adding peers |
+| Chargeback lookup | `lib/services/security/chargeback-lookup.service.ts` | Resolves UPO from `createdFromTransactionId` — Nuvei-only enrichment |
+| Attack-test simulator | `lib/services/simulator/attack-tests/{scenarios,webhook-crafter}.ts` | Nuvei DMN replay format for fraud regression |
+
+## 📊 Effort & Risk Matrix (Adding ONE Peer PSP, Full Parity)
+
+These are realistic estimates for one experienced full-stack dev who already knows the codebase. They assume the new PSP runs **alongside** Nuvei (not replacing it).
+
+| Domain | Coupling | Effort | Risk | Notes |
+|---|---|---|---|---|
+| Deposit front-end (provider switcher) | low | 1–2d | low | Already exists; just wire the new option |
+| Deposit back-end open-order | low | 1–3d | low | Stripe path exists as template |
+| **Deposit webhook (HMAC + lifecycle)** | high | 3–5d | **high** | Each PSP has its own signature scheme; idempotency + race conditions |
+| Withdrawal validator gates | low | 0d | low | Already PSP-agnostic |
+| **Auto-withdrawal logic** | high | 5–10d | **high** | UPO/card-refund equivalents per PSP; fallback chain |
+| **Saved-card refunds (UPO equiv)** | high | 6–10d | **high** | New Mongo model + KYC capture flow + chargeback evidence integration |
+| Chargeback ingestion | low | 1d | medium | `chargeback-handler.ts` is agnostic — just add a webhook adapter that calls it |
+| Chargeback evidence | low | 1–2d | low | Replace `NuveiUserPaymentOption` lookup with a PSP-aware switch |
+| Fraud (fingerprint, decline velocity, alerts) | low | 0–1d | low | Already PSP-agnostic |
+| Admin UI (settings, queues, dashboards) | medium | 3–5d | low | UI surfaces are provider-aware via the `provider` string |
+| Reconciliation | low | 0d | low | Already keys on `provider` + `sourceType` |
+| Attack-test simulator | medium | 2–4d | low | Build a parallel webhook-crafter for the new signature scheme |
+
+**Realistic totals**
+
+- Full parity (deposits + auto-withdrawals + saved cards + chargebacks): **~25–45 dev-days**.
+- Deposits + chargebacks only (no auto-withdrawals, no saved cards): **~10–15 dev-days**.
+
+## ⚠️ Real Dangers (Plan Around These)
+
+1. **Saved-card portability is impossible.** Nuvei UPOs are bound to the Nuvei merchant; you can't move them to another PSP. If a peer PSP needs to refund a Nuvei-originated deposit, that refund still has to go through Nuvei. Plan to keep Nuvei active for the long tail of refunds (~6 months of chargeback window).
+2. **Don't replace, augment.** Replacing Nuvei (vs. adding a peer) is dangerous because in-flight chargebacks (90+ days post-deposit) reference `nuveiUserPaymentOption.createdFromTransactionId` and the evidence packet. Migrating those would require a read-only Nuvei adapter for ~6 months while old chargebacks settle.
+3. **Webhook signature is the unforgiving piece.** Each PSP has its own scheme:
+   - Nuvei: `advanceResponseChecksum = SHA256(secret + totalAmount + currency + timestamp + PPP_TransactionID + Status + productId)`
+   - Stripe: `Stripe-Signature` header HMAC-SHA-256 of `timestamp.payload`
+   - Paddle: HMAC-SHA-256 of raw body with `Paddle-Signature`
+   Get this wrong once and you've shipped an unsigned webhook = forgeable deposits.
+4. **Withdrawal automation is fragile per PSP.** Nuvei has a 5-step fallback (UPO refund → original method → bank payout → manual). Stripe Refund API caps at 90 days for some networks. PayPal Payouts needs separate API permissions. This is real engineering, not configuration.
+5. **`nuveiWithdrawalEnabled` boolean** must be generalized to `autoWithdrawalEnabledByProvider: { nuvei: true, <new>: true }` before adding a second auto-withdrawing PSP. This is a schema migration, not code-only.
+6. **`WalletTransaction.provider` is a hot index.** It powers the live-ops dashboard, financial reports, fraud filters, reconciliation, and chargeback queue. Never change its semantics; only ever **add** new string values.
+
+## ✅ Pattern: How to Add a Peer PSP Safely
+
+Follow this order. Each step is independent and shippable.
+
+### Phase 1 — Deposits + Chargebacks (lowest risk, highest value)
+
+1. **Register the provider** in the `PaymentProvider` collection (`slug`, `displayName`, `credentials`, `testMode`, `webhookUrl`).
+2. **Create the SDK wrapper** at `lib/services/<psp>.service.ts`. Mirror the structure of `lib/services/nuvei.service.ts` (class-based, exposes `getCredentials`, `openOrder`, `getPaymentStatus`, `isEnabled`, `getClientConfig`).
+3. **Create the open-order route** at `app/api/<psp>/open-order/route.ts`. Mirror `app/api/nuvei/open-order/route.ts`:
+   - Auth + per-user + per-IP rate limiting
+   - Sanitize amounts
+   - Look up user country / VAT applicability
+   - Pre-create a `WalletTransaction(status="pending", provider="<psp>", metadata.userAgent, metadata.clientIp, metadata.client{Country,City,Region})`
+   - Return the PSP's session token / checkout URL to the client
+4. **Create the webhook route** at `app/api/<psp>/webhook/route.ts`. Mirror `app/api/nuvei/webhook/route.ts`:
+   - **Signature verify FIRST** (per the PSP's scheme)
+   - On signature failure: `reportWebhookSignatureFailure(...)` + `recordSecurityAlert(...)` + return 200 (never 4xx — attackers learn from rejections)
+   - **Idempotent claim** with `findOneAndUpdate({ status: { $in: ["pending", "awaiting_payment"] } }, { $set: { status: "processing" } })` so concurrent DMNs don't double-credit
+   - On approve: extract authentication facts (AVS / CVV2 / 3DS / authCode / bin / issuer country) into `metadata` — the chargeback defense packet reads these
+   - On decline/error: `recordDecline(userId)` + `recordDecline("ip:" + ip)` for card-testing detection
+   - On chargeback: call `handleChargeback(...)` from `lib/services/security/chargeback-handler.ts` with normalized input
+5. **Wire the front-end** in `components/trading/DepositModal.tsx`:
+   - Add the new slug to `type PaymentProvider`
+   - Add a card to the provider grid using the existing layout
+   - Lazy-load the PSP's SDK script
+6. **Add the chargeback adapter** — a thin function that converts the PSP's chargeback webhook payload to `HandleChargebackInput` and calls `handleChargeback(...)`. The chargeback case, restriction, evidence packet, defense flow, and reconciliation all just work.
+
+### Phase 2 — Auto-withdrawals (only if needed)
+
+7. **Generalize the withdrawal-settings flag** from `nuveiWithdrawalEnabled: boolean` to a per-provider map. Schema migration required.
+8. **Build the auto-withdrawal route** at `app/api/<psp>/withdrawal/route.ts`. Mirror `app/api/nuvei/withdrawal/route.ts` but use the new PSP's refund/payout APIs. **Always call `validateWithdrawal(...)`** from `lib/services/withdrawal-validator.service.ts` — never reimplement gate logic.
+
+### Phase 3 — Saved cards / KYC capture / refunds (only if needed)
+
+9. **Create a sibling UPO model** at `database/models/<psp>-user-payment-option.model.ts`. Do **NOT** reuse `nuvei-user-payment-option.model.ts` — keep PSP UPO stores isolated.
+10. **Update the chargeback evidence builder** in `lib/services/security/chargeback-evidence.service.ts` to look up the right UPO model based on `chargeback.provider`.
+11. **Build the account-capture flow** at `app/api/<psp>/account-capture*` and the matching front-end iframe page.
+
+### Phase 4 — Hardening (mandatory before going live)
+
+12. **Build a parallel attack-test suite** mirroring `lib/services/simulator/attack-tests/scenarios.ts` for the new PSP's webhook (signature replay, missing signature, malformed payload, double-credit attempts, prototype-pollution keys).
+13. **Run the existing attack suite** — none of the existing Nuvei attack tests should regress.
+14. **Verify reconciliation** — make a test deposit, refund, and chargeback through the new PSP and confirm `PlatformTransaction` entries balance against the PSP statement.
+
+## 🚫 Anti-Patterns (Never Do These)
+
+- ❌ Branch on `provider === "nuvei"` inside the agnostic spine. Push the difference into the PSP adapter instead.
+- ❌ Reuse `nuvei-user-payment-option.model.ts` for another PSP. Create a sibling model.
+- ❌ Skip signature verification "for testing" on the new PSP. Always run signature verify FIRST in the webhook handler — it's the contract.
+- ❌ Process a deposit webhook synchronously. Use the existing pattern: claim with `findOneAndUpdate`, then process; this prevents double-credit on retries.
+- ❌ Replace Nuvei wholesale. Run PSPs in parallel; toggle availability via `PaymentProvider.isActive`.
+- ❌ Change `WalletTransaction.provider` semantics. Only ever **add** new values; never rename or repurpose.
+- ❌ Reimplement withdrawal gates inside a new PSP's auto-withdrawal route. Always call `validateWithdrawal(...)` from the central validator.
+- ❌ Return 4xx from a webhook on signature failure. Return 200 + audit log so attackers don't learn the validation logic.
+- ❌ Skip the attack-test suite. The existing suite is the reason the Nuvei DMN endpoint is hardened — replicate it for the new PSP.
+
+## 🔍 Quick Reference — Where to Look
+
+| Question | File |
+|---|---|
+| "How is the deposit lifecycle structured?" | `app/api/nuvei/webhook/route.ts` |
+| "How are withdrawal gates enforced?" | `lib/services/withdrawal-validator.service.ts` |
+| "How is a chargeback ingested?" | `lib/services/security/chargeback-handler.ts` |
+| "How is a chargeback defense packet built?" | `lib/services/security/chargeback-evidence.service.ts` |
+| "What providers are configured / active?" | `database/models/payment-provider.model.ts` + `app/api/payment-config/route.ts` |
+| "Where is the front-end provider switcher?" | `components/trading/DepositModal.tsx` |
+| "Where is the Nuvei SDK wrapper?" | `lib/services/nuvei.service.ts` |
+| "Where do I test PSP attack scenarios?" | `lib/services/simulator/attack-tests/scenarios.ts` |

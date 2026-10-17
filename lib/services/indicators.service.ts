@@ -31,12 +31,68 @@ export interface BollingerBandsData {
   lower: number;
 }
 
+export interface IchimokuData {
+  time: number;
+  tenkan: number;
+  kijun: number;
+  senkouA: number;
+  senkouB: number;
+  chikou: number;
+}
+
+export interface DonchianData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+}
+
+export interface AroonData {
+  time: number;
+  up: number;
+  down: number;
+}
+
+export interface VortexData {
+  time: number;
+  plus: number;
+  minus: number;
+}
+
+export interface ElderRayData {
+  time: number;
+  bull: number;
+  bear: number;
+}
+
+export interface SupertrendData {
+  time: number;
+  value: number;
+  direction: number; // 1 = up, -1 = down
+}
+
+export interface StochRSIData {
+  time: number;
+  k: number;
+  d: number;
+}
+
+export interface ChannelData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+}
+
 /**
  * Simple Moving Average (SMA)
  */
-export function calculateSMA(data: OHLCData[], period: number): IndicatorData[] {
+export function calculateSMA(
+  data: OHLCData[],
+  period: number,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
-  
+
   for (let i = period - 1; i < data.length; i++) {
     let sum = 0;
     for (let j = 0; j < period; j++) {
@@ -44,20 +100,23 @@ export function calculateSMA(data: OHLCData[], period: number): IndicatorData[] 
     }
     result.push({
       time: data[i].time,
-      value: sum / period
+      value: sum / period,
     });
   }
-  
+
   return result;
 }
 
 /**
  * Exponential Moving Average (EMA)
  */
-export function calculateEMA(data: OHLCData[], period: number): IndicatorData[] {
+export function calculateEMA(
+  data: OHLCData[],
+  period: number,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
   const multiplier = 2 / (period + 1);
-  
+
   // Start with SMA for first value
   let sum = 0;
   for (let i = 0; i < period; i++) {
@@ -65,61 +124,64 @@ export function calculateEMA(data: OHLCData[], period: number): IndicatorData[] 
   }
   let ema = sum / period;
   result.push({ time: data[period - 1].time, value: ema });
-  
+
   // Calculate EMA for remaining values
   for (let i = period; i < data.length; i++) {
     ema = (data[i].close - ema) * multiplier + ema;
     result.push({
       time: data[i].time,
-      value: ema
+      value: ema,
     });
   }
-  
+
   return result;
 }
 
 /**
  * Relative Strength Index (RSI)
  */
-export function calculateRSI(data: OHLCData[], period: number = 14): IndicatorData[] {
+export function calculateRSI(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
   const changes: number[] = [];
-  
+
   // Calculate price changes
   for (let i = 1; i < data.length; i++) {
     changes.push(data[i].close - data[i - 1].close);
   }
-  
+
   // Calculate initial average gain and loss
   let avgGain = 0;
   let avgLoss = 0;
-  
+
   for (let i = 0; i < period; i++) {
     if (changes[i] > 0) avgGain += changes[i];
     else avgLoss += Math.abs(changes[i]);
   }
-  
+
   avgGain /= period;
   avgLoss /= period;
-  
+
   // Calculate RSI for each point
   for (let i = period; i < changes.length; i++) {
     const change = changes[i];
     const gain = change > 0 ? change : 0;
     const loss = change < 0 ? Math.abs(change) : 0;
-    
-    avgGain = ((avgGain * (period - 1)) + gain) / period;
-    avgLoss = ((avgLoss * (period - 1)) + loss) / period;
-    
+
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+
     const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    const rsi = 100 - (100 / (1 + rs));
-    
+    const rsi = 100 - 100 / (1 + rs);
+
     result.push({
       time: data[i + 1].time,
-      value: rsi
+      value: rsi,
     });
   }
-  
+
   return result;
 }
 
@@ -130,48 +192,49 @@ export function calculateMACD(
   data: OHLCData[],
   fastPeriod: number = 12,
   slowPeriod: number = 26,
-  signalPeriod: number = 9
+  signalPeriod: number = 9,
 ): MACDData[] {
   const result: MACDData[] = [];
-  
+
   const fastEMA = calculateEMA(data, fastPeriod);
   const slowEMA = calculateEMA(data, slowPeriod);
-  
+
   // Calculate MACD line
   const macdLine: IndicatorData[] = [];
   const startIndex = slowPeriod - fastPeriod;
-  
+
   for (let i = 0; i < slowEMA.length; i++) {
     macdLine.push({
       time: slowEMA[i].time,
-      value: fastEMA[i + startIndex].value - slowEMA[i].value
+      value: fastEMA[i + startIndex].value - slowEMA[i].value,
     });
   }
-  
+
   // Calculate signal line (EMA of MACD)
   const signalMultiplier = 2 / (signalPeriod + 1);
   let signalEMA = 0;
-  
+
   // Initial SMA for signal
   for (let i = 0; i < signalPeriod && i < macdLine.length; i++) {
     signalEMA += macdLine[i].value;
   }
   signalEMA /= Math.min(signalPeriod, macdLine.length);
-  
+
   // Calculate MACD with signal and histogram
   for (let i = signalPeriod - 1; i < macdLine.length; i++) {
     if (i > signalPeriod - 1) {
-      signalEMA = (macdLine[i].value - signalEMA) * signalMultiplier + signalEMA;
+      signalEMA =
+        (macdLine[i].value - signalEMA) * signalMultiplier + signalEMA;
     }
-    
+
     result.push({
       time: macdLine[i].time,
       macd: macdLine[i].value,
       signal: signalEMA,
-      histogram: macdLine[i].value - signalEMA
+      histogram: macdLine[i].value - signalEMA,
     });
   }
-  
+
   return result;
 }
 
@@ -181,14 +244,14 @@ export function calculateMACD(
 export function calculateBollingerBands(
   data: OHLCData[],
   period: number = 20,
-  stdDev: number = 2
+  stdDev: number = 2,
 ): BollingerBandsData[] {
   const result: BollingerBandsData[] = [];
   const sma = calculateSMA(data, period);
-  
+
   for (let i = 0; i < sma.length; i++) {
     const dataIndex = i + period - 1;
-    
+
     // Calculate standard deviation
     let sumSquares = 0;
     for (let j = 0; j < period; j++) {
@@ -196,15 +259,15 @@ export function calculateBollingerBands(
       sumSquares += diff * diff;
     }
     const standardDeviation = Math.sqrt(sumSquares / period);
-    
+
     result.push({
       time: sma[i].time,
       middle: sma[i].value,
-      upper: sma[i].value + (stdDev * standardDeviation),
-      lower: sma[i].value - (stdDev * standardDeviation)
+      upper: sma[i].value + stdDev * standardDeviation,
+      lower: sma[i].value - stdDev * standardDeviation,
     });
   }
-  
+
   return result;
 }
 
@@ -215,63 +278,66 @@ export function calculateVWAP(data: OHLCData[]): IndicatorData[] {
   const result: IndicatorData[] = [];
   let cumulativeTPV = 0; // Typical Price * Volume
   let cumulativeVolume = 0;
-  
+
   for (let i = 0; i < data.length; i++) {
     const typicalPrice = (data[i].high + data[i].low + data[i].close) / 3;
     const volume = data[i].volume || 1;
-    
+
     cumulativeTPV += typicalPrice * volume;
     cumulativeVolume += volume;
-    
+
     result.push({
       time: data[i].time,
-      value: cumulativeTPV / cumulativeVolume
+      value: cumulativeTPV / cumulativeVolume,
     });
   }
-  
+
   return result;
 }
 
 /**
  * Average True Range (ATR)
  */
-export function calculateATR(data: OHLCData[], period: number = 14): IndicatorData[] {
+export function calculateATR(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
   const trueRanges: number[] = [];
-  
+
   // Calculate True Range for each period
   for (let i = 1; i < data.length; i++) {
     const high = data[i].high;
     const low = data[i].low;
     const prevClose = data[i - 1].close;
-    
+
     const tr = Math.max(
       high - low,
       Math.abs(high - prevClose),
-      Math.abs(low - prevClose)
+      Math.abs(low - prevClose),
     );
-    
+
     trueRanges.push(tr);
   }
-  
+
   // Calculate initial ATR (SMA of TR)
   let atr = 0;
   for (let i = 0; i < period && i < trueRanges.length; i++) {
     atr += trueRanges[i];
   }
   atr /= Math.min(period, trueRanges.length);
-  
+
   result.push({ time: data[period].time, value: atr });
-  
+
   // Calculate smoothed ATR
   for (let i = period; i < trueRanges.length; i++) {
-    atr = ((atr * (period - 1)) + trueRanges[i]) / period;
+    atr = (atr * (period - 1) + trueRanges[i]) / period;
     result.push({
       time: data[i + 1].time,
-      value: atr
+      value: atr,
     });
   }
-  
+
   return result;
 }
 
@@ -281,29 +347,29 @@ export function calculateATR(data: OHLCData[], period: number = 14): IndicatorDa
 export function calculateStochastic(
   data: OHLCData[],
   kPeriod: number = 14,
-  dPeriod: number = 3
+  dPeriod: number = 3,
 ): { k: IndicatorData[]; d: IndicatorData[] } {
   const kValues: IndicatorData[] = [];
-  
+
   // Calculate %K
   for (let i = kPeriod - 1; i < data.length; i++) {
     let highestHigh = data[i].high;
     let lowestLow = data[i].low;
-    
+
     for (let j = 0; j < kPeriod; j++) {
       highestHigh = Math.max(highestHigh, data[i - j].high);
       lowestLow = Math.min(lowestLow, data[i - j].low);
     }
-    
+
     const currentClose = data[i].close;
     const k = ((currentClose - lowestLow) / (highestHigh - lowestLow)) * 100;
-    
+
     kValues.push({
       time: data[i].time,
-      value: k
+      value: k,
     });
   }
-  
+
   // Calculate %D (SMA of %K)
   const dValues: IndicatorData[] = [];
   for (let i = dPeriod - 1; i < kValues.length; i++) {
@@ -313,148 +379,158 @@ export function calculateStochastic(
     }
     dValues.push({
       time: kValues[i].time,
-      value: sum / dPeriod
+      value: sum / dPeriod,
     });
   }
-  
+
   return { k: kValues, d: dValues };
 }
 
 /**
  * Williams %R
  */
-export function calculateWilliamsR(data: OHLCData[], period: number = 14): IndicatorData[] {
+export function calculateWilliamsR(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
-  
+
   for (let i = period - 1; i < data.length; i++) {
     let highestHigh = data[i].high;
     let lowestLow = data[i].low;
-    
+
     for (let j = 0; j < period; j++) {
       highestHigh = Math.max(highestHigh, data[i - j].high);
       lowestLow = Math.min(lowestLow, data[i - j].low);
     }
-    
+
     const currentClose = data[i].close;
-    const wr = ((highestHigh - currentClose) / (highestHigh - lowestLow)) * -100;
-    
+    const wr =
+      ((highestHigh - currentClose) / (highestHigh - lowestLow)) * -100;
+
     result.push({
       time: data[i].time,
-      value: wr
+      value: wr,
     });
   }
-  
+
   return result;
 }
 
 /**
  * Commodity Channel Index (CCI)
  */
-export function calculateCCI(data: OHLCData[], period: number = 20): IndicatorData[] {
+export function calculateCCI(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
   const constant = 0.015;
-  
+
   for (let i = period - 1; i < data.length; i++) {
     // Calculate Typical Price
     let sum = 0;
     const typicalPrices: number[] = [];
-    
+
     for (let j = 0; j < period; j++) {
       const tp = (data[i - j].high + data[i - j].low + data[i - j].close) / 3;
       typicalPrices.push(tp);
       sum += tp;
     }
-    
+
     const smaTP = sum / period;
-    
+
     // Calculate Mean Deviation
     let meanDevSum = 0;
     for (let j = 0; j < period; j++) {
       meanDevSum += Math.abs(typicalPrices[j] - smaTP);
     }
     const meanDev = meanDevSum / period;
-    
+
     const currentTP = (data[i].high + data[i].low + data[i].close) / 3;
     const cci = (currentTP - smaTP) / (constant * meanDev);
-    
+
     result.push({
       time: data[i].time,
-      value: cci
+      value: cci,
     });
   }
-  
+
   return result;
 }
 
 /**
  * Average Directional Index (ADX)
  */
-export function calculateADX(data: OHLCData[], period: number = 14): IndicatorData[] {
+export function calculateADX(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
-  
+
   // Calculate True Range and Directional Movement
   const tr: number[] = [];
   const plusDM: number[] = [];
   const minusDM: number[] = [];
-  
+
   for (let i = 1; i < data.length; i++) {
     const high = data[i].high;
     const low = data[i].low;
     const prevHigh = data[i - 1].high;
     const prevLow = data[i - 1].low;
     const prevClose = data[i - 1].close;
-    
+
     // True Range
     const trueRange = Math.max(
       high - low,
       Math.abs(high - prevClose),
-      Math.abs(low - prevClose)
+      Math.abs(low - prevClose),
     );
     tr.push(trueRange);
-    
+
     // Directional Movement
     const upMove = high - prevHigh;
     const downMove = prevLow - low;
-    
+
     plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
     minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
   }
-  
+
   // Calculate smoothed averages
   if (tr.length < period) return result;
-  
+
   let smoothedTR = tr.slice(0, period).reduce((a, b) => a + b, 0);
   let smoothedPlusDM = plusDM.slice(0, period).reduce((a, b) => a + b, 0);
   let smoothedMinusDM = minusDM.slice(0, period).reduce((a, b) => a + b, 0);
-  
+
   const dx: number[] = [];
-  
+
   for (let i = period; i < tr.length; i++) {
-    smoothedTR = smoothedTR - (smoothedTR / period) + tr[i];
-    smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / period) + plusDM[i];
-    smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / period) + minusDM[i];
-    
+    smoothedTR = smoothedTR - smoothedTR / period + tr[i];
+    smoothedPlusDM = smoothedPlusDM - smoothedPlusDM / period + plusDM[i];
+    smoothedMinusDM = smoothedMinusDM - smoothedMinusDM / period + minusDM[i];
+
     const plusDI = (smoothedPlusDM / smoothedTR) * 100;
     const minusDI = (smoothedMinusDM / smoothedTR) * 100;
-    
-    const dxValue = Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100;
+
+    const dxValue = (Math.abs(plusDI - minusDI) / (plusDI + minusDI)) * 100;
     dx.push(dxValue);
   }
-  
+
   // Calculate ADX (smoothed DX)
   if (dx.length < period) return result;
-  
+
   let adx = dx.slice(0, period).reduce((a, b) => a + b, 0) / period;
   result.push({ time: data[period * 2].time, value: adx });
-  
+
   for (let i = period; i < dx.length; i++) {
-    adx = ((adx * (period - 1)) + dx[i]) / period;
+    adx = (adx * (period - 1) + dx[i]) / period;
     result.push({
       time: data[i + period + 1].time,
-      value: adx
+      value: adx,
     });
   }
-  
+
   return result;
 }
 
@@ -464,27 +540,25 @@ export function calculateADX(data: OHLCData[], period: number = 14): IndicatorDa
 export function calculateParabolicSAR(
   data: OHLCData[],
   accelerationFactor: number = 0.02,
-  maxAF: number = 0.2
+  maxAF: number = 0.2,
 ): IndicatorData[] {
   const result: IndicatorData[] = [];
   if (data.length < 2) return result;
-  
+
   let isUptrend = data[1].close > data[0].close;
   let sar = isUptrend ? data[0].low : data[0].high;
   let extremePoint = isUptrend ? data[0].high : data[0].low;
   let af = accelerationFactor;
-  
+
   for (let i = 1; i < data.length; i++) {
     result.push({ time: data[i].time, value: sar });
-    
+
     // Update SAR
     sar = sar + af * (extremePoint - sar);
-    
+
     // Check for reversal
-    const reversal = isUptrend
-      ? data[i].low < sar
-      : data[i].high > sar;
-    
+    const reversal = isUptrend ? data[i].low < sar : data[i].high > sar;
+
     if (reversal) {
       isUptrend = !isUptrend;
       sar = extremePoint;
@@ -501,7 +575,7 @@ export function calculateParabolicSAR(
       }
     }
   }
-  
+
   return result;
 }
 
@@ -521,20 +595,20 @@ export interface PivotPoints {
 
 export function calculatePivotPoints(data: OHLCData[]): PivotPoints[] {
   const result: PivotPoints[] = [];
-  
+
   for (let i = 1; i < data.length; i++) {
     const prevHigh = data[i - 1].high;
     const prevLow = data[i - 1].low;
     const prevClose = data[i - 1].close;
-    
+
     const pivot = (prevHigh + prevLow + prevClose) / 3;
-    const r1 = (2 * pivot) - prevLow;
-    const s1 = (2 * pivot) - prevHigh;
+    const r1 = 2 * pivot - prevLow;
+    const s1 = 2 * pivot - prevHigh;
     const r2 = pivot + (prevHigh - prevLow);
     const s2 = pivot - (prevHigh - prevLow);
     const r3 = prevHigh + 2 * (pivot - prevLow);
     const s3 = prevLow - 2 * (prevHigh - pivot);
-    
+
     result.push({
       time: data[i].time,
       pivot,
@@ -543,45 +617,6105 @@ export function calculatePivotPoints(data: OHLCData[]): PivotPoints[] {
       r3,
       s1,
       s2,
-      s3
+      s3,
     });
   }
-  
+
   return result;
 }
 
 /**
  * Money Flow Index (MFI)
  */
-export function calculateMFI(data: OHLCData[], period: number = 14): IndicatorData[] {
+export function calculateMFI(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
   const result: IndicatorData[] = [];
-  
+
   for (let i = period; i < data.length; i++) {
     let positiveFlow = 0;
     let negativeFlow = 0;
-    
+
     for (let j = 0; j < period; j++) {
       const idx = i - j;
-      const typicalPrice = (data[idx].high + data[idx].low + data[idx].close) / 3;
-      const prevTypicalPrice = (data[idx - 1].high + data[idx - 1].low + data[idx - 1].close) / 3;
+      const typicalPrice =
+        (data[idx].high + data[idx].low + data[idx].close) / 3;
+      const prevTypicalPrice =
+        (data[idx - 1].high + data[idx - 1].low + data[idx - 1].close) / 3;
       const moneyFlow = typicalPrice * (data[idx].volume || 1);
-      
+
       if (typicalPrice > prevTypicalPrice) {
         positiveFlow += moneyFlow;
       } else if (typicalPrice < prevTypicalPrice) {
         negativeFlow += moneyFlow;
       }
     }
-    
+
     const mfiRatio = positiveFlow / (negativeFlow || 1);
-    const mfi = 100 - (100 / (1 + mfiRatio));
-    
+    const mfi = 100 - 100 / (1 + mfiRatio);
+
     result.push({
       time: data[i].time,
-      value: mfi
+      value: mfi,
     });
   }
-  
+
   return result;
 }
 
+// ============================================================================
+// NEW INDICATORS
+// ============================================================================
+
+/**
+ * Weighted Moving Average (WMA)
+ * Gives more weight to recent prices linearly
+ */
+export function calculateWMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (let j = 0; j < period; j++) {
+      const weight = period - j;
+      weightedSum += data[i - j].close * weight;
+      weightTotal += weight;
+    }
+    result.push({ time: data[i].time, value: weightedSum / weightTotal });
+  }
+
+  return result;
+}
+
+/**
+ * Keltner Channels (EMA center + ATR bands)
+ */
+export function calculateKeltnerChannels(
+  data: OHLCData[],
+  period: number = 20,
+  multiplier: number = 2,
+): BollingerBandsData[] {
+  const ema = calculateEMA(data, period);
+  const atr = calculateATR(data, period);
+  const result: BollingerBandsData[] = [];
+
+  // Align EMA and ATR by time
+  const atrMap = new Map(atr.map((d) => [d.time, d.value]));
+
+  for (const e of ema) {
+    const atrVal = atrMap.get(e.time);
+    if (atrVal !== undefined) {
+      result.push({
+        time: e.time,
+        upper: e.value + multiplier * atrVal,
+        middle: e.value,
+        lower: e.value - multiplier * atrVal,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Double Exponential Moving Average (DEMA)
+ * DEMA = 2 * EMA(n) - EMA(EMA(n))
+ */
+export function calculateDEMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const ema1 = calculateEMA(data, period);
+  // Convert ema1 to OHLCData format for second pass
+  const ema1AsOhlc: OHLCData[] = ema1.map((d) => ({
+    time: d.time,
+    open: d.value,
+    high: d.value,
+    low: d.value,
+    close: d.value,
+  }));
+  const ema2 = calculateEMA(ema1AsOhlc, period);
+
+  const ema2Map = new Map(ema2.map((d) => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+
+  for (const e1 of ema1) {
+    const e2 = ema2Map.get(e1.time);
+    if (e2 !== undefined) {
+      result.push({ time: e1.time, value: 2 * e1.value - e2 });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Triple Exponential Moving Average (TEMA)
+ * TEMA = 3*EMA - 3*EMA(EMA) + EMA(EMA(EMA))
+ */
+export function calculateTEMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const ema1 = calculateEMA(data, period);
+  const ema1AsOhlc: OHLCData[] = ema1.map((d) => ({
+    time: d.time,
+    open: d.value,
+    high: d.value,
+    low: d.value,
+    close: d.value,
+  }));
+  const ema2 = calculateEMA(ema1AsOhlc, period);
+  const ema2AsOhlc: OHLCData[] = ema2.map((d) => ({
+    time: d.time,
+    open: d.value,
+    high: d.value,
+    low: d.value,
+    close: d.value,
+  }));
+  const ema3 = calculateEMA(ema2AsOhlc, period);
+
+  const ema2Map = new Map(ema2.map((d) => [d.time, d.value]));
+  const ema3Map = new Map(ema3.map((d) => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+
+  for (const e1 of ema1) {
+    const e2 = ema2Map.get(e1.time);
+    const e3 = ema3Map.get(e1.time);
+    if (e2 !== undefined && e3 !== undefined) {
+      result.push({
+        time: e1.time,
+        value: 3 * e1.value - 3 * e2 + e3,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Hull Moving Average (HMA)
+ * HMA = WMA(2*WMA(n/2) - WMA(n), sqrt(n))
+ */
+export function calculateHMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const halfPeriod = Math.max(2, Math.round(period / 2));
+  const sqrtPeriod = Math.max(2, Math.round(Math.sqrt(period)));
+
+  const wmaHalf = calculateWMA(data, halfPeriod);
+  const wmaFull = calculateWMA(data, period);
+
+  // Create the difference series: 2 * WMA(n/2) - WMA(n)
+  const fullMap = new Map(wmaFull.map((d) => [d.time, d.value]));
+  const diffOhlc: OHLCData[] = [];
+
+  for (const h of wmaHalf) {
+    const f = fullMap.get(h.time);
+    if (f !== undefined) {
+      const val = 2 * h.value - f;
+      diffOhlc.push({
+        time: h.time,
+        open: val,
+        high: val,
+        low: val,
+        close: val,
+      });
+    }
+  }
+
+  return calculateWMA(diffOhlc, sqrtPeriod);
+}
+
+/**
+ * Ichimoku Cloud
+ */
+export function calculateIchimoku(
+  data: OHLCData[],
+  tenkanPeriod: number = 9,
+  kijunPeriod: number = 26,
+  senkouBPeriod: number = 52,
+): IchimokuData[] {
+  const result: IchimokuData[] = [];
+
+  function periodHighLow(end: number, period: number) {
+    let high = -Infinity;
+    let low = Infinity;
+    for (let i = Math.max(0, end - period + 1); i <= end; i++) {
+      if (data[i].high > high) high = data[i].high;
+      if (data[i].low < low) low = data[i].low;
+    }
+    return { high, low };
+  }
+
+  for (let i = senkouBPeriod - 1; i < data.length; i++) {
+    const tenkanHL = periodHighLow(i, tenkanPeriod);
+    const kijunHL = periodHighLow(i, kijunPeriod);
+    const senkouBHL = periodHighLow(i, senkouBPeriod);
+
+    const tenkan = (tenkanHL.high + tenkanHL.low) / 2;
+    const kijun = (kijunHL.high + kijunHL.low) / 2;
+    const senkouA = (tenkan + kijun) / 2;
+    const senkouB = (senkouBHL.high + senkouBHL.low) / 2;
+    const chikou = data[i].close;
+
+    result.push({
+      time: data[i].time,
+      tenkan,
+      kijun,
+      senkouA,
+      senkouB,
+      chikou,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Donchian Channel
+ */
+export function calculateDonchianChannel(
+  data: OHLCData[],
+  period: number = 20,
+): DonchianData[] {
+  const result: DonchianData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let high = -Infinity;
+    let low = Infinity;
+    for (let j = 0; j < period; j++) {
+      if (data[i - j].high > high) high = data[i - j].high;
+      if (data[i - j].low < low) low = data[i - j].low;
+    }
+    result.push({
+      time: data[i].time,
+      upper: high,
+      middle: (high + low) / 2,
+      lower: low,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * On Balance Volume (OBV)
+ */
+export function calculateOBV(data: OHLCData[]): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  let obv = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    if (i === 0) {
+      obv = data[i].volume || 0;
+    } else if (data[i].close > data[i - 1].close) {
+      obv += data[i].volume || 0;
+    } else if (data[i].close < data[i - 1].close) {
+      obv -= data[i].volume || 0;
+    }
+    result.push({ time: data[i].time, value: obv });
+  }
+
+  return result;
+}
+
+/**
+ * Rate of Change (ROC)
+ */
+export function calculateROC(
+  data: OHLCData[],
+  period: number = 12,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    const roc =
+      ((data[i].close - data[i - period].close) / data[i - period].close) *
+      100;
+    result.push({ time: data[i].time, value: roc });
+  }
+
+  return result;
+}
+
+/**
+ * Chaikin Money Flow (CMF)
+ */
+export function calculateCMF(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let mfvSum = 0;
+    let volSum = 0;
+
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j];
+      const range = d.high - d.low;
+      const mfMultiplier =
+        range === 0 ? 0 : (d.close - d.low - (d.high - d.close)) / range;
+      mfvSum += mfMultiplier * (d.volume || 1);
+      volSum += d.volume || 1;
+    }
+
+    result.push({
+      time: data[i].time,
+      value: volSum === 0 ? 0 : mfvSum / volSum,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Momentum Oscillator
+ */
+export function calculateMomentum(
+  data: OHLCData[],
+  period: number = 10,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    result.push({
+      time: data[i].time,
+      value: data[i].close - data[i - period].close,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// BATCH 2: 40 NEW ADVANCED INDICATORS
+// ============================================================================
+
+// --- GROUP 1: ADVANCED MOVING AVERAGES (8) ---
+
+/**
+ * ALMA - Arnaud Legoux Moving Average
+ * Uses Gaussian distribution for weighting
+ */
+export function calculateALMA(
+  data: OHLCData[],
+  period: number = 20,
+  offset: number = 0.85,
+  sigma: number = 6,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  const m = offset * (period - 1);
+  const s = period / sigma;
+
+  for (let i = period - 1; i < data.length; i++) {
+    let norm = 0;
+    let sum = 0;
+    for (let j = 0; j < period; j++) {
+      const w = Math.exp(-((j - m) * (j - m)) / (2 * s * s));
+      norm += w;
+      sum += data[i - (period - 1 - j)].close * w;
+    }
+    result.push({ time: data[i].time, value: sum / norm });
+  }
+  return result;
+}
+
+/**
+ * KAMA - Kaufman Adaptive Moving Average
+ * Adjusts smoothing based on market noise
+ */
+export function calculateKAMA(
+  data: OHLCData[],
+  period: number = 10,
+  fastPeriod: number = 2,
+  slowPeriod: number = 30,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  const fastSC = 2 / (fastPeriod + 1);
+  const slowSC = 2 / (slowPeriod + 1);
+
+  if (data.length < period + 1) return result;
+
+  let kama = data[period].close;
+  result.push({ time: data[period].time, value: kama });
+
+  for (let i = period + 1; i < data.length; i++) {
+    const direction = Math.abs(data[i].close - data[i - period].close);
+    let volatility = 0;
+    for (let j = 0; j < period; j++) {
+      volatility += Math.abs(data[i - j].close - data[i - j - 1].close);
+    }
+    const er = volatility === 0 ? 0 : direction / volatility;
+    const sc = Math.pow(er * (fastSC - slowSC) + slowSC, 2);
+    kama = kama + sc * (data[i].close - kama);
+    result.push({ time: data[i].time, value: kama });
+  }
+  return result;
+}
+
+/**
+ * ZLEMA - Zero-Lag Exponential Moving Average
+ * Removes inherent EMA lag
+ */
+export function calculateZLEMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const lag = Math.floor((period - 1) / 2);
+  const adjusted: OHLCData[] = [];
+  for (let i = lag; i < data.length; i++) {
+    const val = 2 * data[i].close - data[i - lag].close;
+    adjusted.push({ time: data[i].time, open: val, high: val, low: val, close: val });
+  }
+  return calculateEMA(adjusted, period);
+}
+
+/**
+ * T3 - Tillson T3 Moving Average
+ * Ultra-smooth moving average with minimal lag
+ */
+export function calculateT3(
+  data: OHLCData[],
+  period: number = 5,
+  vFactor: number = 0.7,
+): IndicatorData[] {
+  const toOhlc = (arr: IndicatorData[]): OHLCData[] =>
+    arr.map((d) => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value }));
+
+  const e1 = calculateEMA(data, period);
+  const e2 = calculateEMA(toOhlc(e1), period);
+  const e3 = calculateEMA(toOhlc(e2), period);
+  const e4 = calculateEMA(toOhlc(e3), period);
+  const e5 = calculateEMA(toOhlc(e4), period);
+  const e6 = calculateEMA(toOhlc(e5), period);
+
+  const c1 = -(vFactor * vFactor * vFactor);
+  const c2 = 3 * vFactor * vFactor + 3 * vFactor * vFactor * vFactor;
+  const c3 = -6 * vFactor * vFactor - 3 * vFactor - 3 * vFactor * vFactor * vFactor;
+  const c4 = 1 + 3 * vFactor + vFactor * vFactor * vFactor + 3 * vFactor * vFactor;
+
+  const maps = [e3, e4, e5, e6].map((arr) => new Map(arr.map((d) => [d.time, d.value])));
+  const result: IndicatorData[] = [];
+
+  for (const d of e3) {
+    const v4 = maps[1].get(d.time);
+    const v5 = maps[2].get(d.time);
+    const v6 = maps[3].get(d.time);
+    if (v4 !== undefined && v5 !== undefined && v6 !== undefined) {
+      result.push({ time: d.time, value: c1 * v6 + c2 * v5 + c3 * v4 + c4 * d.value });
+    }
+  }
+  return result;
+}
+
+/**
+ * SMMA - Smoothed Moving Average
+ */
+export function calculateSMMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  if (data.length < period) return result;
+
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += data[i].close;
+  let smma = sum / period;
+  result.push({ time: data[period - 1].time, value: smma });
+
+  for (let i = period; i < data.length; i++) {
+    smma = (smma * (period - 1) + data[i].close) / period;
+    result.push({ time: data[i].time, value: smma });
+  }
+  return result;
+}
+
+/**
+ * LSMA - Least Squares Moving Average (Linear Regression)
+ */
+export function calculateLSMA(
+  data: OHLCData[],
+  period: number = 25,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (let j = 0; j < period; j++) {
+      sumX += j;
+      sumY += data[i - period + 1 + j].close;
+      sumXY += j * data[i - period + 1 + j].close;
+      sumX2 += j * j;
+    }
+    const slope = (period * sumXY - sumX * sumY) / (period * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / period;
+    result.push({ time: data[i].time, value: intercept + slope * (period - 1) });
+  }
+  return result;
+}
+
+/**
+ * VIDYA - Variable Index Dynamic Average
+ * Adapts smoothing based on CMO (Chande Momentum Oscillator)
+ */
+export function calculateVIDYA(
+  data: OHLCData[],
+  period: number = 20,
+  cmoPeriod: number = 9,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  const sc = 2 / (period + 1);
+
+  if (data.length < cmoPeriod + 1) return result;
+
+  let vidya = data[cmoPeriod].close;
+  result.push({ time: data[cmoPeriod].time, value: vidya });
+
+  for (let i = cmoPeriod + 1; i < data.length; i++) {
+    let up = 0, down = 0;
+    for (let j = 0; j < cmoPeriod; j++) {
+      const diff = data[i - j].close - data[i - j - 1].close;
+      if (diff > 0) up += diff;
+      else down -= diff;
+    }
+    const cmo = (up + down) === 0 ? 0 : Math.abs((up - down) / (up + down));
+    vidya = vidya + sc * cmo * (data[i].close - vidya);
+    result.push({ time: data[i].time, value: vidya });
+  }
+  return result;
+}
+
+/**
+ * McGinley Dynamic
+ * Self-adjusting moving average
+ */
+export function calculateMcGinley(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  if (data.length === 0) return result;
+
+  let md = data[0].close;
+  result.push({ time: data[0].time, value: md });
+
+  for (let i = 1; i < data.length; i++) {
+    const ratio = data[i].close / md;
+    md = md + (data[i].close - md) / (period * Math.pow(ratio, 4));
+    result.push({ time: data[i].time, value: md });
+  }
+  return result;
+}
+
+// --- GROUP 2: TREND INDICATORS (8) ---
+
+/**
+ * Supertrend
+ */
+export function calculateSupertrend(
+  data: OHLCData[],
+  period: number = 10,
+  multiplier: number = 3,
+): SupertrendData[] {
+  const atr = calculateATR(data, period);
+  const atrMap = new Map(atr.map((d) => [d.time, d.value]));
+  const result: SupertrendData[] = [];
+
+  let upperBand = 0, lowerBand = 0, supertrend = 0, direction = 1;
+
+  for (let i = period; i < data.length; i++) {
+    const atrVal = atrMap.get(data[i].time) || 0;
+    const hl2 = (data[i].high + data[i].low) / 2;
+    const newUpper = hl2 + multiplier * atrVal;
+    const newLower = hl2 - multiplier * atrVal;
+
+    upperBand = newUpper < upperBand || data[i - 1].close > upperBand ? newUpper : upperBand;
+    lowerBand = newLower > lowerBand || data[i - 1].close < lowerBand ? newLower : lowerBand;
+
+    if (supertrend === upperBand) {
+      direction = data[i].close > upperBand ? 1 : -1;
+    } else {
+      direction = data[i].close < lowerBand ? -1 : 1;
+    }
+    supertrend = direction === 1 ? lowerBand : upperBand;
+
+    result.push({ time: data[i].time, value: supertrend, direction });
+  }
+  return result;
+}
+
+/**
+ * Aroon Oscillator
+ */
+export function calculateAroon(
+  data: OHLCData[],
+  period: number = 25,
+): AroonData[] {
+  const result: AroonData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    let highIdx = 0, lowIdx = 0;
+    let maxH = -Infinity, minL = Infinity;
+    for (let j = 0; j <= period; j++) {
+      if (data[i - j].high > maxH) { maxH = data[i - j].high; highIdx = j; }
+      if (data[i - j].low < minL) { minL = data[i - j].low; lowIdx = j; }
+    }
+    result.push({
+      time: data[i].time,
+      up: ((period - highIdx) / period) * 100,
+      down: ((period - lowIdx) / period) * 100,
+    });
+  }
+  return result;
+}
+
+/**
+ * Vortex Indicator
+ */
+export function calculateVortex(
+  data: OHLCData[],
+  period: number = 14,
+): VortexData[] {
+  const result: VortexData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    let vmPlus = 0, vmMinus = 0, tr = 0;
+    for (let j = 0; j < period; j++) {
+      const idx = i - j;
+      vmPlus += Math.abs(data[idx].high - data[idx - 1].low);
+      vmMinus += Math.abs(data[idx].low - data[idx - 1].high);
+      tr += Math.max(
+        data[idx].high - data[idx].low,
+        Math.abs(data[idx].high - data[idx - 1].close),
+        Math.abs(data[idx].low - data[idx - 1].close),
+      );
+    }
+    result.push({
+      time: data[i].time,
+      plus: tr === 0 ? 0 : vmPlus / tr,
+      minus: tr === 0 ? 0 : vmMinus / tr,
+    });
+  }
+  return result;
+}
+
+/**
+ * TRIX - Triple Exponential Average
+ */
+export function calculateTRIX(
+  data: OHLCData[],
+  period: number = 15,
+): IndicatorData[] {
+  const toOhlc = (arr: IndicatorData[]): OHLCData[] =>
+    arr.map((d) => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value }));
+
+  const e1 = calculateEMA(data, period);
+  const e2 = calculateEMA(toOhlc(e1), period);
+  const e3 = calculateEMA(toOhlc(e2), period);
+
+  const result: IndicatorData[] = [];
+  for (let i = 1; i < e3.length; i++) {
+    result.push({
+      time: e3[i].time,
+      value: e3[i - 1].value === 0 ? 0 : ((e3[i].value - e3[i - 1].value) / e3[i - 1].value) * 100,
+    });
+  }
+  return result;
+}
+
+/**
+ * DPO - Detrended Price Oscillator
+ */
+export function calculateDPO(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const sma = calculateSMA(data, period);
+  const smaMap = new Map(sma.map((d) => [d.time, d.value]));
+  const shift = Math.floor(period / 2) + 1;
+  const result: IndicatorData[] = [];
+
+  for (let i = shift; i < data.length; i++) {
+    const smaVal = smaMap.get(data[i - shift]?.time);
+    if (smaVal !== undefined) {
+      result.push({ time: data[i].time, value: data[i].close - smaVal });
+    }
+  }
+  return result;
+}
+
+/**
+ * KST - Know Sure Thing
+ */
+export function calculateKST(
+  data: OHLCData[],
+): IndicatorData[] {
+  const roc1 = calculateROC(data, 10);
+  const roc2 = calculateROC(data, 15);
+  const roc3 = calculateROC(data, 20);
+  const roc4 = calculateROC(data, 30);
+
+  const toOhlc = (arr: IndicatorData[]): OHLCData[] =>
+    arr.map((d) => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value }));
+
+  const sma1 = calculateSMA(toOhlc(roc1), 10);
+  const sma2 = calculateSMA(toOhlc(roc2), 10);
+  const sma3 = calculateSMA(toOhlc(roc3), 10);
+  const sma4 = calculateSMA(toOhlc(roc4), 15);
+
+  const maps = [sma1, sma2, sma3, sma4].map((a) => new Map(a.map((d) => [d.time, d.value])));
+  const result: IndicatorData[] = [];
+
+  for (const d of sma4) {
+    const v1 = maps[0].get(d.time);
+    const v2 = maps[1].get(d.time);
+    const v3 = maps[2].get(d.time);
+    if (v1 !== undefined && v2 !== undefined && v3 !== undefined) {
+      result.push({ time: d.time, value: v1 * 1 + v2 * 2 + v3 * 3 + d.value * 4 });
+    }
+  }
+  return result;
+}
+
+/**
+ * Coppock Curve
+ */
+export function calculateCoppock(
+  data: OHLCData[],
+  wmaPeriod: number = 10,
+  longROC: number = 14,
+  shortROC: number = 11,
+): IndicatorData[] {
+  const roc1 = calculateROC(data, longROC);
+  const roc2 = calculateROC(data, shortROC);
+  const roc2Map = new Map(roc2.map((d) => [d.time, d.value]));
+
+  const combined: OHLCData[] = [];
+  for (const d of roc1) {
+    const v2 = roc2Map.get(d.time);
+    if (v2 !== undefined) {
+      const val = d.value + v2;
+      combined.push({ time: d.time, open: val, high: val, low: val, close: val });
+    }
+  }
+  return calculateWMA(combined, wmaPeriod);
+}
+
+/**
+ * Elder Ray - Bull/Bear Power
+ */
+export function calculateElderRay(
+  data: OHLCData[],
+  period: number = 13,
+): ElderRayData[] {
+  const ema = calculateEMA(data, period);
+  const emaMap = new Map(ema.map((d) => [d.time, d.value]));
+  const result: ElderRayData[] = [];
+
+  for (const d of data) {
+    const emaVal = emaMap.get(d.time);
+    if (emaVal !== undefined) {
+      result.push({ time: d.time, bull: d.high - emaVal, bear: d.low - emaVal });
+    }
+  }
+  return result;
+}
+
+// --- GROUP 3: VOLATILITY INDICATORS (6) ---
+
+/**
+ * Standard Deviation
+ */
+export function calculateStdDev(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += data[i - j].close;
+    const mean = sum / period;
+    let sumSq = 0;
+    for (let j = 0; j < period; j++) sumSq += Math.pow(data[i - j].close - mean, 2);
+    result.push({ time: data[i].time, value: Math.sqrt(sumSq / period) });
+  }
+  return result;
+}
+
+/**
+ * Historical Volatility
+ */
+export function calculateHistVolatility(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    let sumLogR = 0;
+    const logReturns: number[] = [];
+    for (let j = 0; j < period; j++) {
+      const lr = Math.log(data[i - j].close / data[i - j - 1].close);
+      logReturns.push(lr);
+      sumLogR += lr;
+    }
+    const mean = sumLogR / period;
+    let sumSq = 0;
+    for (const lr of logReturns) sumSq += Math.pow(lr - mean, 2);
+    result.push({ time: data[i].time, value: Math.sqrt(sumSq / (period - 1)) * Math.sqrt(252) * 100 });
+  }
+  return result;
+}
+
+/**
+ * Chaikin Volatility
+ */
+export function calculateChaikinVolatility(
+  data: OHLCData[],
+  emaPeriod: number = 10,
+  rocPeriod: number = 10,
+): IndicatorData[] {
+  // EMA of (High - Low)
+  const hlData: OHLCData[] = data.map((d) => {
+    const val = d.high - d.low;
+    return { time: d.time, open: val, high: val, low: val, close: val };
+  });
+  const emaHL = calculateEMA(hlData, emaPeriod);
+  const result: IndicatorData[] = [];
+
+  for (let i = rocPeriod; i < emaHL.length; i++) {
+    const prev = emaHL[i - rocPeriod].value;
+    result.push({
+      time: emaHL[i].time,
+      value: prev === 0 ? 0 : ((emaHL[i].value - prev) / prev) * 100,
+    });
+  }
+  return result;
+}
+
+/**
+ * Mass Index
+ */
+export function calculateMassIndex(
+  data: OHLCData[],
+  emaPeriod: number = 9,
+  sumPeriod: number = 25,
+): IndicatorData[] {
+  const hlData: OHLCData[] = data.map((d) => {
+    const val = d.high - d.low;
+    return { time: d.time, open: val, high: val, low: val, close: val };
+  });
+  const ema1 = calculateEMA(hlData, emaPeriod);
+  const ema2 = calculateEMA(
+    ema1.map((d) => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value })),
+    emaPeriod,
+  );
+  const ema2Map = new Map(ema2.map((d) => [d.time, d.value]));
+
+  const ratios: IndicatorData[] = [];
+  for (const d of ema1) {
+    const v2 = ema2Map.get(d.time);
+    if (v2 !== undefined && v2 !== 0) {
+      ratios.push({ time: d.time, value: d.value / v2 });
+    }
+  }
+
+  const result: IndicatorData[] = [];
+  for (let i = sumPeriod - 1; i < ratios.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < sumPeriod; j++) sum += ratios[i - j].value;
+    result.push({ time: ratios[i].time, value: sum });
+  }
+  return result;
+}
+
+/**
+ * Ulcer Index
+ */
+export function calculateUlcerIndex(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let maxClose = -Infinity;
+    for (let j = 0; j <= i; j++) {
+      if (data[j].close > maxClose) maxClose = data[j].close;
+    }
+    let sumSq = 0;
+    for (let j = 0; j < period; j++) {
+      const pctDrawdown = ((data[i - j].close - maxClose) / maxClose) * 100;
+      sumSq += pctDrawdown * pctDrawdown;
+    }
+    result.push({ time: data[i].time, value: Math.sqrt(sumSq / period) });
+  }
+  return result;
+}
+
+/**
+ * RVI - Relative Volatility Index
+ */
+export function calculateRVI(
+  data: OHLCData[],
+  period: number = 10,
+  smoothing: number = 14,
+): IndicatorData[] {
+  const stdDevs: number[] = [];
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += data[i - j].close;
+    const mean = sum / period;
+    let sumSq = 0;
+    for (let j = 0; j < period; j++) sumSq += Math.pow(data[i - j].close - mean, 2);
+    stdDevs.push(Math.sqrt(sumSq / period));
+  }
+
+  const result: IndicatorData[] = [];
+  let avgUp = 0, avgDown = 0;
+
+  for (let i = 1; i < stdDevs.length; i++) {
+    const dataIdx = i + period - 1;
+    const change = data[dataIdx].close - data[dataIdx - 1].close;
+    const sd = stdDevs[i];
+
+    if (i <= smoothing) {
+      if (change > 0) avgUp += sd;
+      else avgDown += sd;
+      if (i === smoothing) {
+        avgUp /= smoothing;
+        avgDown /= smoothing;
+        const rvi = (avgUp + avgDown) === 0 ? 50 : (avgUp / (avgUp + avgDown)) * 100;
+        result.push({ time: data[dataIdx].time, value: rvi });
+      }
+    } else {
+      avgUp = (avgUp * (smoothing - 1) + (change > 0 ? sd : 0)) / smoothing;
+      avgDown = (avgDown * (smoothing - 1) + (change <= 0 ? sd : 0)) / smoothing;
+      const rvi = (avgUp + avgDown) === 0 ? 50 : (avgUp / (avgUp + avgDown)) * 100;
+      result.push({ time: data[dataIdx].time, value: rvi });
+    }
+  }
+  return result;
+}
+
+// --- GROUP 4: VOLUME INDICATORS (6) ---
+
+/**
+ * VWMA - Volume Weighted Moving Average
+ */
+export function calculateVWMA(
+  data: OHLCData[],
+  period: number = 20,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let sumPV = 0, sumV = 0;
+    for (let j = 0; j < period; j++) {
+      const v = data[i - j].volume || 1;
+      sumPV += data[i - j].close * v;
+      sumV += v;
+    }
+    result.push({ time: data[i].time, value: sumV === 0 ? data[i].close : sumPV / sumV });
+  }
+  return result;
+}
+
+/**
+ * Accumulation/Distribution Line
+ */
+export function calculateADLine(data: OHLCData[]): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  let ad = 0;
+
+  for (const d of data) {
+    const range = d.high - d.low;
+    const clv = range === 0 ? 0 : ((d.close - d.low) - (d.high - d.close)) / range;
+    ad += clv * (d.volume || 1);
+    result.push({ time: d.time, value: ad });
+  }
+  return result;
+}
+
+/**
+ * Force Index
+ */
+export function calculateForceIndex(
+  data: OHLCData[],
+  period: number = 13,
+): IndicatorData[] {
+  const raw: OHLCData[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const val = (data[i].close - data[i - 1].close) * (data[i].volume || 1);
+    raw.push({ time: data[i].time, open: val, high: val, low: val, close: val });
+  }
+  return calculateEMA(raw, period);
+}
+
+/**
+ * Ease of Movement
+ */
+export function calculateEOM(
+  data: OHLCData[],
+  period: number = 14,
+): IndicatorData[] {
+  const raw: OHLCData[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const dm = ((data[i].high + data[i].low) / 2) - ((data[i - 1].high + data[i - 1].low) / 2);
+    const vol = data[i].volume || 1;
+    const range = data[i].high - data[i].low;
+    const br = range === 0 ? 0 : vol / range;
+    const eom = br === 0 ? 0 : dm / br;
+    raw.push({ time: data[i].time, open: eom, high: eom, low: eom, close: eom });
+  }
+  return calculateSMA(raw, period);
+}
+
+/**
+ * NVI - Negative Volume Index
+ */
+export function calculateNVI(data: OHLCData[]): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  let nvi = 1000;
+  result.push({ time: data[0].time, value: nvi });
+
+  for (let i = 1; i < data.length; i++) {
+    if ((data[i].volume || 0) < (data[i - 1].volume || 0)) {
+      nvi = nvi * (1 + (data[i].close - data[i - 1].close) / data[i - 1].close);
+    }
+    result.push({ time: data[i].time, value: nvi });
+  }
+  return result;
+}
+
+/**
+ * PVI - Positive Volume Index
+ */
+export function calculatePVI(data: OHLCData[]): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  let pvi = 1000;
+  result.push({ time: data[0].time, value: pvi });
+
+  for (let i = 1; i < data.length; i++) {
+    if ((data[i].volume || 0) > (data[i - 1].volume || 0)) {
+      pvi = pvi * (1 + (data[i].close - data[i - 1].close) / data[i - 1].close);
+    }
+    result.push({ time: data[i].time, value: pvi });
+  }
+  return result;
+}
+
+// --- GROUP 5: ADVANCED OSCILLATORS (8) ---
+
+/**
+ * Ultimate Oscillator
+ */
+export function calculateUltimateOscillator(
+  data: OHLCData[],
+  period1: number = 7,
+  period2: number = 14,
+  period3: number = 28,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  const bps: number[] = [];
+  const trs: number[] = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const bp = data[i].close - Math.min(data[i].low, data[i - 1].close);
+    const tr = Math.max(data[i].high, data[i - 1].close) - Math.min(data[i].low, data[i - 1].close);
+    bps.push(bp);
+    trs.push(tr);
+  }
+
+  for (let i = period3 - 1; i < bps.length; i++) {
+    let bpSum1 = 0, trSum1 = 0, bpSum2 = 0, trSum2 = 0, bpSum3 = 0, trSum3 = 0;
+    for (let j = 0; j < period1; j++) { bpSum1 += bps[i - j]; trSum1 += trs[i - j]; }
+    for (let j = 0; j < period2; j++) { bpSum2 += bps[i - j]; trSum2 += trs[i - j]; }
+    for (let j = 0; j < period3; j++) { bpSum3 += bps[i - j]; trSum3 += trs[i - j]; }
+
+    const avg1 = trSum1 === 0 ? 0 : bpSum1 / trSum1;
+    const avg2 = trSum2 === 0 ? 0 : bpSum2 / trSum2;
+    const avg3 = trSum3 === 0 ? 0 : bpSum3 / trSum3;
+
+    result.push({
+      time: data[i + 1].time,
+      value: ((4 * avg1 + 2 * avg2 + avg3) / 7) * 100,
+    });
+  }
+  return result;
+}
+
+/**
+ * Awesome Oscillator
+ */
+export function calculateAwesomeOscillator(data: OHLCData[]): IndicatorData[] {
+  const hl2Data: OHLCData[] = data.map((d) => {
+    const val = (d.high + d.low) / 2;
+    return { time: d.time, open: val, high: val, low: val, close: val };
+  });
+  const sma5 = calculateSMA(hl2Data, 5);
+  const sma34 = calculateSMA(hl2Data, 34);
+  const sma34Map = new Map(sma34.map((d) => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+
+  for (const d of sma5) {
+    const v34 = sma34Map.get(d.time);
+    if (v34 !== undefined) {
+      result.push({ time: d.time, value: d.value - v34 });
+    }
+  }
+  return result;
+}
+
+/**
+ * Stochastic RSI
+ */
+export function calculateStochRSI(
+  data: OHLCData[],
+  rsiPeriod: number = 14,
+  stochPeriod: number = 14,
+  kSmooth: number = 3,
+  dSmooth: number = 3,
+): StochRSIData[] {
+  const rsi = calculateRSI(data, rsiPeriod);
+  const result: StochRSIData[] = [];
+  const kValues: IndicatorData[] = [];
+
+  for (let i = stochPeriod - 1; i < rsi.length; i++) {
+    let minRSI = Infinity, maxRSI = -Infinity;
+    for (let j = 0; j < stochPeriod; j++) {
+      if (rsi[i - j].value < minRSI) minRSI = rsi[i - j].value;
+      if (rsi[i - j].value > maxRSI) maxRSI = rsi[i - j].value;
+    }
+    const range = maxRSI - minRSI;
+    const k = range === 0 ? 50 : ((rsi[i].value - minRSI) / range) * 100;
+    kValues.push({ time: rsi[i].time, value: k });
+  }
+
+  // Smooth K
+  const smoothedK: IndicatorData[] = [];
+  for (let i = kSmooth - 1; i < kValues.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < kSmooth; j++) sum += kValues[i - j].value;
+    smoothedK.push({ time: kValues[i].time, value: sum / kSmooth });
+  }
+
+  // Smooth D from K
+  for (let i = dSmooth - 1; i < smoothedK.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < dSmooth; j++) sum += smoothedK[i - j].value;
+    result.push({ time: smoothedK[i].time, k: smoothedK[i].value, d: sum / dSmooth });
+  }
+  return result;
+}
+
+/**
+ * TSI - True Strength Index
+ */
+export function calculateTSI(
+  data: OHLCData[],
+  longPeriod: number = 25,
+  shortPeriod: number = 13,
+): IndicatorData[] {
+  const toOhlc = (arr: IndicatorData[]): OHLCData[] =>
+    arr.map((d) => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value }));
+
+  const pc: IndicatorData[] = [];
+  const absPC: IndicatorData[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const diff = data[i].close - data[i - 1].close;
+    pc.push({ time: data[i].time, value: diff });
+    absPC.push({ time: data[i].time, value: Math.abs(diff) });
+  }
+
+  const dsEma1 = calculateEMA(toOhlc(pc), longPeriod);
+  const dsEma2 = calculateEMA(toOhlc(dsEma1), shortPeriod);
+  const adsEma1 = calculateEMA(toOhlc(absPC), longPeriod);
+  const adsEma2 = calculateEMA(toOhlc(adsEma1), shortPeriod);
+
+  const adsMap = new Map(adsEma2.map((d) => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+
+  for (const d of dsEma2) {
+    const absVal = adsMap.get(d.time);
+    if (absVal !== undefined && absVal !== 0) {
+      result.push({ time: d.time, value: (d.value / absVal) * 100 });
+    }
+  }
+  return result;
+}
+
+/**
+ * PPO - Percentage Price Oscillator
+ */
+export function calculatePPO(
+  data: OHLCData[],
+  fastPeriod: number = 12,
+  slowPeriod: number = 26,
+  signalPeriod: number = 9,
+): MACDData[] {
+  const fastEMA = calculateEMA(data, fastPeriod);
+  const slowEMA = calculateEMA(data, slowPeriod);
+  const slowMap = new Map(slowEMA.map((d) => [d.time, d.value]));
+
+  const ppoLine: IndicatorData[] = [];
+  for (const f of fastEMA) {
+    const s = slowMap.get(f.time);
+    if (s !== undefined && s !== 0) {
+      ppoLine.push({ time: f.time, value: ((f.value - s) / s) * 100 });
+    }
+  }
+
+  const signalEMA = calculateEMA(
+    ppoLine.map((d) => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value })),
+    signalPeriod,
+  );
+  const signalMap = new Map(signalEMA.map((d) => [d.time, d.value]));
+
+  const result: MACDData[] = [];
+  for (const d of ppoLine) {
+    const sig = signalMap.get(d.time);
+    if (sig !== undefined) {
+      result.push({ time: d.time, macd: d.value, signal: sig, histogram: d.value - sig });
+    }
+  }
+  return result;
+}
+
+/**
+ * Fisher Transform
+ */
+export function calculateFisherTransform(
+  data: OHLCData[],
+  period: number = 9,
+): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  let prevFisher = 0;
+
+  for (let i = period - 1; i < data.length; i++) {
+    let maxH = -Infinity, minL = Infinity;
+    for (let j = 0; j < period; j++) {
+      if (data[i - j].high > maxH) maxH = data[i - j].high;
+      if (data[i - j].low < minL) minL = data[i - j].low;
+    }
+    const hl2 = (data[i].high + data[i].low) / 2;
+    const range = maxH - minL;
+    let val = range === 0 ? 0 : 2 * ((hl2 - minL) / range - 0.5);
+    val = Math.max(-0.999, Math.min(0.999, val));
+    const fisher = 0.5 * Math.log((1 + val) / (1 - val)) + 0.5 * prevFisher;
+    prevFisher = fisher;
+    result.push({ time: data[i].time, value: fisher });
+  }
+  return result;
+}
+
+/**
+ * Connors RSI
+ */
+export function calculateConnorsRSI(
+  data: OHLCData[],
+  rsiPeriod: number = 3,
+  streakPeriod: number = 2,
+  rocPeriod: number = 100,
+): IndicatorData[] {
+  // RSI of close
+  const rsi = calculateRSI(data, rsiPeriod);
+  const rsiMap = new Map(rsi.map((d) => [d.time, d.value]));
+
+  // Streak: consecutive up/down days
+  const streaks: number[] = [0];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i].close > data[i - 1].close) {
+      streaks.push(streaks[i - 1] > 0 ? streaks[i - 1] + 1 : 1);
+    } else if (data[i].close < data[i - 1].close) {
+      streaks.push(streaks[i - 1] < 0 ? streaks[i - 1] - 1 : -1);
+    } else {
+      streaks.push(0);
+    }
+  }
+
+  // RSI of streak
+  const streakOhlc: OHLCData[] = data.map((d, i) => ({
+    time: d.time, open: streaks[i], high: streaks[i], low: streaks[i], close: streaks[i],
+  }));
+  const streakRSI = calculateRSI(streakOhlc, streakPeriod);
+  const streakMap = new Map(streakRSI.map((d) => [d.time, d.value]));
+
+  // Percentile rank of ROC
+  const result: IndicatorData[] = [];
+  for (let i = rocPeriod; i < data.length; i++) {
+    const curROC = ((data[i].close - data[i - 1].close) / data[i - 1].close) * 100;
+    let count = 0;
+    for (let j = 1; j <= rocPeriod; j++) {
+      const pastROC = ((data[i - j].close - data[i - j - 1]?.close) / (data[i - j - 1]?.close || 1)) * 100;
+      if (pastROC < curROC) count++;
+    }
+    const pctRank = (count / rocPeriod) * 100;
+
+    const r = rsiMap.get(data[i].time);
+    const s = streakMap.get(data[i].time);
+    if (r !== undefined && s !== undefined) {
+      result.push({ time: data[i].time, value: (r + s + pctRank) / 3 });
+    }
+  }
+  return result;
+}
+
+/**
+ * SMI Ergodic Oscillator
+ */
+export function calculateSMIErgodic(
+  data: OHLCData[],
+  shortPeriod: number = 5,
+  longPeriod: number = 20,
+  signalPeriod: number = 5,
+): MACDData[] {
+  const tsi = calculateTSI(data, longPeriod, shortPeriod);
+  const signalEMA = calculateEMA(
+    tsi.map((d) => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value })),
+    signalPeriod,
+  );
+  const signalMap = new Map(signalEMA.map((d) => [d.time, d.value]));
+
+  const result: MACDData[] = [];
+  for (const d of tsi) {
+    const sig = signalMap.get(d.time);
+    if (sig !== undefined) {
+      result.push({ time: d.time, macd: d.value, signal: sig, histogram: d.value - sig });
+    }
+  }
+  return result;
+}
+
+// --- GROUP 6: CHANNEL / BAND INDICATORS (4) ---
+
+/**
+ * Linear Regression Channel
+ */
+export function calculateLinRegChannel(
+  data: OHLCData[],
+  period: number = 100,
+  deviations: number = 2,
+): ChannelData[] {
+  const result: ChannelData[] = [];
+
+  for (let i = period - 1; i < data.length; i++) {
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (let j = 0; j < period; j++) {
+      sumX += j;
+      sumY += data[i - period + 1 + j].close;
+      sumXY += j * data[i - period + 1 + j].close;
+      sumX2 += j * j;
+    }
+    const slope = (period * sumXY - sumX * sumY) / (period * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / period;
+    const regValue = intercept + slope * (period - 1);
+
+    // Calculate standard error
+    let sumResidSq = 0;
+    for (let j = 0; j < period; j++) {
+      const predicted = intercept + slope * j;
+      sumResidSq += Math.pow(data[i - period + 1 + j].close - predicted, 2);
+    }
+    const stdErr = Math.sqrt(sumResidSq / period);
+
+    result.push({
+      time: data[i].time,
+      upper: regValue + deviations * stdErr,
+      middle: regValue,
+      lower: regValue - deviations * stdErr,
+    });
+  }
+  return result;
+}
+
+/**
+ * Moving Average Envelope
+ */
+export function calculateMAEnvelope(
+  data: OHLCData[],
+  period: number = 20,
+  percentage: number = 2.5,
+): ChannelData[] {
+  const sma = calculateSMA(data, period);
+  return sma.map((d) => ({
+    time: d.time,
+    upper: d.value * (1 + percentage / 100),
+    middle: d.value,
+    lower: d.value * (1 - percentage / 100),
+  }));
+}
+
+/**
+ * Price Channel (Highest High / Lowest Low)
+ */
+export function calculatePriceChannel(
+  data: OHLCData[],
+  period: number = 20,
+): ChannelData[] {
+  const result: ChannelData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    let high = -Infinity, low = Infinity;
+    for (let j = 1; j <= period; j++) {
+      if (data[i - j].high > high) high = data[i - j].high;
+      if (data[i - j].low < low) low = data[i - j].low;
+    }
+    result.push({ time: data[i].time, upper: high, middle: (high + low) / 2, lower: low });
+  }
+  return result;
+}
+
+/**
+ * Chandelier Exit
+ */
+export function calculateChandelierExit(
+  data: OHLCData[],
+  period: number = 22,
+  multiplier: number = 3,
+): ChannelData[] {
+  const atr = calculateATR(data, period);
+  const atrMap = new Map(atr.map((d) => [d.time, d.value]));
+  const result: ChannelData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    let maxH = -Infinity, minL = Infinity;
+    for (let j = 0; j < period; j++) {
+      if (data[i - j].high > maxH) maxH = data[i - j].high;
+      if (data[i - j].low < minL) minL = data[i - j].low;
+    }
+    const atrVal = atrMap.get(data[i].time) || 0;
+    const exitLong = maxH - multiplier * atrVal;
+    const exitShort = minL + multiplier * atrVal;
+    result.push({
+      time: data[i].time,
+      upper: exitShort,
+      middle: (exitLong + exitShort) / 2,
+      lower: exitLong,
+    });
+  }
+  return result;
+}
+
+// ============================================================================
+// PREMIUM MARKETPLACE-ONLY INDICATORS (40 unique, creative indicators)
+// These are NOT available in the free chart panel
+// ============================================================================
+
+export interface TrendRibbonData { time: number; ema1: number; ema2: number; ema3: number; ema4: number; ema5: number; ema6: number; ema7: number; ema8: number; }
+export interface DualLineData { time: number; upper: number; lower: number; }
+
+// --- 1. Trend Pulse: ADX strength × RSI direction normalized 0-100 ---
+export function calculateTrendPulse(data: OHLCData[], adxPeriod: number = 14, rsiPeriod: number = 14): IndicatorData[] {
+  const adx = calculateADX(data, adxPeriod);
+  const rsi = calculateRSI(data, rsiPeriod);
+  const adxMap = new Map(adx.map(d => [d.time, d.value]));
+  const rsiMap = new Map(rsi.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  for (const d of data) {
+    const a = adxMap.get(d.time); const r = rsiMap.get(d.time);
+    if (a !== undefined && r !== undefined) {
+      // Blend: strong trend (ADX>25) + directional bias (RSI distance from 50)
+      const dirBias = (r - 50) / 50; // -1 to 1
+      const strength = Math.min(a / 50, 1); // 0 to 1
+      result.push({ time: d.time, value: 50 + dirBias * strength * 50 });
+    }
+  }
+  return result;
+}
+
+// --- 2. Market Regime Detector: 0=ranging, 50=transitioning, 100=trending ---
+export function calculateMarketRegime(data: OHLCData[], period: number = 20): IndicatorData[] {
+  const adx = calculateADX(data, period);
+  const atr = calculateATR(data, period);
+  const adxMap = new Map(adx.map(d => [d.time, d.value]));
+  const atrMap = new Map(atr.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  const atrValues: number[] = [];
+  for (const d of data) {
+    const a = adxMap.get(d.time); const t = atrMap.get(d.time);
+    if (a !== undefined && t !== undefined) {
+      atrValues.push(t);
+      const avgATR = atrValues.length >= period ? atrValues.slice(-period).reduce((s, v) => s + v, 0) / period : t;
+      const volExpansion = avgATR === 0 ? 1 : t / avgATR;
+      const trendScore = Math.min(a / 40, 1) * 0.6 + Math.min(volExpansion, 2) / 2 * 0.4;
+      result.push({ time: d.time, value: trendScore * 100 });
+    }
+  }
+  return result;
+}
+
+// --- 3. Trend Strength Composite: consensus of EMA slope + ADX + momentum ---
+export function calculateTrendComposite(data: OHLCData[], period: number = 14): IndicatorData[] {
+  const ema = calculateEMA(data, period);
+  const adx = calculateADX(data, period);
+  const mom = calculateMomentum(data, period);
+  const emaMap = new Map(ema.map(d => [d.time, d.value]));
+  const adxMap = new Map(adx.map(d => [d.time, d.value]));
+  const momMap = new Map(mom.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  let prevEma = 0;
+  for (const d of data) {
+    const e = emaMap.get(d.time); const a = adxMap.get(d.time); const m = momMap.get(d.time);
+    if (e !== undefined && a !== undefined && m !== undefined) {
+      const slope = prevEma === 0 ? 0 : (e - prevEma) / prevEma * 1000;
+      prevEma = e;
+      const slopeScore = Math.max(-1, Math.min(1, slope));
+      const adxScore = Math.min(a / 50, 1);
+      const momScore = m === 0 ? 0 : Math.max(-1, Math.min(1, m / (Math.abs(m) + d.close * 0.01)));
+      result.push({ time: d.time, value: ((slopeScore + momScore) / 2 * adxScore) * 50 + 50 });
+    }
+  }
+  return result;
+}
+
+// --- 4. Composite Breadth Score: how many sub-signals agree ---
+export function calculateCompositeBreadth(data: OHLCData[]): IndicatorData[] {
+  const rsi = calculateRSI(data, 14);
+  const macd = calculateMACD(data, 12, 26, 9);
+  const stoch = calculateStochastic(data, 14, 3);
+  const cci = calculateCCI(data, 20);
+  const rsiMap = new Map(rsi.map(d => [d.time, d.value]));
+  const macdMap = new Map(macd.map(d => [d.time, d.macd > d.signal ? 1 : -1]));
+  const stochKMap = new Map(stoch.k.map(d => [d.time, d.value]));
+  const stochDMap = new Map(stoch.d.map(d => [d.time, d.value]));
+  const cciMap = new Map(cci.map(d => [d.time, d.value > 0 ? 1 : -1]));
+  const ema20 = calculateEMA(data, 20);
+  const emaMap = new Map(ema20.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  for (const d of data) {
+    const signals: number[] = [];
+    const r = rsiMap.get(d.time); if (r !== undefined) signals.push(r > 50 ? 1 : -1);
+    const m = macdMap.get(d.time); if (m !== undefined) signals.push(m);
+    const sk = stochKMap.get(d.time); const sd = stochDMap.get(d.time); if (sk !== undefined && sd !== undefined) signals.push(sk > sd ? 1 : -1);
+    const c = cciMap.get(d.time); if (c !== undefined) signals.push(c);
+    const e = emaMap.get(d.time); if (e !== undefined) signals.push(d.close > e ? 1 : -1);
+    if (signals.length >= 3) {
+      const sum = signals.reduce((a, b) => a + b, 0);
+      result.push({ time: d.time, value: (sum / signals.length) * 50 + 50 }); // 0-100
+    }
+  }
+  return result;
+}
+
+// --- 5. Reversal Signal Detector: composite oversold+volume+candle pattern ---
+export function calculateReversalSignal(data: OHLCData[], rsiPeriod: number = 14): IndicatorData[] {
+  const rsi = calculateRSI(data, rsiPeriod);
+  const rsiMap = new Map(rsi.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const r = rsiMap.get(data[i].time);
+    if (r === undefined) continue;
+    const body = data[i].close - data[i].open;
+    const range = data[i].high - data[i].low || 0.0001;
+    const lowerWick = Math.min(data[i].open, data[i].close) - data[i].low;
+    const upperWick = data[i].high - Math.max(data[i].open, data[i].close);
+    const vol = data[i].volume || 1; const prevVol = data[i - 1].volume || 1;
+    const volSpike = vol / prevVol;
+    // Bullish reversal score
+    let bullScore = 0;
+    if (r < 30) bullScore += (30 - r) / 30; // Oversold RSI
+    if (lowerWick / range > 0.6) bullScore += 0.3; // Hammer
+    if (volSpike > 1.5) bullScore += 0.2; // Volume spike
+    if (body > 0 && data[i - 1].close < data[i - 1].open) bullScore += 0.2; // Bullish after bearish
+    // Bearish reversal score
+    let bearScore = 0;
+    if (r > 70) bearScore += (r - 70) / 30;
+    if (upperWick / range > 0.6) bearScore += 0.3;
+    if (volSpike > 1.5) bearScore += 0.2;
+    if (body < 0 && data[i - 1].close > data[i - 1].open) bearScore += 0.2;
+    result.push({ time: data[i].time, value: (bullScore - bearScore) * 50 + 50 });
+  }
+  return result;
+}
+
+// --- 6. Predictive Range: projected next-bar expected range ---
+export function calculatePredictiveRange(data: OHLCData[], period: number = 14): ChannelData[] {
+  const atr = calculateATR(data, period);
+  const atrMap = new Map(atr.map(d => [d.time, d.value]));
+  const result: ChannelData[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const a = atrMap.get(data[i].time);
+    if (a !== undefined) {
+      const momentum = (data[i].close - data[i - 1].close);
+      const center = data[i].close + momentum * 0.5;
+      result.push({ time: data[i].time, upper: center + a, middle: center, lower: center - a });
+    }
+  }
+  return result;
+}
+
+// --- 7. Breakout Probability: squeeze detection + energy build-up ---
+export function calculateBreakoutProb(data: OHLCData[], bbPeriod: number = 20, keltPeriod: number = 20): IndicatorData[] {
+  const bb = calculateBollingerBands(data, bbPeriod, 2);
+  const kelt = calculateKeltnerChannels(data, keltPeriod, 1.5);
+  const bbMap = new Map(bb.map(d => [d.time, { u: d.upper, l: d.lower }]));
+  const keltMap = new Map(kelt.map(d => [d.time, { u: d.upper, l: d.lower }]));
+  const result: IndicatorData[] = [];
+  let squeezeCount = 0;
+  for (const d of data) {
+    const b = bbMap.get(d.time); const k = keltMap.get(d.time);
+    if (b && k) {
+      const isSqueeze = b.u < k.u && b.l > k.l;
+      if (isSqueeze) squeezeCount++;
+      else squeezeCount = Math.max(0, squeezeCount - 2);
+      // Probability increases with squeeze duration
+      const prob = Math.min(squeezeCount * 5, 100);
+      result.push({ time: d.time, value: prob });
+    }
+  }
+  return result;
+}
+
+// --- 8. Sentiment Oscillator: candle pattern scoring ---
+export function calculateSentimentOsc(data: OHLCData[], smooth: number = 5): IndicatorData[] {
+  const raw: IndicatorData[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const d = data[i]; const p = data[i - 1];
+    const body = d.close - d.open; const range = d.high - d.low || 0.0001;
+    const bodyRatio = Math.abs(body) / range;
+    const lowerWick = (Math.min(d.open, d.close) - d.low) / range;
+    const upperWick = (d.high - Math.max(d.open, d.close)) / range;
+    let score = 0;
+    // Bullish patterns
+    if (body > 0 && bodyRatio > 0.6) score += 2; // Strong bullish candle
+    if (lowerWick > 0.6 && bodyRatio < 0.3) score += 3; // Hammer/pin bar
+    if (body > 0 && p.close < p.open && d.close > p.open) score += 3; // Bullish engulfing
+    if (Math.abs(body) / range < 0.1) score += 0; // Doji - neutral
+    // Bearish patterns
+    if (body < 0 && bodyRatio > 0.6) score -= 2;
+    if (upperWick > 0.6 && bodyRatio < 0.3) score -= 3; // Shooting star
+    if (body < 0 && p.close > p.open && d.close < p.open) score -= 3; // Bearish engulfing
+    raw.push({ time: d.time, value: score });
+  }
+  // Smooth
+  const result: IndicatorData[] = [];
+  for (let i = smooth - 1; i < raw.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < smooth; j++) sum += raw[i - j].value;
+    result.push({ time: raw[i].time, value: sum / smooth });
+  }
+  return result;
+}
+
+// --- 9. Whale Accumulation: volume-weighted OBV focusing on big blocks ---
+export function calculateWhaleAccumulation(data: OHLCData[], threshold: number = 1.5): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  let acc = 0;
+  // Calculate average volume
+  const avgVolWindow = 20;
+  for (let i = 0; i < data.length; i++) {
+    const vol = data[i].volume || 1;
+    let avgVol = vol;
+    if (i >= avgVolWindow) {
+      let sum = 0;
+      for (let j = 1; j <= avgVolWindow; j++) sum += (data[i - j].volume || 1);
+      avgVol = sum / avgVolWindow;
+    }
+    // Only count volume blocks above threshold * average
+    if (vol > avgVol * threshold) {
+      acc += data[i].close >= (i > 0 ? data[i - 1].close : data[i].open) ? vol : -vol;
+    }
+    result.push({ time: data[i].time, value: acc });
+  }
+  return result;
+}
+
+// --- 10. Smart Money Flow: weighted money flow emphasizing institutional bars ---
+export function calculateSmartMoneyFlow(data: OHLCData[], period: number = 14): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let smartFlow = 0;
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j];
+      const range = d.high - d.low || 0.0001;
+      const clv = ((d.close - d.low) - (d.high - d.close)) / range;
+      const vol = d.volume || 1;
+      // Weight by relative volume (institutional = high vol)
+      const relVol = j > 0 ? vol / (data[i - j - 1]?.volume || vol) : 1;
+      smartFlow += clv * vol * Math.min(relVol, 3);
+    }
+    result.push({ time: data[i].time, value: smartFlow });
+  }
+  return result;
+}
+
+// --- 11. Volume Climax: detects extreme volume spikes ---
+export function calculateVolumeClimax(data: OHLCData[], period: number = 20, threshold: number = 2): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 1; j <= period; j++) sum += (data[i - j].volume || 1);
+    const avgVol = sum / period;
+    const curVol = data[i].volume || 1;
+    const ratio = avgVol === 0 ? 1 : curVol / avgVol;
+    const isClimax = ratio > threshold;
+    const direction = data[i].close >= data[i].open ? 1 : -1;
+    result.push({ time: data[i].time, value: isClimax ? direction * ratio * 10 : 0 });
+  }
+  return result;
+}
+
+// --- 12. Net Buying Pressure: buyer aggression from within-bar action ---
+export function calculateNetBuyingPressure(data: OHLCData[], period: number = 14): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let pressure = 0;
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j];
+      const range = d.high - d.low || 0.0001;
+      const buyPressure = (d.close - d.low) / range;
+      const sellPressure = (d.high - d.close) / range;
+      pressure += (buyPressure - sellPressure) * (d.volume || 1);
+    }
+    result.push({ time: data[i].time, value: pressure });
+  }
+  return result;
+}
+
+// --- 13. Order Flow Imbalance: approximated buy vs sell from candle structure ---
+export function calculateOrderFlowImbalance(data: OHLCData[], period: number = 10): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let buyVol = 0, sellVol = 0;
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j];
+      const range = d.high - d.low || 0.0001;
+      const buyFrac = (d.close - d.low) / range;
+      const vol = d.volume || 1;
+      buyVol += buyFrac * vol;
+      sellVol += (1 - buyFrac) * vol;
+    }
+    const total = buyVol + sellVol || 1;
+    result.push({ time: data[i].time, value: ((buyVol - sellVol) / total) * 100 });
+  }
+  return result;
+}
+
+// --- 14. Intraday Intensity Index ---
+export function calculateIntradayIntensity(data: OHLCData[], period: number = 21): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period - 1; i < data.length; i++) {
+    let iiSum = 0, volSum = 0;
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j]; const range = d.high - d.low || 0.0001;
+      iiSum += ((2 * d.close - d.high - d.low) / range) * (d.volume || 1);
+      volSum += (d.volume || 1);
+    }
+    result.push({ time: data[i].time, value: volSum === 0 ? 0 : (iiSum / volSum) * 100 });
+  }
+  return result;
+}
+
+// --- 15. Volume Momentum: rate of change of volume ---
+export function calculateVolumeMomentum(data: OHLCData[], period: number = 14): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    const curVol = data[i].volume || 1;
+    const prevVol = data[i - period].volume || 1;
+    result.push({ time: data[i].time, value: prevVol === 0 ? 0 : ((curVol - prevVol) / prevVol) * 100 });
+  }
+  return result;
+}
+
+// --- 16. Liquidity Heatmap: volume-weighted price levels proxy ---
+export function calculateLiquidityHeatmap(data: OHLCData[], period: number = 50): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period - 1; i < data.length; i++) {
+    let vpSum = 0, volSum = 0;
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j]; const tp = (d.high + d.low + d.close) / 3;
+      vpSum += tp * (d.volume || 1);
+      volSum += (d.volume || 1);
+    }
+    const vpoc = volSum === 0 ? data[i].close : vpSum / volSum;
+    // Return distance from VPOC as percentage
+    result.push({ time: data[i].time, value: ((data[i].close - vpoc) / vpoc) * 100 });
+  }
+  return result;
+}
+
+// --- 17. Volatility Squeeze: BB inside Keltner detection ---
+export function calculateVolatilitySqueeze(data: OHLCData[], period: number = 20): IndicatorData[] {
+  const bb = calculateBollingerBands(data, period, 2);
+  const kelt = calculateKeltnerChannels(data, period, 1.5);
+  const mom = calculateMomentum(data, 12);
+  const bbMap = new Map(bb.map(d => [d.time, { u: d.upper, l: d.lower }]));
+  const keltMap = new Map(kelt.map(d => [d.time, { u: d.upper, l: d.lower }]));
+  const momMap = new Map(mom.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  for (const d of data) {
+    const b = bbMap.get(d.time); const k = keltMap.get(d.time); const m = momMap.get(d.time);
+    if (b && k && m !== undefined) {
+      const squeeze = b.u < k.u && b.l > k.l;
+      result.push({ time: d.time, value: squeeze ? m * 0.5 : m });
+    }
+  }
+  return result;
+}
+
+// --- 18. Squeeze Momentum: momentum reading during squeeze ---
+export function calculateSqueezeMomentum(data: OHLCData[], period: number = 20): IndicatorData[] {
+  // Linear regression of close - midline(keltner)
+  const kelt = calculateKeltnerChannels(data, period, 1.5);
+  const keltMap = new Map(kelt.map(d => [d.time, d.middle]));
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    const mid = keltMap.get(data[i].time);
+    if (mid !== undefined) {
+      // Simple momentum relative to Keltner midline
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+      for (let j = 0; j < period; j++) {
+        const y = data[i - j].close - (keltMap.get(data[i - j].time) || mid);
+        sumX += j; sumY += y; sumXY += j * y; sumX2 += j * j;
+      }
+      const slope = (period * sumXY - sumX * sumY) / (period * sumX2 - sumX * sumX);
+      result.push({ time: data[i].time, value: slope * 1000 });
+    }
+  }
+  return result;
+}
+
+// --- 19. Volatility Ratio: current vs historical vol ---
+export function calculateVolatilityRatio(data: OHLCData[], shortPeriod: number = 5, longPeriod: number = 20): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = longPeriod; i < data.length; i++) {
+    let shortTR = 0, longTR = 0;
+    for (let j = 0; j < shortPeriod; j++) {
+      const idx = i - j;
+      shortTR += Math.max(data[idx].high - data[idx].low, Math.abs(data[idx].high - data[idx - 1].close), Math.abs(data[idx].low - data[idx - 1].close));
+    }
+    for (let j = 0; j < longPeriod; j++) {
+      const idx = i - j;
+      longTR += Math.max(data[idx].high - data[idx].low, Math.abs(data[idx].high - data[idx - 1].close), Math.abs(data[idx].low - data[idx - 1].close));
+    }
+    const ratio = (longTR / longPeriod) === 0 ? 1 : (shortTR / shortPeriod) / (longTR / longPeriod);
+    result.push({ time: data[i].time, value: ratio });
+  }
+  return result;
+}
+
+// --- 20. Range Expansion Index ---
+export function calculateRangeExpansion(data: OHLCData[], period: number = 14): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let avgRange = 0;
+    for (let j = 1; j <= period; j++) avgRange += (data[i - j].high - data[i - j].low);
+    avgRange /= period;
+    const curRange = data[i].high - data[i].low;
+    result.push({ time: data[i].time, value: avgRange === 0 ? 0 : (curRange / avgRange - 1) * 100 });
+  }
+  return result;
+}
+
+// --- 21. Choppy Market Index ---
+export function calculateChoppyMarket(data: OHLCData[], period: number = 14): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let trSum = 0; let maxH = -Infinity, minL = Infinity;
+    for (let j = 0; j < period; j++) {
+      const idx = i - j;
+      trSum += Math.max(data[idx].high - data[idx].low, Math.abs(data[idx].high - data[idx - 1].close), Math.abs(data[idx].low - data[idx - 1].close));
+      if (data[idx].high > maxH) maxH = data[idx].high;
+      if (data[idx].low < minL) minL = data[idx].low;
+    }
+    const hlRange = maxH - minL || 0.0001;
+    const chop = (Math.log10(trSum / hlRange) / Math.log10(period)) * 100;
+    result.push({ time: data[i].time, value: Math.max(0, Math.min(100, chop)) });
+  }
+  return result;
+}
+
+// --- 22. Fractal Dimension: market complexity 1=trending, 2=random ---
+export function calculateFractalDimension(data: OHLCData[], period: number = 30): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    const half = Math.floor(period / 2);
+    let n1 = 0, n2 = 0, n3 = 0;
+    let maxH1 = -Infinity, minL1 = Infinity, maxH2 = -Infinity, minL2 = Infinity, maxH3 = -Infinity, minL3 = Infinity;
+    for (let j = 0; j < half; j++) {
+      if (data[i - j].high > maxH1) maxH1 = data[i - j].high;
+      if (data[i - j].low < minL1) minL1 = data[i - j].low;
+    }
+    n1 = (maxH1 - minL1) / half;
+    for (let j = half; j < period; j++) {
+      if (data[i - j].high > maxH2) maxH2 = data[i - j].high;
+      if (data[i - j].low < minL2) minL2 = data[i - j].low;
+    }
+    n2 = (maxH2 - minL2) / half;
+    for (let j = 0; j < period; j++) {
+      if (data[i - j].high > maxH3) maxH3 = data[i - j].high;
+      if (data[i - j].low < minL3) minL3 = data[i - j].low;
+    }
+    n3 = (maxH3 - minL3) / period;
+    const dimen = (n1 + n2 > 0 && n3 > 0) ? (Math.log(n1 + n2) - Math.log(n3)) / Math.log(2) + 1 : 1.5;
+    result.push({ time: data[i].time, value: Math.max(1, Math.min(2, dimen)) });
+  }
+  return result;
+}
+
+// --- 23. Acceleration Bands ---
+export function calculateAccelerationBands(data: OHLCData[], period: number = 20): ChannelData[] {
+  const result: ChannelData[] = [];
+  for (let i = period - 1; i < data.length; i++) {
+    let sumMid = 0, sumUpper = 0, sumLower = 0;
+    for (let j = 0; j < period; j++) {
+      const d = data[i - j]; const range = d.high - d.low;
+      const accel = d.high === 0 ? 0 : range / d.high;
+      sumUpper += d.high * (1 + 2 * accel);
+      sumLower += d.low * (1 - 2 * accel);
+      sumMid += d.close;
+    }
+    result.push({ time: data[i].time, upper: sumUpper / period, middle: sumMid / period, lower: sumLower / period });
+  }
+  return result;
+}
+
+// --- 24. Adaptive Channel: volatility-adaptive price channel ---
+export function calculateAdaptiveChannel(data: OHLCData[], period: number = 20): ChannelData[] {
+  const atr = calculateATR(data, period);
+  const ema = calculateEMA(data, period);
+  const atrMap = new Map(atr.map(d => [d.time, d.value]));
+  const emaMap = new Map(ema.map(d => [d.time, d.value]));
+  const result: ChannelData[] = [];
+  for (const d of data) {
+    const a = atrMap.get(d.time); const e = emaMap.get(d.time);
+    if (a !== undefined && e !== undefined) {
+      const width = a * 2.5;
+      result.push({ time: d.time, upper: e + width, middle: e, lower: e - width });
+    }
+  }
+  return result;
+}
+
+// --- 25. Alpha Momentum: risk-adjusted momentum ---
+export function calculateAlphaMomentum(data: OHLCData[], period: number = 20): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    const returns = (data[i].close - data[i - period].close) / data[i - period].close;
+    let sumSq = 0;
+    for (let j = 0; j < period; j++) {
+      const r = (data[i - j].close - data[i - j - 1].close) / (data[i - j - 1].close || 1);
+      sumSq += r * r;
+    }
+    const vol = Math.sqrt(sumSq / period);
+    result.push({ time: data[i].time, value: vol === 0 ? 0 : (returns / vol) * 10 });
+  }
+  return result;
+}
+
+// --- 26. Efficiency Ratio Oscillator ---
+export function calculateEfficiencyRatio(data: OHLCData[], period: number = 10): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    const direction = Math.abs(data[i].close - data[i - period].close);
+    let volatility = 0;
+    for (let j = 0; j < period; j++) volatility += Math.abs(data[i - j].close - data[i - j - 1].close);
+    const er = volatility === 0 ? 0 : direction / volatility;
+    const sign = data[i].close > data[i - period].close ? 1 : -1;
+    result.push({ time: data[i].time, value: sign * er * 100 });
+  }
+  return result;
+}
+
+// --- 27. Trend Persistence ---
+export function calculateTrendPersistence(data: OHLCData[], period: number = 20): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let upCount = 0;
+    for (let j = 0; j < period; j++) {
+      if (data[i - j].close > data[i - j - 1].close) upCount++;
+    }
+    result.push({ time: data[i].time, value: (upCount / period) * 100 });
+  }
+  return result;
+}
+
+// --- 28. Multi-Timeframe Momentum ---
+export function calculateMTFMomentum(data: OHLCData[]): IndicatorData[] {
+  const mom5 = calculateROC(data, 5);
+  const mom10 = calculateROC(data, 10);
+  const mom20 = calculateROC(data, 20);
+  const m10Map = new Map(mom10.map(d => [d.time, d.value]));
+  const m20Map = new Map(mom20.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  for (const d of mom5) {
+    const m10 = m10Map.get(d.time); const m20 = m20Map.get(d.time);
+    if (m10 !== undefined && m20 !== undefined) {
+      result.push({ time: d.time, value: d.value * 0.5 + m10 * 0.3 + m20 * 0.2 });
+    }
+  }
+  return result;
+}
+
+// --- 29. Momentum Wave: sine-wave fitted cycle momentum ---
+export function calculateMomentumWave(data: OHLCData[], period: number = 20): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period; i < data.length; i++) {
+    let sinSum = 0, cosSum = 0;
+    for (let j = 0; j < period; j++) {
+      const phase = (2 * Math.PI * j) / period;
+      const val = data[i - j].close - data[i - period].close;
+      sinSum += val * Math.sin(phase);
+      cosSum += val * Math.cos(phase);
+    }
+    const amplitude = Math.sqrt(sinSum * sinSum + cosSum * cosSum) / period;
+    const phase = Math.atan2(sinSum, cosSum);
+    result.push({ time: data[i].time, value: amplitude * Math.sin(phase) });
+  }
+  return result;
+}
+
+// --- 30. Gap Momentum: cumulative overnight/gap impact ---
+export function calculateGapMomentum(data: OHLCData[], period: number = 14): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  const gaps: number[] = [];
+  for (let i = 1; i < data.length; i++) {
+    const gap = data[i].open - data[i - 1].close;
+    gaps.push(gap);
+    if (gaps.length >= period) {
+      let sum = 0;
+      for (let j = gaps.length - period; j < gaps.length; j++) sum += gaps[j];
+      result.push({ time: data[i].time, value: sum });
+    }
+  }
+  return result;
+}
+
+// --- 31. Heikin Ashi Trend: HA-based trend direction ---
+export function calculateHeikinAshiTrend(data: OHLCData[], period: number = 10): IndicatorData[] {
+  const ha: { time: number; close: number; open: number }[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const haClose = (data[i].open + data[i].high + data[i].low + data[i].close) / 4;
+    const haOpen = i === 0 ? (data[i].open + data[i].close) / 2 : (ha[i - 1].open + ha[i - 1].close) / 2;
+    ha.push({ time: data[i].time, close: haClose, open: haOpen });
+  }
+  const result: IndicatorData[] = [];
+  for (let i = period - 1; i < ha.length; i++) {
+    let bullCount = 0;
+    for (let j = 0; j < period; j++) {
+      if (ha[i - j].close > ha[i - j].open) bullCount++;
+    }
+    result.push({ time: ha[i].time, value: (bullCount / period) * 100 });
+  }
+  return result;
+}
+
+// --- 32. Cycle Detector: dominant period estimation ---
+export function calculateCycleDetector(data: OHLCData[], maxPeriod: number = 50): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = maxPeriod * 2; i < data.length; i++) {
+    let bestPeriod = 10; let bestCorr = -Infinity;
+    for (let p = 5; p <= maxPeriod; p++) {
+      let corr = 0;
+      for (let j = 0; j < p; j++) {
+        corr += (data[i - j].close - data[i - j - 1].close) * (data[i - j - p].close - data[i - j - p - 1].close);
+      }
+      if (corr > bestCorr) { bestCorr = corr; bestPeriod = p; }
+    }
+    result.push({ time: data[i].time, value: bestPeriod });
+  }
+  return result;
+}
+
+// --- 33. Adaptive RSI: volatility-adjusted period ---
+export function calculateAdaptiveRSI(data: OHLCData[], basePeriod: number = 14): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = basePeriod * 2; i < data.length; i++) {
+    // Calculate local volatility to adapt period
+    let vol = 0;
+    for (let j = 0; j < basePeriod; j++) {
+      vol += Math.abs(data[i - j].close - data[i - j - 1].close);
+    }
+    const avgVol = vol / basePeriod;
+    let longVol = 0;
+    for (let j = 0; j < basePeriod * 2; j++) {
+      longVol += Math.abs(data[i - j].close - data[i - j - 1].close);
+    }
+    const avgLongVol = longVol / (basePeriod * 2);
+    const ratio = avgLongVol === 0 ? 1 : avgVol / avgLongVol;
+    const adaptedPeriod = Math.max(5, Math.min(30, Math.round(basePeriod / ratio)));
+    // Calculate RSI with adapted period
+    let avgGain = 0, avgLoss = 0;
+    for (let j = 0; j < adaptedPeriod; j++) {
+      const change = data[i - j].close - data[i - j - 1].close;
+      if (change > 0) avgGain += change; else avgLoss -= change;
+    }
+    avgGain /= adaptedPeriod; avgLoss /= adaptedPeriod;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    result.push({ time: data[i].time, value: 100 - 100 / (1 + rs) });
+  }
+  return result;
+}
+
+// --- 34. Mean Reversion Band: Z-score bands ---
+export function calculateMeanReversionBand(data: OHLCData[], period: number = 20): ChannelData[] {
+  const result: ChannelData[] = [];
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += data[i - j].close;
+    const mean = sum / period;
+    let sumSq = 0;
+    for (let j = 0; j < period; j++) sumSq += Math.pow(data[i - j].close - mean, 2);
+    const stdDev = Math.sqrt(sumSq / period);
+    result.push({ time: data[i].time, upper: mean + 2 * stdDev, middle: mean, lower: mean - 2 * stdDev });
+  }
+  return result;
+}
+
+// --- 35. Trend Ribbon: 8 EMAs for visual ribbon ---
+export function calculateTrendRibbon(data: OHLCData[]): TrendRibbonData[] {
+  const periods = [5, 8, 13, 21, 34, 55, 89, 144];
+  const emas = periods.map(p => new Map(calculateEMA(data, p).map(d => [d.time, d.value])));
+  const result: TrendRibbonData[] = [];
+  for (const d of data) {
+    const vals = emas.map(m => m.get(d.time));
+    if (vals.every(v => v !== undefined)) {
+      result.push({ time: d.time, ema1: vals[0]!, ema2: vals[1]!, ema3: vals[2]!, ema4: vals[3]!, ema5: vals[4]!, ema6: vals[5]!, ema7: vals[6]!, ema8: vals[7]! });
+    }
+  }
+  return result;
+}
+
+// --- 36. Relative Vigor Index (unique version): conviction using O/H/L/C ---
+export function calculateRelativeVigor(data: OHLCData[], period: number = 10): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = period + 3; i < data.length; i++) {
+    let numSum = 0, denSum = 0;
+    for (let j = 0; j < period; j++) {
+      const idx = i - j;
+      // Numerator: (Close-Open) + 2*(Close[1]-Open[1]) + 2*(Close[2]-Open[2]) + (Close[3]-Open[3])
+      const num = (data[idx].close - data[idx].open) + 2 * (data[idx - 1].close - data[idx - 1].open) + 2 * (data[idx - 2].close - data[idx - 2].open) + (data[idx - 3].close - data[idx - 3].open);
+      const den = (data[idx].high - data[idx].low) + 2 * (data[idx - 1].high - data[idx - 1].low) + 2 * (data[idx - 2].high - data[idx - 2].low) + (data[idx - 3].high - data[idx - 3].low);
+      numSum += num / 6; denSum += den / 6;
+    }
+    result.push({ time: data[i].time, value: denSum === 0 ? 0 : (numSum / denSum) * 100 });
+  }
+  return result;
+}
+
+// --- 37. Dynamic Pivot Zones ---
+export function calculateDynamicPivots(data: OHLCData[], lookback: number = 5): ChannelData[] {
+  const result: ChannelData[] = [];
+  for (let i = lookback * 2; i < data.length; i++) {
+    // Find fractal high/low pivots
+    let pivotHigh = data[i].high, pivotLow = data[i].low;
+    for (let j = 1; j <= lookback * 2; j++) {
+      const idx = i - j;
+      // Check if any point was a swing high/low
+      if (idx >= lookback && idx < data.length - lookback) {
+        let isHigh = true, isLow = true;
+        for (let k = 1; k <= lookback; k++) {
+          if (data[idx].high <= data[idx - k].high || data[idx].high <= data[idx + k >= data.length ? idx : idx + k].high) isHigh = false;
+          if (data[idx].low >= data[idx - k].low || data[idx].low >= data[idx + k >= data.length ? idx : idx + k].low) isLow = false;
+        }
+        if (isHigh && data[idx].high > pivotHigh * 0.99) pivotHigh = data[idx].high;
+        if (isLow && data[idx].low < pivotLow * 1.01) pivotLow = data[idx].low;
+      }
+    }
+    result.push({ time: data[i].time, upper: pivotHigh, middle: (pivotHigh + pivotLow) / 2, lower: pivotLow });
+  }
+  return result;
+}
+
+// --- 38. Price Action Score ---
+export function calculatePriceActionScore(data: OHLCData[], period: number = 10): IndicatorData[] {
+  const result: IndicatorData[] = [];
+  for (let i = 2; i < data.length; i++) {
+    const d = data[i]; const p1 = data[i - 1]; const p2 = data[i - 2];
+    let score = 0;
+    const body = d.close - d.open; const range = d.high - d.low || 0.0001;
+    // Higher highs / higher lows
+    if (d.high > p1.high && d.low > p1.low) score += 2;
+    if (d.high < p1.high && d.low < p1.low) score -= 2;
+    // Body vs range
+    if (body > 0) score += Math.abs(body) / range * 2;
+    else score -= Math.abs(body) / range * 2;
+    // Consecutive direction
+    if (body > 0 && p1.close > p1.open) score += 1;
+    if (body < 0 && p1.close < p1.open) score -= 1;
+    // Three-bar pattern
+    if (d.close > p2.high) score += 1.5;
+    if (d.close < p2.low) score -= 1.5;
+    result.push({ time: d.time, value: score });
+  }
+  // Smooth
+  const smoothed: IndicatorData[] = [];
+  for (let i = period - 1; i < result.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += result[i - j].value;
+    smoothed.push({ time: result[i].time, value: sum / period });
+  }
+  return smoothed;
+}
+
+// --- 39. Ergodic Volume Oscillator ---
+export function calculateErgodicVolume(data: OHLCData[], shortPeriod: number = 5, longPeriod: number = 20): IndicatorData[] {
+  const toOhlc = (arr: IndicatorData[]): OHLCData[] => arr.map(d => ({ time: d.time, open: d.value, high: d.value, low: d.value, close: d.value }));
+  // Volume-weighted candle body
+  const vwBody: IndicatorData[] = [];
+  for (const d of data) {
+    vwBody.push({ time: d.time, value: (d.close - d.open) * (d.volume || 1) });
+  }
+  const e1 = calculateEMA(toOhlc(vwBody), longPeriod);
+  const e2 = calculateEMA(toOhlc(e1), shortPeriod);
+  const absVwBody = vwBody.map(d => ({ time: d.time, value: Math.abs(d.value) }));
+  const ae1 = calculateEMA(toOhlc(absVwBody), longPeriod);
+  const ae2 = calculateEMA(toOhlc(ae1), shortPeriod);
+  const ae2Map = new Map(ae2.map(d => [d.time, d.value]));
+  const result: IndicatorData[] = [];
+  for (const d of e2) {
+    const abs = ae2Map.get(d.time);
+    if (abs !== undefined && abs !== 0) result.push({ time: d.time, value: (d.value / abs) * 100 });
+  }
+  return result;
+}
+
+// --- 40. Anchored VWAP Bands ---
+export function calculateAnchoredVWAPBands(data: OHLCData[], deviations: number = 2): ChannelData[] {
+  let cumVP = 0, cumVol = 0, cumVP2 = 0;
+  const result: ChannelData[] = [];
+  for (const d of data) {
+    const tp = (d.high + d.low + d.close) / 3;
+    const vol = d.volume || 1;
+    cumVP += tp * vol; cumVol += vol; cumVP2 += tp * tp * vol;
+    const vwap = cumVol === 0 ? tp : cumVP / cumVol;
+    const variance = cumVol === 0 ? 0 : cumVP2 / cumVol - vwap * vwap;
+    const stdDev = Math.sqrt(Math.max(0, variance));
+    result.push({ time: d.time, upper: vwap + deviations * stdDev, middle: vwap, lower: vwap - deviations * stdDev });
+  }
+  return result;
+}
+
+// ============================================================================
+// NEXUS TREND MATRIX — Premium Marketplace Indicator
+// Combines KAMA adaptive core + ATR volatility bands + multi-factor trend score
+// ============================================================================
+
+export interface NexusTrendMatrixData {
+  time: number;
+  core: number;       // KAMA adaptive center line
+  upper: number;      // Core + ATR-based upper band
+  lower: number;      // Core - ATR-based lower band
+  trendScore: number; // -100 to +100 composite trend strength
+}
+
+export function calculateNexusTrendMatrix(
+  data: OHLCData[],
+  period: number = 20,
+  fastPeriod: number = 2,
+  slowPeriod: number = 30,
+  atrPeriod: number = 14,
+  atrMultiplier: number = 2.0,
+  trendSmoothPeriod: number = 10,
+): NexusTrendMatrixData[] {
+  if (data.length < Math.max(period, atrPeriod, trendSmoothPeriod) + 10) return [];
+
+  // --- Component 1: KAMA Adaptive Core ---
+  const fastSC = 2 / (fastPeriod + 1);
+  const slowSC = 2 / (slowPeriod + 1);
+  const kamaValues: number[] = new Array(data.length).fill(NaN);
+
+  if (data.length > period) {
+    kamaValues[period] = data[period].close;
+    for (let i = period + 1; i < data.length; i++) {
+      const direction = Math.abs(data[i].close - data[i - period].close);
+      let volatility = 0;
+      for (let j = 0; j < period; j++) {
+        volatility += Math.abs(data[i - j].close - data[i - j - 1].close);
+      }
+      const er = volatility === 0 ? 0 : direction / volatility;
+      const sc = Math.pow(er * (fastSC - slowSC) + slowSC, 2);
+      kamaValues[i] = kamaValues[i - 1] + sc * (data[i].close - kamaValues[i - 1]);
+    }
+  }
+
+  // --- Component 2: ATR for dynamic bands ---
+  const atrValues: number[] = new Array(data.length).fill(NaN);
+  if (data.length > atrPeriod) {
+    let atrSum = 0;
+    for (let i = 1; i <= atrPeriod; i++) {
+      const tr = Math.max(
+        data[i].high - data[i].low,
+        Math.abs(data[i].high - data[i - 1].close),
+        Math.abs(data[i].low - data[i - 1].close),
+      );
+      atrSum += tr;
+    }
+    atrValues[atrPeriod] = atrSum / atrPeriod;
+    for (let i = atrPeriod + 1; i < data.length; i++) {
+      const tr = Math.max(
+        data[i].high - data[i].low,
+        Math.abs(data[i].high - data[i - 1].close),
+        Math.abs(data[i].low - data[i - 1].close),
+      );
+      atrValues[i] = (atrValues[i - 1] * (atrPeriod - 1) + tr) / atrPeriod;
+    }
+  }
+
+  // --- Component 3: Multi-factor trend score ---
+  // Factor A: KAMA slope (direction and magnitude)
+  // Factor B: ADX-like directional strength
+  // Factor C: Price momentum relative to KAMA
+  const rawScores: number[] = new Array(data.length).fill(0);
+  const slopeLookback = Math.max(3, Math.floor(period / 4));
+
+  for (let i = period + slopeLookback; i < data.length; i++) {
+    if (isNaN(kamaValues[i]) || isNaN(kamaValues[i - slopeLookback])) continue;
+
+    // Factor A: Normalized KAMA slope (-50 to +50)
+    const kamaSlope = (kamaValues[i] - kamaValues[i - slopeLookback]) / slopeLookback;
+    const avgPrice = (data[i].high + data[i].low) / 2;
+    const normalizedSlope = avgPrice === 0 ? 0 : (kamaSlope / avgPrice) * 10000;
+    const slopeScore = Math.max(-50, Math.min(50, normalizedSlope * 10));
+
+    // Factor B: Directional strength via +DI/-DI ratio (-30 to +30)
+    let plusDMSum = 0, minusDMSum = 0, trSum = 0;
+    const diLookback = Math.min(atrPeriod, i);
+    for (let j = 1; j <= diLookback; j++) {
+      const idx = i - diLookback + j;
+      if (idx < 1) continue;
+      const upMove = data[idx].high - data[idx - 1].high;
+      const downMove = data[idx - 1].low - data[idx].low;
+      plusDMSum += (upMove > downMove && upMove > 0) ? upMove : 0;
+      minusDMSum += (downMove > upMove && downMove > 0) ? downMove : 0;
+      trSum += Math.max(
+        data[idx].high - data[idx].low,
+        Math.abs(data[idx].high - data[idx - 1].close),
+        Math.abs(data[idx].low - data[idx - 1].close),
+      );
+    }
+    const plusDI = trSum === 0 ? 0 : (plusDMSum / trSum) * 100;
+    const minusDI = trSum === 0 ? 0 : (minusDMSum / trSum) * 100;
+    const diDiff = plusDI - minusDI;
+    const diSum = plusDI + minusDI;
+    const dirScore = diSum === 0 ? 0 : (diDiff / diSum) * 30;
+
+    // Factor C: Price position relative to KAMA (-20 to +20)
+    const priceDeviation = data[i].close - kamaValues[i];
+    const atrVal = isNaN(atrValues[i]) ? 1 : Math.max(atrValues[i], 0.00001);
+    const positionScore = Math.max(-20, Math.min(20, (priceDeviation / atrVal) * 10));
+
+    rawScores[i] = slopeScore + dirScore + positionScore;
+  }
+
+  // Smooth the trend score with EMA
+  const smoothedScores: number[] = new Array(data.length).fill(0);
+  const smoothAlpha = 2 / (trendSmoothPeriod + 1);
+  let smoothInit = false;
+  for (let i = 0; i < data.length; i++) {
+    if (rawScores[i] !== 0 && !smoothInit) {
+      smoothedScores[i] = rawScores[i];
+      smoothInit = true;
+    } else if (smoothInit) {
+      smoothedScores[i] = smoothAlpha * rawScores[i] + (1 - smoothAlpha) * smoothedScores[i - 1];
+    }
+  }
+
+  // --- Assemble output ---
+  const result: NexusTrendMatrixData[] = [];
+  const startIdx = Math.max(period + slopeLookback, atrPeriod + 1);
+
+  for (let i = startIdx; i < data.length; i++) {
+    if (isNaN(kamaValues[i]) || isNaN(atrValues[i])) continue;
+
+    const atr = atrValues[i];
+    const core = kamaValues[i];
+    const trendScore = Math.max(-100, Math.min(100, Math.round(smoothedScores[i])));
+
+    result.push({
+      time: data[i].time,
+      core,
+      upper: core + atrMultiplier * atr,
+      lower: core - atrMultiplier * atr,
+      trendScore,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// PHANTOM FLOW ZONES — Premium Marketplace Indicator
+// Detects institutional accumulation/distribution via volume absorption,
+// wick rejection, and projects dynamic supply/demand zones on chart.
+// ============================================================================
+
+export interface PhantomFlowZonesData {
+  time: number;
+  flowLine: number;    // Volume-weighted smoothed midpoint (institutional bias)
+  demandZone: number;  // Demand (support) level, NaN when inactive
+  supplyZone: number;  // Supply (resistance) level, NaN when inactive
+  signalStrength: number; // 0-100 strength of the current zone signal
+  atr: number;         // ATR value for zone thickness rendering
+}
+
+export function calculatePhantomFlowZones(
+  data: OHLCData[],
+  period: number = 20,
+  volumeThreshold: number = 1.5,
+  wickThreshold: number = 0.6,
+  zoneLookback: number = 50,
+  smoothPeriod: number = 10,
+): PhantomFlowZonesData[] {
+  if (data.length < period + 5) return [];
+
+  // --- Step 0: ATR for zone thickness ---
+  const atrPeriod = 14;
+  const pfzTr = new Array(data.length).fill(0);
+  pfzTr[0] = data[0].high - data[0].low;
+  for (let i = 1; i < data.length; i++) {
+    pfzTr[i] = Math.max(data[i].high - data[i].low, Math.abs(data[i].high - data[i - 1].close), Math.abs(data[i].low - data[i - 1].close));
+  }
+  const pfzAtr = new Array(data.length).fill(0);
+  let pfzAtrSum = 0;
+  for (let i = 0; i < atrPeriod && i < data.length; i++) pfzAtrSum += pfzTr[i];
+  pfzAtr[atrPeriod - 1] = pfzAtrSum / atrPeriod;
+  for (let i = atrPeriod; i < data.length; i++) pfzAtr[i] = (pfzAtr[i - 1] * (atrPeriod - 1) + pfzTr[i]) / atrPeriod;
+
+  // --- Step 1: Compute volume SMA for spike detection ---
+  const volSma: number[] = new Array(data.length).fill(0);
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) {
+      sum += (data[i - j].volume || 1);
+    }
+    volSma[i] = sum / period;
+  }
+
+  // --- Step 2: Detect absorption and rejection events ---
+  interface ZoneEvent {
+    bar: number;
+    level: number;
+    type: "demand" | "supply";
+    strength: number;
+  }
+  const events: ZoneEvent[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    const d = data[i];
+    const vol = d.volume || 1;
+    const avgVol = volSma[i] || 1;
+    const range = d.high - d.low;
+    if (range <= 0) continue;
+
+    const body = Math.abs(d.close - d.open);
+    const upperWick = d.high - Math.max(d.close, d.open);
+    const lowerWick = Math.min(d.close, d.open) - d.low;
+
+    // Volume ratio: how much volume relative to average
+    const volumeRatio = vol / avgVol;
+
+    // Absorption score: high volume + small body = orders being absorbed
+    const bodyRatio = body / range;
+    const absorptionScore = volumeRatio * (1 - bodyRatio);
+
+    // Wick rejection: large wicks relative to range
+    const wickRatio = (upperWick + lowerWick) / range;
+
+    // Combined signal
+    const signal = absorptionScore * (0.5 + wickRatio * 0.5);
+
+    // Must exceed volume threshold AND have meaningful wicks
+    if (volumeRatio >= volumeThreshold && wickRatio >= wickThreshold * 0.5 && signal > 1.0) {
+      const strength = Math.min(100, Math.round(signal * 40));
+
+      if (d.close >= d.open) {
+        events.push({ bar: i, level: d.low, type: "demand", strength });
+      } else {
+        events.push({ bar: i, level: d.high, type: "supply", strength });
+      }
+    } else if (volumeRatio >= volumeThreshold * 0.8 && wickRatio >= wickThreshold) {
+      const strength = Math.min(80, Math.round(wickRatio * volumeRatio * 30));
+      if (lowerWick > upperWick) {
+        events.push({ bar: i, level: d.low, type: "demand", strength });
+      } else {
+        events.push({ bar: i, level: d.high, type: "supply", strength });
+      }
+    }
+  }
+
+  // --- Step 3: Compute flow line (volume-weighted EMA of typical price) ---
+  const flowLineValues: number[] = new Array(data.length).fill(NaN);
+  const alpha = 2 / (smoothPeriod + 1);
+  let flowInit = false;
+
+  for (let i = period; i < data.length; i++) {
+    const tp = (data[i].high + data[i].low + data[i].close) / 3;
+    const vol = data[i].volume || 1;
+    const avgVol = volSma[i] || 1;
+    const weight = Math.min(vol / avgVol, 3);
+    const effectiveAlpha = alpha * (0.5 + weight * 0.5);
+
+    if (!flowInit) {
+      flowLineValues[i] = tp;
+      flowInit = true;
+    } else {
+      flowLineValues[i] = effectiveAlpha * tp + (1 - effectiveAlpha) * flowLineValues[i - 1];
+    }
+  }
+
+  // --- Step 4: Project zones forward and assemble output ---
+  const result: PhantomFlowZonesData[] = [];
+
+  for (let i = period; i < data.length; i++) {
+    if (isNaN(flowLineValues[i])) continue;
+
+    let demandLevel = NaN;
+    let supplyLevel = NaN;
+    let demandStrength = 0;
+    let supplyStrength = 0;
+
+    for (let e = events.length - 1; e >= 0; e--) {
+      const ev = events[e];
+      const age = i - ev.bar;
+      if (age < 0) continue;
+      if (age > zoneLookback) break;
+
+      let broken = false;
+      for (let k = ev.bar + 1; k <= i; k++) {
+        if (ev.type === "demand" && data[k].close < ev.level - (data[k].high - data[k].low) * 0.5) {
+          broken = true; break;
+        }
+        if (ev.type === "supply" && data[k].close > ev.level + (data[k].high - data[k].low) * 0.5) {
+          broken = true; break;
+        }
+      }
+      if (broken) continue;
+
+      const ageFactor = 1 - (age / zoneLookback) * 0.7;
+      const effectiveStrength = ev.strength * ageFactor;
+
+      if (ev.type === "demand" && effectiveStrength > demandStrength) {
+        demandLevel = ev.level;
+        demandStrength = effectiveStrength;
+      } else if (ev.type === "supply" && effectiveStrength > supplyStrength) {
+        supplyLevel = ev.level;
+        supplyStrength = effectiveStrength;
+      }
+    }
+
+    result.push({
+      time: data[i].time,
+      flowLine: flowLineValues[i],
+      demandZone: demandLevel,
+      supplyZone: supplyLevel,
+      signalStrength: Math.round(Math.max(demandStrength, supplyStrength)),
+      atr: pfzAtr[i] || 0,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// FRACTAL PULSE GRID — Premium Marketplace Indicator
+// Adaptive market structure overlay: volatility-adaptive fractal swing detection,
+// structural level tracking with break/test logic, and a pulse line showing bias.
+// ============================================================================
+
+export interface FractalPulseGridData {
+  time: number;
+  resistance: number;  // Active structural resistance level, NaN when none
+  support: number;     // Active structural support level, NaN when none
+  pulseLine: number;   // Adaptive smoothed midpoint of structure
+  structureBias: number; // -100 to +100 (positive = bullish structure)
+}
+
+export function calculateFractalPulseGrid(
+  data: OHLCData[],
+  period: number = 20,
+  atrPeriod: number = 14,
+  baseLookback: number = 3,
+  maxAge: number = 100,
+  smoothPeriod: number = 8,
+  breakTolerance: number = 0.25,
+): FractalPulseGridData[] {
+  if (data.length < Math.max(period, atrPeriod) + baseLookback * 2 + 5) return [];
+
+  // --- Step 1: Compute ATR for volatility adaptation ---
+  const atrArr: number[] = new Array(data.length).fill(0);
+  for (let i = 1; i < data.length; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    if (i < atrPeriod) {
+      atrArr[i] = atrArr[i - 1] + (tr - atrArr[i - 1]) / i;
+    } else {
+      atrArr[i] = atrArr[i - 1] + (tr - atrArr[i - 1]) / atrPeriod;
+    }
+  }
+
+  // ATR SMA for volatility normalization
+  const atrSma: number[] = new Array(data.length).fill(0);
+  for (let i = period - 1; i < data.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < period; j++) sum += atrArr[i - j];
+    atrSma[i] = sum / period;
+  }
+
+  // --- Step 2: Detect adaptive fractals and track levels ---
+  interface SwingLevel {
+    bar: number;
+    price: number;
+    type: "high" | "low";
+    testCount: number;
+  }
+
+  const activeHighs: SwingLevel[] = [];
+  const activeLows: SwingLevel[] = [];
+  const startBar = Math.max(period, atrPeriod) + baseLookback;
+  const result: FractalPulseGridData[] = [];
+  const alpha = 2 / (smoothPeriod + 1);
+  let pulseEma = NaN;
+  let prevResistance = NaN;
+  let prevSupport = NaN;
+  let biasSmooth = 0;
+
+  for (let i = startBar; i < data.length; i++) {
+    const curAtr = atrArr[i] || 0.0001;
+    const breakDist = curAtr * breakTolerance;
+    const volRatio = atrSma[i] > 0 ? atrArr[i] / atrSma[i] : 1;
+    const adaptiveLookback = Math.max(2, Math.min(6,
+      Math.round(baseLookback * Math.max(0.7, Math.min(1.8, volRatio)))),
+    );
+
+    // --- Fractal detection (need future bars, so detect for bar i - adaptiveLookback) ---
+    const checkBar = i - adaptiveLookback;
+    if (checkBar >= startBar - baseLookback && checkBar > 0) {
+      let isSwingHigh = true;
+      let isSwingLow = true;
+      for (let j = 1; j <= adaptiveLookback; j++) {
+        const leftIdx = checkBar - j;
+        const rightIdx = checkBar + j;
+        if (leftIdx < 0 || rightIdx >= data.length) { isSwingHigh = false; isSwingLow = false; break; }
+        if (data[leftIdx].high >= data[checkBar].high || data[rightIdx].high >= data[checkBar].high) isSwingHigh = false;
+        if (data[leftIdx].low <= data[checkBar].low || data[rightIdx].low <= data[checkBar].low) isSwingLow = false;
+      }
+
+      if (isSwingHigh) {
+        const tooClose = activeHighs.some(
+          (h) => Math.abs(h.price - data[checkBar].high) < curAtr * 0.3 && checkBar - h.bar < period,
+        );
+        if (!tooClose) {
+          activeHighs.push({ bar: checkBar, price: data[checkBar].high, type: "high", testCount: 0 });
+        }
+      }
+      if (isSwingLow) {
+        const tooClose = activeLows.some(
+          (l) => Math.abs(l.price - data[checkBar].low) < curAtr * 0.3 && checkBar - l.bar < period,
+        );
+        if (!tooClose) {
+          activeLows.push({ bar: checkBar, price: data[checkBar].low, type: "low", testCount: 0 });
+        }
+      }
+    }
+
+    // --- Expire old levels and detect breaks/tests ---
+    for (let h = activeHighs.length - 1; h >= 0; h--) {
+      const lvl = activeHighs[h];
+      if (i - lvl.bar > maxAge) { activeHighs.splice(h, 1); continue; }
+      if (lvl.bar > i) continue;
+      if (data[i].close > lvl.price + breakDist) { activeHighs.splice(h, 1); continue; }
+      if (data[i].high >= lvl.price - breakDist && data[i].close <= lvl.price + breakDist * 0.5) {
+        lvl.testCount++;
+      }
+    }
+
+    for (let l = activeLows.length - 1; l >= 0; l--) {
+      const lvl = activeLows[l];
+      if (i - lvl.bar > maxAge) { activeLows.splice(l, 1); continue; }
+      if (lvl.bar > i) continue;
+      if (data[i].close < lvl.price - breakDist) { activeLows.splice(l, 1); continue; }
+      if (data[i].low <= lvl.price + breakDist && data[i].close >= lvl.price - breakDist * 0.5) {
+        lvl.testCount++;
+      }
+    }
+
+    // --- Select best resistance (closest above price, weighted by recency + tests) ---
+    let bestRes = NaN;
+    let bestResScore = -Infinity;
+    for (const h of activeHighs) {
+      if (h.bar > i || h.price <= data[i].close) continue;
+      const proximity = 1 / (1 + (h.price - data[i].close) / curAtr);
+      const recency = 1 - (i - h.bar) / maxAge * 0.5;
+      const testBonus = 1 + h.testCount * 0.3;
+      const score = proximity * recency * testBonus;
+      if (score > bestResScore) { bestResScore = score; bestRes = h.price; }
+    }
+
+    // --- Select best support (closest below price, weighted by recency + tests) ---
+    let bestSup = NaN;
+    let bestSupScore = -Infinity;
+    for (const l of activeLows) {
+      if (l.bar > i || l.price >= data[i].close) continue;
+      const proximity = 1 / (1 + (data[i].close - l.price) / curAtr);
+      const recency = 1 - (i - l.bar) / maxAge * 0.5;
+      const testBonus = 1 + l.testCount * 0.3;
+      const score = proximity * recency * testBonus;
+      if (score > bestSupScore) { bestSupScore = score; bestSup = l.price; }
+    }
+
+    // Carry forward previous levels when no active level found
+    if (isNaN(bestRes) && !isNaN(prevResistance)) bestRes = prevResistance;
+    if (isNaN(bestSup) && !isNaN(prevSupport)) bestSup = prevSupport;
+    prevResistance = bestRes;
+    prevSupport = bestSup;
+
+    // --- Pulse line: adaptive midpoint ---
+    let mid: number;
+    if (!isNaN(bestRes) && !isNaN(bestSup)) {
+      mid = (bestRes + bestSup) / 2;
+    } else if (!isNaN(bestRes)) {
+      mid = bestRes - curAtr;
+    } else if (!isNaN(bestSup)) {
+      mid = bestSup + curAtr;
+    } else {
+      mid = (data[i].high + data[i].low + data[i].close) / 3;
+    }
+
+    if (isNaN(pulseEma)) {
+      pulseEma = mid;
+    } else {
+      const structureShifting = (bestRes !== prevResistance) || (bestSup !== prevSupport);
+      const effectiveAlpha = structureShifting ? alpha * 1.5 : alpha;
+      pulseEma = effectiveAlpha * mid + (1 - effectiveAlpha) * pulseEma;
+    }
+
+    // --- Structure bias ---
+    let bias = 0;
+    if (!isNaN(pulseEma) && curAtr > 0) {
+      const pricePos = (data[i].close - pulseEma) / curAtr;
+      const priceBias = Math.max(-1, Math.min(1, pricePos * 0.5));
+      const supDist = !isNaN(bestSup) ? (data[i].close - bestSup) / curAtr : 0;
+      const resDist = !isNaN(bestRes) ? (bestRes - data[i].close) / curAtr : 0;
+      const levelBias = resDist > 0 && supDist > 0
+        ? Math.max(-1, Math.min(1, (supDist - resDist) / (supDist + resDist)))
+        : 0;
+      bias = (priceBias * 0.6 + levelBias * 0.4) * 100;
+    }
+    biasSmooth = biasSmooth * 0.8 + bias * 0.2;
+
+    result.push({
+      time: data[i].time,
+      resistance: bestRes,
+      support: bestSup,
+      pulseLine: pulseEma,
+      structureBias: Math.round(Math.max(-100, Math.min(100, biasSmooth))),
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// VORTEX DRIFT CLOUD - Adaptive trend channel with momentum coloring
+// ============================================================================
+
+export interface VortexDriftCloudData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  trend: "bullish" | "bearish" | "neutral";
+  strength: number; // 0-100
+}
+
+export function calculateVortexDriftCloud(
+  data: OHLCData[],
+  smoothPeriod: number = 21,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 2.0,
+  adxPeriod: number = 14,
+  adxThreshold: number = 25,
+  momentumLookback: number = 10,
+): VortexDriftCloudData[] {
+  if (data.length < Math.max(smoothPeriod, atrPeriod, adxPeriod) + 10) return [];
+
+  const result: VortexDriftCloudData[] = [];
+  const closes = data.map((d) => d.close);
+
+  // Ehlers 2-pole Super Smoother filter (near-zero lag)
+  const angle = (Math.PI * Math.SQRT2) / smoothPeriod;
+  const a1 = Math.exp(-angle);
+  const coeff2 = 2 * a1 * Math.cos(angle);
+  const coeff3 = -(a1 * a1);
+  const coeff1 = 1 - coeff2 - coeff3;
+  const ss: number[] = new Array(data.length).fill(0);
+  ss[0] = closes[0];
+  ss[1] = closes.length > 1 ? closes[1] : closes[0];
+  for (let i = 2; i < data.length; i++) {
+    ss[i] = coeff1 * (closes[i] + closes[i - 1]) / 2 + coeff2 * ss[i - 1] + coeff3 * ss[i - 2];
+  }
+
+  // ATR (exponential smoothing)
+  const atr: number[] = new Array(data.length).fill(0);
+  for (let i = 1; i < data.length; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    if (i < atrPeriod) {
+      atr[i] = atr[i - 1] + (tr - atr[i - 1]) / i;
+    } else {
+      atr[i] = atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+    }
+  }
+
+  // ADX (Wilder smoothing)
+  const adx: number[] = new Array(data.length).fill(0);
+  let sPlusDM = 0;
+  let sMinusDM = 0;
+  let sTR = 0;
+  let adxEma = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const upMove = data[i].high - data[i - 1].high;
+    const downMove = data[i - 1].low - data[i].low;
+    const plusDM = upMove > downMove && upMove > 0 ? upMove : 0;
+    const minusDM = downMove > upMove && downMove > 0 ? downMove : 0;
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+
+    if (i <= adxPeriod) {
+      sPlusDM += plusDM;
+      sMinusDM += minusDM;
+      sTR += tr;
+      if (i === adxPeriod) {
+        sPlusDM /= adxPeriod;
+        sMinusDM /= adxPeriod;
+        sTR /= adxPeriod;
+      }
+    } else {
+      sPlusDM = sPlusDM - sPlusDM / adxPeriod + plusDM;
+      sMinusDM = sMinusDM - sMinusDM / adxPeriod + minusDM;
+      sTR = sTR - sTR / adxPeriod + tr;
+    }
+
+    if (i >= adxPeriod && sTR > 0) {
+      const plusDI = (sPlusDM / sTR) * 100;
+      const minusDI = (sMinusDM / sTR) * 100;
+      const diSum = plusDI + minusDI;
+      const dx = diSum > 0 ? (Math.abs(plusDI - minusDI) / diSum) * 100 : 0;
+      adxEma = adxEma === 0 ? dx : adxEma + (dx - adxEma) * (2 / (adxPeriod + 1));
+      adx[i] = adxEma;
+    }
+  }
+
+  // Build output: midline, adaptive bands, trend classification
+  const startIdx = Math.max(smoothPeriod, atrPeriod, adxPeriod) + 2;
+  for (let i = startIdx; i < data.length; i++) {
+    const midline = ss[i];
+    const adxWeight = 0.5 + 0.5 * Math.min(adx[i] / 50, 1);
+    const bandWidth = atr[i] * bandMultiplier * adxWeight;
+
+    const lookbackIdx = Math.max(0, i - momentumLookback);
+    const midlineRising = midline > ss[lookbackIdx];
+    const midlineFalling = midline < ss[lookbackIdx];
+
+    let trend: "bullish" | "bearish" | "neutral" = "neutral";
+    if (midlineRising && closes[i] > midline) trend = "bullish";
+    else if (midlineFalling && closes[i] < midline) trend = "bearish";
+
+    result.push({
+      time: data[i].time,
+      upper: midline + bandWidth,
+      middle: midline,
+      lower: midline - bandWidth,
+      trend,
+      strength: Math.round(Math.min(100, Math.max(0, (adx[i] / 50) * 100))),
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// ORION MOMENTUM SHIELD - Momentum-reactive overlay with EHMA and VNM bands
+// ============================================================================
+
+export interface OrionMomentumShieldData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  vnm: number;       // Volatility-Normalized Momentum (-100 to +100)
+  phase: "surge" | "drift" | "fade"; // momentum phase
+}
+
+export function calculateOrionMomentumShield(
+  data: OHLCData[],
+  hmaPeriod: number = 16,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 1.8,
+  momentumPeriod: number = 12,
+  surgeThreshold: number = 40,
+  fadeSmooth: number = 5,
+): OrionMomentumShieldData[] {
+  const minBars = Math.max(hmaPeriod * 2, atrPeriod, momentumPeriod) + fadeSmooth + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- EMA helper ---
+  const ema = (src: number[], period: number): number[] => {
+    const out = new Array(len).fill(NaN);
+    const k = 2 / (period + 1);
+    let acc = 0;
+    let cnt = 0;
+    for (let i = 0; i < len; i++) {
+      if (isNaN(src[i])) continue;
+      if (isNaN(out[i - 1] ?? NaN) || cnt < period) {
+        acc += src[i];
+        cnt++;
+        out[i] = acc / cnt;
+      } else {
+        out[i] = src[i] * k + out[i - 1] * (1 - k);
+      }
+    }
+    return out;
+  };
+
+  // --- WMA helper ---
+  const wma = (src: number[], period: number): number[] => {
+    const out = new Array(len).fill(NaN);
+    const denom = (period * (period + 1)) / 2;
+    for (let i = period - 1; i < len; i++) {
+      let sum = 0;
+      for (let j = 0; j < period; j++) {
+        sum += src[i - period + 1 + j] * (j + 1);
+      }
+      out[i] = sum / denom;
+    }
+    return out;
+  };
+
+  // --- EHMA: Exponential Hull Moving Average ---
+  // EHMA = WMA(2*EMA(N/2) - EMA(N), sqrt(N))
+  const halfPeriod = Math.max(2, Math.round(hmaPeriod / 2));
+  const sqrtPeriod = Math.max(2, Math.round(Math.sqrt(hmaPeriod)));
+  const emaHalf = ema(closes, halfPeriod);
+  const emaFull = ema(closes, hmaPeriod);
+  const diff: number[] = new Array(len).fill(NaN);
+  for (let i = 0; i < len; i++) {
+    if (!isNaN(emaHalf[i]) && !isNaN(emaFull[i])) {
+      diff[i] = 2 * emaHalf[i] - emaFull[i];
+    }
+  }
+  const ehma = wma(diff, sqrtPeriod);
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- Volatility-Normalized Momentum (VNM) ---
+  // Raw momentum (ROC) normalized by ATR → scale roughly -100 to +100
+  const vnmRaw: number[] = new Array(len).fill(0);
+  for (let i = momentumPeriod; i < len; i++) {
+    const roc = closes[i] - closes[i - momentumPeriod];
+    vnmRaw[i] = atr[i] > 0 ? (roc / atr[i]) * 20 : 0;
+    vnmRaw[i] = Math.max(-100, Math.min(100, vnmRaw[i]));
+  }
+
+  // Smooth VNM
+  const vnm = ema(vnmRaw, fadeSmooth);
+
+  // --- Build output ---
+  const result: OrionMomentumShieldData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    if (isNaN(ehma[i]) || atr[i] === 0) continue;
+
+    const midline = ehma[i];
+    const momentumAbs = Math.abs(vnm[i] || 0);
+    const expansionFactor = 1 + (momentumAbs / 100) * 0.8;
+    const bandWidth = atr[i] * bandMultiplier * expansionFactor;
+
+    let phase: "surge" | "drift" | "fade" = "drift";
+    if (momentumAbs >= surgeThreshold) phase = "surge";
+    else if (momentumAbs < surgeThreshold * 0.4) phase = "fade";
+
+    result.push({
+      time: data[i].time,
+      upper: midline + bandWidth,
+      middle: midline,
+      lower: midline - bandWidth,
+      vnm: Math.round(vnm[i] || 0),
+      phase,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// NEBULA PHASE BANDS - Kalman-filtered overlay with Shannon entropy phase detection
+// ============================================================================
+
+export interface NebulaPhaseData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  entropy: number;   // 0–1 normalized Shannon entropy
+  phase: "plasma" | "liquid" | "gaseous" | "crystalline";
+}
+
+export function calculateNebulaPhaseBands(
+  data: OHLCData[],
+  kalmanGain: number = 0.05,
+  entropyPeriod: number = 20,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 2.0,
+  phaseSmooth: number = 5,
+): NebulaPhaseData[] {
+  const minBars = Math.max(entropyPeriod, atrPeriod, phaseSmooth) + 10;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- Kalman Filter ---
+  // State: estimated price. Adapts measurement noise from local variance.
+  const kalman = new Array(len).fill(0);
+  let kState = closes[0];
+  let kVariance = 1;
+  const processNoise = kalmanGain * kalmanGain;
+
+  for (let i = 0; i < len; i++) {
+    const measurement = closes[i];
+    const localWindow = Math.min(i, 10);
+    let localVar = 0;
+    if (localWindow > 1) {
+      let sum = 0;
+      let sumSq = 0;
+      for (let j = i - localWindow; j <= i; j++) {
+        sum += closes[j];
+        sumSq += closes[j] * closes[j];
+      }
+      const mean = sum / (localWindow + 1);
+      localVar = sumSq / (localWindow + 1) - mean * mean;
+    }
+    const measurementNoise = Math.max(localVar, 1e-10);
+
+    kVariance += processNoise;
+    const kGain = kVariance / (kVariance + measurementNoise);
+    kState = kState + kGain * (measurement - kState);
+    kVariance = (1 - kGain) * kVariance;
+    kalman[i] = kState;
+  }
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- Shannon Entropy of price returns ---
+  // Bin returns into buckets and compute -Σ p·log2(p)
+  const numBins = 8;
+  const entropy: number[] = new Array(len).fill(0);
+
+  for (let i = entropyPeriod; i < len; i++) {
+    const returns: number[] = [];
+    for (let j = i - entropyPeriod + 1; j <= i; j++) {
+      if (closes[j - 1] !== 0) {
+        returns.push((closes[j] - closes[j - 1]) / closes[j - 1]);
+      }
+    }
+    if (returns.length < 2) continue;
+
+    let rMin = returns[0];
+    let rMax = returns[0];
+    for (const r of returns) {
+      if (r < rMin) rMin = r;
+      if (r > rMax) rMax = r;
+    }
+    const range = rMax - rMin;
+    if (range === 0) { entropy[i] = 0; continue; }
+
+    const bins = new Array(numBins).fill(0);
+    for (const r of returns) {
+      let bin = Math.floor(((r - rMin) / range) * numBins);
+      if (bin >= numBins) bin = numBins - 1;
+      bins[bin]++;
+    }
+
+    let h = 0;
+    const total = returns.length;
+    for (const count of bins) {
+      if (count > 0) {
+        const p = count / total;
+        h -= p * Math.log2(p);
+      }
+    }
+    entropy[i] = h / Math.log2(numBins);
+  }
+
+  // --- Smooth entropy ---
+  const smoothedEntropy = new Array(len).fill(0);
+  const eK = 2 / (phaseSmooth + 1);
+  for (let i = entropyPeriod; i < len; i++) {
+    smoothedEntropy[i] = i === entropyPeriod
+      ? entropy[i]
+      : smoothedEntropy[i - 1] + (entropy[i] - smoothedEntropy[i - 1]) * eK;
+  }
+
+  // --- Phase detection + output ---
+  const result: NebulaPhaseData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    if (atr[i] === 0) continue;
+
+    const midline = kalman[i];
+    const ent = Math.max(0, Math.min(1, smoothedEntropy[i]));
+    const displacement = atr[i] > 0 ? Math.abs(closes[i] - midline) / atr[i] : 0;
+    const momentum = i >= 5 ? Math.abs(kalman[i] - kalman[i - 5]) / atr[i] : 0;
+
+    // Phase classification
+    let phase: "plasma" | "liquid" | "gaseous" | "crystalline";
+    if (ent < 0.45 && displacement > 1.2 && momentum > 0.4) {
+      phase = "plasma";       // aggressive trend: ordered + displaced + fast
+    } else if (ent >= 0.7 && displacement > 0.5) {
+      phase = "gaseous";      // chaotic: disordered + volatile
+    } else if (ent < 0.55 && displacement < 0.6 && momentum < 0.25) {
+      phase = "crystalline";  // consolidation: ordered + tight + slow
+    } else {
+      phase = "liquid";       // normal trending
+    }
+
+    // Phase-adaptive band width
+    let phaseMultiplier: number;
+    switch (phase) {
+      case "plasma":      phaseMultiplier = 1.3; break;
+      case "gaseous":     phaseMultiplier = 1.8; break;
+      case "crystalline": phaseMultiplier = 0.6; break;
+      default:            phaseMultiplier = 1.0; break;
+    }
+    const bandWidth = atr[i] * bandMultiplier * phaseMultiplier;
+
+    result.push({
+      time: data[i].time,
+      upper: midline + bandWidth,
+      middle: midline,
+      lower: midline - bandWidth,
+      entropy: Math.round(ent * 100) / 100,
+      phase,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// CIPHER HARMONIC VEIL - Autocorrelation cycle detection + Hurst exponent overlay
+// ============================================================================
+
+export interface CipherHarmonicVeilData {
+  time: number;
+  upper: number;
+  middle: number;
+  lower: number;
+  hurst: number;    // 0–1 Hurst exponent
+  cycle: number;    // dominant cycle period (bars)
+  regime: "persistent" | "antipersistent" | "random";
+}
+
+export function calculateCipherHarmonicVeil(
+  data: OHLCData[],
+  maxCyclePeriod: number = 50,
+  hurstPeriod: number = 100,
+  atrPeriod: number = 14,
+  bandMultiplier: number = 2.0,
+  smooth: number = 5,
+): CipherHarmonicVeilData[] {
+  const minBars = Math.max(maxCyclePeriod + 10, hurstPeriod, atrPeriod) + smooth + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- Log returns ---
+  const logReturns = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    logReturns[i] = closes[i - 1] > 0 ? Math.log(closes[i] / closes[i - 1]) : 0;
+  }
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- Dominant cycle via autocorrelation peak detection ---
+  // For each bar, compute autocorrelation of returns over lags 5..maxCyclePeriod
+  // The lag with the highest positive autocorrelation is the dominant cycle
+  const dominantCycle = new Array(len).fill(20); // default fallback
+  const minLag = 5;
+
+  for (let i = maxCyclePeriod + 10; i < len; i++) {
+    const window = maxCyclePeriod + 5;
+    let mean = 0;
+    for (let j = i - window; j <= i; j++) mean += logReturns[j];
+    mean /= (window + 1);
+
+    let variance = 0;
+    for (let j = i - window; j <= i; j++) {
+      const d = logReturns[j] - mean;
+      variance += d * d;
+    }
+    if (variance < 1e-20) continue;
+
+    let bestLag = 20;
+    let bestCorr = -2;
+    for (let lag = minLag; lag <= maxCyclePeriod; lag++) {
+      let corr = 0;
+      let count = 0;
+      for (let j = i - window + lag; j <= i; j++) {
+        corr += (logReturns[j] - mean) * (logReturns[j - lag] - mean);
+        count++;
+      }
+      corr /= variance;
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestLag = lag;
+      }
+    }
+    dominantCycle[i] = bestLag;
+  }
+
+  // Smooth the dominant cycle to avoid erratic flips
+  const smoothCycle = new Array(len).fill(20);
+  const cK = 2 / (smooth * 2 + 1);
+  for (let i = maxCyclePeriod + 10; i < len; i++) {
+    smoothCycle[i] = i === maxCyclePeriod + 10
+      ? dominantCycle[i]
+      : smoothCycle[i - 1] + (dominantCycle[i] - smoothCycle[i - 1]) * cK;
+  }
+
+  // --- Cycle-adaptive EMA midline (period = half dominant cycle, Nyquist) ---
+  const midline = new Array(len).fill(0);
+  midline[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const halfCycle = Math.max(3, Math.round(smoothCycle[i] / 2));
+    const alpha = 2 / (halfCycle + 1);
+    midline[i] = closes[i] * alpha + midline[i - 1] * (1 - alpha);
+  }
+
+  // --- Hurst Exponent via Rescaled Range (R/S) analysis ---
+  const hurst = new Array(len).fill(0.5);
+
+  for (let i = hurstPeriod; i < len; i++) {
+    const window = hurstPeriod;
+    const segment: number[] = [];
+    for (let j = i - window + 1; j <= i; j++) segment.push(logReturns[j]);
+
+    let mean = 0;
+    for (const v of segment) mean += v;
+    mean /= segment.length;
+
+    // Cumulative deviations from mean
+    const cumDev: number[] = [];
+    let cumSum = 0;
+    for (const v of segment) {
+      cumSum += (v - mean);
+      cumDev.push(cumSum);
+    }
+
+    const R = Math.max(...cumDev) - Math.min(...cumDev);
+    let S = 0;
+    for (const v of segment) S += (v - mean) * (v - mean);
+    S = Math.sqrt(S / segment.length);
+
+    if (S > 1e-15 && R > 0) {
+      const rs = R / S;
+      // H = log(R/S) / log(n)  — simplified single-scale estimator
+      hurst[i] = Math.log(rs) / Math.log(segment.length);
+      hurst[i] = Math.max(0, Math.min(1, hurst[i]));
+    }
+  }
+
+  // Smooth Hurst
+  const smoothHurst = new Array(len).fill(0.5);
+  const hK = 2 / (smooth + 1);
+  for (let i = hurstPeriod; i < len; i++) {
+    smoothHurst[i] = i === hurstPeriod
+      ? hurst[i]
+      : smoothHurst[i - 1] + (hurst[i] - smoothHurst[i - 1]) * hK;
+  }
+
+  // --- Build output ---
+  const result: CipherHarmonicVeilData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    if (atr[i] === 0) continue;
+
+    const mid = midline[i];
+    const h = smoothHurst[i];
+    const cyc = Math.round(smoothCycle[i]);
+
+    // Regime classification
+    let regime: "persistent" | "antipersistent" | "random";
+    if (h > 0.55) regime = "persistent";
+    else if (h < 0.45) regime = "antipersistent";
+    else regime = "random";
+
+    // Regime-adaptive band multiplier
+    let regimeScale: number;
+    switch (regime) {
+      case "persistent":     regimeScale = 0.8; break;  // tight trailing in trends
+      case "antipersistent": regimeScale = 1.5; break;  // wide for mean-reversion zones
+      default:               regimeScale = 1.0; break;  // neutral
+    }
+    const bandWidth = atr[i] * bandMultiplier * regimeScale;
+
+    result.push({
+      time: data[i].time,
+      upper: mid + bandWidth,
+      middle: mid,
+      lower: mid - bandWidth,
+      hurst: Math.round(h * 100) / 100,
+      cycle: cyc,
+      regime,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// TITAN PULSE SIGNAL - Adaptive single-line trend + buy/sell signal markers
+// ============================================================================
+
+export interface TitanPulseSignalData {
+  time: number;
+  level: number;          // the single trend line price
+  direction: 1 | -1;     // 1 = bullish (support), -1 = bearish (resistance)
+  signal: "strong_buy" | "buy" | "strong_sell" | "sell" | "none";
+  strength: number;       // 0–100 signal confidence
+}
+
+export function calculateTitanPulseSignal(
+  data: OHLCData[],
+  kamaPeriod: number = 10,
+  kamaFast: number = 2,
+  kamaSlow: number = 30,
+  atrPeriod: number = 14,
+  atrMultiplier: number = 1.5,
+  squeezeLookback: number = 20,
+  signalThreshold: number = 40,
+): TitanPulseSignalData[] {
+  const minBars = Math.max(kamaPeriod, atrPeriod, squeezeLookback) + 10;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // --- Kaufman Adaptive Moving Average (KAMA) ---
+  const fastSC = 2 / (kamaFast + 1);
+  const slowSC = 2 / (kamaSlow + 1);
+  const kama = new Array(len).fill(0);
+  kama[0] = closes[0];
+  for (let i = 1; i < kamaPeriod; i++) kama[i] = closes[i];
+
+  for (let i = kamaPeriod; i < len; i++) {
+    const direction = Math.abs(closes[i] - closes[i - kamaPeriod]);
+    let volatility = 0;
+    for (let j = i - kamaPeriod + 1; j <= i; j++) {
+      volatility += Math.abs(closes[j] - closes[j - 1]);
+    }
+    const er = volatility > 0 ? direction / volatility : 0;
+    const sc = (er * (fastSC - slowSC) + slowSC);
+    const smoothConst = sc * sc;
+    kama[i] = kama[i - 1] + smoothConst * (closes[i] - kama[i - 1]);
+  }
+
+  // --- ATR ---
+  const atr: number[] = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - data[i - 1].close),
+      Math.abs(data[i].low - data[i - 1].close),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (tr - atr[i - 1]) * (2 / (atrPeriod + 1));
+  }
+
+  // --- ATR rate of change (for squeeze detection) ---
+  const atrRoc: number[] = new Array(len).fill(0);
+  for (let i = squeezeLookback; i < len; i++) {
+    const prevAtr = atr[i - squeezeLookback];
+    atrRoc[i] = prevAtr > 0 ? (atr[i] - prevAtr) / prevAtr : 0;
+  }
+
+  // --- ATR percentile within lookback (squeeze = low ATR relative to recent) ---
+  const atrSqueeze: boolean[] = new Array(len).fill(false);
+  for (let i = squeezeLookback; i < len; i++) {
+    let countBelow = 0;
+    for (let j = i - squeezeLookback; j < i; j++) {
+      if (atr[j] > atr[i]) countBelow++;
+    }
+    atrSqueeze[i] = countBelow / squeezeLookback > 0.7;
+  }
+
+  // --- Build adaptive trend line with flip logic ---
+  const result: TitanPulseSignalData[] = [];
+  let dir = 1;      // 1 = bull, -1 = bear
+  let trendLevel = closes[minBars - 1];
+  let prevDir = 1;
+  let barsInTrend = 0;
+  let wasInSqueeze = false;
+
+  for (let i = minBars; i < len; i++) {
+    if (atr[i] === 0) continue;
+
+    const offset = atr[i] * atrMultiplier;
+    const bullLevel = kama[i] - offset;  // support
+    const bearLevel = kama[i] + offset;  // resistance
+
+    prevDir = dir;
+
+    if (dir === 1) {
+      trendLevel = Math.max(trendLevel, bullLevel);
+      if (closes[i] < trendLevel) {
+        dir = -1;
+        trendLevel = bearLevel;
+        barsInTrend = 0;
+      }
+    } else {
+      trendLevel = Math.min(trendLevel, bearLevel);
+      if (closes[i] > trendLevel) {
+        dir = 1;
+        trendLevel = bullLevel;
+        barsInTrend = 0;
+      }
+    }
+    barsInTrend++;
+
+    // --- Signal detection (confluence scoring) ---
+    let score = 0;
+
+    // Signal 1: Trend flip (highest weight)
+    const isFlip = dir !== prevDir;
+    if (isFlip) score += 45;
+
+    // Signal 2: Momentum surge — price accelerating away from the line
+    const distFromLine = Math.abs(closes[i] - trendLevel);
+    const momentumRatio = atr[i] > 0 ? distFromLine / atr[i] : 0;
+    if (momentumRatio > 1.5 && barsInTrend <= 5) score += 30;
+    else if (momentumRatio > 1.0 && barsInTrend <= 3) score += 20;
+
+    // Signal 3: Volatility expansion after squeeze
+    const inSqueeze = atrSqueeze[i];
+    if (wasInSqueeze && !inSqueeze && atrRoc[i] > 0.1) {
+      score += 25;
+    }
+    wasInSqueeze = inSqueeze;
+
+    // Determine signal type
+    const strength = Math.min(100, score);
+    let signal: TitanPulseSignalData["signal"] = "none";
+    if (strength >= signalThreshold) {
+      if (dir === 1) signal = strength >= 70 ? "strong_buy" : "buy";
+      else signal = strength >= 70 ? "strong_sell" : "sell";
+    }
+
+    result.push({
+      time: data[i].time,
+      level: trendLevel,
+      direction: dir as 1 | -1,
+      signal,
+      strength,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// AURORA CASCADE FLOW - 5-layer adaptive KAMA cascade with directional stacking
+// ============================================================================
+
+export interface AuroraCascadeFlowData {
+  time: number;
+  l1: number;  // fastest layer
+  l2: number;
+  l3: number;  // core layer
+  l4: number;
+  l5: number;  // slowest layer
+  alignment: number;   // 0–5 how many layers agree on direction
+  direction: 1 | -1;  // majority direction
+}
+
+export function calculateAuroraCascadeFlow(
+  data: OHLCData[],
+  erPeriod: number = 10,
+  fastSC: number = 2,
+  slowRange: [number, number] = [10, 40],
+  smoothFactor: number = 3,
+): AuroraCascadeFlowData[] {
+  const minBars = erPeriod + smoothFactor + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+  const numLayers = 5;
+
+  // Generate 5 slow-SC values spread linearly across the range
+  const slowSCs: number[] = [];
+  for (let n = 0; n < numLayers; n++) {
+    const slowPeriod = slowRange[0] + (slowRange[1] - slowRange[0]) * (n / (numLayers - 1));
+    slowSCs.push(2 / (slowPeriod + 1));
+  }
+  const fastSCVal = 2 / (fastSC + 1);
+
+  // Calculate each KAMA layer
+  const layers: number[][] = [];
+  for (let n = 0; n < numLayers; n++) {
+    const kama = new Array(len).fill(0);
+    kama[0] = closes[0];
+    for (let i = 1; i < erPeriod; i++) kama[i] = closes[i];
+
+    for (let i = erPeriod; i < len; i++) {
+      const direction = Math.abs(closes[i] - closes[i - erPeriod]);
+      let vol = 0;
+      for (let j = i - erPeriod + 1; j <= i; j++) vol += Math.abs(closes[j] - closes[j - 1]);
+      const er = vol > 0 ? direction / vol : 0;
+      const sc = er * (fastSCVal - slowSCs[n]) + slowSCs[n];
+      const alpha = sc * sc;
+      kama[i] = kama[i - 1] + alpha * (closes[i] - kama[i - 1]);
+    }
+
+    // Apply additional EMA smoothing to reduce noise on faster layers
+    if (smoothFactor > 1 && n < 3) {
+      const smoothK = 2 / (smoothFactor + 1);
+      for (let i = erPeriod + 1; i < len; i++) {
+        kama[i] = kama[i - 1] + smoothK * (kama[i] - kama[i - 1]);
+      }
+    }
+
+    layers.push(kama);
+  }
+
+  // Build output
+  const result: AuroraCascadeFlowData[] = [];
+  const startIdx = minBars;
+
+  for (let i = startIdx; i < len; i++) {
+    // Count alignment: how many layers have positive slope
+    let bullCount = 0;
+    for (let n = 0; n < numLayers; n++) {
+      if (layers[n][i] > layers[n][i - 1]) bullCount++;
+    }
+    const bearCount = numLayers - bullCount;
+    const dir = bullCount >= bearCount ? 1 : -1;
+    const alignment = Math.max(bullCount, bearCount);
+
+    result.push({
+      time: data[i].time,
+      l1: layers[0][i],
+      l2: layers[1][i],
+      l3: layers[2][i],
+      l4: layers[3][i],
+      l5: layers[4][i],
+      alignment,
+      direction: dir as 1 | -1,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// ECLIPSE STEALTH TRAIL - Stepping adaptive trend with fractal dimension regime
+// ============================================================================
+
+export interface EclipseStealthTrailData {
+  time: number;
+  trail: number;
+  shadow: number;
+  direction: 1 | -1;
+  regime: "stepping" | "trailing";
+  signal: "breakout" | "flip_bull" | "flip_bear" | "none";
+  fractalDim: number;
+}
+
+export function calculateEclipseStealthTrail(
+  data: OHLCData[],
+  mcgPeriod: number = 14,
+  fdPeriod: number = 30,
+  fdThreshold: number = 1.5,
+  atrPeriod: number = 14,
+  atrMultiplier: number = 1.8,
+): EclipseStealthTrailData[] {
+  const minBars = Math.max(mcgPeriod, fdPeriod, atrPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const len = data.length;
+
+  // --- McGinley Dynamic ---
+  const mcg = new Array(len).fill(0);
+  mcg[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const ratio = closes[i] / mcg[i - 1];
+    const denom = mcgPeriod * Math.pow(ratio, 4);
+    mcg[i] = mcg[i - 1] + (closes[i] - mcg[i - 1]) / Math.max(denom, 1);
+  }
+
+  // --- Fractal Dimension (path complexity method) ---
+  const fd = new Array(len).fill(1.5);
+  for (let i = fdPeriod; i < len; i++) {
+    const window = closes.slice(i - fdPeriod, i);
+    const n = window.length;
+
+    const rangeHL = Math.max(...highs.slice(i - fdPeriod, i)) - Math.min(...lows.slice(i - fdPeriod, i));
+    if (rangeHL <= 0) { fd[i] = 1.5; continue; }
+
+    let pathLength = 0;
+    for (let k = 1; k < n; k++) pathLength += Math.abs(window[k] - window[k - 1]);
+
+    const straightLine = Math.abs(window[n - 1] - window[0]);
+    const complexity = straightLine > 0 ? pathLength / straightLine : fdPeriod;
+    fd[i] = 1 + Math.log(complexity) / Math.log(fdPeriod);
+    fd[i] = Math.max(1.0, Math.min(2.0, fd[i]));
+  }
+
+  // --- ATR ---
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1]),
+    );
+  }
+  const atr = new Array(len).fill(0);
+  let atrSum = 0;
+  for (let i = 0; i < atrPeriod && i < len; i++) atrSum += tr[i];
+  atr[atrPeriod - 1] = atrSum / atrPeriod;
+  for (let i = atrPeriod; i < len; i++) {
+    atr[i] = (atr[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+  }
+
+  // --- Stealth Trail (stepping logic) ---
+  const trail = new Array(len).fill(0);
+  const shadow = new Array(len).fill(0);
+  const dir = new Array(len).fill(1);
+  const regimeArr: string[] = new Array(len).fill("trailing");
+
+  trail[minBars - 1] = mcg[minBars - 1];
+  dir[minBars - 1] = closes[minBars - 1] >= mcg[minBars - 1] ? 1 : -1;
+  shadow[minBars - 1] = dir[minBars - 1] === 1
+    ? trail[minBars - 1] - atr[minBars - 1] * atrMultiplier
+    : trail[minBars - 1] + atr[minBars - 1] * atrMultiplier;
+
+  const result: EclipseStealthTrailData[] = [];
+
+  for (let i = minBars; i < len; i++) {
+    const isStepping = fd[i] >= fdThreshold;
+    regimeArr[i] = isStepping ? "stepping" : "trailing";
+
+    if (isStepping) {
+      trail[i] = trail[i - 1];
+    } else {
+      trail[i] = mcg[i];
+    }
+
+    const prevDir = dir[i - 1];
+    if (closes[i] > trail[i] + atr[i] * atrMultiplier * 0.5) {
+      dir[i] = 1;
+    } else if (closes[i] < trail[i] - atr[i] * atrMultiplier * 0.5) {
+      dir[i] = -1;
+    } else {
+      dir[i] = prevDir;
+    }
+
+    if (dir[i] === 1) {
+      trail[i] = Math.max(trail[i], trail[i - 1]);
+      shadow[i] = trail[i] - atr[i] * atrMultiplier;
+    } else {
+      trail[i] = Math.min(trail[i], trail[i - 1]);
+      shadow[i] = trail[i] + atr[i] * atrMultiplier;
+    }
+
+    let signal: "breakout" | "flip_bull" | "flip_bear" | "none" = "none";
+    if (regimeArr[i - 1] === "stepping" && regimeArr[i] === "trailing") {
+      signal = "breakout";
+    }
+    if (prevDir === -1 && dir[i] === 1) {
+      signal = "flip_bull";
+    } else if (prevDir === 1 && dir[i] === -1) {
+      signal = "flip_bear";
+    }
+
+    result.push({
+      time: data[i].time,
+      trail: trail[i],
+      shadow: shadow[i],
+      direction: dir[i] as 1 | -1,
+      regime: regimeArr[i] as "stepping" | "trailing",
+      signal,
+      fractalDim: fd[i],
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// WRAITH CONVERGENCE ENGINE - Multi-method consensus line with convergence signals
+// ============================================================================
+
+export interface WraithConvergenceData {
+  time: number;
+  consensus: number;
+  convergence: number;     // 0-100 how tightly the methods agree
+  direction: 1 | -1;
+  signal: "converge_bull" | "converge_bear" | "diverge" | "none";
+  methodValues: [number, number, number, number];
+}
+
+export function calculateWraithConvergenceEngine(
+  data: OHLCData[],
+  period: number = 20,
+  kamaFast: number = 2,
+  kamaSlow: number = 30,
+  convergenceThreshold: number = 70,
+): WraithConvergenceData[] {
+  const minBars = period + 10;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // Method 1: McGinley Dynamic
+  const mcg = new Array(len).fill(0);
+  mcg[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const ratio = closes[i] / mcg[i - 1];
+    const denom = period * Math.pow(ratio, 4);
+    mcg[i] = mcg[i - 1] + (closes[i] - mcg[i - 1]) / Math.max(denom, 1);
+  }
+
+  // Method 2: Ehlers 2-Pole Super Smoother
+  const ss = new Array(len).fill(0);
+  const freq = Math.sqrt(2) * Math.PI / period;
+  const a1ss = Math.exp(-freq);
+  const b1ss = 2 * a1ss * Math.cos(freq);
+  const c2ss = b1ss;
+  const c3ss = -(a1ss * a1ss);
+  const c1ss = 1 - c2ss - c3ss;
+  ss[0] = closes[0]; ss[1] = closes[1];
+  for (let i = 2; i < len; i++) {
+    ss[i] = c1ss * (closes[i] + closes[i - 1]) / 2 + c2ss * ss[i - 1] + c3ss * ss[i - 2];
+  }
+
+  // Method 3: KAMA
+  const kama = new Array(len).fill(0);
+  const fSC = 2 / (kamaFast + 1);
+  const sSC = 2 / (kamaSlow + 1);
+  kama[0] = closes[0];
+  for (let i = 1; i < period && i < len; i++) kama[i] = closes[i];
+  for (let i = period; i < len; i++) {
+    const dir = Math.abs(closes[i] - closes[i - period]);
+    let vol = 0;
+    for (let j = i - period + 1; j <= i; j++) vol += Math.abs(closes[j] - closes[j - 1]);
+    const er = vol > 0 ? dir / vol : 0;
+    const sc = er * (fSC - sSC) + sSC;
+    const alpha = sc * sc;
+    kama[i] = kama[i - 1] + alpha * (closes[i] - kama[i - 1]);
+  }
+
+  // Method 4: Hull MA (HMA)
+  const halfP = Math.max(Math.floor(period / 2), 1);
+  const sqrtP = Math.max(Math.floor(Math.sqrt(period)), 1);
+  const wmaFull = _wma(closes, period);
+  const wmaHalf = _wma(closes, halfP);
+  const hullRaw = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) hullRaw[i] = 2 * wmaHalf[i] - wmaFull[i];
+  const hull = _wma(hullRaw, sqrtP);
+
+  // ATR for normalization
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = new Array(len).fill(0);
+  let aSum = 0;
+  for (let i = 0; i < period && i < len; i++) aSum += tr[i];
+  atr[period - 1] = aSum / period;
+  for (let i = period; i < len; i++) atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+
+  // Build consensus + convergence
+  const result: WraithConvergenceData[] = [];
+  let prevAllBull = false;
+  let prevAllBear = false;
+  let prevConverged = false;
+
+  for (let i = minBars; i < len; i++) {
+    const methods = [mcg[i], ss[i], kama[i], hull[i]] as [number, number, number, number];
+    const consensus = (mcg[i] + ss[i] + kama[i] + hull[i]) / 4;
+
+    const spread = Math.max(...methods) - Math.min(...methods);
+    const normATR = atr[i] > 0 ? atr[i] : 1;
+    const rawConv = 1 - Math.min(spread / (normATR * 2), 1);
+    const convergence = Math.round(rawConv * 100);
+
+    const bullCount = methods.filter((m) => closes[i] > m).length;
+    const direction: 1 | -1 = bullCount >= 3 ? 1 : -1;
+
+    const allBull = bullCount === 4;
+    const allBear = bullCount === 0;
+    const isConverged = convergence >= convergenceThreshold;
+
+    let signal: "converge_bull" | "converge_bear" | "diverge" | "none" = "none";
+    if (isConverged && allBull && !prevAllBull) signal = "converge_bull";
+    else if (isConverged && allBear && !prevAllBear) signal = "converge_bear";
+    else if (!isConverged && prevConverged) signal = "diverge";
+
+    prevAllBull = allBull;
+    prevAllBear = allBear;
+    prevConverged = isConverged;
+
+    result.push({ time: data[i].time, consensus, convergence, direction, signal, methodValues: methods });
+  }
+
+  return result;
+}
+
+function _wma(src: number[], period: number): number[] {
+  const len = src.length;
+  const out = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) {
+    if (i < period - 1) { out[i] = src[i]; continue; }
+    let num = 0, den = 0;
+    for (let j = 0; j < period; j++) { const w = period - j; num += src[i - j] * w; den += w; }
+    out[i] = den > 0 ? num / den : src[i];
+  }
+  return out;
+}
+
+// ============================================================================
+// FLUX MOMENTUM TRAIL - Per-bar gradient-colored momentum line
+// ============================================================================
+
+export interface FluxMomentumTrailData {
+  time: number;
+  trail: number;
+  momentum: number;  // -100 to 100
+  color: string;
+  signal: "surge_bull" | "surge_bear" | "fade" | "none";
+}
+
+export function calculateFluxMomentumTrail(
+  data: OHLCData[],
+  fastPeriod: number = 8,
+  slowPeriod: number = 21,
+  rocPeriod: number = 12,
+  atrPeriod: number = 14,
+  surgeThreshold: number = 70,
+): FluxMomentumTrailData[] {
+  const minBars = Math.max(slowPeriod * 2, rocPeriod, atrPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const volumes = data.map((d) => d.volume || 0);
+  const len = data.length;
+
+  // DEMA (Double EMA) for the trail line
+  const emaFast1 = _emaArr(closes, fastPeriod);
+  const emaFast2 = _emaArr(emaFast1, fastPeriod);
+  const dema = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) dema[i] = 2 * emaFast1[i] - emaFast2[i];
+
+  // Slow EMA for momentum reference
+  const emaSlow = _emaArr(closes, slowPeriod);
+
+  // Rate of Change
+  const roc = new Array(len).fill(0);
+  for (let i = rocPeriod; i < len; i++) {
+    roc[i] = closes[i - rocPeriod] > 0 ? ((closes[i] - closes[i - rocPeriod]) / closes[i - rocPeriod]) * 100 : 0;
+  }
+
+  // ATR for normalization
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = _emaArr(tr, atrPeriod);
+
+  // Volume ratio (current vs average)
+  const volAvg = _emaArr(volumes, slowPeriod);
+
+  // Composite momentum score (-100 to 100)
+  const momentum = new Array(len).fill(0);
+  for (let i = minBars; i < len; i++) {
+    const trendComponent = atr[i] > 0 ? ((dema[i] - emaSlow[i]) / atr[i]) * 25 : 0;
+    const rocComponent = Math.max(-50, Math.min(50, roc[i] * 5));
+    const volRatio = volAvg[i] > 0 ? volumes[i] / volAvg[i] : 1;
+    const volBoost = Math.min(volRatio - 1, 1) * 25 * Math.sign(trendComponent);
+    momentum[i] = Math.max(-100, Math.min(100, trendComponent + rocComponent + volBoost));
+  }
+
+  // Smooth momentum
+  const smoothMom = _emaArr(momentum, 3);
+
+  // Map momentum to color
+  const result: FluxMomentumTrailData[] = [];
+  let prevMomAbs = 0;
+
+  for (let i = minBars; i < len; i++) {
+    const m = smoothMom[i];
+    const absM = Math.abs(m);
+    const color = _momentumToColor(m);
+
+    let signal: "surge_bull" | "surge_bear" | "fade" | "none" = "none";
+    if (absM >= surgeThreshold && prevMomAbs < surgeThreshold) {
+      signal = m > 0 ? "surge_bull" : "surge_bear";
+    } else if (absM < surgeThreshold * 0.4 && prevMomAbs >= surgeThreshold * 0.4) {
+      signal = "fade";
+    }
+
+    prevMomAbs = absM;
+
+    result.push({
+      time: data[i].time,
+      trail: dema[i],
+      momentum: Math.round(m),
+      color,
+      signal,
+    });
+  }
+
+  return result;
+}
+
+function _emaArr(src: number[], period: number): number[] {
+  const len = src.length;
+  const out = new Array(len).fill(0);
+  const k = 2 / (period + 1);
+  out[0] = src[0];
+  for (let i = 1; i < len; i++) out[i] = src[i] * k + out[i - 1] * (1 - k);
+  return out;
+}
+
+function _momentumToColor(m: number): string {
+  const abs = Math.abs(m);
+  if (m > 0) {
+    if (abs >= 80) return "#15803d";
+    if (abs >= 60) return "#22c55e";
+    if (abs >= 40) return "#4ade80";
+    if (abs >= 20) return "#06b6d4";
+    return "#94a3b8";
+  } else {
+    if (abs >= 80) return "#b91c1c";
+    if (abs >= 60) return "#ef4444";
+    if (abs >= 40) return "#f87171";
+    if (abs >= 20) return "#f97316";
+    return "#94a3b8";
+  }
+}
+
+// ============================================================================
+// APEX PREDATOR SIGNAL - Multi-factor confluence signal engine
+// ============================================================================
+
+export interface ApexPredatorSignalData {
+  time: number;
+  line: number;
+  direction: 1 | -1;
+  confluence: number;
+  signal: "apex_bull" | "apex_bear" | "stalk_bull" | "stalk_bear" | "none";
+}
+
+export function calculateApexPredatorSignal(
+  data: OHLCData[],
+  zlemaPeriod: number = 21,
+  rocPeriod: number = 12,
+  atrPeriod: number = 14,
+  volPeriod: number = 20,
+  minConfluence: number = 2,
+): ApexPredatorSignalData[] {
+  const minBars = Math.max(zlemaPeriod * 2, rocPeriod, atrPeriod, volPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const volumes = data.map((d) => d.volume || 0);
+  const len = data.length;
+
+  // ZLEMA (Zero-Lag EMA)
+  const lag = Math.floor((zlemaPeriod - 1) / 2);
+  const k = 2 / (zlemaPeriod + 1);
+  const zlema = new Array(len).fill(0);
+  zlema[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const src = i >= lag ? 2 * closes[i] - closes[i - lag] : closes[i];
+    zlema[i] = src * k + zlema[i - 1] * (1 - k);
+  }
+
+  // ATR
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = new Array(len).fill(0);
+  let aSum = 0;
+  for (let i = 0; i < atrPeriod && i < len; i++) aSum += tr[i];
+  atr[atrPeriod - 1] = aSum / atrPeriod;
+  for (let i = atrPeriod; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+
+  // Volume average
+  const volAvg = new Array(len).fill(0);
+  let vSum = 0;
+  for (let i = 0; i < volPeriod && i < len; i++) vSum += volumes[i];
+  volAvg[volPeriod - 1] = vSum / volPeriod;
+  for (let i = volPeriod; i < len; i++) volAvg[i] = (volAvg[i - 1] * (volPeriod - 1) + volumes[i]) / volPeriod;
+
+  // ROC
+  const roc = new Array(len).fill(0);
+  for (let i = rocPeriod; i < len; i++) {
+    roc[i] = closes[i - rocPeriod] !== 0 ? ((closes[i] - closes[i - rocPeriod]) / closes[i - rocPeriod]) * 100 : 0;
+  }
+
+  // ATR ratio (current vs rolling average for squeeze detection)
+  const atrRatio = new Array(len).fill(1);
+  for (let i = volPeriod; i < len; i++) {
+    let atrAvg = 0;
+    for (let j = i - volPeriod; j < i; j++) atrAvg += atr[j];
+    atrAvg /= volPeriod;
+    atrRatio[i] = atrAvg > 0 ? atr[i] / atrAvg : 1;
+  }
+
+  const result: ApexPredatorSignalData[] = [];
+  let prevDir = 0;
+
+  for (let i = minBars; i < len; i++) {
+    const dir = closes[i] > zlema[i] ? 1 : -1;
+    const dirFlip = prevDir !== 0 && dir !== prevDir;
+
+    // Factor 1: Trend flip (ZLEMA crossover)
+    const f1 = dirFlip ? 1 : 0;
+
+    // Factor 2: Momentum surge (ROC magnitude)
+    const absRoc = Math.abs(roc[i]);
+    const rocThresh = atr[i] > 0 ? (atr[i] / closes[i]) * 100 * 3 : 0.5;
+    const f2 = absRoc > rocThresh ? 1 : 0;
+
+    // Factor 3: Volatility expansion (ATR breakout from squeeze)
+    const f3 = atrRatio[i] > 1.4 ? 1 : 0;
+
+    // Factor 4: Volume confirmation
+    const f4 = volAvg[i] > 0 && volumes[i] > volAvg[i] * 1.3 ? 1 : 0;
+
+    const confluence = f1 + f2 + f3 + f4;
+
+    let signal: ApexPredatorSignalData["signal"] = "none";
+    if (dirFlip && confluence >= 3) {
+      signal = dir === 1 ? "apex_bull" : "apex_bear";
+    } else if (dirFlip && confluence >= minConfluence) {
+      signal = dir === 1 ? "stalk_bull" : "stalk_bear";
+    }
+
+    prevDir = dir;
+
+    result.push({
+      time: data[i].time,
+      line: zlema[i],
+      direction: dir as 1 | -1,
+      confluence,
+      signal,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// PHANTOM DIVERGENCE TRACKER - Dual-line price vs volume-adjusted divergence
+// ============================================================================
+
+export interface PhantomDivergenceData {
+  time: number;
+  priceLine: number;
+  momentumLine: number;
+  divergence: number;
+  direction: 1 | -1;
+  signal: "div_bull" | "div_bear" | "converge" | "none";
+}
+
+export function calculatePhantomDivergenceTracker(
+  data: OHLCData[],
+  smoothPeriod: number = 21,
+  volPeriod: number = 20,
+  atrPeriod: number = 14,
+  divergenceThreshold: number = 60,
+): PhantomDivergenceData[] {
+  const minBars = Math.max(smoothPeriod * 2, volPeriod, atrPeriod) + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const volumes = data.map((d) => d.volume || 1);
+  const highs = data.map((d) => d.high);
+  const lows = data.map((d) => d.low);
+  const len = data.length;
+
+  const k = 2 / (smoothPeriod + 1);
+  const ema1 = new Array(len).fill(0);
+  const ema2 = new Array(len).fill(0);
+  ema1[0] = closes[0]; ema2[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    ema1[i] = closes[i] * k + ema1[i - 1] * (1 - k);
+    ema2[i] = ema1[i] * k + ema2[i - 1] * (1 - k);
+  }
+  const priceLine = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) priceLine[i] = 2 * ema1[i] - ema2[i];
+
+  const volAvg = new Array(len).fill(0);
+  let vSum = 0;
+  for (let i = 0; i < volPeriod && i < len; i++) vSum += volumes[i];
+  volAvg[volPeriod - 1] = vSum / volPeriod;
+  for (let i = volPeriod; i < len; i++) {
+    volAvg[i] = volAvg[i - 1] + (volumes[i] - volumes[i - volPeriod]) / volPeriod;
+  }
+
+  const momLine = new Array(len).fill(0);
+  momLine[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const vRatio = volAvg[i] > 0 ? volumes[i] / volAvg[i] : 1;
+    const cappedRatio = Math.min(Math.max(vRatio, 0.2), 3.0);
+    const priceChange = closes[i] - closes[i - 1];
+    momLine[i] = momLine[i - 1] + priceChange * cappedRatio;
+  }
+  const mEma1 = new Array(len).fill(0);
+  const mEma2 = new Array(len).fill(0);
+  mEma1[0] = momLine[0]; mEma2[0] = momLine[0];
+  for (let i = 1; i < len; i++) {
+    mEma1[i] = momLine[i] * k + mEma1[i - 1] * (1 - k);
+    mEma2[i] = mEma1[i] * k + mEma2[i - 1] * (1 - k);
+  }
+  const smoothMom = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) smoothMom[i] = 2 * mEma1[i] - mEma2[i];
+
+  const tr = new Array(len).fill(0);
+  tr[0] = highs[0] - lows[0];
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const atr = new Array(len).fill(0);
+  let aSum = 0;
+  for (let i = 0; i < atrPeriod && i < len; i++) aSum += tr[i];
+  atr[atrPeriod - 1] = aSum / atrPeriod;
+  for (let i = atrPeriod; i < len; i++) atr[i] = (atr[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+
+  const result: PhantomDivergenceData[] = [];
+  let prevDivScore = 0;
+  let prevBearDiv = false;
+  let prevBullDiv = false;
+
+  for (let i = minBars; i < len; i++) {
+    const gap = priceLine[i] - smoothMom[i];
+    const normATR = atr[i] > 0 ? atr[i] : 1;
+    const rawDiv = Math.abs(gap) / (normATR * 2);
+    const divScore = Math.round(Math.min(rawDiv, 1) * 100);
+
+    const direction: 1 | -1 = closes[i] > priceLine[i] ? 1 : -1;
+    const isBearDiv = gap > 0 && divScore >= divergenceThreshold;
+    const isBullDiv = gap < 0 && divScore >= divergenceThreshold;
+    const isConverging = prevDivScore >= divergenceThreshold && divScore < divergenceThreshold * 0.6;
+
+    let signal: PhantomDivergenceData["signal"] = "none";
+    if (isBearDiv && !prevBearDiv) signal = "div_bear";
+    else if (isBullDiv && !prevBullDiv) signal = "div_bull";
+    else if (isConverging) signal = "converge";
+
+    prevDivScore = divScore;
+    prevBearDiv = isBearDiv;
+    prevBullDiv = isBullDiv;
+
+    result.push({
+      time: data[i].time,
+      priceLine: priceLine[i],
+      momentumLine: smoothMom[i],
+      divergence: divScore,
+      direction,
+      signal,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// CHAOS SENTINEL - Lyapunov-based market stability detection
+// ============================================================================
+
+export interface ChaosSentinelData {
+  time: number;
+  attractor: number;
+  lyapunov: number;
+  regime: "order" | "transition" | "chaos";
+  signal: "order_start" | "chaos_start" | "none";
+}
+
+export function calculateChaosSentinel(
+  data: OHLCData[],
+  attractorPeriod: number = 21,
+  lyapunovPeriod: number = 14,
+  smoothing: number = 5,
+  chaosThreshold: number = 50,
+): ChaosSentinelData[] {
+  const minBars = Math.max(attractorPeriod, lyapunovPeriod) + smoothing + 5;
+  if (data.length < minBars) return [];
+
+  const closes = data.map((d) => d.close);
+  const len = data.length;
+
+  // Attractor: Ehlers 2-pole Super Smoother
+  const freq = Math.sqrt(2) * Math.PI / attractorPeriod;
+  const a1 = Math.exp(-freq);
+  const b1 = 2 * a1 * Math.cos(freq);
+  const c2 = b1;
+  const c3 = -(a1 * a1);
+  const c1 = 1 - c2 - c3;
+  const att = new Array(len).fill(0);
+  att[0] = closes[0]; att[1] = closes[1];
+  for (let i = 2; i < len; i++) {
+    att[i] = c1 * (closes[i] + closes[i - 1]) / 2 + c2 * att[i - 1] + c3 * att[i - 2];
+  }
+
+  // Lyapunov exponent estimation (rolling absolute log-return average)
+  const logReturns = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const r = closes[i] / closes[i - 1];
+    logReturns[i] = r > 0 ? Math.log(r) : 0;
+  }
+
+  const rawLyap = new Array(len).fill(0);
+  for (let i = lyapunovPeriod; i < len; i++) {
+    let sum = 0;
+    for (let j = i - lyapunovPeriod + 1; j <= i; j++) sum += Math.abs(logReturns[j]);
+    rawLyap[i] = sum / lyapunovPeriod;
+  }
+
+  // Normalize to 0-100 using rolling min/max
+  const normWindow = attractorPeriod * 3;
+  const lyap = new Array(len).fill(50);
+  for (let i = normWindow; i < len; i++) {
+    let mn = Infinity, mx = -Infinity;
+    for (let j = i - normWindow; j <= i; j++) {
+      if (rawLyap[j] < mn) mn = rawLyap[j];
+      if (rawLyap[j] > mx) mx = rawLyap[j];
+    }
+    lyap[i] = mx > mn ? ((rawLyap[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // Smooth
+  const smoothK = 2 / (smoothing + 1);
+  for (let i = minBars; i < len; i++) {
+    lyap[i] = lyap[i - 1] + smoothK * (lyap[i] - lyap[i - 1]);
+  }
+
+  const result: ChaosSentinelData[] = [];
+  let prevRegime: "order" | "transition" | "chaos" = "transition";
+
+  for (let i = minBars; i < len; i++) {
+    const regime: "order" | "transition" | "chaos" =
+      lyap[i] >= chaosThreshold + 15 ? "chaos" :
+      lyap[i] <= chaosThreshold - 15 ? "order" : "transition";
+
+    let signal: ChaosSentinelData["signal"] = "none";
+    if (regime === "order" && prevRegime !== "order") signal = "order_start";
+    else if (regime === "chaos" && prevRegime !== "chaos") signal = "chaos_start";
+
+    prevRegime = regime;
+    result.push({ time: data[i].time, attractor: att[i], lyapunov: lyap[i], regime, signal });
+  }
+
+  return result;
+}
+
+// ─── Helix Phase Engine ──────────────────────────────────────────────────────
+export interface HelixPhaseEngineData {
+  time: number;
+  phaseLine: number;
+  upper: number;
+  lower: number;
+  phaseVelocity: number;
+  regime: "trending" | "consolidation" | "reversal";
+  signal: "lead_bull" | "lead_bear" | "sync" | "none";
+}
+
+export function calculateHelixPhaseEngine(
+  data: OHLCData[],
+  detrendPeriod: number = 20,
+  hilbertLength: number = 7,
+  ampMultiplier: number = 1.5,
+  velocitySmooth: number = 5,
+  leadSensitivity: number = 60,
+): HelixPhaseEngineData[] {
+  const minBars = detrendPeriod + hilbertLength * 2 + velocitySmooth + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const demaK = 2 / (detrendPeriod + 1);
+  const ema1 = new Array(len).fill(0);
+  const ema2 = new Array(len).fill(0);
+  ema1[0] = closes[0]; ema2[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    ema1[i] = ema1[i - 1] + demaK * (closes[i] - ema1[i - 1]);
+    ema2[i] = ema2[i - 1] + demaK * (ema1[i] - ema2[i - 1]);
+  }
+  const dema = ema1.map((v, i) => 2 * v - ema2[i]);
+  const cycle = closes.map((c, i) => c - dema[i]);
+
+  const hLen = hilbertLength;
+  const kernel: number[] = [];
+  for (let k = -hLen; k <= hLen; k++) {
+    kernel.push(k % 2 !== 0 ? 2 / (Math.PI * k) : 0);
+  }
+  const hilbert = new Array(len).fill(0);
+  for (let i = hLen; i < len - hLen; i++) {
+    let sum = 0;
+    for (let k = -hLen; k <= hLen; k++) {
+      sum += kernel[k + hLen] * cycle[i - k];
+    }
+    hilbert[i] = sum;
+  }
+
+  const amplitude = new Array(len).fill(0);
+  const phase = new Array(len).fill(0);
+  for (let i = hLen; i < len; i++) {
+    amplitude[i] = Math.sqrt(cycle[i] * cycle[i] + hilbert[i] * hilbert[i]);
+    phase[i] = Math.atan2(hilbert[i], cycle[i]);
+  }
+
+  const unwrapped = new Array(len).fill(0);
+  unwrapped[hLen] = phase[hLen];
+  for (let i = hLen + 1; i < len; i++) {
+    let diff = phase[i] - phase[i - 1];
+    if (diff > Math.PI) diff -= 2 * Math.PI;
+    else if (diff < -Math.PI) diff += 2 * Math.PI;
+    unwrapped[i] = unwrapped[i - 1] + diff;
+  }
+
+  const rawVelocity = new Array(len).fill(0);
+  const instPeriod = new Array(len).fill(detrendPeriod);
+  for (let i = hLen + 1; i < len; i++) {
+    rawVelocity[i] = Math.abs(unwrapped[i] - unwrapped[i - 1]);
+    if (rawVelocity[i] > 0.001) {
+      instPeriod[i] = Math.min(Math.max(2 * Math.PI / rawVelocity[i], 4), detrendPeriod * 4);
+    }
+  }
+
+  const smoothedVel = [...rawVelocity];
+  const vK = 2 / (velocitySmooth + 1);
+  for (let i = hLen + 2; i < len; i++) {
+    smoothedVel[i] = smoothedVel[i - 1] + vK * (rawVelocity[i] - smoothedVel[i - 1]);
+  }
+  const normWindow = detrendPeriod * 3;
+  const normVel = new Array(len).fill(50);
+  for (let i = normWindow + hLen; i < len; i++) {
+    let mn = Infinity, mx = -Infinity;
+    for (let j = i - normWindow; j <= i; j++) {
+      if (smoothedVel[j] < mn) mn = smoothedVel[j];
+      if (smoothedVel[j] > mx) mx = smoothedVel[j];
+    }
+    normVel[i] = mx > mn ? ((smoothedVel[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  const phaseLine = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) {
+    const adaptK = 2 / (Math.max(instPeriod[i], 2) + 1);
+    phaseLine[i] = phaseLine[i - 1] + adaptK * (closes[i] - phaseLine[i - 1]);
+  }
+
+  const smoothAmp = [...amplitude];
+  for (let i = hLen + 1; i < len; i++) {
+    smoothAmp[i] = smoothAmp[i - 1] + vK * (amplitude[i] - smoothAmp[i - 1]);
+  }
+
+  const startIdx = normWindow + hLen + 2;
+  const result: HelixPhaseEngineData[] = [];
+  let prevRegime: HelixPhaseEngineData["regime"] = "consolidation";
+  let prevPhaseLine = phaseLine[startIdx - 1];
+  let prevClose = closes[startIdx - 1];
+
+  for (let i = startIdx; i < len; i++) {
+    const vel = normVel[i];
+    const regime: HelixPhaseEngineData["regime"] =
+      vel >= leadSensitivity + 10 ? "trending" :
+      vel <= leadSensitivity - 20 ? "consolidation" : "reversal";
+
+    let signal: HelixPhaseEngineData["signal"] = "none";
+    const plCrossUp = prevPhaseLine < prevClose && phaseLine[i] >= closes[i];
+    const plCrossDown = prevPhaseLine > prevClose && phaseLine[i] <= closes[i];
+    if (plCrossUp && vel > leadSensitivity) signal = "lead_bear";
+    else if (plCrossDown && vel > leadSensitivity) signal = "lead_bull";
+    else if (regime === "consolidation" && prevRegime !== "consolidation") signal = "sync";
+
+    const envWidth = smoothAmp[i] * ampMultiplier;
+    result.push({
+      time: data[i].time,
+      phaseLine: phaseLine[i],
+      upper: phaseLine[i] + envWidth,
+      lower: phaseLine[i] - envWidth,
+      phaseVelocity: vel,
+      regime,
+      signal,
+    });
+
+    prevRegime = regime;
+    prevPhaseLine = phaseLine[i];
+    prevClose = closes[i];
+  }
+
+  return result;
+}
+
+// ============================================================================
+// PRISM WAVELET CASCADE
+// Haar Wavelet Decomposition → 4 frequency layers + spectral alignment scoring
+// ============================================================================
+
+export interface PrismWaveletCascadeData {
+  time: number;
+  d1: number;    // Detail level 1 (fastest, 2-bar cycles)
+  d2: number;    // Detail level 2 (4-bar cycles)
+  d3: number;    // Detail level 3 (8-bar cycles)
+  a3: number;    // Approximation level 3 (slow trend)
+  alignment: number; // 0-100 spectral alignment score
+  trendDir: "bull" | "bear" | "neutral";
+  signal: "align" | "split" | "none";
+}
+
+export function calculatePrismWaveletCascade(
+  data: OHLCData[],
+  waveletDepth: number = 3,
+  smoothPeriod: number = 8,
+  alignThreshold: number = 70,
+  splitThreshold: number = 30,
+): PrismWaveletCascadeData[] {
+  const minBars = (1 << waveletDepth) * 4 + smoothPeriod + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const blockSize = 1 << waveletDepth;
+  const d1Raw = new Array(len).fill(NaN);
+  const d2Raw = new Array(len).fill(NaN);
+  const d3Raw = new Array(len).fill(NaN);
+  const a3Raw = new Array(len).fill(NaN);
+
+  for (let i = blockSize - 1; i < len; i++) {
+    const block = closes.slice(i - blockSize + 1, i + 1);
+
+    const a1: number[] = [];
+    const detail1: number[] = [];
+    for (let j = 0; j < block.length; j += 2) {
+      a1.push((block[j] + block[j + 1]) / 2);
+      detail1.push((block[j] - block[j + 1]) / 2);
+    }
+
+    const a2: number[] = [];
+    const detail2: number[] = [];
+    for (let j = 0; j < a1.length; j += 2) {
+      a2.push((a1[j] + a1[j + 1]) / 2);
+      detail2.push((a1[j] - a1[j + 1]) / 2);
+    }
+
+    const a3Arr: number[] = [];
+    const detail3: number[] = [];
+    for (let j = 0; j < a2.length; j += 2) {
+      a3Arr.push((a2[j] + a2[j + 1]) / 2);
+      detail3.push((a2[j] - a2[j + 1]) / 2);
+    }
+
+    const d1Energy = detail1.reduce((s, v) => s + Math.abs(v), 0) / detail1.length;
+    const d2Energy = detail2.reduce((s, v) => s + Math.abs(v), 0) / detail2.length;
+    const d3Energy = detail3.reduce((s, v) => s + Math.abs(v), 0) / detail3.length;
+
+    d1Raw[i] = closes[i] - d1Energy * Math.sign(closes[i] - closes[i - 1]);
+    d2Raw[i] = closes[i] - d2Energy * 1.5 * Math.sign(closes[i] - (closes[i - 2] || closes[i - 1]));
+    d3Raw[i] = closes[i] - d3Energy * 2.5 * Math.sign(closes[i] - (closes[i - 4] || closes[i - 1]));
+    a3Raw[i] = a3Arr.length > 0 ? a3Arr[a3Arr.length - 1] : closes[i];
+  }
+
+  const emaSmooth = (raw: number[], period: number): number[] => {
+    const out = new Array(len).fill(NaN);
+    const k = 2 / (period + 1);
+    let started = false;
+    for (let i2 = 0; i2 < len; i2++) {
+      if (isNaN(raw[i2])) continue;
+      if (!started) { out[i2] = raw[i2]; started = true; continue; }
+      out[i2] = raw[i2] * k + (out[i2 - 1] ?? raw[i2]) * (1 - k);
+    }
+    return out;
+  };
+
+  const d1S = emaSmooth(d1Raw, Math.max(2, Math.round(smoothPeriod * 0.5)));
+  const d2S = emaSmooth(d2Raw, smoothPeriod);
+  const d3S = emaSmooth(d3Raw, Math.round(smoothPeriod * 1.5));
+  const a3S = emaSmooth(a3Raw, smoothPeriod * 2);
+
+  const atrPeriod = 14;
+  const atrArr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(data[i].high - data[i].low, Math.abs(data[i].high - data[i - 1].close), Math.abs(data[i].low - data[i - 1].close));
+    atrArr[i] = i < atrPeriod ? tr : atrArr[i - 1] + (tr - atrArr[i - 1]) / atrPeriod;
+  }
+
+  const result: PrismWaveletCascadeData[] = [];
+  let prevAlignment = 50;
+
+  const startIdx = blockSize + smoothPeriod;
+  for (let i = startIdx; i < len; i++) {
+    if (isNaN(d1S[i]) || isNaN(d2S[i]) || isNaN(d3S[i]) || isNaN(a3S[i])) continue;
+
+    const layers = [d1S[i], d2S[i], d3S[i], a3S[i]];
+    const spread = Math.max(...layers) - Math.min(...layers);
+    const atrVal = atrArr[i] || 1;
+    const rawAlign = 1 - Math.min(spread / (atrVal * 3), 1);
+    const alignment = Math.round(rawAlign * 100);
+
+    const avgDir = (d1S[i] + d2S[i] + d3S[i] + a3S[i]) / 4;
+    const trendDir: PrismWaveletCascadeData["trendDir"] =
+      avgDir > closes[i] * 1.0002 ? "bear" :
+      avgDir < closes[i] * 0.9998 ? "bull" : "neutral";
+
+    let signal: PrismWaveletCascadeData["signal"] = "none";
+    if (alignment >= alignThreshold && prevAlignment < alignThreshold) signal = "align";
+    else if (alignment <= splitThreshold && prevAlignment > splitThreshold) signal = "split";
+
+    prevAlignment = alignment;
+
+    result.push({ time: data[i].time, d1: d1S[i], d2: d2S[i], d3: d3S[i], a3: a3S[i], alignment, trendDir, signal });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// MIRAGE DEPTH SCANNER — Singular Spectrum Analysis (SSA) trend extraction
+// ============================================================================
+
+export interface MirageDepthScannerData {
+  time: number;
+  trendLine: number;
+  upper: number;
+  lower: number;
+  depthScore: number;
+  regime: "deep" | "surface" | "transition";
+  signal: "emerge" | "submerge" | "none";
+}
+
+export function calculateMirageDepthScanner(
+  data: OHLCData[],
+  windowLength: number = 30,
+  corridorMultiplier: number = 1.5,
+  depthSmooth: number = 5,
+  signalThreshold: number = 65,
+): MirageDepthScannerData[] {
+  const L = Math.max(8, Math.min(windowLength, Math.floor(data.length / 3)));
+  const minBars = L * 2 + depthSmooth + 5;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const ssaTrend = new Array(len).fill(0);
+  const ssaOsc = new Array(len).fill(0);
+  const rawDepth = new Array(len).fill(50);
+
+  for (let t = L; t < len; t++) {
+    const K = L;
+    const segment = closes.slice(t - L - K + 1, t + 1);
+    const segLen = segment.length;
+    if (segLen < L + K - 1) { ssaTrend[t] = closes[t]; continue; }
+
+    const mean = segment.reduce((a, b) => a + b, 0) / segLen;
+
+    const autoCorr = new Array(L).fill(0);
+    for (let lag = 0; lag < L; lag++) {
+      let s = 0, cnt = 0;
+      for (let j = 0; j < segLen - lag; j++) {
+        s += (segment[j] - mean) * (segment[j + lag] - mean);
+        cnt++;
+      }
+      autoCorr[lag] = cnt > 0 ? s / cnt : 0;
+    }
+
+    let eigVec = new Array(L).fill(1 / Math.sqrt(L));
+    for (let iter = 0; iter < 12; iter++) {
+      const newVec = new Array(L).fill(0);
+      for (let i = 0; i < L; i++) {
+        for (let j = 0; j < L; j++) {
+          newVec[i] += autoCorr[Math.abs(i - j)] * eigVec[j];
+        }
+      }
+      let norm = 0;
+      for (let i = 0; i < L; i++) norm += newVec[i] * newVec[i];
+      norm = Math.sqrt(norm);
+      if (norm > 0) for (let i = 0; i < L; i++) eigVec[i] = newVec[i] / norm;
+    }
+
+    let eigenVal1 = 0;
+    for (let i = 0; i < L; i++) {
+      let v = 0;
+      for (let j = 0; j < L; j++) v += autoCorr[Math.abs(i - j)] * eigVec[j];
+      eigenVal1 += eigVec[i] * v;
+    }
+
+    let proj = 0;
+    const windowData = segment.slice(segLen - L);
+    for (let i = 0; i < L; i++) proj += (windowData[i] - mean) * eigVec[i];
+
+    ssaTrend[t] = mean + proj * eigVec[L - 1];
+    ssaOsc[t] = closes[t] - ssaTrend[t];
+
+    const totalVar = autoCorr[0] * L;
+    rawDepth[t] = totalVar > 0 ? Math.min(100, Math.max(0, (eigenVal1 / totalVar) * 100)) : 50;
+  }
+
+  for (let t = 1; t < L; t++) ssaTrend[t] = closes[t];
+
+  const smoothK = 2 / (depthSmooth + 1);
+  const smoothTrend = [...ssaTrend];
+  const smoothDepth = [...rawDepth];
+  const smoothOsc = new Array(len).fill(0);
+  for (let i = L + 1; i < len; i++) {
+    smoothTrend[i] = smoothTrend[i - 1] + smoothK * (ssaTrend[i] - smoothTrend[i - 1]);
+    smoothDepth[i] = smoothDepth[i - 1] + smoothK * (rawDepth[i] - smoothDepth[i - 1]);
+    smoothOsc[i] = smoothOsc[i - 1] + smoothK * (Math.abs(ssaOsc[i]) - smoothOsc[i - 1]);
+  }
+
+  const startIdx = L + depthSmooth + 2;
+  const result: MirageDepthScannerData[] = [];
+  let prevRegime: MirageDepthScannerData["regime"] = "transition";
+
+  for (let i = startIdx; i < len; i++) {
+    const corridor = smoothOsc[i] * corridorMultiplier;
+    const depth = smoothDepth[i];
+    const regime: MirageDepthScannerData["regime"] =
+      depth >= signalThreshold + 10 ? "deep" :
+      depth <= signalThreshold - 15 ? "surface" : "transition";
+
+    let signal: MirageDepthScannerData["signal"] = "none";
+    if (regime === "deep" && prevRegime !== "deep") signal = "emerge";
+    else if (regime === "surface" && prevRegime !== "surface") signal = "submerge";
+
+    prevRegime = regime;
+    result.push({
+      time: data[i].time,
+      trendLine: smoothTrend[i],
+      upper: smoothTrend[i] + corridor,
+      lower: smoothTrend[i] - corridor,
+      depthScore: depth,
+      regime,
+      signal,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// QUANTUM DRIFT MAPPER — Detrended Fluctuation Analysis (DFA)
+// ============================================================================
+
+export interface QuantumDriftMapperData {
+  time: number;
+  driftLine: number;
+  upper: number;
+  lower: number;
+  alpha: number;
+  regime: "persistent" | "antipersistent" | "random";
+  signal: "drift_start" | "snap_start" | "none";
+}
+
+export function calculateQuantumDriftMapper(
+  data: OHLCData[],
+  dfaWindow: number = 40,
+  corridorMultiplier: number = 1.5,
+  smooth: number = 5,
+  persistenceThreshold: number = 0.6,
+): QuantumDriftMapperData[] {
+  const minBars = dfaWindow + smooth + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+
+  const logReturns = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    logReturns[i] = closes[i] > 0 && closes[i - 1] > 0 ? Math.log(closes[i] / closes[i - 1]) : 0;
+  }
+
+  const alphaRaw = new Array(len).fill(0.5);
+  const halfWin = Math.floor(dfaWindow / 2);
+
+  for (let i = dfaWindow; i < len; i++) {
+    const segment = logReturns.slice(i - dfaWindow + 1, i + 1);
+    const mean = segment.reduce((s, v) => s + v, 0) / segment.length;
+    const cumDev = new Array(segment.length);
+    cumDev[0] = segment[0] - mean;
+    for (let j = 1; j < segment.length; j++) cumDev[j] = cumDev[j - 1] + (segment[j] - mean);
+
+    const scales = [4, 8, Math.max(12, halfWin)];
+    const logS: number[] = [];
+    const logF: number[] = [];
+
+    for (const s of scales) {
+      if (s > segment.length) continue;
+      const numBoxes = Math.floor(segment.length / s);
+      if (numBoxes < 1) continue;
+      let totalFluc = 0;
+      for (let b = 0; b < numBoxes; b++) {
+        const start = b * s;
+        let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+        for (let k = 0; k < s; k++) {
+          sx += k; sy += cumDev[start + k]; sxy += k * cumDev[start + k]; sx2 += k * k;
+        }
+        const denom = s * sx2 - sx * sx;
+        const slope = denom !== 0 ? (s * sxy - sx * sy) / denom : 0;
+        const intercept = (sy - slope * sx) / s;
+        let rms = 0;
+        for (let k = 0; k < s; k++) {
+          const fit = intercept + slope * k;
+          const diff = cumDev[start + k] - fit;
+          rms += diff * diff;
+        }
+        totalFluc += Math.sqrt(rms / s);
+      }
+      const avgF = totalFluc / numBoxes;
+      if (avgF > 1e-12) { logS.push(Math.log(s)); logF.push(Math.log(avgF)); }
+    }
+
+    if (logS.length >= 2) {
+      let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+      const n = logS.length;
+      for (let j = 0; j < n; j++) { sx += logS[j]; sy += logF[j]; sxy += logS[j] * logF[j]; sx2 += logS[j] * logS[j]; }
+      const denom = n * sx2 - sx * sx;
+      alphaRaw[i] = denom !== 0 ? (n * sxy - sx * sy) / denom : 0.5;
+    }
+  }
+
+  const alphaSmooth = new Array(len).fill(0.5);
+  const ek = 2 / (smooth + 1);
+  alphaSmooth[dfaWindow] = alphaRaw[dfaWindow];
+  for (let i = dfaWindow + 1; i < len; i++) {
+    alphaSmooth[i] = alphaSmooth[i - 1] + ek * (alphaRaw[i] - alphaSmooth[i - 1]);
+  }
+
+  const driftLine = new Array(len).fill(0);
+  driftLine[0] = closes[0];
+  for (let i = 1; i < len; i++) {
+    const a = Math.max(0.1, Math.min(2.0, alphaSmooth[i]));
+    const adaptLen = Math.max(3, Math.round(dfaWindow * (1.5 - a)));
+    const k = 2 / (adaptLen + 1);
+    driftLine[i] = driftLine[i - 1] + k * (closes[i] - driftLine[i - 1]);
+  }
+
+  const atrArr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(data[i].high - data[i].low, Math.abs(data[i].high - closes[i - 1]), Math.abs(data[i].low - closes[i - 1]));
+    atrArr[i] = atrArr[i - 1] + (2 / 15) * (tr - atrArr[i - 1]);
+  }
+
+  const result: QuantumDriftMapperData[] = [];
+  let prevRegime: QuantumDriftMapperData["regime"] = "random";
+
+  for (let i = minBars; i < len; i++) {
+    const a = alphaSmooth[i];
+    const regime: QuantumDriftMapperData["regime"] =
+      a >= persistenceThreshold ? "persistent" :
+      a <= (1.0 - persistenceThreshold) ? "antipersistent" : "random";
+
+    let signal: QuantumDriftMapperData["signal"] = "none";
+    if (regime === "persistent" && prevRegime !== "persistent") signal = "drift_start";
+    else if (regime === "antipersistent" && prevRegime !== "antipersistent") signal = "snap_start";
+
+    const spread = atrArr[i] * corridorMultiplier * (0.5 + a);
+    prevRegime = regime;
+    result.push({
+      time: data[i].time, driftLine: driftLine[i],
+      upper: driftLine[i] + spread, lower: driftLine[i] - spread,
+      alpha: a, regime, signal,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// SOVEREIGN GRAVITY ARC — Volume-Weighted Gravity Field + Orbital Mechanics
+// ============================================================================
+
+export interface SovereignGravityArcData {
+  time: number;
+  center: number;        // Volume-weighted gravity center line
+  upper: number;         // Upper orbital arc boundary
+  lower: number;         // Lower orbital arc boundary
+  velocityNorm: number;  // Normalized radial velocity 0-1
+  state: "orbital" | "escape_up" | "escape_down" | "capturing";
+  signal: "none" | "escape" | "capture";
+}
+
+export function calculateSovereignGravityArc(
+  data: OHLCData[],
+  gravityWindow: number = 30,
+  orbitalRadius: number = 2.0,
+  velocitySmooth: number = 5,
+  escapeMultiplier: number = 1.8,
+): SovereignGravityArcData[] {
+  const minBars = gravityWindow + velocitySmooth + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const volumes = data.map(d => (d as any).volume ?? 1);
+
+  // Step 1 — Volume-weighted price centroid over rolling gravityWindow
+  const rawCenter = new Array(len).fill(0);
+  for (let i = gravityWindow - 1; i < len; i++) {
+    let wSum = 0, vSum = 0;
+    for (let j = i - gravityWindow + 1; j <= i; j++) {
+      const tp = (data[j].high + data[j].low + closes[j]) / 3;
+      const w = volumes[j];
+      wSum += tp * w;
+      vSum += w;
+    }
+    rawCenter[i] = vSum > 0 ? wSum / vSum : closes[i];
+  }
+
+  // Step 2 — Smooth center with EMA for a clean arc line
+  const centerLine = new Array(len).fill(0);
+  const ck = 2 / (velocitySmooth + 1);
+  centerLine[gravityWindow - 1] = rawCenter[gravityWindow - 1];
+  for (let i = gravityWindow; i < len; i++) {
+    centerLine[i] = centerLine[i - 1] + ck * (rawCenter[i] - centerLine[i - 1]);
+  }
+
+  // Step 3 — ATR for orbital band width
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      data[i].high - data[i].low,
+      Math.abs(data[i].high - closes[i - 1]),
+      Math.abs(data[i].low - closes[i - 1]),
+    );
+    atr[i] = atr[i - 1] + (2 / 15) * (tr - atr[i - 1]);
+  }
+
+  // Step 4 — Radial velocity: EMA of normalized displacement from center
+  const radVelRaw = new Array(len).fill(0);
+  const vk = 2 / (velocitySmooth + 1);
+  for (let i = gravityWindow; i < len; i++) {
+    const disp = atr[i] > 0 ? (closes[i] - centerLine[i]) / atr[i] : 0;
+    radVelRaw[i] = i === gravityWindow
+      ? disp
+      : radVelRaw[i - 1] + vk * (disp - radVelRaw[i - 1]);
+  }
+
+  // Step 5 — Normalize velocity to 0–1 using rolling max
+  const velocityNormArr = new Array(len).fill(0);
+  for (let i = gravityWindow; i < len; i++) {
+    let maxAbs = 0.001;
+    for (let j = Math.max(gravityWindow, i - gravityWindow + 1); j <= i; j++) {
+      if (Math.abs(radVelRaw[j]) > maxAbs) maxAbs = Math.abs(radVelRaw[j]);
+    }
+    velocityNormArr[i] = Math.min(1, Math.abs(radVelRaw[i]) / maxAbs);
+  }
+
+  // Step 6 — State + signal classification
+  const result: SovereignGravityArcData[] = [];
+  let prevState: SovereignGravityArcData["state"] = "orbital";
+  const escapeThresh = escapeMultiplier / (escapeMultiplier + 1);
+
+  for (let i = minBars; i < len; i++) {
+    const center = centerLine[i];
+    const band = atr[i] * orbitalRadius;
+    const upper = center + band;
+    const lower = center - band;
+    const velNorm = velocityNormArr[i];
+    const escapeReached = velNorm > escapeThresh;
+
+    let state: SovereignGravityArcData["state"];
+    if (closes[i] > upper && escapeReached) {
+      state = "escape_up";
+    } else if (closes[i] < lower && escapeReached) {
+      state = "escape_down";
+    } else if (
+      (prevState === "escape_up" || prevState === "escape_down") &&
+      closes[i] >= lower && closes[i] <= upper
+    ) {
+      state = "capturing";
+    } else {
+      state = "orbital";
+    }
+
+    let signal: SovereignGravityArcData["signal"] = "none";
+    if ((state === "escape_up" || state === "escape_down") && prevState === "orbital") {
+      signal = "escape";
+    } else if (state === "capturing" && prevState !== "capturing" && prevState !== "orbital") {
+      signal = "capture";
+    }
+
+    prevState = state;
+    result.push({ time: data[i].time, center, upper, lower, velocityNorm: velNorm, state, signal });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// SOLARIS TREND ENGINE — Hybrid: KAMA + Supertrend + ADX + Parabolic SAR + EMA Cross
+// ============================================================================
+
+export interface SolarisTrendEngineData {
+  time: number;
+  solarCore: number;     // KAMA adaptive spine (main line)
+  upperBand: number;     // Supertrend upper boundary
+  lowerBand: number;     // Supertrend lower boundary
+  sarDot: number;        // Parabolic SAR acceleration dot
+  adxStrength: number;   // ADX trend strength 0–100
+  trend: "bull" | "bear" | "neutral";
+  signal: "fusion_bull" | "fusion_bear" | "none";
+}
+
+export function calculateSolarisTrendEngine(
+  data: OHLCData[],
+  kamaFast: number = 2,
+  kamaSlow: number = 30,
+  atrPeriod: number = 14,
+  supertrendMult: number = 3.0,
+  adxPeriod: number = 14,
+  adxThreshold: number = 25,
+): SolarisTrendEngineData[] {
+  const minBars = Math.max(kamaSlow, atrPeriod, adxPeriod) * 2 + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. KAMA (Solar Core) ────────────────────────────────────────────────
+  const kamaFastK = 2 / (kamaFast + 1);
+  const kamaSlowK = 2 / (kamaSlow + 1);
+  const kama = new Array(len).fill(closes[0]);
+  for (let i = kamaSlow; i < len; i++) {
+    let direction = Math.abs(closes[i] - closes[i - kamaSlow]);
+    let volatility = 0;
+    for (let j = i - kamaSlow + 1; j <= i; j++) {
+      volatility += Math.abs(closes[j] - closes[j - 1]);
+    }
+    const er = volatility > 0 ? direction / volatility : 0;
+    const sc = Math.pow(er * (kamaFastK - kamaSlowK) + kamaSlowK, 2);
+    kama[i] = kama[i - 1] + sc * (closes[i] - kama[i - 1]);
+  }
+
+  // ── 2. ATR ──────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]),
+      Math.abs(lows[i] - closes[i - 1]),
+    );
+    atr[i] = i < atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (2 / (atrPeriod + 1)) * (tr - atr[i - 1]);
+  }
+
+  // ── 3. Supertrend ───────────────────────────────────────────────────────
+  const upperBands = new Array(len).fill(0);
+  const lowerBands = new Array(len).fill(0);
+  const stDir = new Array(len).fill(1); // 1=bull, -1=bear
+  for (let i = atrPeriod; i < len; i++) {
+    const hl2 = (highs[i] + lows[i]) / 2;
+    const basicUpper = hl2 + supertrendMult * atr[i];
+    const basicLower = hl2 - supertrendMult * atr[i];
+
+    upperBands[i] = (basicUpper < upperBands[i - 1] || closes[i - 1] > upperBands[i - 1])
+      ? basicUpper : upperBands[i - 1];
+    lowerBands[i] = (basicLower > lowerBands[i - 1] || closes[i - 1] < lowerBands[i - 1])
+      ? basicLower : lowerBands[i - 1];
+
+    if (closes[i] > upperBands[i - 1]) stDir[i] = 1;
+    else if (closes[i] < lowerBands[i - 1]) stDir[i] = -1;
+    else stDir[i] = stDir[i - 1];
+  }
+
+  // ── 4. ADX ──────────────────────────────────────────────────────────────
+  const pdm = new Array(len).fill(0);
+  const ndm = new Array(len).fill(0);
+  const trArr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const upMove = highs[i] - highs[i - 1];
+    const downMove = lows[i - 1] - lows[i];
+    pdm[i] = upMove > downMove && upMove > 0 ? upMove : 0;
+    ndm[i] = downMove > upMove && downMove > 0 ? downMove : 0;
+    trArr[i] = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+  const spdm = new Array(len).fill(0);
+  const sndm = new Array(len).fill(0);
+  const satr = new Array(len).fill(0);
+  const k = 2 / (adxPeriod + 1);
+  spdm[adxPeriod] = pdm.slice(1, adxPeriod + 1).reduce((a, b) => a + b, 0) / adxPeriod;
+  sndm[adxPeriod] = ndm.slice(1, adxPeriod + 1).reduce((a, b) => a + b, 0) / adxPeriod;
+  satr[adxPeriod] = trArr.slice(1, adxPeriod + 1).reduce((a, b) => a + b, 0) / adxPeriod;
+  for (let i = adxPeriod + 1; i < len; i++) {
+    spdm[i] = spdm[i - 1] + k * (pdm[i] - spdm[i - 1]);
+    sndm[i] = sndm[i - 1] + k * (ndm[i] - sndm[i - 1]);
+    satr[i] = satr[i - 1] + k * (trArr[i] - satr[i - 1]);
+  }
+  const dx = new Array(len).fill(0);
+  const adx = new Array(len).fill(0);
+  for (let i = adxPeriod; i < len; i++) {
+    const pdi = satr[i] > 0 ? 100 * spdm[i] / satr[i] : 0;
+    const ndi = satr[i] > 0 ? 100 * sndm[i] / satr[i] : 0;
+    dx[i] = pdi + ndi > 0 ? 100 * Math.abs(pdi - ndi) / (pdi + ndi) : 0;
+    adx[i] = i === adxPeriod ? dx[i] : adx[i - 1] + k * (dx[i] - adx[i - 1]);
+  }
+
+  // ── 5. Parabolic SAR ────────────────────────────────────────────────────
+  const sarStep = 0.02;
+  const sarMax = 0.2;
+  const sar = new Array(len).fill(closes[0]);
+  let sarBull = true;
+  let sarEP = lows[0];
+  let sarAF = sarStep;
+  for (let i = 1; i < len; i++) {
+    const prevSar = sar[i - 1];
+    let newSar = prevSar + sarAF * (sarEP - prevSar);
+    if (sarBull) {
+      newSar = Math.min(newSar, lows[i - 1], i >= 2 ? lows[i - 2] : lows[i - 1]);
+      if (lows[i] < newSar) {
+        sarBull = false; sarAF = sarStep; sarEP = highs[i]; newSar = sarEP;
+      } else {
+        if (highs[i] > sarEP) { sarEP = highs[i]; sarAF = Math.min(sarAF + sarStep, sarMax); }
+      }
+    } else {
+      newSar = Math.max(newSar, highs[i - 1], i >= 2 ? highs[i - 2] : highs[i - 1]);
+      if (highs[i] > newSar) {
+        sarBull = true; sarAF = sarStep; sarEP = lows[i]; newSar = sarEP;
+      } else {
+        if (lows[i] < sarEP) { sarEP = lows[i]; sarAF = Math.min(sarAF + sarStep, sarMax); }
+      }
+    }
+    sar[i] = newSar;
+  }
+
+  // ── 6. Fast/Slow EMA cross ──────────────────────────────────────────────
+  const emaFastP = Math.max(2, Math.round(kamaSlow / 4));
+  const emaSlowP = kamaSlow;
+  const emaFast = new Array(len).fill(closes[0]);
+  const emaSlow = new Array(len).fill(closes[0]);
+  const ef = 2 / (emaFastP + 1);
+  const es = 2 / (emaSlowP + 1);
+  for (let i = 1; i < len; i++) {
+    emaFast[i] = emaFast[i - 1] + ef * (closes[i] - emaFast[i - 1]);
+    emaSlow[i] = emaSlow[i - 1] + es * (closes[i] - emaSlow[i - 1]);
+  }
+
+  // ── 7. Composite classification + output ────────────────────────────────
+  const result: SolarisTrendEngineData[] = [];
+  let prevTrend: SolarisTrendEngineData["trend"] = "neutral";
+
+  for (let i = minBars; i < len; i++) {
+    const adxVal = Math.min(100, Math.max(0, adx[i]));
+    const stBull = stDir[i] === 1;
+    const kamaBull = kama[i] > kama[i - 1];
+    const emaCross = emaFast[i] > emaSlow[i];
+
+    let trend: SolarisTrendEngineData["trend"];
+    if (stBull && kamaBull && emaCross) {
+      trend = "bull";
+    } else if (!stBull && !kamaBull && !emaCross) {
+      trend = "bear";
+    } else {
+      trend = "neutral";
+    }
+
+    let signal: SolarisTrendEngineData["signal"] = "none";
+    if (trend === "bull" && prevTrend !== "bull" && adxVal >= adxThreshold) {
+      signal = "fusion_bull";
+    } else if (trend === "bear" && prevTrend !== "bear" && adxVal >= adxThreshold) {
+      signal = "fusion_bear";
+    }
+
+    // Bands: use supertrend's active boundary
+    const activeBand = stBull ? lowerBands[i] : upperBands[i];
+    const bandOther = stBull ? upperBands[i] : lowerBands[i];
+
+    prevTrend = trend;
+    result.push({
+      time: data[i].time,
+      solarCore: kama[i],
+      upperBand: Math.max(activeBand, bandOther),
+      lowerBand: Math.min(activeBand, bandOther),
+      sarDot: sar[i],
+      adxStrength: adxVal,
+      trend,
+      signal,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// STELLAR CONFLUENCE RIBBON — KAMA + Hull MA + McGinley Adaptive Blend
+// Multi-dimensional ribbon with confluence scoring & node markers
+// ============================================================================
+
+export interface StellarConfluenceRibbonData {
+  time: number;
+  coreBlend: number;       // Weighted adaptive blend (KAMA + HMA + McGinley)
+  upperRibbon: number;     // Core + ATR × innerMult (inner band)
+  lowerRibbon: number;     // Core - ATR × innerMult
+  outerUpper: number;      // Core + ATR × outerMult (outer boundary)
+  outerLower: number;      // Core - ATR × outerMult
+  confluenceScore: number; // 0-100: MA agreement strength
+  trend: "bull" | "bear" | "neutral";
+  signal: "stellar_bull" | "stellar_bear" | "none";
+  nodePoint: boolean;      // True at local confluence peak ≥ nodeThreshold
+}
+
+export function calculateStellarConfluenceRibbon(
+  data: OHLCData[],
+  blendPeriod: number = 21,
+  atrPeriod: number = 14,
+  innerMult: number = 1.5,
+  outerMult: number = 2.8,
+  confluenceThreshold: number = 70,
+  nodeThreshold: number = 80,
+): StellarConfluenceRibbonData[] {
+  const minBars = blendPeriod * 2 + atrPeriod + 5;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. KAMA ─────────────────────────────────────────────────────────────
+  const kamaFastK = 2 / (2 + 1);
+  const kamaSlowK = 2 / (blendPeriod + 1);
+  const kama = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod; i < len; i++) {
+    const direction = Math.abs(closes[i] - closes[i - blendPeriod]);
+    let volatility = 0;
+    for (let j = i - blendPeriod + 1; j <= i; j++) volatility += Math.abs(closes[j] - closes[j - 1]);
+    const er = volatility > 0 ? direction / volatility : 0;
+    const sc = Math.pow(er * (kamaFastK - kamaSlowK) + kamaSlowK, 2);
+    kama[i] = kama[i - 1] + sc * (closes[i] - kama[i - 1]);
+  }
+
+  // ── 2. Hull MA (HMA) ─────────────────────────────────────────────────────
+  const wma = (arr: number[], n: number, end: number): number => {
+    if (end < n - 1) return arr[Math.max(0, end)];
+    let num = 0, den = 0;
+    for (let j = 0; j < n; j++) { num += (j + 1) * arr[end - n + 1 + j]; den += j + 1; }
+    return den > 0 ? num / den : arr[end];
+  };
+  const halfP = Math.max(2, Math.floor(blendPeriod / 2));
+  const sqrtP = Math.max(2, Math.round(Math.sqrt(blendPeriod)));
+  const hmaInner = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod - 1; i < len; i++) {
+    hmaInner[i] = 2 * wma(closes, halfP, i) - wma(closes, blendPeriod, i);
+  }
+  const hma = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod - 1 + sqrtP - 1; i < len; i++) {
+    hma[i] = wma(hmaInner, sqrtP, i);
+  }
+
+  // ── 3. McGinley Dynamic ──────────────────────────────────────────────────
+  const mcg = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) {
+    const ratio = mcg[i - 1] > 0 ? closes[i] / mcg[i - 1] : 1;
+    const denom = blendPeriod * Math.pow(ratio, 4);
+    mcg[i] = denom > 0 ? mcg[i - 1] + (closes[i] - mcg[i - 1]) / denom : mcg[i - 1];
+  }
+
+  // ── 4. Inverse-distance Weighted Blend (closest MA to price gets highest weight) ──
+  const blend = new Array(len).fill(closes[0]);
+  for (let i = blendPeriod; i < len; i++) {
+    const dKama = Math.abs(closes[i] - kama[i]) + 1e-9;
+    const dHma = Math.abs(closes[i] - hma[i]) + 1e-9;
+    const dMcg = Math.abs(closes[i] - mcg[i]) + 1e-9;
+    const wKama = 1 / dKama; const wHma = 1 / dHma; const wMcg = 1 / dMcg;
+    const wSum = wKama + wHma + wMcg;
+    blend[i] = (kama[i] * wKama + hma[i] * wHma + mcg[i] * wMcg) / wSum;
+  }
+
+  // ── 5. ATR ───────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i <= atrPeriod
+      ? atr[i - 1] + (tr - atr[i - 1]) / i
+      : atr[i - 1] + (2 / (atrPeriod + 1)) * (tr - atr[i - 1]);
+  }
+
+  // ── 6. Confluence Score: % of last blendPeriod bars all 3 MAs agree ─────
+  const confScore = new Array(len).fill(50);
+  for (let i = blendPeriod; i < len; i++) {
+    let agree = 0;
+    for (let j = i - blendPeriod + 1; j <= i; j++) {
+      const b = closes[j] > kama[j] && closes[j] > hma[j] && closes[j] > mcg[j];
+      const be = closes[j] < kama[j] && closes[j] < hma[j] && closes[j] < mcg[j];
+      if (b || be) agree++;
+    }
+    confScore[i] = (agree / blendPeriod) * 100;
+  }
+
+  // ── 7. Build Output ──────────────────────────────────────────────────────
+  const result: StellarConfluenceRibbonData[] = [];
+  let prevTrend2: StellarConfluenceRibbonData["trend"] = "neutral";
+  let prevConf = 50;
+
+  for (let i = minBars; i < len; i++) {
+    const core = blend[i];
+    const atrVal = atr[i];
+    const score = confScore[i];
+
+    const allBull = kama[i] > kama[i - 1] && hma[i] > hma[i - 1] && mcg[i] > mcg[i - 1] && closes[i] > core;
+    const allBear = kama[i] < kama[i - 1] && hma[i] < hma[i - 1] && mcg[i] < mcg[i - 1] && closes[i] < core;
+    const trend2: StellarConfluenceRibbonData["trend"] = allBull ? "bull" : allBear ? "bear" : "neutral";
+
+    let signal2: StellarConfluenceRibbonData["signal"] = "none";
+    if (trend2 === "bull" && prevTrend2 !== "bull" && score >= confluenceThreshold) signal2 = "stellar_bull";
+    else if (trend2 === "bear" && prevTrend2 !== "bear" && score >= confluenceThreshold) signal2 = "stellar_bear";
+
+    const nodePoint = score >= nodeThreshold && score >= prevConf && trend2 !== "neutral";
+
+    prevTrend2 = trend2;
+    prevConf = score;
+
+    result.push({
+      time: data[i].time,
+      coreBlend: core,
+      upperRibbon: core + atrVal * innerMult,
+      lowerRibbon: core - atrVal * innerMult,
+      outerUpper: core + atrVal * outerMult,
+      outerLower: core - atrVal * outerMult,
+      confluenceScore: score,
+      trend: trend2,
+      signal: signal2,
+      nodePoint,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// KINETIC PRESSURE ZONES — RSI + Stoch + CCI + Williams %R + ROC Fusion
+// Momentum oscillators mapped to on-chart horizontal zone bands
+// ============================================================================
+
+export interface KineticPressureZonesData {
+  time: number;
+  momentumScore: number;         // 0-100 composite momentum (>70=overbought, <30=oversold)
+  kineticSpine: number;          // EMA of close, color-coded by momentum regime
+  regime: "overbought" | "oversold" | "bullish" | "bearish" | "neutral";
+  signal: "kinetic_bull" | "kinetic_bear" | "none";
+  // Supply zones (resistance — from past overbought readings)
+  sup1High: number; sup1Low: number; sup1Strength: number; sup1Active: boolean;
+  sup2High: number; sup2Low: number; sup2Strength: number; sup2Active: boolean;
+  // Demand zones (support — from past oversold readings)
+  dem1High: number; dem1Low: number; dem1Strength: number; dem1Active: boolean;
+  dem2High: number; dem2Low: number; dem2Strength: number; dem2Active: boolean;
+}
+
+export function calculateKineticPressureZones(
+  data: OHLCData[],
+  period: number = 14,
+  rocPeriod: number = 10,
+  atrPeriod: number = 14,
+  zoneWidthMult: number = 1.2,
+  oversoldLevel: number = 30,
+  overboughtLevel: number = 70,
+): KineticPressureZonesData[] {
+  const minBars = period * 3 + rocPeriod + atrPeriod;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. RSI ───────────────────────────────────────────────────────────────
+  const rsi = new Array(len).fill(50);
+  let avgGain = 0, avgLoss = 0;
+  for (let i = 1; i <= period; i++) {
+    const c = closes[i] - closes[i - 1];
+    if (c > 0) avgGain += c; else avgLoss += -c;
+  }
+  avgGain /= period; avgLoss /= period;
+  rsi[period] = avgLoss > 0 ? 100 - 100 / (1 + avgGain / avgLoss) : 100;
+  for (let i = period + 1; i < len; i++) {
+    const c = closes[i] - closes[i - 1];
+    avgGain = (avgGain * (period - 1) + Math.max(0, c)) / period;
+    avgLoss = (avgLoss * (period - 1) + Math.max(0, -c)) / period;
+    rsi[i] = avgLoss > 0 ? 100 - 100 / (1 + avgGain / avgLoss) : 100;
+  }
+
+  // ── 2. Stochastic %K ─────────────────────────────────────────────────────
+  const stochK = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    stochK[i] = hMax > lMin ? ((closes[i] - lMin) / (hMax - lMin)) * 100 : 50;
+  }
+  // Smooth stochK (3-bar SMA = %K fast)
+  const stochSmooth = [...stochK];
+  for (let i = 2; i < len; i++) stochSmooth[i] = (stochK[i] + stochK[i - 1] + stochK[i - 2]) / 3;
+
+  // ── 3. CCI → normalized 0-100 ────────────────────────────────────────────
+  const cciNorm = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let sumTp = 0;
+    for (let j = i - period + 1; j <= i; j++) sumTp += (highs[j] + lows[j] + closes[j]) / 3;
+    const meanTp = sumTp / period;
+    let md = 0;
+    for (let j = i - period + 1; j <= i; j++) md += Math.abs((highs[j] + lows[j] + closes[j]) / 3 - meanTp);
+    md /= period;
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    const rawCci = md > 0 ? (tp - meanTp) / (0.015 * md) : 0;
+    cciNorm[i] = Math.max(0, Math.min(100, (Math.max(-200, Math.min(200, rawCci)) + 200) / 4));
+  }
+
+  // ── 4. Williams %R → normalized 0-100 ────────────────────────────────────
+  const willNorm = new Array(len).fill(50);
+  // Convention: willR = -100 (oversold) → norm = 0, willR = 0 (overbought) → norm = 100
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    const willR = hMax > lMin ? ((hMax - closes[i]) / (hMax - lMin)) * -100 : -50;
+    willNorm[i] = (willR + 100); // -100 → 0, 0 → 100
+  }
+
+  // ── 5. ROC → normalized 0-100 (rolling percentile window) ────────────────
+  const roc = new Array(len).fill(0);
+  for (let i = rocPeriod; i < len; i++) roc[i] = closes[i - rocPeriod] > 0 ? ((closes[i] - closes[i - rocPeriod]) / closes[i - rocPeriod]) * 100 : 0;
+  const rocNorm = new Array(len).fill(50);
+  const rocWin = Math.max(period * 2, rocPeriod * 3);
+  for (let i = rocWin; i < len; i++) {
+    let mn = roc[i], mx = roc[i];
+    for (let j = i - rocWin + 1; j <= i; j++) { if (roc[j] < mn) mn = roc[j]; if (roc[j] > mx) mx = roc[j]; }
+    rocNorm[i] = mx > mn ? ((roc[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // ── 6. ATR ────────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i <= atrPeriod ? atr[i - 1] + (tr - atr[i - 1]) / i : atr[i - 1] + (2 / (atrPeriod + 1)) * (tr - atr[i - 1]);
+  }
+
+  // ── 7. EMA spine ─────────────────────────────────────────────────────────
+  const emaK = 2 / (period + 1);
+  const spine = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) spine[i] = closes[i] * emaK + spine[i - 1] * (1 - emaK);
+
+  // ── 8. Composite Momentum Score ───────────────────────────────────────────
+  const composite = new Array(len).fill(50);
+  const startC = Math.max(period, rocWin);
+  for (let i = startC; i < len; i++) {
+    composite[i] = rsi[i] * 0.25 + stochSmooth[i] * 0.20 + cciNorm[i] * 0.20 + willNorm[i] * 0.20 + rocNorm[i] * 0.15;
+  }
+  // Light smoothing for zone detection only
+  const compSmooth = [...composite];
+  for (let i = 3; i < len; i++) compSmooth[i] = (composite[i] + composite[i - 1] + composite[i - 2]) / 3;
+
+  // ── 9. Build output with rolling zone detection ───────────────────────────
+  const result: KineticPressureZonesData[] = [];
+  const startI = startC + 5;
+
+  // Zone state (mutable — updated as new zones form)
+  let sup1H = 0, sup1L = 0, sup1S = 0, sup1A = false;
+  let sup2H = 0, sup2L = 0, sup2S = 0, sup2A = false;
+  let dem1H = 0, dem1L = 0, dem1S = 0, dem1A = false;
+  let dem2H = 0, dem2L = 0, dem2S = 0, dem2A = false;
+
+  let prevComp = compSmooth[startI - 1];
+  let wasOverbought = compSmooth[startI - 1] >= overboughtLevel;
+  let wasOversold = compSmooth[startI - 1] <= oversoldLevel;
+
+  for (let i = startI; i < len; i++) {
+    const score = compSmooth[i];
+    const atrV = atr[i];
+    const halfW = atrV * zoneWidthMult * 0.5;
+
+    // Detect new SUPPLY zone: overbought → cooling (score crossing back below overbought)
+    if (wasOverbought && score < overboughtLevel) {
+      let pivotH = highs[i];
+      for (let j = Math.max(0, i - 4); j <= i; j++) if (highs[j] > pivotH) pivotH = highs[j];
+      const str = Math.min(100, Math.round(((prevComp - overboughtLevel) / (100 - overboughtLevel)) * 100));
+      sup2H = sup1H; sup2L = sup1L; sup2S = sup1S; sup2A = sup1A;
+      sup1H = pivotH + halfW * 0.4; sup1L = pivotH - halfW; sup1S = str; sup1A = true;
+    }
+
+    // Detect new DEMAND zone: oversold → recovering (score crossing back above oversold)
+    if (wasOversold && score > oversoldLevel) {
+      let pivotL = lows[i];
+      for (let j = Math.max(0, i - 4); j <= i; j++) if (lows[j] < pivotL) pivotL = lows[j];
+      const str = Math.min(100, Math.round(((oversoldLevel - prevComp) / oversoldLevel) * 100));
+      dem2H = dem1H; dem2L = dem1L; dem2S = dem1S; dem2A = dem1A;
+      dem1H = pivotL + halfW; dem1L = pivotL - halfW * 0.4; dem1S = str; dem1A = true;
+    }
+
+    // Signal: momentum crosses midline after extreme
+    let signal: KineticPressureZonesData["signal"] = "none";
+    if (prevComp < 50 && score >= 50 && score - prevComp > 3) signal = "kinetic_bull";
+    else if (prevComp > 50 && score <= 50 && prevComp - score > 3) signal = "kinetic_bear";
+
+    // Regime
+    let regime: KineticPressureZonesData["regime"] = "neutral";
+    if (score >= overboughtLevel) regime = "overbought";
+    else if (score <= oversoldLevel) regime = "oversold";
+    else if (score > 55) regime = "bullish";
+    else if (score < 45) regime = "bearish";
+
+    wasOverbought = score >= overboughtLevel;
+    wasOversold = score <= oversoldLevel;
+    prevComp = score;
+
+    result.push({
+      time: data[i].time,
+      momentumScore: score,
+      kineticSpine: spine[i],
+      regime,
+      signal,
+      sup1High: sup1H, sup1Low: sup1L, sup1Strength: sup1S, sup1Active: sup1A,
+      sup2High: sup2H, sup2Low: sup2L, sup2Strength: sup2S, sup2Active: sup2A,
+      dem1High: dem1H, dem1Low: dem1L, dem1Strength: dem1S, dem1Active: dem1A,
+      dem2High: dem2H, dem2Low: dem2L, dem2Strength: dem2S, dem2Active: dem2A,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// NOVA RESONANCE FIELD — 6-Oscillator Composite Momentum Echo in Price Space
+// RSI + Stoch + CCI + Williams %R + Momentum + ROC → echo line + divergence
+// ============================================================================
+
+export interface NovaResonanceFieldData {
+  time: number;
+  resonanceScore: number;  // 0-100 composite
+  echoLine: number;        // Momentum mapped back to price (floats above/below priceRef)
+  priceRef: number;        // EMA reference baseline
+  signalLine: number;      // EMA of echoLine (for cross signals)
+  fieldStrength: number;   // 0-1: distance between echo and priceRef / ATR
+  state: "nova_bull" | "nova_bear" | "echo_bull" | "echo_bear" | "neutral";
+  signal: "nova_bull" | "nova_bear" | "echo_cross_up" | "echo_cross_down" | "none";
+  divergence: "bull_div" | "bear_div" | "none";
+}
+
+export function calculateNovaResonanceField(
+  data: OHLCData[],
+  period: number = 14,
+  sensitivity: number = 2.0,
+  signalPeriod: number = 9,
+  novaThreshold: number = 70,
+  divergenceLookback: number = 20,
+): NovaResonanceFieldData[] {
+  const minBars = period * 3 + divergenceLookback + 10;
+  if (data.length < minBars) return [];
+
+  const len = data.length;
+  const closes = data.map(d => d.close);
+  const highs = data.map(d => d.high);
+  const lows = data.map(d => d.low);
+
+  // ── 1. RSI ────────────────────────────────────────────────────────────────
+  const rsi = new Array(len).fill(50);
+  let avgG = 0, avgL = 0;
+  for (let i = 1; i <= period; i++) { const c = closes[i] - closes[i - 1]; if (c > 0) avgG += c; else avgL += -c; }
+  avgG /= period; avgL /= period;
+  rsi[period] = avgL > 0 ? 100 - 100 / (1 + avgG / avgL) : 100;
+  for (let i = period + 1; i < len; i++) {
+    const c = closes[i] - closes[i - 1];
+    avgG = (avgG * (period - 1) + Math.max(0, c)) / period;
+    avgL = (avgL * (period - 1) + Math.max(0, -c)) / period;
+    rsi[i] = avgL > 0 ? 100 - 100 / (1 + avgG / avgL) : 100;
+  }
+
+  // ── 2. Stochastic %K (3-bar smooth) ──────────────────────────────────────
+  const stochK = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    stochK[i] = hMax > lMin ? ((closes[i] - lMin) / (hMax - lMin)) * 100 : 50;
+  }
+  const stochS = [...stochK];
+  for (let i = 2; i < len; i++) stochS[i] = (stochK[i] + stochK[i - 1] + stochK[i - 2]) / 3;
+
+  // ── 3. CCI → 0-100 ───────────────────────────────────────────────────────
+  const cciN = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let sumTp = 0;
+    for (let j = i - period + 1; j <= i; j++) sumTp += (highs[j] + lows[j] + closes[j]) / 3;
+    const mean = sumTp / period;
+    let md = 0;
+    for (let j = i - period + 1; j <= i; j++) md += Math.abs((highs[j] + lows[j] + closes[j]) / 3 - mean);
+    md /= period;
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    const raw = md > 0 ? (tp - mean) / (0.015 * md) : 0;
+    cciN[i] = Math.max(0, Math.min(100, (Math.max(-200, Math.min(200, raw)) + 200) / 4));
+  }
+
+  // ── 4. Williams %R → 0-100 ───────────────────────────────────────────────
+  const willN = new Array(len).fill(50);
+  for (let i = period - 1; i < len; i++) {
+    let hMax = highs[i], lMin = lows[i];
+    for (let j = i - period + 1; j <= i; j++) { if (highs[j] > hMax) hMax = highs[j]; if (lows[j] < lMin) lMin = lows[j]; }
+    const wR = hMax > lMin ? ((hMax - closes[i]) / (hMax - lMin)) * -100 : -50;
+    willN[i] = wR + 100; // -100→0, 0→100
+  }
+
+  // ── 5. Momentum Indicator → 0-100 (rolling percentile) ───────────────────
+  const momRaw = new Array(len).fill(0);
+  for (let i = period; i < len; i++) momRaw[i] = closes[i] - closes[i - period];
+  const momN = new Array(len).fill(50);
+  const momWin = period * 2;
+  for (let i = momWin; i < len; i++) {
+    let mn = momRaw[i], mx = momRaw[i];
+    for (let j = i - momWin + 1; j <= i; j++) { if (momRaw[j] < mn) mn = momRaw[j]; if (momRaw[j] > mx) mx = momRaw[j]; }
+    momN[i] = mx > mn ? ((momRaw[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // ── 6. ROC → 0-100 (rolling percentile) ──────────────────────────────────
+  const roc = new Array(len).fill(0);
+  for (let i = period; i < len; i++) roc[i] = closes[i - period] > 0 ? ((closes[i] - closes[i - period]) / closes[i - period]) * 100 : 0;
+  const rocN = new Array(len).fill(50);
+  const rocWin = period * 2;
+  for (let i = rocWin; i < len; i++) {
+    let mn = roc[i], mx = roc[i];
+    for (let j = i - rocWin + 1; j <= i; j++) { if (roc[j] < mn) mn = roc[j]; if (roc[j] > mx) mx = roc[j]; }
+    rocN[i] = mx > mn ? ((roc[i] - mn) / (mx - mn)) * 100 : 50;
+  }
+
+  // ── 7. ATR ────────────────────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i <= 14 ? atr[i - 1] + (tr - atr[i - 1]) / i : atr[i - 1] + (2 / 15) * (tr - atr[i - 1]);
+  }
+
+  // ── 8. EMA Price Reference & Composite Score ─────────────────────────────
+  const emaK = 2 / (period + 1);
+  const priceRef = new Array(len).fill(closes[0]);
+  for (let i = 1; i < len; i++) priceRef[i] = closes[i] * emaK + priceRef[i - 1] * (1 - emaK);
+
+  const startC = Math.max(period, momWin, rocWin);
+  const composite = new Array(len).fill(50);
+  for (let i = startC; i < len; i++) {
+    composite[i] = rsi[i] * 0.25 + stochS[i] * 0.20 + cciN[i] * 0.20 + willN[i] * 0.15 + momN[i] * 0.10 + rocN[i] * 0.10;
+  }
+  // 3-bar smooth
+  const compS = [...composite];
+  for (let i = 2; i < len; i++) compS[i] = (composite[i] + composite[i - 1] + composite[i - 2]) / 3;
+
+  // ── 9. Echo Line & Signal Line ────────────────────────────────────────────
+  // echoLine floats above priceRef when bullish, below when bearish
+  const echoLine = new Array(len).fill(closes[0]);
+  for (let i = startC; i < len; i++) {
+    const offset = ((compS[i] - 50) / 50) * atr[i] * sensitivity;
+    echoLine[i] = priceRef[i] + offset;
+  }
+  const sigK2 = 2 / (signalPeriod + 1);
+  const sigLine = [...echoLine];
+  for (let i = 1; i < len; i++) sigLine[i] = echoLine[i] * sigK2 + sigLine[i - 1] * (1 - sigK2);
+
+  // ── 10. Divergence: price position vs momentum position in rolling window ─
+  const novaLow = 100 - novaThreshold;
+  const divArr = new Array(len).fill("none");
+  for (let i = startC + divergenceLookback; i < len; i++) {
+    const win = Math.min(divergenceLookback, i - startC);
+    let priceMin = closes[i], priceMax = closes[i];
+    let scoreMin = compS[i], scoreMax = compS[i];
+    for (let j = i - win + 1; j <= i; j++) {
+      if (closes[j] < priceMin) priceMin = closes[j];
+      if (closes[j] > priceMax) priceMax = closes[j];
+      if (compS[j] < scoreMin) scoreMin = compS[j];
+      if (compS[j] > scoreMax) scoreMax = compS[j];
+    }
+    const priceRange = priceMax - priceMin + 1e-9;
+    const scoreRange = scoreMax - scoreMin + 1e-9;
+    const pricePct = (closes[i] - priceMin) / priceRange;  // 0=low, 1=high
+    const scorePct = (compS[i] - scoreMin) / scoreRange;
+    // Bull div: price near bottom of range, momentum NOT near bottom
+    if (pricePct < 0.20 && scorePct > 0.45) divArr[i] = "bull_div";
+    // Bear div: price near top of range, momentum NOT near top
+    else if (pricePct > 0.80 && scorePct < 0.55) divArr[i] = "bear_div";
+  }
+
+  // ── 11. Build output ──────────────────────────────────────────────────────
+  const result: NovaResonanceFieldData[] = [];
+  const startOut = startC + divergenceLookback;
+  let prevScore = compS[startOut - 1];
+  let prevEcho = echoLine[startOut - 1];
+  let prevRef = priceRef[startOut - 1];
+  let prevSig = sigLine[startOut - 1];
+
+  for (let i = startOut; i < len; i++) {
+    const score = compS[i];
+    const echo = echoLine[i];
+    const ref = priceRef[i];
+    const sig = sigLine[i];
+    const fieldStrength = Math.min(1, Math.abs(echo - ref) / (atr[i] * sensitivity + 1e-9));
+
+    let state: NovaResonanceFieldData["state"] = "neutral";
+    if (score >= novaThreshold && echo > ref) state = "nova_bull";
+    else if (score <= novaLow && echo < ref) state = "nova_bear";
+    else if (score > 55 && echo > ref) state = "echo_bull";
+    else if (score < 45 && echo < ref) state = "echo_bear";
+
+    let signal: NovaResonanceFieldData["signal"] = "none";
+    if (prevScore < novaThreshold && score >= novaThreshold) signal = "nova_bull";
+    else if (prevScore > novaLow && score <= novaLow) signal = "nova_bear";
+    else if (prevEcho < prevSig && echo >= sig) signal = "echo_cross_up";
+    else if (prevEcho > prevSig && echo <= sig) signal = "echo_cross_down";
+
+    prevScore = score; prevEcho = echo; prevRef = ref; prevSig = sig;
+
+    result.push({
+      time: data[i].time,
+      resonanceScore: score,
+      echoLine: echo,
+      priceRef: ref,
+      signalLine: sig,
+      fieldStrength,
+      state,
+      signal,
+      divergence: divArr[i] as "bull_div" | "bear_div" | "none",
+    });
+  }
+
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SPECTRE LIQUIDITY MATRIX
+// Hybrid Institutional / Smart Money Indicator
+// Combines: Order Block Detection + Fair Value Gap (FVG) mapping +
+//           Break of Structure (BOS) / Change of Character (CHoCH) +
+//           Liquidity Pool Lines + Volume-Weighted Bias Line
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface SpectreLiquidityMatrixData {
+  time: number;
+  biasLine:    number;
+  biasState:   "bullish" | "bearish" | "neutral";
+  bullOB1High: number | null;
+  bullOB1Low:  number | null;
+  bullOB2High: number | null;
+  bullOB2Low:  number | null;
+  bearOB1High: number | null;
+  bearOB1Low:  number | null;
+  bearOB2High: number | null;
+  bearOB2Low:  number | null;
+  bullFVGTop:  number | null;
+  bullFVGBot:  number | null;
+  bearFVGTop:  number | null;
+  bearFVGBot:  number | null;
+  liquidityHigh: number | null;
+  liquidityLow:  number | null;
+  signal:      "bos_bull" | "bos_bear" | "choch_bull" | "choch_bear" | "none";
+  signalPrice: number;
+}
+
+export function calculateSpectreLiquidityMatrix(
+  data: OHLCData[],
+  swingLookback = 5,
+  obStrength    = 1.5,
+  period        = 20,
+  maxFVGAge     = 50,
+): SpectreLiquidityMatrixData[] {
+  const len = data.length;
+  if (len < swingLookback * 2 + 10) return [];
+
+  const highs   = data.map(d => d.high);
+  const lows    = data.map(d => d.low);
+  const closes  = data.map(d => d.close);
+  const opens   = data.map(d => d.open);
+  const volumes = data.map(d => d.volume ?? 1);
+  const N = swingLookback;
+
+  // ── 1. ATR (14-period Wilder) ──────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i < 14 ? tr : (atr[i - 1] * 13 + tr) / 14;
+  }
+
+  // ── 2. Volume-Weighted Bias Line ───────────────────────────────────────────
+  const bias  = new Array(len).fill(0);
+  let cumPV = 0, cumV = 0;
+  const alpha = 2 / (period + 1);
+  for (let i = 0; i < len; i++) {
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    cumPV += tp * volumes[i];
+    cumV  += volumes[i];
+    const vwap = cumPV / cumV;
+    bias[i] = i === 0 ? vwap : bias[i - 1] + alpha * (vwap - bias[i - 1]);
+  }
+
+  // ── 3. Swing High / Low Detection ─────────────────────────────────────────
+  const shSet = new Set<number>();
+  const slSet = new Set<number>();
+  for (let i = N; i < len - N; i++) {
+    let isSH = true, isSL = true;
+    for (let j = i - N; j <= i + N; j++) {
+      if (j === i) continue;
+      if (highs[j] >= highs[i]) isSH = false;
+      if (lows[j]  <= lows[i])  isSL = false;
+      if (!isSH && !isSL) break;
+    }
+    if (isSH) shSet.add(i);
+    if (isSL) slSet.add(i);
+  }
+
+  // ── 4. Order Block Detection ───────────────────────────────────────────────
+  interface OBRec { idx: number; high: number; low: number; type: "bullish"|"bearish"; mitigatedAt: number|null; }
+  const allOBs: OBRec[] = [];
+
+  for (const idx of slSet) {                             // Bullish OB at swing low
+    for (let k = idx - 1; k >= Math.max(0, idx - N * 3); k--) {
+      if (closes[k] < opens[k]) {
+        if ((highs[idx] - lows[idx]) > atr[idx] * obStrength)
+          allOBs.push({ idx: k, high: opens[k], low: lows[k], type: "bullish", mitigatedAt: null });
+        break;
+      }
+    }
+  }
+  for (const idx of shSet) {                             // Bearish OB at swing high
+    for (let k = idx - 1; k >= Math.max(0, idx - N * 3); k--) {
+      if (closes[k] > opens[k]) {
+        if ((highs[idx] - lows[idx]) > atr[idx] * obStrength)
+          allOBs.push({ idx: k, high: highs[k], low: opens[k], type: "bearish", mitigatedAt: null });
+        break;
+      }
+    }
+  }
+  for (const ob of allOBs) {
+    for (let j = ob.idx + 1; j < len; j++) {
+      if (ob.type === "bullish" && lows[j]  <= ob.high) { ob.mitigatedAt = j; break; }
+      if (ob.type === "bearish" && highs[j] >= ob.low)  { ob.mitigatedAt = j; break; }
+    }
+  }
+
+  // ── 5. Fair Value Gap Detection ────────────────────────────────────────────
+  interface FVGRec { startIdx: number; top: number; bottom: number; type: "bullish"|"bearish"; mitigatedAt: number|null; }
+  const allFVGs: FVGRec[] = [];
+
+  for (let i = 2; i < len; i++) {
+    const bullGap = lows[i] - highs[i - 2];
+    const bearGap = lows[i - 2] - highs[i];
+    if (bullGap > atr[i] * 0.2) allFVGs.push({ startIdx: i - 1, top: lows[i], bottom: highs[i - 2], type: "bullish", mitigatedAt: null });
+    if (bearGap > atr[i] * 0.2) allFVGs.push({ startIdx: i - 1, top: lows[i - 2], bottom: highs[i], type: "bearish", mitigatedAt: null });
+  }
+  for (const fvg of allFVGs) {
+    for (let j = fvg.startIdx + 1; j < len; j++) {
+      if (fvg.type === "bullish" && lows[j]  <= fvg.top)    { fvg.mitigatedAt = j; break; }
+      if (fvg.type === "bearish" && highs[j] >= fvg.bottom) { fvg.mitigatedAt = j; break; }
+    }
+  }
+
+  // ── 6. BOS / CHoCH Detection ──────────────────────────────────────────────
+  const sigMap   = new Map<number, SpectreLiquidityMatrixData["signal"]>();
+  const sigPrMap = new Map<number, number>();
+  let structure: "bullish"|"bearish"|"undefined" = "undefined";
+  let runSHPrice = -Infinity;
+  let runSLPrice =  Infinity;
+
+  for (let i = N; i < len; i++) {
+    const pivIdx = i - N;
+    if (shSet.has(pivIdx)) runSHPrice = highs[pivIdx];
+    if (slSet.has(pivIdx)) runSLPrice = lows[pivIdx];
+
+    if (runSHPrice > -Infinity && closes[i] > runSHPrice) {
+      const sig: SpectreLiquidityMatrixData["signal"] = structure === "bearish" ? "choch_bull" : "bos_bull";
+      if (!sigMap.has(i)) { sigMap.set(i, sig); sigPrMap.set(i, runSHPrice); }
+      structure = "bullish"; runSHPrice = -Infinity;
+    }
+    if (runSLPrice < Infinity && closes[i] < runSLPrice) {
+      const sig: SpectreLiquidityMatrixData["signal"] = structure === "bullish" ? "choch_bear" : "bos_bear";
+      if (!sigMap.has(i)) { sigMap.set(i, sig); sigPrMap.set(i, runSLPrice); }
+      structure = "bearish"; runSLPrice = Infinity;
+    }
+    if (structure === "undefined") {
+      if (shSet.has(i)) structure = "bearish";
+      if (slSet.has(i)) structure = "bullish";
+    }
+  }
+
+  // ── 7. Build output ────────────────────────────────────────────────────────
+  const result: SpectreLiquidityMatrixData[] = [];
+
+  for (let i = N + 1; i < len; i++) {
+    const activeBull: OBRec[] = [];
+    const activeBear: OBRec[] = [];
+    for (const ob of allOBs) {
+      if (ob.idx >= i) continue;
+      const mit = ob.mitigatedAt !== null && ob.mitigatedAt <= i;
+      if (!mit) (ob.type === "bullish" ? activeBull : activeBear).push(ob);
+    }
+    activeBull.sort((a, b) => b.idx - a.idx);
+    activeBear.sort((a, b) => b.idx - a.idx);
+
+    let bullFVG: FVGRec | null = null, bearFVG: FVGRec | null = null;
+    for (const fvg of allFVGs) {
+      if (fvg.startIdx >= i || i - fvg.startIdx > maxFVGAge) continue;
+      if (fvg.mitigatedAt !== null && fvg.mitigatedAt <= i) continue;
+      if (!bullFVG && fvg.type === "bullish") bullFVG = fvg;
+      if (!bearFVG && fvg.type === "bearish") bearFVG = fvg;
+      if (bullFVG && bearFVG) break;
+    }
+
+    let liqHigh: number | null = null, liqLow: number | null = null;
+    for (let j = i - 1; j >= Math.max(0, i - 80) && (liqHigh === null || liqLow === null); j--) {
+      if (liqHigh === null && shSet.has(j)) {
+        let swept = false;
+        for (let k = j + 1; k <= i; k++) { if (highs[k] > highs[j]) { swept = true; break; } }
+        if (!swept) liqHigh = highs[j];
+      }
+      if (liqLow === null && slSet.has(j)) {
+        let swept = false;
+        for (let k = j + 1; k <= i; k++) { if (lows[k] < lows[j]) { swept = true; break; } }
+        if (!swept) liqLow = lows[j];
+      }
+    }
+
+    const biasState: SpectreLiquidityMatrixData["biasState"] =
+      closes[i] > bias[i] * 1.0005 ? "bullish" :
+      closes[i] < bias[i] * 0.9995 ? "bearish" : "neutral";
+
+    result.push({
+      time: data[i].time,
+      biasLine:    bias[i],
+      biasState,
+      bullOB1High: activeBull[0]?.high ?? null,
+      bullOB1Low:  activeBull[0]?.low  ?? null,
+      bullOB2High: activeBull[1]?.high ?? null,
+      bullOB2Low:  activeBull[1]?.low  ?? null,
+      bearOB1High: activeBear[0]?.high ?? null,
+      bearOB1Low:  activeBear[0]?.low  ?? null,
+      bearOB2High: activeBear[1]?.high ?? null,
+      bearOB2Low:  activeBear[1]?.low  ?? null,
+      bullFVGTop:  bullFVG?.top    ?? null,
+      bullFVGBot:  bullFVG?.bottom ?? null,
+      bearFVGTop:  bearFVG?.top    ?? null,
+      bearFVGBot:  bearFVG?.bottom ?? null,
+      liquidityHigh: liqHigh,
+      liquidityLow:  liqLow,
+      signal:      sigMap.get(i)   ?? "none",
+      signalPrice: sigPrMap.get(i) ?? closes[i],
+    });
+  }
+
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RADIANT FIBONACCI MATRIX
+// Dynamic Auto-Fibonacci Retracement & Extension overlay indicator
+// Combines: Rolling swing high/low detection + All Fib levels (23.6–161.8%) +
+//           Level-interaction signal detection (BOUNCE / BREAK)
+// Uses O(n) monotonic deque for sliding window max/min
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface RadiantFibonacciMatrixData {
+  time:       number;
+  swingHigh:  number;
+  swingLow:   number;
+  swingTrend: "bullish" | "bearish";
+  // Retracement levels (always ordered low → high)
+  fib0:       number;   // 0%   = swing low
+  fib236:     number;   // 23.6%
+  fib382:     number;   // 38.2%
+  fib500:     number;   // 50%
+  fib618:     number;   // 61.8% — Golden Ratio (most important)
+  fib786:     number;   // 78.6%
+  fib100:     number;   // 100% = swing high
+  // Extension levels (direction-aware — beyond the dominant move)
+  fibExt1272: number;   // 127.2%
+  fibExt1618: number;   // 161.8% — Golden Extension
+  // Level-interaction signal
+  signal:     "bounce_up" | "bounce_down" | "break_up" | "break_down" | "none";
+  signalLevel: number;
+  nearestFib: string;
+}
+
+export function calculateRadiantFibonacciMatrix(
+  data:      OHLCData[],
+  lookback:  number = 55,   // Rolling window for swing detection
+  atrPeriod: number = 14,
+): RadiantFibonacciMatrixData[] {
+  const len = data.length;
+  if (len < lookback + 2) return [];
+
+  const highs  = data.map(d => d.high);
+  const lows   = data.map(d => d.low);
+  const closes = data.map(d => d.close);
+
+  // ── ATR (Wilder smoothing) ─────────────────────────────────────────────────
+  const atr = new Array(len).fill(0);
+  for (let i = 1; i < len; i++) {
+    const tr = Math.max(highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    atr[i] = i < atrPeriod ? tr : (atr[i - 1] * (atrPeriod - 1) + tr) / atrPeriod;
+  }
+
+  // ── Sliding window max/min with index tracking — O(n) monotonic deque ─────
+  const maxDeq: number[] = [];
+  const minDeq: number[] = [];
+  const winHigh: Array<{ val: number; idx: number }> = [];
+  const winLow:  Array<{ val: number; idx: number }> = [];
+
+  for (let i = 0; i < len; i++) {
+    while (maxDeq.length > 0 && maxDeq[0] < i - lookback)             maxDeq.shift();
+    while (minDeq.length > 0 && minDeq[0] < i - lookback)             minDeq.shift();
+    while (maxDeq.length > 0 && highs[maxDeq[maxDeq.length - 1]] <= highs[i]) maxDeq.pop();
+    while (minDeq.length > 0 && lows[minDeq[minDeq.length - 1]]   >= lows[i]) minDeq.pop();
+    maxDeq.push(i);
+    minDeq.push(i);
+    winHigh.push({ val: highs[maxDeq[0]], idx: maxDeq[0] });
+    winLow.push({ val: lows[minDeq[0]],   idx: minDeq[0] });
+  }
+
+  // ── Build per-candle output ────────────────────────────────────────────────
+  const result: RadiantFibonacciMatrixData[] = [];
+
+  for (let i = lookback; i < len; i++) {
+    const sh    = winHigh[i];
+    const sl    = winLow[i];
+    const range = sh.val - sl.val;
+    if (range < 1e-9) continue;
+
+    // Dominant trend: whichever extreme is MORE RECENT drives the direction
+    const swingTrend: "bullish" | "bearish" = sl.idx > sh.idx ? "bullish" : "bearish";
+
+    // Retracement levels (always from low to high)
+    const fib0   = sl.val;
+    const fib236 = sl.val + 0.236 * range;
+    const fib382 = sl.val + 0.382 * range;
+    const fib500 = sl.val + 0.500 * range;
+    const fib618 = sl.val + 0.618 * range;
+    const fib786 = sl.val + 0.786 * range;
+    const fib100 = sh.val;
+
+    // Extension levels — beyond the swing in the trend direction
+    const fibExt1272 = swingTrend === "bullish"
+      ? sh.val + 0.272 * range   // upside target above swing high
+      : sl.val - 0.272 * range;  // downside target below swing low
+    const fibExt1618 = swingTrend === "bullish"
+      ? sh.val + 0.618 * range
+      : sl.val - 0.618 * range;
+
+    // Signal detection: test if price crossed or bounced from a key Fib level
+    let signal: RadiantFibonacciMatrixData["signal"] = "none";
+    let signalLevel = 0;
+    let nearestFib  = "none";
+
+    if (i > 0) {
+      const prev = closes[i - 1];
+      const curr = closes[i];
+      const tol  = atr[i] * 0.35;  // ATR-scaled proximity tolerance
+
+      const levels: Array<[number, string]> = [
+        [fib618, "61.8%"], [fib382, "38.2%"], [fib500, "50%"],
+        [fib786, "78.6%"], [fib236, "23.6%"], [fib100, "100%"],
+        [fib0, "0%"], [fibExt1618, "161.8%"], [fibExt1272, "127.2%"],
+      ];
+
+      for (const [level, label] of levels) {
+        if (Math.abs((prev + curr) * 0.5 - level) < tol) {
+          if      (prev < level && curr > level) { signal = "break_up";   }
+          else if (prev > level && curr < level) { signal = "break_down"; }
+          else if (curr > prev)                  { signal = "bounce_up";  }
+          else if (curr < prev)                  { signal = "bounce_down";}
+          signalLevel = level;
+          nearestFib  = label;
+          break;
+        }
+      }
+    }
+
+    result.push({
+      time: data[i].time,
+      swingHigh: sh.val, swingLow: sl.val, swingTrend,
+      fib0, fib236, fib382, fib500, fib618, fib786, fib100,
+      fibExt1272, fibExt1618,
+      signal, signalLevel, nearestFib,
+    });
+  }
+
+  return result;
+}

@@ -1,113 +1,166 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IEmailTemplate extends Document {
-  templateType: 'welcome' | 'price_alert' | 'invoice' | 'news_summary' | 'inactive_reminder';
+  templateType:
+    | "welcome"
+    | "price_alert"
+    | "invoice"
+    | "news_summary"
+    | "inactive_reminder"
+    | "deposit_completed"
+    | "withdrawal_completed"
+    | "refund_completed"
+    | "email_verification"
+    | "account_manager_assigned"
+    | "account_manager_changed"
+    | "competition_starting"
+    | "competition_ended"
+    | "margin_warning"
+    | "challenge_received"
+    | "notification_alert"
+    | "gm_terms_request"
+    | "password_reset"
+    | "two_factor_otp";
   name: string;
   subject: string;
   fromName: string;
-  
+
   // Welcome email specific
-  headingText: string;           // "Welcome aboard {{name}}"
-  introText: string;             // Default intro if AI fails
-  featureListLabel: string;      // "Here's what you can do right now:"
-  featureItems: string[];        // Array of feature bullet points
-  closingText: string;           // Text after feature list
-  ctaButtonText: string;         // "Go to Dashboard"
-  ctaButtonUrl: string;          // Dashboard URL
-  footerAddress: string;         // Company address for footer
+  headingText: string; // "Welcome aboard {{name}}"
+  introText: string; // Default intro if AI fails
+  featureListLabel: string; // "Here's what you can do right now:"
+  featureItems: string[]; // Array of feature bullet points
+  closingText: string; // Text after feature list
+  ctaButtonText: string; // "Go to Dashboard"
+  ctaButtonUrl: string; // Dashboard URL
+  footerAddress: string; // Company address for footer
   footerLinks: {
     unsubscribeUrl: string;
     websiteUrl: string;
   };
-  
+
   // AI Personalization
   useAIPersonalization: boolean;
   aiPersonalizationPrompt: string;
-  
+
   // Template HTML (advanced users can customize)
   customHtmlTemplate: string;
   useCustomHtml: boolean;
-  
+
   // Status
   isActive: boolean;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
 
-const EmailTemplateSchema = new Schema<IEmailTemplate>({
-  templateType: {
-    type: String,
-    enum: ['welcome', 'price_alert', 'invoice', 'news_summary', 'inactive_reminder'],
-    required: true,
-    unique: true,
-  },
-  name: {
-    type: String,
-    required: true,
-    default: 'Welcome Email',
-  },
-  subject: {
-    type: String,
-    required: true,
-    default: 'Welcome to {{platformName}} - Start competing and win real prizes!',
-  },
-  fromName: {
-    type: String,
-    required: true,
-    default: '{{platformName}}',
-  },
-  
-  // Welcome email specific fields
-  headingText: {
-    type: String,
-    default: 'Welcome aboard {{name}}',
-  },
-  introText: {
-    type: String,
-    default: 'Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.',
-  },
-  featureListLabel: {
-    type: String,
-    default: "Here's what you can do right now:",
-  },
-  featureItems: {
-    type: [String],
-    default: [
-      'Deposit credits to your wallet and enter trading competitions',
-      'Compete in live trading competitions with real-time market prices',
-      'Climb the leaderboard by trading smarter and win cash prizes',
-    ],
-  },
-  closingText: {
-    type: String,
-    default: "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
-  },
-  ctaButtonText: {
-    type: String,
-    default: 'View Competitions',
-  },
-  ctaButtonUrl: {
-    type: String,
-    default: '{{baseUrl}}/competitions',
-  },
-  footerAddress: {
-    type: String,
-    default: '{{companyAddress}}',
-  },
-  footerLinks: {
-    unsubscribeUrl: { type: String, default: '#' },
-    websiteUrl: { type: String, default: '{{baseUrl}}' },
-  },
-  
-  // AI Personalization
-  useAIPersonalization: {
-    type: Boolean,
-    default: true,
-  },
-  aiPersonalizationPrompt: {
-    type: String,
-    default: `Generate a personalized welcome message for a new user joining a trading competition platform.
+const EmailTemplateSchema = new Schema<IEmailTemplate>(
+  {
+    templateType: {
+      type: String,
+      enum: [
+        "welcome",
+        "price_alert",
+        "invoice",
+        "news_summary",
+        "inactive_reminder",
+        "deposit_completed",
+        "withdrawal_completed",
+        "refund_completed",
+        "email_verification",
+        "account_manager_assigned",
+        "account_manager_changed",
+        "competition_starting",
+        "competition_ended",
+        "margin_warning",
+        "challenge_received",
+        // Reason: one template carrying any notification's own wording, so a new
+        // NotificationTemplate marked `channels.email` needs no enum value here.
+        // A missing enum value rejects the whole write, so this list is add-only.
+        "notification_alert",
+        // Reason: a Game Master asking their own referral to accept the GM terms.
+        // A dedicated template rather than `notification_alert`, because the owner
+        // wanted it editable on its own under Email Templates.
+        "gm_terms_request",
+        // Reason: forgot-password flow. Add-only enum — a missing value rejects
+        // the whole write, so never remove this once shipped.
+        "password_reset",
+        // Reason: the email second factor. It was sent with hard-coded HTML and
+        // never appeared under Email Templates. Add-only, like the rest.
+        "two_factor_otp",
+      ],
+      required: true,
+      unique: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      default: "Welcome Email",
+    },
+    subject: {
+      type: String,
+      required: true,
+      default:
+        "Welcome to {{platformName}} - Start competing and win real prizes!",
+    },
+    fromName: {
+      type: String,
+      required: true,
+      default: "{{platformName}}",
+    },
+
+    // Welcome email specific fields
+    headingText: {
+      type: String,
+      default: "Welcome aboard {{name}}",
+    },
+    introText: {
+      type: String,
+      default:
+        "Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.",
+    },
+    featureListLabel: {
+      type: String,
+      default: "Here's what you can do right now:",
+    },
+    featureItems: {
+      type: [String],
+      default: [
+        "Deposit credits to your wallet and enter trading competitions",
+        "Compete in live trading competitions with real-time market prices",
+        "Climb the leaderboard by trading smarter and win cash prizes",
+      ],
+    },
+    closingText: {
+      type: String,
+      default:
+        "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
+    },
+    ctaButtonText: {
+      type: String,
+      default: "View Competitions",
+    },
+    ctaButtonUrl: {
+      type: String,
+      default: "{{baseUrl}}/competitions",
+    },
+    footerAddress: {
+      type: String,
+      default: "{{companyAddress}}",
+    },
+    footerLinks: {
+      unsubscribeUrl: { type: String, default: "#" },
+      websiteUrl: { type: String, default: "{{baseUrl}}" },
+    },
+
+    // AI Personalization
+    useAIPersonalization: {
+      type: Boolean,
+      default: true,
+    },
+    aiPersonalizationPrompt: {
+      type: String,
+      default: `Generate a personalized welcome message for a new user joining a trading competition platform.
 
 User profile:
 {{userProfile}}
@@ -123,55 +176,388 @@ Requirements:
 - Do NOT start with "Welcome" (already in heading)
 
 Return only the message text, no HTML.`,
+    },
+
+    // Custom HTML Template
+    customHtmlTemplate: {
+      type: String,
+      default: "",
+    },
+    useCustomHtml: {
+      type: Boolean,
+      default: false,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
-  
-  // Custom HTML Template
-  customHtmlTemplate: {
-    type: String,
-    default: '',
+  {
+    timestamps: true,
   },
-  useCustomHtml: {
-    type: Boolean,
-    default: false,
-  },
-  
-  isActive: {
-    type: Boolean,
-    default: true,
-  },
-}, {
-  timestamps: true,
-});
+);
 
 // Note: unique: true on templateType already creates an index
 
-const EmailTemplate = mongoose.models.EmailTemplate || mongoose.model<IEmailTemplate>('EmailTemplate', EmailTemplateSchema);
+const EmailTemplate =
+  mongoose.models.EmailTemplate ||
+  mongoose.model<IEmailTemplate>("EmailTemplate", EmailTemplateSchema);
 
 export default EmailTemplate;
 
+// Reason: schema field defaults are welcome-shaped (historical). Creating a
+// row with only `{ templateType, name }` therefore stores a "password reset"
+// document that still says "Welcome to ChartVolt…". Exact match only — an
+// operator who edited the subject is left alone.
+const WELCOME_SCHEMA_DEFAULT_SUBJECT =
+  "Welcome to {{platformName}} - Start competing and win real prizes!";
+
+function needsTypeSpecificDefaultsRepair(
+  templateType: IEmailTemplate["templateType"],
+  template: IEmailTemplate,
+): boolean {
+  if (templateType === "welcome") return false;
+  const defaults = getTemplateDefaults(templateType);
+  if (!defaults.subject) return false;
+  return (
+    template.subject === WELCOME_SCHEMA_DEFAULT_SUBJECT &&
+    defaults.subject !== WELCOME_SCHEMA_DEFAULT_SUBJECT
+  );
+}
+
 // Helper function to get or create default template
-export async function getEmailTemplate(templateType: IEmailTemplate['templateType']): Promise<IEmailTemplate> {
+export async function getEmailTemplate(
+  templateType: IEmailTemplate["templateType"],
+): Promise<IEmailTemplate> {
   let template = await EmailTemplate.findOne({ templateType });
-  
+
   if (!template) {
-    // Create default template
+    // Create default template with proper defaults for each type
+    const defaults = getTemplateDefaults(templateType);
     template = await EmailTemplate.create({
       templateType,
-      name: getDefaultName(templateType),
+      ...defaults,
     });
+    return template;
   }
-  
+
+  if (needsTypeSpecificDefaultsRepair(templateType, template)) {
+    const defaults = getTemplateDefaults(templateType);
+    template.name = defaults.name ?? template.name;
+    template.subject = defaults.subject ?? template.subject;
+    template.headingText = defaults.headingText ?? template.headingText;
+    template.introText = defaults.introText ?? template.introText;
+    template.featureListLabel =
+      defaults.featureListLabel ?? template.featureListLabel;
+    template.featureItems = defaults.featureItems ?? template.featureItems;
+    template.closingText = defaults.closingText ?? template.closingText;
+    template.ctaButtonText = defaults.ctaButtonText ?? template.ctaButtonText;
+    template.ctaButtonUrl = defaults.ctaButtonUrl ?? template.ctaButtonUrl;
+    if (defaults.useAIPersonalization !== undefined) {
+      template.useAIPersonalization = defaults.useAIPersonalization;
+    }
+    await template.save();
+  }
+
   return template;
 }
 
-function getDefaultName(type: string): string {
-  const names: Record<string, string> = {
-    welcome: 'Welcome Email',
-    price_alert: 'Price Alert Email',
-    invoice: 'Invoice Email',
-    news_summary: 'News Summary Email',
-    inactive_reminder: 'Inactive User Reminder',
-  };
-  return names[type] || 'Email Template';
-}
+function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
+  switch (type) {
+    case "deposit_completed":
+      return {
+        name: "Deposit Completed Email",
+        subject:
+          "✓ Deposit Confirmed - {{credits}} credits added to your account",
+        headingText: "✓ Deposit Successful!",
+        introText:
+          "Great news! Your deposit has been processed successfully and your credits are ready to use.",
+        featureListLabel: "What's Next?",
+        featureItems: [
+          "Browse active competitions and join one that matches your style",
+          "Challenge other traders in head-to-head matches",
+          "Climb the leaderboard and win real prizes!",
+        ],
+        closingText: "",
+        ctaButtonText: "Start Competing Now",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: false,
+      };
 
+    case "withdrawal_completed":
+      return {
+        name: "Withdrawal Completed Email",
+        subject: "💸 Withdrawal Processed - €{{netAmount}} on the way",
+        headingText: "💸 Withdrawal Processed",
+        introText:
+          "Your withdrawal request has been processed and your funds are on the way!",
+        featureListLabel: "What's Next?",
+        featureItems: [
+          "Check your bank account or card statement for the incoming transfer",
+          "Allow 3-5 business days for the funds to appear",
+          "Contact support if you haven't received it after 7 days",
+        ],
+        closingText: "",
+        ctaButtonText: "View Wallet",
+        ctaButtonUrl: "{{baseUrl}}/wallet",
+        useAIPersonalization: false,
+      };
+
+    case "refund_completed":
+      return {
+        name: "Refund Completed Email",
+        subject: "Your refund of €{{refundAmount}} has been processed",
+        headingText: "Refund Processed",
+        introText:
+          "Your refund has been processed successfully and the money is on its way back to your original payment method.",
+        featureListLabel: "What happens next?",
+        featureItems: [
+          "The refunded amount will appear on your card/bank statement within 3-10 business days",
+          "Any credits granted by the original deposit may be adjusted from your wallet",
+          "Contact support if you have any questions about this refund",
+        ],
+        closingText: "",
+        ctaButtonText: "View Wallet",
+        ctaButtonUrl: "{{baseUrl}}/wallet",
+        useAIPersonalization: false,
+      };
+
+    case "welcome":
+      return {
+        name: "Welcome Email",
+        subject:
+          "Welcome to {{platformName}} - Start competing and win real prizes!",
+        headingText: "Welcome aboard {{name}}",
+        introText:
+          "Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.",
+        featureListLabel: "Here's what you can do right now:",
+        featureItems: [
+          "Deposit credits to your wallet and enter trading competitions",
+          "Compete in live trading competitions with real-time market prices",
+          "Climb the leaderboard by trading smarter and win cash prizes",
+        ],
+        closingText:
+          "Competitions run daily with prize pools waiting to be won. The top traders take home real money — will you be one of them?",
+        ctaButtonText: "View Competitions",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: true,
+      };
+
+    case "price_alert":
+      return { name: "Price Alert Email" };
+
+    case "invoice":
+      return { name: "Invoice Email" };
+
+    case "news_summary":
+      return { name: "News Summary Email" };
+
+    case "inactive_reminder":
+      return { name: "Inactive User Reminder" };
+
+    case "account_manager_assigned":
+      return {
+        name: "Account Manager Assigned",
+        subject: "🎉 Meet Your Dedicated Account Manager at {{platformName}}",
+        headingText: "👋 Welcome to Personalized Support!",
+        introText:
+          "Great news! You have been assigned a dedicated account manager who will be your primary point of contact for all your needs.",
+        featureListLabel: "Your Account Manager",
+        featureItems: [
+          "{{managerFirstName}} will assist you with any questions about your account",
+          "Get personalized guidance for competitions and trading",
+          "Receive priority support whenever you need help",
+        ],
+        closingText:
+          "Feel free to reach out through the messaging feature in your account. {{managerFirstName}} is here to help you succeed!",
+        ctaButtonText: "Send a Message",
+        ctaButtonUrl: "{{baseUrl}}/messaging",
+        useAIPersonalization: false,
+      };
+
+    case "account_manager_changed":
+      return {
+        name: "Account Manager Changed",
+        subject: "🔄 Your Account Manager Has Changed at {{platformName}}",
+        headingText: "👋 Meet Your New Account Manager",
+        introText:
+          "We wanted to let you know that your account has been reassigned to a new account manager who will be taking care of your needs going forward.",
+        featureListLabel: "Your New Account Manager",
+        featureItems: [
+          "{{newManagerFirstName}} is now your dedicated point of contact",
+          "All your account history and preferences have been transferred",
+          "You can reach out anytime through the messaging feature",
+        ],
+        closingText:
+          "{{newManagerFirstName}} is excited to work with you and help you achieve your trading goals!",
+        ctaButtonText: "Say Hello",
+        ctaButtonUrl: "{{baseUrl}}/messaging",
+        useAIPersonalization: false,
+      };
+
+    case "competition_starting":
+      return {
+        name: "Competition Starting Soon",
+        subject: "🏆 {{competitionName}} starts soon — get ready!",
+        headingText: "🏆 Competition Alert",
+        introText:
+          "The competition {{competitionName}} is starting at {{startTime}} UTC. Make sure you're ready to trade!",
+        featureListLabel: "Quick Tips",
+        featureItems: [
+          "Review your trading strategy before the competition begins",
+          "Check the competition rules and prize pool",
+          "Make sure you have enough balance to participate",
+        ],
+        closingText:
+          "Good luck! May the best trader win.",
+        ctaButtonText: "View Competition",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: false,
+      };
+
+    case "competition_ended":
+      return {
+        name: "Competition Ended — Results Available",
+        subject: "🎯 {{competitionName}} has ended — check your results!",
+        headingText: "🎯 Competition Results",
+        introText:
+          "The competition {{competitionName}} has ended. Check your final ranking and see how you performed!",
+        featureListLabel: "What's Next?",
+        featureItems: [
+          "View your final ranking and performance stats",
+          "Check if you've won any prizes",
+          "Join the next competition to keep improving",
+        ],
+        closingText: "",
+        ctaButtonText: "See Results",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: false,
+      };
+
+    case "margin_warning":
+      return {
+        name: "Margin Warning Alert",
+        subject: "⚠️ Margin Warning — {{marginLevel}}% in {{competitionName}}",
+        headingText: "⚠️ Margin Level Warning",
+        introText:
+          "Your margin level in {{competitionName}} has dropped to {{marginLevel}}%. Consider closing some positions to avoid liquidation.",
+        featureListLabel: "Recommended Actions",
+        featureItems: [
+          "Close some of your losing positions to free up margin",
+          "Reduce position sizes on your open trades",
+          "Add stop-loss orders to limit further losses",
+        ],
+        closingText:
+          "Act quickly — if your margin level drops further, your positions may be automatically liquidated.",
+        ctaButtonText: "Manage Positions",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: false,
+      };
+
+    case "challenge_received":
+      return {
+        name: "Challenge Received",
+        subject: "⚔️ {{challengerName}} challenged you to a 1v1 battle!",
+        headingText: "⚔️ New Challenge",
+        introText:
+          "{{challengerName}} has challenged you to a 1v1 trading battle with a stake of {{stakeAmount}} credits. Do you accept?",
+        featureListLabel: "Challenge Details",
+        featureItems: [
+          "Stake: {{stakeAmount}} credits",
+          "You'll trade head-to-head with {{challengerName}}",
+          "The winner takes the combined prize pool",
+        ],
+        closingText:
+          "Log in to accept or decline the challenge before it expires.",
+        ctaButtonText: "View Challenge",
+        ctaButtonUrl: "{{baseUrl}}/challenges",
+        useAIPersonalization: false,
+      };
+
+    case "notification_alert":
+      // Reason: the body is the notification's own title and message, so this
+      // template carries the frame and the operator's wording of it — not a
+      // description of any one event. Switching it off silences every
+      // notification email at once, which is why it is a single template.
+      return {
+        name: "Notification Alert",
+        subject: "{{notificationTitle}}",
+        headingText: "{{notificationTitle}}",
+        introText: "{{notificationMessage}}",
+        featureListLabel: "",
+        featureItems: [],
+        closingText:
+          "You can change which notifications reach you by email in your account settings.",
+        ctaButtonText: "{{actionText}}",
+        ctaButtonUrl: "{{actionUrl}}",
+        useAIPersonalization: false,
+      };
+
+    case "gm_terms_request":
+      // Reason: the button opens the signed-in dashboard, where the terms window asks
+      // the server whether a request is still pending. A player who already answered
+      // therefore sees nothing - pressing an old email does no harm.
+      return {
+        name: "Game Master Terms Request",
+        subject: "📜 {{gameMasterName}} sent you the Game Master terms",
+        headingText: "📜 Please review the Game Master terms",
+        introText:
+          "Hi {{name}}, {{gameMasterName}} is your Game Master on {{platformName}} and has asked you to read and accept the Game Master terms.",
+        featureListLabel: "What this means",
+        featureItems: [
+          "Nothing changes until you answer",
+          "You can accept or decline in the window that opens",
+          "Accepting confirms you play under {{gameMasterName}}",
+        ],
+        closingText:
+          "If you have already answered, there is nothing more to do.",
+        ctaButtonText: "Review Terms",
+        ctaButtonUrl: "{{actionUrl}}",
+        useAIPersonalization: false,
+      };
+
+    case "password_reset":
+      return {
+        name: "Password Reset",
+        subject: "Reset your {{platformName}} password",
+        headingText: "Reset your password",
+        introText:
+          "Hi {{name}}, we received a request to reset the password for your {{platformName}} account. Click the button below to choose a new password.",
+        featureListLabel: "Security tips",
+        featureItems: [
+          "This link expires in {{expiryHours}} hours",
+          "If you did not request a reset, you can ignore this email",
+          "Never share this link with anyone",
+        ],
+        closingText:
+          "If the button does not work, copy and paste this link into your browser: {{resetLink}}",
+        ctaButtonText: "Reset Password",
+        ctaButtonUrl: "{{resetLink}}",
+        useAIPersonalization: false,
+      };
+
+    case "two_factor_otp":
+      return {
+        name: "Two-Factor Code",
+        subject: "Your {{platformName}} verification code",
+        fromName: "{{platformName}} Security",
+        headingText: "Your verification code",
+        introText:
+          "Hi {{name}}, use the code below to finish signing in to {{platformName}}.",
+        featureListLabel: "Keep your account safe",
+        featureItems: [
+          "This code expires in {{ttlMinutes}} minutes",
+          "{{platformName}} staff will never ask you for this code",
+          "If you did not try to sign in, change your password now",
+        ],
+        closingText: "",
+        ctaButtonText: "",
+        ctaButtonUrl: "",
+        useAIPersonalization: false,
+      };
+
+    default:
+      return { name: "Email Template" };
+  }
+}

@@ -1,4 +1,4 @@
-import { Schema, model, models, type Document, type Model } from 'mongoose';
+import { Schema, model, models, type Document, type Model } from "mongoose";
 
 export interface IInvoiceLineItem {
   description: string;
@@ -10,7 +10,7 @@ export interface IInvoiceLineItem {
 export interface IInvoice extends Document {
   // Invoice Identity
   invoiceNumber: string;
-  
+
   // Customer Information
   userId: string;
   customerName: string;
@@ -23,7 +23,7 @@ export interface IInvoice extends Document {
     postalCode?: string;
     country?: string;
   };
-  
+
   // Company Information (snapshot at time of invoice)
   companyName: string;
   companyAddress: {
@@ -39,36 +39,36 @@ export interface IInvoice extends Document {
   companyEmail: string;
   companyPhone?: string;
   companyLogoUrl?: string;
-  
+
   // Financial Details
   subtotal: number;
   vatRate: number;
   vatAmount: number;
   total: number;
   currency: string;
-  
+
   // Line Items
   lineItems: IInvoiceLineItem[];
-  
+
   // Transaction Reference
   transactionId: string;
-  transactionType: 'deposit' | 'purchase' | 'subscription';
+  transactionType: "deposit" | "purchase" | "subscription";
   paymentMethod?: string;
   paymentId?: string;
-  
+
   // Status
-  status: 'draft' | 'sent' | 'paid' | 'cancelled' | 'refunded';
-  
+  status: "draft" | "sent" | "paid" | "cancelled" | "refunded";
+
   // Dates
   invoiceDate: Date;
   dueDate?: Date;
   sentAt?: Date;
   paidAt?: Date;
-  
+
   // Notes
   notes?: string;
   internalNotes?: string;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,7 +80,7 @@ const InvoiceLineItemSchema = new Schema<IInvoiceLineItem>(
     unitPrice: { type: Number, required: true },
     total: { type: Number, required: true },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const InvoiceSchema = new Schema<IInvoice>(
@@ -92,7 +92,7 @@ const InvoiceSchema = new Schema<IInvoice>(
       unique: true,
       index: true,
     },
-    
+
     // Customer Information
     userId: {
       type: String,
@@ -115,7 +115,7 @@ const InvoiceSchema = new Schema<IInvoice>(
       postalCode: String,
       country: String,
     },
-    
+
     // Company Information
     companyName: {
       type: String,
@@ -134,7 +134,7 @@ const InvoiceSchema = new Schema<IInvoice>(
     companyEmail: { type: String, required: true },
     companyPhone: String,
     companyLogoUrl: String,
-    
+
     // Financial Details
     subtotal: {
       type: Number,
@@ -157,12 +157,12 @@ const InvoiceSchema = new Schema<IInvoice>(
     currency: {
       type: String,
       required: true,
-      default: 'EUR',
+      default: "EUR",
     },
-    
+
     // Line Items
     lineItems: [InvoiceLineItemSchema],
-    
+
     // Transaction Reference
     transactionId: {
       type: String,
@@ -171,19 +171,19 @@ const InvoiceSchema = new Schema<IInvoice>(
     },
     transactionType: {
       type: String,
-      enum: ['deposit', 'purchase', 'subscription'],
+      enum: ["deposit", "purchase", "subscription"],
       required: true,
     },
     paymentMethod: String,
     paymentId: String,
-    
+
     // Status
     status: {
       type: String,
-      enum: ['draft', 'sent', 'paid', 'cancelled', 'refunded'],
-      default: 'draft',
+      enum: ["draft", "sent", "paid", "cancelled", "refunded"],
+      default: "draft",
     },
-    
+
     // Dates
     invoiceDate: {
       type: Date,
@@ -192,14 +192,14 @@ const InvoiceSchema = new Schema<IInvoice>(
     dueDate: Date,
     sentAt: Date,
     paidAt: Date,
-    
+
     // Notes
     notes: String,
     internalNotes: String,
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
@@ -209,7 +209,6 @@ InvoiceSchema.index({ invoiceDate: -1 });
 
 const Invoice: Model<IInvoice> =
   (models?.Invoice as Model<IInvoice>) ||
-  model<IInvoice>('Invoice', InvoiceSchema);
+  model<IInvoice>("Invoice", InvoiceSchema);
 
 export default Invoice;
-

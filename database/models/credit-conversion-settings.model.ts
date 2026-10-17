@@ -1,24 +1,28 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema } from "mongoose";
+
+// Interface for the static methods
+interface ICreditConversionSettingsModel extends Model<ICreditConversionSettings> {
+  getSingleton(): Promise<ICreditConversionSettings>;
+}
 
 export interface ICreditConversionSettings extends Document {
-  _id: string;
   eurToCreditsRate: number; // How many credits for 1 EUR (e.g., 100 credits = 1 EUR)
   minimumDeposit: number; // Minimum EUR deposit amount
   minimumWithdrawal: number; // Minimum EUR withdrawal amount
-  
+
   // Platform Fees (what platform charges users)
   platformDepositFeePercentage: number; // Fee platform charges on deposits (e.g., 2%)
   platformWithdrawalFeePercentage: number; // Fee platform charges on withdrawals (e.g., 2%)
-  
+
   // Bank/Provider Fees (what payment providers charge platform)
   bankDepositFeePercentage: number; // What Stripe/provider charges for deposits (e.g., 2.9%)
   bankDepositFeeFixed: number; // Fixed fee per deposit in EUR (e.g., 0.30)
   bankWithdrawalFeePercentage: number; // What bank charges for payouts (e.g., 0.25%)
   bankWithdrawalFeeFixed: number; // Fixed fee per withdrawal in EUR (e.g., 0.25)
-  
+
   // Legacy field for backward compatibility
   withdrawalFeePercentage: number; // Deprecated - use platformWithdrawalFeePercentage
-  
+
   lastUpdated: Date;
   updatedBy: string;
 }
@@ -26,8 +30,8 @@ export interface ICreditConversionSettings extends Document {
 const CreditConversionSettingsSchema = new Schema<ICreditConversionSettings>(
   {
     _id: {
-      type: String,
-      default: 'global-credit-conversion',
+      type: Schema.Types.Mixed,
+      default: "global-credit-conversion",
     },
     eurToCreditsRate: {
       type: Number,
@@ -48,7 +52,7 @@ const CreditConversionSettingsSchema = new Schema<ICreditConversionSettings>(
       default: 20, // 20 EUR minimum
       min: 1,
     },
-    
+
     // Platform Fees (what platform charges users)
     platformDepositFeePercentage: {
       type: Number,
@@ -64,7 +68,7 @@ const CreditConversionSettingsSchema = new Schema<ICreditConversionSettings>(
       min: 0,
       max: 50,
     },
-    
+
     // Bank/Provider Fees (what payment providers charge platform)
     bankDepositFeePercentage: {
       type: Number,
@@ -76,7 +80,7 @@ const CreditConversionSettingsSchema = new Schema<ICreditConversionSettings>(
     bankDepositFeeFixed: {
       type: Number,
       required: true,
-      default: 0.30, // Stripe charges €0.30 fixed
+      default: 0.3, // Stripe charges €0.30 fixed
       min: 0,
       max: 10,
     },
@@ -94,7 +98,7 @@ const CreditConversionSettingsSchema = new Schema<ICreditConversionSettings>(
       min: 0,
       max: 10,
     },
-    
+
     // Legacy field for backward compatibility
     withdrawalFeePercentage: {
       type: Number,
@@ -109,21 +113,21 @@ const CreditConversionSettingsSchema = new Schema<ICreditConversionSettings>(
     },
     updatedBy: {
       type: String,
-      default: 'system',
+      default: "system",
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Static method to get or create singleton
 CreditConversionSettingsSchema.statics.getSingleton = async function () {
-  let settings = await this.findById('global-credit-conversion');
-  
+  let settings = await this.findById("global-credit-conversion");
+
   if (!settings) {
     settings = await this.create({
-      _id: 'global-credit-conversion',
+      _id: "global-credit-conversion",
       eurToCreditsRate: 100,
       minimumDeposit: 10,
       minimumWithdrawal: 20,
@@ -132,20 +136,23 @@ CreditConversionSettingsSchema.statics.getSingleton = async function () {
       platformWithdrawalFeePercentage: 2,
       // Bank fees (Stripe defaults)
       bankDepositFeePercentage: 2.9,
-      bankDepositFeeFixed: 0.30,
+      bankDepositFeeFixed: 0.3,
       bankWithdrawalFeePercentage: 0.25,
       bankWithdrawalFeeFixed: 0.25,
       // Legacy
       withdrawalFeePercentage: 2,
     });
   }
-  
+
   return settings;
 };
 
-const CreditConversionSettings: Model<ICreditConversionSettings> =
-  mongoose.models?.CreditConversionSettings ||
-  mongoose.model<ICreditConversionSettings>('CreditConversionSettings', CreditConversionSettingsSchema);
+const CreditConversionSettings =
+  (mongoose.models
+    ?.CreditConversionSettings as unknown as ICreditConversionSettingsModel) ||
+  mongoose.model<ICreditConversionSettings, ICreditConversionSettingsModel>(
+    "CreditConversionSettings",
+    CreditConversionSettingsSchema,
+  );
 
 export default CreditConversionSettings;
-

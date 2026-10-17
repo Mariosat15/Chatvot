@@ -1,0 +1,445 @@
+# 07 - Failure Modes and Edge Cases
+
+The integration depends on a third party we do not control, while real prize money
+waits on their answers. This document covers what happens when they do not answer.
+
+---
+
+## 1. The governing principle
+
+> **A provider failure must degrade the experience. It must never corrupt money.**
+
+Acceptable outcomes: a contest is delayed, paused, extended, or cancelled with full
+refunds. Unacceptable outcomes: prizes paid on incomplete scores, a player charged
+for a round they could not play, a contest that can never settle, or two payouts for
+one contest.
+
+---
+
+## 2. The worst failure - a round that never reports
+
+This is the single most important scenario in the integration. A player played, the
+contest is over, and we do not know their score. Everyone else's prize money is
+blocked behind it.
+
+### 2.1 The four-stage safety net
+
+```
+Stage 1  CALLBACK        Provider posts the result       -> normal path, ~99% of cases
+Stage 2  POLL            Reconciliation job pulls        -> catches lost webhooks
+Stage 3  FINAL SWEEP     Pull once more at grace end     -> last chance before settling
+Stage 4  POLICY          Apply the unresolved policy     -> settle without it, and alert
+```
+
+### 2.2 The reconciliation job
+
+Runs every minute against rounds that are launched but unresolved.
+
+| Round age | Action |
+|---|---|
+| < 2 min past expected finish | Wait - the callback is probably in flight |
+| 2-10 min | Poll `GET /v1/rounds/{roundId}` with backoff |
+| Contest entering grace | Poll every attempt remaining, urgently |
+| Grace expired | Apply the unresolved policy and raise a **critical** alert |
+
+Polling is cheap and the failure it prevents is expensive. Poll generously.
+
+> **This job is written but NOT SCHEDULED - it is E7/X8, and every row above describes the
+> target rather than the build.** So nothing polls (a lost webhook is a lost score today,
+> not a slow one) and **no critical alert fires.** Stage 4's write is performed by
+> settlement instead, at the cut-off - see **s2.3b**, which is also where the reason the
+> two will agree once E7 lands is recorded.
+
+### 2.3 The unresolved policy - an explicit per-contest choice
+
+| Policy | Behaviour | Use when |
+|---|---|---|
+| `score_zero` | Unresolved round scores zero. Contest settles on time | **Default.** Most players finish; one straggler must not block everyone |
+| `exclude` | Player removed from ranking and **refunded their entry fee** | Fairer to the affected player, slightly reduces the pot. Good for small, high-value contests |
+| `hold_and_alert` | Settlement blocked until a human decides | High-value contests only. Requires someone actually watching |
+
+The choice must be made when the contest is created, not improvised during an
+incident. Whichever is chosen, the affected player is **notified explicitly** rather
+than silently scored zero.
+
+#### 2.3a BUILT, 4 September 2026 - and there were two gaps here, not one
+
+All three policies are now honoured. Before this, **only `score_zero` worked, and it
+worked because it asks settlement to do nothing.** The other two were written, tested at
+the reconciliation layer, and consumed by nobody:
+
+- `exclude` left the player **ranked and unrefunded**. Not merely unpaid - because
+ `calculateRankings` does not filter on participant status at all, an excluded player
+ could still be ranked and **paid a prize while also being owed their fee back**.
+- `hold_and_alert` **settled on time and paid out**, exactly as though it were
+ `score_zero`, while the policy the operator chose promises the opposite.
+
+Only the first was recorded as an open obligation. The second was a genuine surprise, and
+it is the fourth instance of the rule that a plan's count is a hypothesis: **check every
+sibling of the thing you are fixing, not just the one a document named.**
+
+**Where it lives.** `lib/services/settlement/unresolved-rounds.ts` reads the state and
+`lib/services/settlement/exclusion-refund.ts` moves the money, both mirrored, both driven
+from `provider-settlement.service.ts` inside the settlement transaction. Pinned by 15 tests
+in `__tests__/services/provider-settlement.test.ts` and 2 in
+`provider-settlement-late-hold.test.ts`, every guard probed.
+
+Five things about the build that the table above cannot show:
+
+- **Settlement does not read `refundOwed` or `blocksSettlement`, and must not.** They are
+ return values in a worker process that has exited long before a contest settles, and
+ nothing persists them. Settlement re-derives both from the one thing stage 4 *writes* -
+ `round.status = "unresolved"`. That also means a contest settled by a path the net never
+ drove (the lazy auto-finalize, a manual admin trigger) honours the policy anyway; a
+ parameter would have made those paths silently skip it.
+- **Exclusion is done by filtering the participant list, never by the status field.** The
+ refund marks the participant `refunded` for the audit trail and every screen that reads
+ it, but `calculateRankings` reads `status` only for the liquidation rule - so the status
+ alone removes nobody. This is the whole double-payment defect, and it is one line.
+- **The refund happens before ranking, so the pool the winners are paid from is already the
+ reduced one.** Reducing after would pay prizes out of a pot that still counted a player
+ who had left. The reduction is the **full entry fee**, because entry adds the full fee and
+ the platform share is taken later out of the pool - a stale comment in both copies of
+ `competition-cancel.actions.ts` claimed the opposite and was corrected the same day.
+- **The `hold_and_alert` gate sits before the optimistic lock**, so a parked contest is left
+ completely untouched rather than claimed and released on every sweep. The second,
+ in-transaction check is a real gate rather than decoration - it catches a round going
+ unresolved between the two reads - but it exposed a latent bug that mattered more than
+ either policy: **a `success: false` return from settlement used to commit anyway and never
+ release the claim**, leaving the contest at `finalizing` for ever, where no caller, cron or
+ human could claim it again and nobody would be paid.
+- **A duplicate refund is prevented by a ledger check, not by the transaction.** The
+ transaction is atomic, so a failed run rolls back - but a run that stalls in `finalizing`
+ is reset to `active` after five minutes (R4) and the next sweep settles it *for real*, and
+ the first run had already committed.
+
+**Still not built:** the `exclude` refund fires only on the provider settlement path. The
+trading path cannot reach it, because trading has no rounds - which is correct, not a gap,
+but a document saying "settlement honours the unresolved policies" should say **provider
+settlement**.
+
+#### 2.3b BUILT, 7 September 2026 - the universal cut-off, and who actually writes `unresolved`
+
+**s2.3a was true about the policies and wrong about the trigger.** It assumed the
+reconciliation net's stage 4 would write `round.status = "unresolved"` and settlement would
+read it. **The net is not scheduled** - `reconcileRound` and
+`findRoundsNeedingReconciliation` are imported by their own test and by nothing else,
+because the schedule belongs to **E7/X8**. So until 7 September nothing in the running
+system ever wrote that status, and the three policies above could not fire at all:
+`hold_and_alert` and `exclude` were code with no input.
+
+Three consequences follow, and none of them is guessable from the table in s2.2:
+
+- **Nothing polls.** A lost webhook is a genuinely lost score today, not a slow one.
+- **Nothing else closes a live round.** Without the step below, a round sat `launched`
+ for ever against a contest that had finished weeks earlier.
+- **No alert fires.** The "Grace expired -> raise a **critical** alert" row in s2.2 is
+ describing **E7**, not the build. A document saying an operator is paged for an unreported
+ round is describing the target.
+
+**The defect that made this urgent was not the policies, it was the wait.**
+`checkAndFinalizeCompetitions` claims any contest whose `endTime` has passed, every minute,
+and since `12` s2.3 the play window *is* the contest clock - so a provider contest settled
+within about sixty seconds of its cut-off, **before the grace window had even opened.** A
+player who finished at 13:59:50 had their result refused as `late_recorded_not_applied`,
+was ranked on nothing and **was paid nothing for a round they had actually finished.** From
+the player's seat that is indistinguishable from being cheated, and the only trace is a
+critical audit row nobody is watching.
+
+**What was built.** `lib/services/settlement/round-cutoff.ts` (mirrored) answers two
+questions - is any round still inside the grace window, and how many never reported - and
+`provider-finalize.ts` acts on both **before** the optimistic claim:
+
+1. **Defer while the grace window is open.** Settlement returns a refusal naming the time
+ it can run, and the cron picks the contest up a few passes later. It refuses a **manual**
+ admin finalize too, deliberately: an operator forcing settlement two minutes after the
+ cut-off would destroy the scores of everyone who finished in the last minute and never
+ know. The answer is to wait, not to override.
+2. **Mark what never reported `unresolved`,** via a new `cutoff` outcome on
+ `endLiveRoundsForContest`. This is the first time `exclude` and `hold_and_alert` have had
+ anything to read.
+
+**`voided` was the tidy-looking mistake.** It reads as housekeeping, it is what the
+cancellation path writes, and it would silently override all three configured policies with
+"score zero, nothing owed" - including the ones set to refund the player or park the contest
+for a human. `unresolved` is the one persisted fact `assessUnresolvedRounds` reads, so the
+operator's choice actually decides. A configured policy that cannot fire is the same failure
+as a `rankingMethod` a provider game ignores.
+
+**The ordering is the subtle half, and getting it wrong is silent in both directions.** The
+mark is written **outside** the settlement transaction and **before** the hold gate. Inside
+the transaction, a `hold_and_alert` abort - which is the policy working - would roll the mark
+back, the pre-lock gate would keep seeing nothing unresolved, and **every cron pass would
+re-mark, re-block and re-roll-back for ever**: nobody paid, no round for an operator to
+resolve in the inspector, no error anywhere. And assessing the hold *before* the mark always
+sees zero, so a held contest settles on its first pass.
+
+**When E7 lands the two agree by construction** - both write `unresolved`, both read it back
+through `assessUnresolvedRounds` - which is precisely the property the plan bought by
+choosing a persisted status over a passed parameter.
+
+**Deviation from this chapter, recorded rather than absorbed:** s2.2 puts the write in the
+net's stage 4. Settlement performs the equivalent because the net is unscheduled and
+something has to. The net's version is still the target, and it will find nothing left to do
+on a contest settlement has already closed - which is the correct interaction, not a race.
+
+**Harm statement:** **latent.** No provider contest has settled in production, so no score
+was actually discarded, and **nothing was backfilled** - the defect is an absent wait, not a
+stored value. Risk **R44**. Pinned by 8 tests in
+`__tests__/services/provider-round-cutoff.test.ts` and 15 probes in
+`tools/probe-round-cutoff.ps1`.
+
+**Answered later the same day, by R45, and the answer was worse than the question implied.**
+This paragraph used to list two things as unverified: what a contest pays when **nobody**
+scored, and where an unclaimed rank's percentage goes. `distributePrizesWithTies` handled the
+second correctly all along - an unfilled rank's share goes to the players above it, exactly as
+the owner described. The first was **broken, and by a defect one step earlier than either
+question looks:** nothing disqualified a participant who never played, so they held a prize rank
+on a `score ?? 0` fallback and were paid, and an all-unscored contest split the whole pot between
+players who had done nothing. Design in `05` **s9.2**, risk **R45**.
+
+**What remains genuinely open** is narrower than the pair above and is a policy decision, not a
+gap: an all-unscored contest currently routes its pot to the existing `all_disqualified`
+unclaimed pool net of the platform fee. Given that the likeliest cause of nobody scoring is a
+**provider outage** - which is this chapter's own section 3 - refunding is at least arguable.
+Open question 17. Still true and still outstanding: **no player or admin screen explains any of
+this**, which belongs with the player-facing results work rather than here.
+
+---
+
+## 3. Provider outage
+
+### 3.1 Detection
+
+Health checks each minute: a lightweight catalogue call, plus round-creation success
+rate and callback arrival rate. Three consecutive failures marks the provider
+`degraded`; sustained failure marks it `down`.
+
+### 3.2 Response by contest state
+
+> **Play-in-progress pause/extend BUILT 20 September 2026 (X9 slice 3).**
+> Pre-start rows (**not yet open** / **registration open**) **BUILT 20 September 2026**
+> (X9 leftover): `provider-entry-gate.ts` refuses new entry while the provider is `down`
+> or kill-switched off; empty upcoming contests are hidden from hubs; if still blocked
+> when play opens, Inngest + `getCompetitionById` cancel and refund in full.
+> `lib/services/game-providers/provider-outage-pause.service.ts` on Agenda every minute.
+> When `GameProvider.healthStatus === "down"`, every active provider contest for that key
+> is paused via shared `contest-pause.service.ts` with `pausedBy: "system:provider-outage"`.
+> On evidence `ok` (same classifier as the kill-switch), those system pauses are resumed and
+> `playWindowEnd` / `endTime` are extended by the pause duration — identical math to the
+> admin resume control. **Manual pauses are never auto-resumed.** Recovery probes even when
+> the provider is already `enabled: false` (kill-switch); re-enable stays an operator action.
+> Say outage responses code-complete (all three table rows).
+
+> **AMENDED 20 September 2026 (R111), and the sentence above about `healthStatus === "down"`
+> is the thing that was wrong.** That field **defaults to `"down"`**, and the kill-switch
+> passes the previous status through on `no_evidence`, so a provider that has never produced
+> a scored round carries the default for ever. Read literally, this section refused every
+> entry on a brand-new provider and paused any contest already running on it — **a deadlock,
+> because entry creates the first round, the round produces the evidence, and the evidence is
+> what clears the status.** Both readers now go through `providerObservedDown` /
+> `PROVIDER_OBSERVED_DOWN_FILTER`, which require **`healthDownSince` as well as the status**:
+> a stored `"down"` with no stamp is a state nothing but the schema can produce. **A document
+> describing the response as keyed on `healthStatus` alone is describing the defect.** Note
+> that s3.3 below already carried this exact caution and scoped it to the *health dashboard* —
+> the caution was right and its scope was too narrow.
+
+> **AMENDED AGAIN 20 September 2026 (owner decision), and this is the larger change of the
+> two: every automatic response in this section is now OPT-IN PER PROVIDER.** The table
+> below describes what the platform does when an operator has switched
+> `GameProvider.autoOutageResponseEnabled` on for that provider. The field **defaults to
+> `false`**, and with it off the platform **watches and alerts and changes nothing** — it
+> does not stop entry, does not hide a contest, does not pause a running one and does not
+> take the provider off sale. A document presenting any row below as unconditional is
+> describing the version the owner rejected. The predicate is `systemMayActOnOutage`, which
+> is `providerObservedDown` **and** the consent, with `PROVIDER_AUTO_OUTAGE_FILTER` as its
+> query form; **`providerObservedDown` survives unchanged and is still the evidence half**,
+> so R111 above is not superseded by this — a consented provider still needs the stamp.
+> **One asymmetry is deliberate and is the thing most likely to be "tidied" away: RESUME is
+> NOT gated on the consent.** The flag governs whether we may intervene, never whether we
+> may undo an intervention already made, and an operator switching the automation off
+> mid-outage is the likeliest moment for it to matter — gated, that switch would strand
+> every system-paused contest paused for ever, with nothing to log and nobody told.
+
+| State | Response |
+|---|---|
+| **Not yet open** | Hide the contest. Postpone or cancel with full refunds before anyone pays — **BUILT** (hide empty upcoming; cancel-at-gun covers the rest) |
+| **Registration open, play not started** | Stop new entries. If not recovered before play opens, cancel and refund everyone — **BUILT** |
+| **Play in progress** | **Pause the contest** and extend the play window by the outage duration. Show players an honest message — **BUILT (X9 slice 3)** |
+| **Settling** | Poll until the grace period ends, then apply the unresolved policy |
+| **Completed** | Unaffected |
+
+Pausing and extending is far better than cancelling. Players who already played keep
+their scores, and the contest completes late rather than not at all.
+
+### 3.3 The automatic kill switch
+
+> **BUILT 20 September 2026 (X9 slice 2).** `lib/services/game-providers/provider-kill-switch.service.ts`
+> on Agenda every minute. Evidence from recent rounds/events; three consecutive failures →
+> `degraded`; five → `down` with `healthDownSince`; after 15 minutes continuously down,
+> `enabled: false` on both `GameProvider` and `WhiteLabel.gameProviders`, plus a critical
+> `provider_kill_switch` SecurityAlert. Idle providers (`no_evidence`) do not accumulate
+> streak. Admin health dashboard still **derives** its verdict and must not read the stored
+> `healthStatus` (default `"down"` would paint every quiet provider red — **and R111 is that
+> same caution needed one file along: it was written here for the dashboard and not applied to
+> the entry gate or the pause worker, which read the raw status and deadlocked a new provider.
+> The rule generalises to every reader of this field, never just the one it was first noticed
+> on**). Manual disable
+> already existed (`setProviderEnabled`). Say kill-switch code-complete, not E7/X9 done —
+> full `06` s10 monitors (**BUILT X9 slice 4**) and re-settle (**BUILT X9 slice 5**). Outage pause/extend:
+
+> **BUILT X9 slice 3** (see s3.2).
+
+> **AMENDED 20 September 2026 (owner decision): the kill switch no longer disables a
+> provider unless an operator asked it to.** The paragraph below said "automatically
+> disable", and that is now conditional on `autoOutageResponseEnabled`, which defaults to
+> `false`. **What is unconditional is the watching and the shouting** — the worker still
+> classifies evidence, still moves `healthStatus` and `healthFailureStreak`, and still
+> raises the critical `provider_kill_switch` alert — so a document describing the
+> withholding as the worker being switched off is wrong, and the pair of tests is written
+> that way on purpose: asserting only that a flagless provider survives is equally green
+> against a worker that has stopped noticing outages altogether. Two further facts.
+> **`RunProviderKillSwitchSummary.withheld` counts the providers it declined to disable**,
+> which is the difference between "no outage" and "an outage nobody let me act on" — the
+> `classify, never merely count` rule applied to the summary. And **the alert is claimed
+> once per outage EPISODE, not once per pass**, by an atomic `outageAlertedAt` update
+> keyed against `healthDownSince`: a withheld provider stays `enabled: true`, so the
+> worker examines it again every minute, and without the claim an unattended outage pages
+> somebody sixty times an hour until the next real one is ignored.
+
+If a provider is `down` for more than 15 minutes, automatically disable **new**
+contest creation and new round creation for that provider, and notify admins. Live
+contests continue under the rules above.
+
+A per-provider manual kill switch must also exist and must be usable without a
+deployment.
+
+---
+
+## 4. Round-level edge cases
+
+| Case | Handling |
+|---|---|
+| Player double-clicks Play | Idempotent round creation returns the same round and launch URL. The unique index on `{contestId, userId, attemptNumber}` is the hard guarantee |
+| Launch URL expires before play | Detect on page load; request a fresh round. Does **not** consume another attempt if the original was never started |
+| Player closes the tab mid-round | Round stays live until `expiresAt`. Returning resumes if the provider supports it, otherwise it resolves as abandoned |
+| Player loses connectivity | Provider's problem to handle gracefully. Our rule: they must not lose a paid attempt to a dropped signal, so `abandoned` results should carry a partial score where possible |
+| Two devices, same round | One live round per player per contest, enforced in the database |
+| Round outlives the contest | `expiresAt` is always set at or before the play window end |
+| Result arrives after settlement | Recorded against the round for audit, **not** applied to the ranking. Alert raised. If it would have changed the outcome, follow the re-settlement path in `06` |
+| Provider reports an impossible score | Rejected against `scoreRange`, round marked unresolved, alert raised |
+| Provider reports the same round twice with different scores | First valid result wins. Second stored and flagged as a **critical** discrepancy |
+| Provider voids a round after settlement | Manual re-settlement. Must be supported deliberately |
+
+---
+
+## 5. Contest-level edge cases
+
+| Case | Handling |
+|---|---|
+| Nobody plays | Cancel, refund everyone in full |
+| Only one player plays | Honour the prize split if minimum participants were met; otherwise cancel and refund. Decided by existing contest rules, not by anything new |
+| Fewer than minimum participants | Existing auto-cancel and refund path, unchanged |
+| Everyone ties | Existing shared-position logic splits the pot |
+| Game withdrawn by the provider mid-contest | Existing rounds honoured; no new rounds; settle on the scores achieved. If nobody played, cancel and refund |
+| Admin edits settings mid-contest | **Blocked.** Game, settings and seed lock the moment the first player joins |
+| Contest cancelled with live rounds | Void the rounds via the provider if supported, refund everyone regardless |
+
+---
+
+## 6. Money-safety invariants
+
+These must hold at all times and be asserted by automated tests, in the same spirit
+as the Stage 0 money tests.
+
+| # | Invariant |
+|---|---|
+| 1 | Prize pool == sum of entry fees collected, minus refunds |
+| 2 | Prizes paid + platform fee == prize pool, to the cent |
+| 3 | No participant is ever debited twice for one entry |
+| 4 | Settling a contest twice pays winners **once** |
+| 5 | A cancelled contest returns every entry fee, and leaves the pool at zero |
+| 6 | No money moves as a result of any provider call, ever |
+| 7 | A voided round never causes a debit or a credit |
+| 8 | Every round reaches a terminal state within grace end + 24h |
+
+Invariant 6 is the one that makes this integration fundamentally safer than a
+provider-hosted wallet, and it should be enforced by a test that fails if any
+provider code path can reach the wallet service.
+
+---
+
+## 7. Degradation matrix
+
+| Failure | Players see | Money impact |
+|---|---|---|
+| Catalogue sync fails | Nothing - cached catalogue is served | None |
+| Round creation fails | "Cannot start right now, try again" | None - no attempt consumed |
+| Launch URL fails to load | Retry, then a fresh round | None |
+| Callback delayed | "Score being confirmed" | None - grace period absorbs it |
+| Callback never arrives | Unresolved policy applies, player notified | Possible refund under `exclude` |
+| Provider down mid-contest | Contest paused, window extended | None |
+| Provider down before start | Contest cancelled | Full refunds |
+| Provider terminates the contract | Games disabled; live contests settle or refund | Full refunds where unsettled |
+
+**In no row does money move incorrectly.** That is the test of the design.
+
+---
+
+## 8. What must be built alongside the feature
+
+Easy to defer, expensive to add after the first incident.
+
+| Item | Why it cannot wait |
+|---|---|
+| Reconciliation job | Without it a single lost webhook blocks a contest indefinitely |
+| Unresolved-round alert | Silence is the failure mode. Nobody discovers it except an angry player |
+| Provider health panel in admin | Otherwise "is it us or them" takes an hour every time |
+| Manual round resolution tool | Support must be able to set a score with a reason and an audit entry |
+| Re-settlement capability | Contests will occasionally need correcting after payout — **BUILT X9 slice 5** |
+| Pause and extend on a contest | The single most useful outage response — **BUILT X9** (all three 07 s3.2 rows) |
+
+| Per-provider kill switch | Must be usable without a deployment |
+
+---
+
+## 9. Rehearsal before launch
+
+Every one of these should be executed deliberately in the sandbox, not hoped about:
+
+- [x] Withhold a callback entirely, confirm reconciliation resolves it
+- [x] Withhold it permanently, confirm the unresolved policy fires and alerts
+- [x] Send a callback with a bad signature, confirm rejection and alert
+- [x] Send the same callback twice, confirm one score
+- [x] Send two different scores for one round, confirm the discrepancy alert
+- [x] Send a result after settlement, confirm it is recorded but not applied
+- [x] Take the provider offline mid-contest, confirm pause and extend — **code-complete X9 slice 3** (owner click still owed; needs worker restart for Agenda job)
+- [ ] Cancel a contest with live rounds, confirm full refunds
+- [ ] Settle the same contest twice, confirm winners paid once
+- [ ] Run a contest end to end with real (small) entry fees before going public
+
+### Status, 4 September 2026 - and what the ticks do NOT mean
+
+**The first six are green against the mock** (X3, `__tests__/services/round-lifecycle.test.ts`,
+49 tests), which is the gate `09` E2 sets: "do not move past E2 until those tests are green."
+All six central guards were probed by reintroducing the defect, so each tick rests on a test
+proven capable of failing.
+
+**Read the ticks precisely.** They mean the behaviour is correct **against the mock adapter**.
+They do not mean it has been seen against a real provider - that is X4 - and they do not mean
+any money has moved, because nothing in the first six touches a wallet.
+
+**The last four are deliberately not attempted yet**, and each is blocked on a phase rather
+than on effort:
+
+| Rehearsal | Blocked on | Why it cannot be faked now |
+|---|---|---|
+| Provider offline, pause and extend | E7/X9 (section 3.2) | **BUILT 20 Sep 2026** (X9 slice 3). Not-yet-open / registration responses still owed |
+
+| Cancel a contest with live rounds | E4/X5 (section 5) | Needs contest cancellation to know about rounds |
+| Settle the same contest twice | E4/X5 (section 6 #4) | Needs provider settlement to exist before it can be made idempotent |
+| End to end with real entry fees | E9 pilot | Needs a real provider and real money |
+
+All four are **money tests**. Building half of one now against a stub would produce a green
+tick that proves nothing about the path real money takes - which is worse than an empty
+checkbox, because an empty checkbox is honest.

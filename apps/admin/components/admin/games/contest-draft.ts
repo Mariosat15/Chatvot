@@ -1,0 +1,333 @@
+/**
+ * The wizard's in-progress state, and the one place that turns it into a request.
+ *
+ * Kept out of the component so the shape is testable and so there is a single conversion
+ * to the API's vocabulary. A form that builds its own payload inline is where a renamed
+ * field goes unnoticed - it type-checks, posts, and the server reads `undefined`.
+ */
+
+import type { ConfigField } from "@/lib/services/games/config-schema";
+import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
+import type { PlayMode } from "@/lib/services/games/play-shape";
+import {
+  DEFAULT_GAME_TIE_RULE,
+  type GameTieRule,
+} from "@/lib/services/games/game-tie-rule";
+import { DEFAULT_START_WAIT_SECONDS } from "@/lib/services/games/start-wait";
+import { defaultContestWindow } from "@/lib/utils/default-contest-window";
+import {
+  deriveResultGraceSeconds as deriveGraceFromFloor,
+  isoToUtcDraft,
+  utcDraftToIso,
+} from "@/lib/services/games/round-fit";
+import type {
+  RoundStartPolicy,
+  UnscoredContestPolicy,
+} from "@/lib/services/games/round-types";
+
+// Reason: these moved to the shared, mirrored `round-fit.ts` so the Game Master wizard in the
+// main app states the same fit and offers the same fix. Re-exported so admin callers and the
+// tests importing them from here are unchanged.
+export {
+  describeDurationSeconds,
+  describeRoundFit,
+  endTimeThatFits,
+  isoToUtcDraft,
+} from "@/lib/services/games/round-fit";
+
+export interface ContestDraft {
+  providerKey: string;
+  gameCode: string;
+  settings: Record<string, unknown>;
+
+  name: string;
+  description: string;
+
+  /**
+   * UTC wall-clock strings as `YYYY-MM-DDTHH:mm` (no zone suffix).
+   *
+   * THEY ARE UTC, NOT THE OPERATOR'S BROWSER ZONE. The schedule UI is the trading-style
+   * 24-hour UTC picker (`UtcScheduleFields`); `utcDraftToIso` appends `:00Z` so the server
+   * stores the instant shown on screen. Reading them with `new Date(value)` without `Z`
+   * would reintroduce the local-zone shift the picker was built to kill.
+   *
+   * THERE IS ONE CONTEST CLOCK AND NO SEPARATE PLAY WINDOW. The draft used to carry
+   * `playWindowStart` and `playWindowEnd` as two more operator-set dates; see
+   * `deriveWindow` below for why they are now computed from these two instead.
+   */
+  startTime: string;
+  endTime: string;
+
+  entryFee: number;
+  minParticipants: number;
+  maxParticipants: number;
+  platformFeePercentage: number;
+  prizeDistribution: { rank: number; percentage: number }[];
+
+  /**
+   * The shape THIS contest is run as, chosen from the title's supported set (task document 11).
+   *
+   * Seeded from the title on selection and only ever offered as a choice when the title
+   * supports more than one, so an operator running a single-shape game never meets it. It is
+   * in the draft rather than derived at submit time because the forced attempts and
+   * round-start values follow from it, and the review step must show what will be stored.
+   */
+  playMode: PlayMode;
+
+  attemptsPolicy: "single" | "best_of_n" | "sum_of_n";
+  attemptsAllowed?: number;
+  unresolvedRoundPolicy: "score_zero" | "exclude" | "hold_and_alert";
+  unscoredContestPolicy: UnscoredContestPolicy;
+  /** What happens on an equal score (owner, 1 Oct 2026). Create only, like playMode. */
+  tieRule: GameTieRule;
+  roundStartPolicy: RoundStartPolicy;
+  /**
+   * Together-start contests only: how many minutes play may wait for two ready players before
+   * the contest is cancelled and every player refunded in full (owner rule, 28 Sep 2026).
+   * Minutes on screen, seconds on the wire.
+   */
+  startWaitMinutes: number;
+  resultGracePeriodSeconds: number;
+  perRoundCostAcknowledged: boolean;
+
+  /**
+   * Publish on save rather than leaving a draft.
+   *
+   * NOT SENT TO THE CREATE ROUTE. The wizard calls the publish endpoint afterwards, so the
+   * pre-flight runs a second time against the STORED record - which is the property that
+   * makes publishing safe, and a `publish: true` flag on create would quietly discard it.
+   */
+  publishOnSave: boolean;
+}
+
+export const emptyDraft: ContestDraft = {
+  providerKey: "",
+  gameCode: "",
+  settings: {},
+  name: "",
+  description: "",
+  startTime: "",
+  endTime: "",
+  entryFee: 0,
+  minParticipants: 2,
+  maxParticipants: 100,
+  platformFeePercentage: 10,
+  // A sane default that already totals 100, so an operator who never opens the prize step
+  // still produces a valid contest rather than a validation error they did not cause.
+  prizeDistribution: [
+    { rank: 1, percentage: 50 },
+    { rank: 2, percentage: 30 },
+    { rank: 3, percentage: 20 },
+  ],
+  // Overwritten by `selectTitle` before the operator can reach any control that depends on
+  // it. `anytime` rather than `scheduled` because it is the less constrained of the two, so
+  // an empty draft that somehow reached the schedule step would show every control rather
+  // than withholding controls for a shape nobody chose.
+  playMode: "anytime",
+  attemptsPolicy: "single",
+  unresolvedRoundPolicy: "score_zero",
+  // Reason: the owner reversed the 7 Sep 2026 refund default on 1 Oct 2026 - when nobody
+  // scores, the pot goes to the unclaimed pool. It now AGREES with the schema default; the
+  // operator can still pick the refund on the schedule step.
+  unscoredContestPolicy: "unclaimed_pool",
+  tieRule: DEFAULT_GAME_TIE_RULE,
+  // Reason: the owner's answer, 8 September 2026, and it AGREES with the schema default -
+  // unlike the line above, these two are deliberately the same. Every player gets the same
+  // playing time or does not start at all, which is only fair once the playing time is the
+  // operator's own choice rather than a catalogue ceiling nobody set. The wizard used to
+  // default to `until_window_closes`, which was the right answer while the gate reserved a
+  // ceiling that could be five times the configured length; that arithmetic is fixed, so the
+  // reservation now costs a player only the time they were actually going to be given.
+  roundStartPolicy: "until_window_closes",
+  startWaitMinutes: DEFAULT_START_WAIT_SECONDS / 60,
+  // A floor, not the value sent. `deriveResultGraceSeconds` raises it to cover the playing
+  // time the operator chooses; this covers a ten-minute session, which is the default.
+  resultGracePeriodSeconds: 900,
+  perRoundCostAcknowledged: false,
+  // Default on, per the owner: the common case is a contest meant to go live, and leaving it
+  // in draft means an operator who does not notice has a contest nobody can see or enter.
+  publishOnSave: true,
+};
+
+/**
+ * How long the contest keeps accepting a late result, derived rather than asked for.
+ *
+ * NOBODY HAS A BASIS FOR CHOOSING THIS, which is why no screen offers it and why the draft's
+ * value is a floor rather than an answer. It has to cover the longest attempt the contest can
+ * produce plus a margin, or a round started at the last moment is cut off before its result
+ * can arrive - and `contest-preflight.ts` refuses a contest whose grace is short. Since the
+ * playing time is now an operator choice that can run to an hour, a fixed 900 seconds would
+ * have refused every contest with a playing time above ten minutes, naming a field the
+ * operator cannot see.
+ *
+ * IT ONLY EVER RAISES. A stored contest whose operator deliberately allowed longer keeps it;
+ * lowering a grace period retroactively is how a result that was going to be counted stops
+ * being counted.
+ */
+export function deriveResultGraceSeconds(
+  draft: ContestDraft,
+  attemptSeconds: number | undefined,
+): number {
+  return deriveGraceFromFloor(draft.resultGracePeriodSeconds, attemptSeconds);
+}
+
+/**
+ * The facts about the chosen title that the request body cannot be built without.
+ *
+ * Passed in rather than read from the draft because they belong to the CATALOGUE, not to the
+ * operator's answers - the same reason `maxDurationSeconds` never became a draft field.
+ */
+export interface DraftTitleFacts {
+  schemaFields?: ConfigField[];
+  maxDurationSeconds?: number;
+}
+
+export function toRequestBody(
+  draft: ContestDraft,
+  title: DraftTitleFacts = {},
+): Record<string, unknown> {
+  return {
+    name: draft.name,
+    description: draft.description,
+    providerKey: draft.providerKey,
+    gameCode: draft.gameCode,
+    settings: draft.settings,
+    entryFee: draft.entryFee,
+    minParticipants: draft.minParticipants,
+    maxParticipants: draft.maxParticipants,
+    platformFeePercentage: draft.platformFeePercentage,
+    prizeDistribution: draft.prizeDistribution,
+    // UTC draft → absolute ISO. The schedule UI shows UTC; pinning `Z` here is what keeps
+    // the stored instant identical to the numbers on screen.
+    ...deriveWindow(draft),
+    // The operator's chosen shape (task document 11), and CREATE ONLY - `toEditRequestBody`
+    // deliberately omits it. The create service validates it against the title's supported
+    // set and refuses an unsupported one with the allowed modes named, so sending it is not
+    // the same as being trusted with it.
+    playMode: draft.playMode,
+    attemptsPolicy: draft.attemptsPolicy,
+    attemptsAllowed:
+      draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
+    unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
+    unscoredContestPolicy: draft.unscoredContestPolicy,
+    tieRule: draft.tieRule,
+    roundStartPolicy: draft.roundStartPolicy,
+    // How long a together-start contest waits for two ready players before it is cancelled
+    // and refunded in full. Scheduled contests only, and create only: an edit must not move
+    // the deadline players entered under.
+    ...(draft.playMode === "scheduled"
+      ? { startWaitSeconds: Math.round(draft.startWaitMinutes * 60) }
+      : {}),
+    resultGracePeriodSeconds: deriveResultGraceSeconds(
+      draft,
+      resolveAttemptSeconds(
+        title.schemaFields ?? [],
+        draft.settings,
+        title.maxDurationSeconds,
+      ),
+    ),
+    perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
+  };
+}
+
+/**
+ * The contest clock, and the play window derived from it.
+ *
+ * ONE CLOCK, FOUR FIELDS ON THE WIRE. The server still stores `playWindowStart` and
+ * `playWindowEnd`, and the round services still read them - `createRound` clamps a round's
+ * `expiresAt` to the window end, and the launch service refuses before the window start. That
+ * clamp is exactly the universal cut-off the owner asked for, so the fields earn their keep;
+ * what had to go was the operator's ability to set them to something OTHER than the contest.
+ *
+ * Two dates that must agree is the "one rule, two copies" shape that has produced five defects
+ * in this codebase already, so this is the only function that produces the pair. It is not
+ * enough that the wizard stops asking: `toEditRequestBody` sends them too, and an edit that
+ * moved `endTime` while leaving `playWindowEnd` behind would shorten play without touching any
+ * field named "play".
+ */
+function deriveWindow(draft: ContestDraft): Record<string, string> {
+  return {
+    startTime: utcDraftToIso(draft.startTime),
+    endTime: utcDraftToIso(draft.endTime),
+    playWindowStart: utcDraftToIso(draft.startTime),
+    playWindowEnd: utcDraftToIso(draft.endTime),
+  };
+}
+
+/**
+ * The edit payload, which is deliberately NOT `toRequestBody` minus a few keys.
+ *
+ * Once anyone has entered the contest, only the fields on `EDITABLE_ONCE_ENTERED` may be
+ * sent at all - the server refuses the whole request if a frozen field arrives, naming it.
+ * So this omits them rather than sending them unchanged: submitting `entryFee` with its
+ * existing value looks harmless and would be refused, and the operator would be told they
+ * had tried to change a fee they had not touched.
+ *
+ * `providerKey`, `gameCode` and the content seed are absent at every state, because game
+ * identity is never editable. That is not an omission to fix later - editing it is creating
+ * a different contest, which is what the wizard is for.
+ *
+ * `playMode` IS ABSENT FOR THE SAME REASON, and it is the one most likely to be "fixed" in
+ * (task document 11). It decides when entry closes and how many attempts a paying entrant
+ * gets, so changing it on a live contest changes the rules under people who have bought in.
+ * A contest that should be the other shape is a new contest.
+ */
+export function toEditRequestBody(
+  draft: ContestDraft,
+  options: { entered: boolean } & DraftTitleFacts,
+): Record<string, unknown> {
+  const always: Record<string, unknown> = {
+    name: draft.name,
+    description: draft.description,
+    maxParticipants: draft.maxParticipants,
+  };
+
+  if (options.entered) return always;
+
+  return {
+    ...always,
+    settings: draft.settings,
+    entryFee: draft.entryFee,
+    minParticipants: draft.minParticipants,
+    platformFeePercentage: draft.platformFeePercentage,
+    prizeDistribution: draft.prizeDistribution,
+    ...deriveWindow(draft),
+    attemptsPolicy: draft.attemptsPolicy,
+    attemptsAllowed:
+      draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
+    unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
+    unscoredContestPolicy: draft.unscoredContestPolicy,
+    roundStartPolicy: draft.roundStartPolicy,
+    resultGracePeriodSeconds: deriveResultGraceSeconds(
+      draft,
+      resolveAttemptSeconds(
+        options.schemaFields ?? [],
+        draft.settings,
+        options.maxDurationSeconds,
+      ),
+    ),
+    perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
+  };
+}
+
+/** @deprecated Use `isoToUtcDraft`. Kept so any leftover import fails loudly at typecheck once removed. */
+export const isoToLocal = isoToUtcDraft;
+
+/**
+ * A ready-to-edit window: start about one hour from now (UTC), lasting one hour.
+ *
+ * Empty date fields are how an operator lands on Launch with nothing set and then fights
+ * AM/PM. Seeding a valid upcoming window means the common case is "tweak and go", and the
+ * duration chips on the schedule step can still shorten or lengthen it in one click.
+ */
+export function defaultUpcomingUtcWindow(now: Date = new Date()): {
+  startTime: string;
+  endTime: string;
+} {
+  // One rule for every wizard's opening schedule, so the four cannot drift apart.
+  const w = defaultContestWindow(60, now);
+  return {
+    startTime: `${w.startDate}T${w.startTime}`,
+    endTime: `${w.endDate}T${w.endTime}`,
+  };
+}

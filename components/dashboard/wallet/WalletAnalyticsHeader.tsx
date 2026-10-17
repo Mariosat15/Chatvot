@@ -1,0 +1,54 @@
+"use client";
+
+import Image from "next/image";
+import { AnalyticsPageHeadline } from "@/components/dashboard/AnalyticsPageHeadline";
+import { WALLET_ART } from "@/lib/services/games/wallet-assets";
+import WalletNeonIcon from "./WalletNeonIcon";
+import { WALLET_CYAN } from "./wallet-tokens";
+
+/**
+ * Compact page header — neon credits tile + glass plate over the page backdrop.
+ */
+export default function WalletAnalyticsHeader({
+  rangeLabel,
+}: {
+  rangeLabel: string;
+}) {
+  return (
+    <header className="relative overflow-hidden rounded-[16px] border border-cyan-400/30 bg-[linear-gradient(135deg,rgba(9,22,45,0.65)_0%,rgba(3,10,25,0.72)_100%)] shadow-[0_0_28px_rgba(0,229,255,0.12)] backdrop-blur-md">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-50"
+        aria-hidden
+        style={{
+          backgroundImage: [
+            `radial-gradient(ellipse 80% 120% at 88% 20%, ${WALLET_CYAN}33 0%, transparent 55%)`,
+            `linear-gradient(115deg, transparent 40%, rgba(0,229,255,0.1) 50%, transparent 60%)`,
+          ].join(", "),
+        }}
+      />
+      <div className="relative flex min-h-[88px] flex-wrap items-center justify-between gap-4 px-4 py-4 sm:min-h-[100px] sm:px-6 sm:py-5">
+        <AnalyticsPageHeadline
+          lead="Wallet"
+          accentWord="Analytics"
+          accent="cyan"
+          subtitle="Track your volts, spending, earnings and overall wallet activity."
+          icon={
+            <WalletNeonIcon
+              src={WALLET_ART.header}
+              size={56}
+              ringClass="ring-cyan-400/55"
+              bgClass="bg-transparent"
+              className="shadow-[0_0_22px_rgba(0,229,255,0.4)]"
+            />
+          }
+        />
+        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-black/45 px-3.5 py-2 text-xs font-medium text-cyan-100 shadow-[0_0_14px_rgba(0,229,255,0.25)]">
+          <span className="relative h-4 w-4 shrink-0">
+            <Image src={WALLET_ART.range} alt="" fill sizes="16px" className="object-contain" />
+          </span>
+          <span className="tabular-nums">{rangeLabel}</span>
+        </div>
+      </div>
+    </header>
+  );
+}

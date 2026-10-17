@@ -1,0 +1,649 @@
+ChartVolt Volt Velocity — Responsive Gameplay HUD & UI Cursor Guide
+
+BUILT (14 Oct 2026, partial — owner follow-ups on cockpit landscape):
+- Default camera is **inside cockpit** (`interior`); player choice persists in `localStorage` (`cv-camera-view`).
+- In-game **camera cycle** button restored on touch (with pause + settings); mute/fullscreen stay in the menu.
+- Long item labels (`OVERDRIVE`, `COUNTERMEASURE`) fit the bay via `itemBayLabel` + ellipsis CSS.
+- **Landscape only**: cockpit shell scaled to ~66% height, compact top telemetry; portrait and desktop unchanged.
+Never verified by eye on a real phone.
+
+Objective
+Rebuild the Volt Velocity presentation layer so it works correctly on desktop, tablet, mobile portrait, and mobile landscape.
+Do not rebuild the gameplay mechanics. Keep the existing Three.js game, ship logic, track logic, multiplayer, power-ups, health, shield, lap, position, speed, competition data, and backend state.
+The current problem is structural: the HUD behaves like a desktop interface that has been resized. The target is a true responsive racing-game HUD where the road and ship remain the visual focus.
+1. Core Rule
+Do not scale the current layout.
+Create four presentation modes:
+1. Desktop
+2. Tablet
+3. Mobile Portrait
+4. Mobile Landscape
+Share the same game state and mechanics, but change:
+- HUD composition
+- controls
+- camera framing
+- utility menu
+- spacing
+- typography
+- safe-area behavior
+2. Main Current Problems
+The current build has:
+- too much HUD in the upper-left
+- too many stacked cards in the upper-right
+- oversized desktop touch controls
+- too much vertical space used by the bottom control area
+- a large minimap/circuit block
+- server connection UI taking central space
+- scattered audio/pause/settings/fullscreen controls
+- portrait and landscape layouts that are too similar
+- control panels that compete with the road
+- poor use of mobile screen width and height
+The center of the screen must remain gameplay-first.
+3. Recommended Architecture
+<GameViewport>
+  <GameCanvas />
+
+  <ResponsiveHUD
+    deviceMode={deviceMode}
+    orientation={orientation}
+  />
+
+  <ResponsiveControls
+    deviceMode={deviceMode}
+    orientation={orientation}
+  />
+
+  <GameUtilityMenu />
+</GameViewport>
+Use:
+type DeviceMode =
+  | "desktop"
+  | "tablet"
+  | "mobile-portrait"
+  | "mobile-landscape";
+Do not position every component with unrelated top, left, right, and bottom values.
+Create reusable HUD zones.
+4. Game Viewport
+.gameViewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #020817;
+}
+
+.gameViewport canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.gameViewport.isFullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100dvw;
+  height: 100dvh;
+  z-index: 9999;
+}
+Use 100dvh, not only 100vh.
+Listen to:
+- viewport resize
+- window.visualViewport
+- orientation changes
+- fullscreen changes
+5. HUD Zones
+Build:
+<GameHUD>
+  <HudTopLeft />
+  <HudTopCenter />
+  <HudTopRight />
+  <HudBottomLeft />
+  <HudBottomCenter />
+  <HudBottomRight />
+</GameHUD>
+The center 50–60% of the gameplay area should remain free from permanent HUD panels.
+DESKTOP
+6. Desktop Target
+Desktop should look like a modern racing game, not a web dashboard.
+┌────────────────────────────────────────────────────────┐
+│ LAP / TIME                              POSITION       │
+│ HULL / SHIELD                           SPEED          │
+│                                                        │
+│                    GAME WORLD                          │
+│                                                        │
+│                       SHIP                             │
+│                                                        │
+│ ITEM                                            BOOST │
+│                                                        │
+│ A/D STEER · W ACCEL · S BRAKE · SPACE BOOST · E USE  │
+└────────────────────────────────────────────────────────┘
+Desktop rules
+- no giant mobile touch buttons by default
+- road remains dominant
+- compact race information
+- compact utility toolbar
+- optional keyboard/gamepad hint strip
+- minimap collapsible
+- detailed ship stats hidden during race
+7. Desktop Top-Left HUD
+Combine race data into one compact panel.
+LAP
+01 / 03
+
+TIME
+00:28.783
+
+BEST
+00:27.112
+
+HULL   ██████████ 100
+SHIELD ███████░░░ 72
+Recommended width:
+- 190–220px
+Do not split this into multiple oversized cards.
+8. Desktop Top-Right HUD
+Combine:
+POSITION
+01 / 12
+
+SPEED
+248 KM/H
+Recommended width:
+- 170–210px
+The minimap should not permanently occupy another large vertical card.
+9. Desktop Controls
+For keyboard/gamepad users, replace large touch controls with a compact command strip:
+A / D  Steer
+W      Accelerate
+S      Brake
+Space  Boost
+E      Use Item
+Recommended height:
+- 40–48px
+Fade it after a few seconds if desired.
+Only show full touch controls if touch input is detected.
+10. Desktop Utility Menu
+Use one compact group:
+[Audio] [Pause] [Settings] [Fullscreen]
+Recommended button size:
+- 40–44px
+Keep them in one place.
+Do not scatter them around gameplay.
+MOBILE PORTRAIT
+11. Portrait Target
+┌─────────────────────────────┐
+│ HULL          POSITION      │
+│ SHIELD        SPEED         │
+│                             │
+│         GAME WORLD          │
+│                             │
+│            SHIP             │
+│                             │
+│ ITEM               BOOST    │
+│                             │
+│ STEER      BRAKE    ACCEL   │
+└─────────────────────────────┘
+Portrait rules
+- no desktop card layout
+- no permanent large minimap
+- no website header during race
+- no oversized lap/time block
+- no horizontal overflow
+- controls must be thumb reachable
+- ship and road must remain visible
+12. Portrait Control Zones
+Bottom-left:
+- Item / Use
+- Steering
+Bottom-right:
+- Boost
+- Brake
+- Accelerate
+Example:
+[ ITEM ]                         [ BOOST ]
+
+[       STEER        ] [BRAKE] [ACCEL]
+MOBILE LANDSCAPE
+13. Landscape Target
+┌───────────────────────────────────────────────┐
+│ HULL / SHIELD                   POS / SPEED   │
+│                                               │
+│                 GAME WORLD                    │
+│                                               │
+│                    SHIP                       │
+│                                               │
+│ ITEM                                   BOOST │
+│ STEER                          BRAKE   ACCEL  │
+└───────────────────────────────────────────────┘
+The controls stay in the bottom corners.
+Do not push controls into the track center.
+14. Steering
+Use either:
+- circular thumb joystick, or
+- wide horizontal steering pad
+Example:
+STEER
+‹      ◉      ›
+Requirements:
+- continuous hold
+- finger sliding
+- pressed glow
+- strong touch area
+- responsive visual feedback
+Recommended size:
+- portrait: 130–160px wide
+- landscape: 145–190px wide
+15. Accelerate
+Use ChartVolt teal/green.
+Pressed state:
+- brighter border
+- stronger inner glow
+- slight depression
+- optional haptic feedback
+Recommended:
+- portrait width: 68–88px
+- landscape width: 72–96px
+16. Brake
+Use coral/red styling.
+Brake should be roughly the same height as Accelerate.
+Do not make it tiny.
+17. Boost
+Do not show only a static text label.
+Use:
+BOOST
+████████ 100%
+or a circular progress ring.
+States:
+- ready
+- charging
+- empty
+- active
+Use cyan/purple ChartVolt glow.
+18. Item / Power-Up
+Remove the large EMPTY SLOT panel.
+Use a compact component:
+◇ EMPTY
+When acquired:
+⚡ EMP
+READY
+Place it near the Use control.
+Do not cover the center of the track.
+RACE INFORMATION
+19. Position
+Use:
+POSITION
+01 / 12
+Do not show a large standings panel permanently.
+Detailed standings can open separately.
+20. Speed
+Use:
+SPEED
+248 KM/H
+Keep Speed near Position.
+Do not place the speed card in the lower-center gameplay area.
+21. Hull + Shield
+Use compact bars:
+HULL
+██████████ 100
+
+SHIELD
+███████░░░ 72
+Avoid oversized cards with unused space.
+22. Lap + Timer
+Desktop/tablet:
+LAP 01 / 03
+TIME 00:28.783
+BEST 00:27.112
+Mobile:
+reduce to only the data needed during active driving.
+23. Connection Status
+Replace the large SERVER CONNECTED element with:
+● LIVE
+or:
+● CONNECTED
+Fade it after a few seconds.
+Show it prominently again only when connection state changes.
+24. Minimap / Circuit
+The current map card is too large.
+Use a small:
+[ MAP ]
+control.
+When pressed, open a compact floating minimap.
+Alternative:
+- 80–100px semitransparent minimap
+- collapsible
+- top corner only
+CAMERA
+25. Responsive Camera
+Do not only resize the renderer.
+Adapt the camera.
+Suggested starting point:
+if (isMobilePortrait) {
+  camera.fov = 70;
+  cameraOffset.set(0, 4.8, -11);
+}
+
+if (isMobileLandscape) {
+  camera.fov = 62;
+  cameraOffset.set(0, 3.7, -9);
+}
+
+if (isDesktop) {
+  camera.fov = 58;
+  cameraOffset.set(0, 3.5, -8.5);
+}
+Tune these values against the actual game coordinates.
+Desktop
+- cinematic chase view
+- enough track ahead
+Portrait
+- farther behind
+- slightly higher
+- wider FOV
+- ship around lower 30–35% of screen
+Landscape
+- slightly lower
+- closer than portrait
+- horizon around upper third
+26. Orientation Change
+Do not reload the race.
+On orientation change:
+1. detect new orientation
+2. resize renderer
+3. update camera aspect
+4. update FOV
+5. change HUD mode
+6. reposition controls
+7. preserve race state
+const portrait =
+  window.matchMedia("(orientation: portrait)").matches;
+PRE-RACE / SHIP SELECTION
+27. Keep Pre-Race Separate from Racing HUD
+The current pre-race screen contains useful information, but it must remain a separate game state.
+During the race, hide:
+- large Vanguard stat panel
+- ship description
+- acceleration details
+- handling details
+- ship strengths/weaknesses
+- multi-ship selection
+28. Desktop Ship Selection
+Recommended:
+Main area
+Large selected ship preview.
+Info panel
+VANGUARD
+Balanced Racer
+
+Speed        403
+Acceleration 320
+Handling     25/32
+Hull         100
+
++ Balanced acceleration
++ Strong durability
+Bottom selector
+Vanguard | Spectre | Pulse | Raptor
+Bastion  | Wraith  | Comet | Tempest
+Selected ship:
+- cyan glow
+- stronger border
+- slightly elevated
+CTA:
+READY TO RACE
+29. Mobile Ship Selection
+Do not show all 8 ships at once.
+Use carousel:
+‹ VANGUARD ›
+
+[ large ship preview ]
+
+Speed
+Acceleration
+Handling
+Hull
+
+● ○ ○ ○ ○ ○ ○ ○
+
+[ SELECT SHIP ]
+
+[ READY TO RACE ]
+Support swipe.
+MENU SYSTEM
+30. Desktop Menu
+[ 🔊 ] [ ⏸ ] [ ⚙ ] [ ⛶ ]
+31. Mobile Menu
+Use one button:
+☰
+Pressing opens:
+VOLT VELOCITY
+
+Resume Race
+Audio
+Controls
+Graphics
+Camera
+Restart Race
+Leave Race
+Do not permanently show several large utility buttons on mobile.
+32. Pause Menu
+When paused:
+- dark translucent overlay
+- subtle blur
+- centered card
+- gameplay remains behind it
+VOLT VELOCITY
+
+Resume Race
+Controls
+Audio
+Graphics
+Camera
+Restart Race
+Leave Race
+Leave Race uses danger styling.
+RESPONSIVE SYSTEM
+33. Breakpoints
+Recommended:
+- Desktop: >= 1024px
+- Tablet: 768–1023px
+- Mobile: < 768px
+Also check orientation.
+Do not rely on width alone.
+34. Touch Detection
+const showTouchControls =
+  isMobile ||
+  isTablet ||
+  navigator.maxTouchPoints > 0;
+Keyboard/gamepad desktop:
+- hide touch controls
+Touch tablet/mobile:
+- show touch controls
+35. Safe Areas
+Support:
+- iPhone notch
+- Dynamic Island
+- Android display cutouts
+- browser bottom bars
+padding-top:
+  max(8px, env(safe-area-inset-top));
+
+padding-left:
+  max(8px, env(safe-area-inset-left));
+
+padding-right:
+  max(8px, env(safe-area-inset-right));
+
+padding-bottom:
+  max(8px, env(safe-area-inset-bottom));
+Canvas stays edge-to-edge.
+HUD respects safe areas.
+36. Fullscreen
+On race start, attempt fullscreen when supported:
+document.documentElement.requestFullscreen?.();
+Do not depend on fullscreen permission.
+The layout must still work correctly in mobile Safari without fullscreen.
+VISUAL STYLE
+37. ChartVolt HUD Styling
+Use dark glass with restrained neon.
+background:
+  linear-gradient(
+    180deg,
+    rgba(4, 22, 39, .90),
+    rgba(3, 14, 28, .76)
+  );
+
+backdrop-filter: blur(12px);
+
+border:
+  1px solid rgba(31, 214, 255, .45);
+Avoid excessive nested borders.
+Avoid card-inside-card-inside-card design.
+Use separators where possible.
+38. Typography
+Minimum recommended values:
+- micro label: 10–11px
+- secondary HUD: 12–13px
+- HUD value: 20–32px
+- control label: 13–16px
+- Position: 30–40px
+- Speed: 25–34px
+Never shrink text just to force it into a card.
+39. Animation
+Use restrained feedback:
+- Boost ready → subtle pulse
+- Damage → short red flash
+- Position change → number transition
+- Item acquired → icon pop
+- Checkpoint → short cyan success burst
+- Speed → smooth interpolation
+Do not animate every border continuously.
+PERFORMANCE
+40. Mobile Graphics Scaling
+Reduce rendering cost dynamically.
+High-end:
+- DPR max 2
+Mid-range:
+- DPR ~1.5
+Low-end:
+- DPR 1.0–1.25
+Also scale:
+- shadows
+- particles
+- reflections
+- bloom
+- post-processing
+Do not render desktop-quality pixel density on every phone.
+41. React HUD Performance
+Do not rerender the entire HUD every frame.
+Fast-changing:
+- speed
+- hull
+- shield
+- boost
+Slow-changing:
+- lap
+- position
+- checkpoint
+- item
+Static:
+- logo
+- controls layout
+- menus
+Use memoized components/selectors and event-based updates.
+TESTING
+42. Desktop
+Test:
+- 1366×768
+- 1440×900
+- 1920×1080
+- 2560×1440
+43. Tablet
+Test:
+- 768×1024
+- 820×1180
+- 1024×1366
+44. Mobile Portrait
+Test:
+- 360×800
+- 375×812
+- 390×844
+- 393×852
+- 430×932
+45. Mobile Landscape
+Test:
+- 800×360
+- 812×375
+- 844×390
+- 852×393
+- 932×430
+46. Acceptance Checklist
+Do not mark complete until all are true:
+- canvas fills available gameplay viewport
+- road remains visible
+- ship remains visible
+- no horizontal scrolling
+- no vertical scrolling during race
+- HUD does not block upcoming track
+- Position is readable
+- Speed is readable
+- Hull is readable
+- Shield is readable
+- Boost is readable
+- Item state is readable
+- Steering is reachable
+- Brake is reachable
+- Accelerate is reachable
+- utility menu is reachable
+- portrait works
+- landscape works
+- desktop works
+- tablet works
+- orientation changes without reload
+- touch controls work
+- keyboard controls work
+- gamepad controls work
+- safe areas work
+- browser viewport resize works
+- fullscreen works
+- pause menu works
+- no clipped HUD
+- no overlapping HUD
+- no oversized unnecessary panels
+- pre-race UI and racing HUD are separate
+- ChartVolt theme remains consistent
+47. Final Cursor Instruction
+The current Volt Velocity implementation is not to be fixed by simply moving existing boxes.
+Rebuild the presentation layer as a proper responsive HUD system.
+Use:
+- dedicated Desktop HUD
+- dedicated Tablet HUD
+- dedicated Mobile Portrait HUD
+- dedicated Mobile Landscape HUD
+Share:
+- game mechanics
+- game state
+- backend state
+Change:
+- HUD composition
+- camera framing
+- control layout
+- utility menu
+- responsive spacing
+The final result must:
+- keep the road dominant
+- keep the ship visible
+- keep HUD at the screen edges
+- reduce top-left and top-right clutter
+- remove giant desktop touch controls
+- use thumb-friendly mobile controls
+- simplify menu handling
+- use a single mobile menu
+- support safe areas
+- adapt camera to aspect ratio
+- avoid clipping and overlap
+- preserve the Volt Velocity / ChartVolt neon visual language
+Do not scale the current layout. Recompose it per device and orientation.

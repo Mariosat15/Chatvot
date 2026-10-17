@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ChartVolt — Preliminary Legal Opinion</title>
+<style>
+  :root {
+    --navy: #0f2a43; --navy-2: #16395c; --gold: #b8912f; --gold-light: #d9b96a;
+    --ink: #1c2733; --muted: #5a6a7a; --parchment: #f7f4ec;
+    --green: #1d6b46; --green-bg: #eef7f1; --amber: #9a6b08; --amber-bg: #fdf6e6;
+    --red: #8c2f39; --red-bg: #faeef0; --blue-bg: #eef3f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, "Times New Roman", serif; color: var(--ink); font-size: 10.8pt; line-height: 1.58; background: #fff; }
+  @page { size: A4; margin: 18mm 18mm 18mm 18mm; }
+  @page :first { margin: 0; }
+  .wrap { max-width: 178mm; margin: 0 auto; padding: 10mm 0 14mm; }
+  .cover { background: linear-gradient(160deg, #0b2033 0%, #0f2a43 55%, #16395c 100%); color: #eef2f6; min-height: 297mm; padding: 34mm 24mm 24mm; page-break-after: always; display: flex; flex-direction: column; }
+  .cover .firm { font-family: "Segoe UI", Arial, sans-serif; letter-spacing: .32em; text-transform: uppercase; font-size: 9pt; color: var(--gold-light); }
+  .cover .rule { height: 2px; background: linear-gradient(90deg, var(--gold), rgba(184,145,47,0)); margin: 10mm 0 8mm; }
+  .cover h1 { font-size: 30pt; font-weight: normal; line-height: 1.2; color: #fff; }
+  .cover h2 { font-size: 13pt; font-weight: normal; font-style: italic; color: #c8d4df; margin-top: 5mm; }
+  .cover .meta { margin-top: auto; font-family: "Segoe UI", Arial, sans-serif; font-size: 9.5pt; color: #c8d4df; line-height: 1.8; }
+  .cover .meta b { color: var(--gold-light); font-weight: 600; }
+  .cover .notice { margin-top: 10mm; border-left: 3px solid var(--gold); padding: 4mm 5mm; background: rgba(255,255,255,.05); font-size: 9.5pt; color: #dfe6ec; }
+  h2.sec { font-size: 15pt; font-weight: normal; color: var(--navy); border-bottom: 1.5px solid var(--gold); padding-bottom: 2mm; margin: 9mm 0 4mm; page-break-after: avoid; }
+  h3 { font-size: 11.5pt; color: var(--navy-2); margin: 5mm 0 2mm; page-break-after: avoid; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin: 0 0 3mm 6mm; }
+  li { margin-bottom: 1.2mm; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 5mm; font-size: 9.6pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th { background: var(--navy); color: #fff; text-align: left; font-family: "Segoe UI", Arial, sans-serif; font-weight: 600; font-size: 8.8pt; padding: 2mm 2.5mm; }
+  td { border-bottom: 1px solid #dde3e9; padding: 2mm 2.5mm; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafbfc; }
+  .pill { display: inline-block; font-family: "Segoe UI", Arial, sans-serif; font-size: 8pt; font-weight: 700; padding: .4mm 2.2mm; border-radius: 3mm; white-space: nowrap; }
+  .low { background: var(--green-bg); color: var(--green); } .med { background: var(--amber-bg); color: var(--amber); } .high { background: var(--red-bg); color: var(--red); }
+  .built { color: var(--green); font-weight: 700; font-family: "Segoe UI", Arial, sans-serif; font-size: 8.8pt; }
+  .box { padding: 4mm 5mm; margin: 3mm 0 5mm; border-left: 3px solid; page-break-inside: avoid; }
+  .box.key { background: var(--blue-bg); border-color: var(--navy-2); }
+  .box.warn { background: var(--amber-bg); border-color: var(--amber); }
+  .box.risk { background: var(--red-bg); border-color: var(--red); }
+  .box.ok { background: var(--green-bg); border-color: var(--green); }
+  .box b.lbl { font-family: "Segoe UI", Arial, sans-serif; font-size: 8.5pt; letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 1mm; }
+  .opinion { background: var(--parchment); border: 1px solid #e3dccb; padding: 6mm 7mm; margin: 3mm 0 5mm; }
+  .opinion h3 { margin-top: 3mm; }
+  .small { font-size: 9pt; color: var(--muted); }
+  .refs li { font-size: 9.6pt; }
+  .final { background: var(--navy); color: #eef2f6; padding: 6mm 7mm; margin-top: 6mm; page-break-inside: avoid; }
+  .final b { color: var(--gold-light); }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="firm">ChartVolt · Confidential</div>
+  <div class="rule"></div>
+  <h1>Preliminary<br/>Legal Opinion</h1>
+  <h2>Regulatory classification of paid-entry game competitions, 1v1 challenges, simulated-trading competitions, pooled prizes and cash-redeemable Volts</h2>
+  <div class="notice">
+    This is a preliminary analysis based on published legislation and regulatory guidance. It is <b>not</b> a formal opinion from a Cyprus-qualified lawyer and must be reviewed and adopted by Cyprus counsel before it is relied on or shown to a regulator. Every factual statement about the platform was checked against the ChartVolt source code on 13 October 2026.
+  </div>
+  <div class="meta">
+    <b>Date</b> 13 October 2026<br/>
+    <b>Scope</b> Cyprus · European Union · International markets
+  </div>
+</section>
+
+<div class="wrap">
+
+<h2 class="sec">1. Executive conclusion — the honest answer first</h2>
+<div class="box risk"><b class="lbl">The truthful position</b>
+No lawyer can truthfully promise that ChartVolt needs “no licence of any kind” in Cyprus and across the EU. Gambling is not harmonised at EU level, each Member State applies its own test, and two features of the current platform give a regulator a real foothold. What can be built is a strong, documented position for each service separately — and the platform already does more of that than most operators at this stage.
+</div>
+<table>
+  <tr><th>Area</th><th>Current position</th><th>Risk</th></tr>
+  <tr><td>Simulated trading / MiFID II</td><td>Strongest. No real instruments; prizes come from the entry-fee pool, not from simulated P&amp;L</td><td><span class="pill low">Lower</span></td></tr>
+  <tr><td>Cyprus “betting” definition</td><td>No odds, no bookmaker, no wager on external events, no house exposure</td><td><span class="pill med">Medium</span></td></tr>
+  <tr><td>Circuit Sprint, Volt Stack</td><td>Identical seeded content for every competitor, no paid hints or retries, ranked by score</td><td><span class="pill low">Medium-low</span></td></tr>
+  <tr><td>Volt Velocity (live combat race)</td><td>Weapons that affect other racers, seeded start-grid shuffle, real-time network conditions</td><td><span class="pill high">High</span></td></tr>
+  <tr><td>Electronic money</td><td>Volts are accepted only by ChartVolt for its own services</td><td><span class="pill med">Medium</span></td></tr>
+  <tr><td>Payment services / stored value</td><td>Purchased Volts can be withdrawn unused; Game Masters receive Volts</td><td><span class="pill high">Medium-high</span></td></tr>
+  <tr><td>Cross-border EU</td><td>Each country decides separately</td><td><span class="pill high">High</span></td></tr>
+</table>
+<p class="small">Qualitative estimates, not probabilities or regulatory determinations.</p>
+<div class="box key"><b class="lbl">Principal conclusion</b>
+A no-licence position is defensible for simulated trading and for the deterministic skill games, and arguable for Volts. It is <b>not</b> defensible today, with confidence, for paid Volt Velocity races or for the unrestricted withdrawal of purchased Volts. Both are fixable by product changes, listed in section 9.
+</div>
+
+<h2 class="sec">2. The ChartVolt operating model (verified against the code)</h2>
+<p><b>Competitions.</b> Users buy Volts and spend them to enter paid competitions (two or more players) or 1v1 challenges (exactly two players). A platform fee is deducted and the remainder funds the prize pool. ChartVolt adds nothing to the pool, takes no side of any result, sets no odds, and earns the same fee whoever wins.</p>
+<p><b>No single-player paid format.</b> Every paid format has at least two players. A competition below its minimum is cancelled with full refunds. The only one-player mode is free practice — no prize, no ranking.</p>
+<p><b>Ranking.</b> Winners are ranked by each title’s published score and score direction (higher score wins, or fastest time wins), fixed per title in the catalogue — not chosen by the game provider per result.</p>
+<p><b>Game providers never touch money.</b> A game service reports a score only. Fees, winners, payouts and refunds are decided by ChartVolt’s settlement engine.</p>
+<p><b>Players with no result.</b> The operator chooses in advance, per contest, whether a player who recorded no score is refunded or excluded. Cancelled and failed competitions are refunded in full.</p>
+<p><b>Marketplace rule.</b> Nothing sold may improve a score or ranking in a paid contest — no paid hints, retries, extra time, skips or easier content. No random or mystery packs, even cosmetic ones.</p>
+<p><b>Simulated trading.</b> Fictional capital; no real instruments bought, no orders routed to a market, simulated profit never paid out. The prize is the competition pool, allocated by rank.</p>
+
+<h3>The current game catalogue</h3>
+<table>
+  <tr><th>Title</th><th>What the player does</th><th>How content is chosen</th><th>Status</th></tr>
+  <tr><td>Circuit Sprint</td><td>Solve as many connection puzzles as possible in a fixed time</td><td>Same seeded puzzle sequence for every competitor in the contest</td><td>Active</td></tr>
+  <tr><td>Circuit Perfect</td><td>Solve a fixed set of puzzles as fast as possible</td><td>Same</td><td>Retired</td></tr>
+  <tr><td>Volt Stack</td><td>Falling-block puzzle (Tetris-style)</td><td>Same seeded piece sequence for every competitor; “hold” only reorders two known pieces</td><td>Active</td></tr>
+  <tr><td>Volt Velocity</td><td>Scheduled live race; fastest time wins</td><td>Same track, pickup layout and hazards for every racer — but see 3.3</td><td>Active</td></tr>
+  <tr><td>Simulated trading</td><td>Trade on live prices with fictional capital</td><td>Same price feed and starting capital for every trader</td><td>Active</td></tr>
+</table>
+<p><b>Volts.</b> Bought from ChartVolt; usable only for ChartVolt services; no user-to-user transfer feature. Both purchased and won Volts can be withdrawn for EUR/USD at 100 Volts = EUR 1, subject to configurable controls (identity verification, minimum-deposit rule, post-deposit hold, refund to the original payment method). Game Masters are credited with a share of referred players’ entry fees, in Volts.</p>
+
+<h2 class="sec">3. Cyprus gambling and betting classification</h2>
+<h3>3.1 Exclusion from the Cyprus definition of betting</h3>
+<p>The Cyprus Betting Law, Law 37(I)/2019, regulates betting by reference to wagers on events and outcomes at stated odds. ChartVolt’s model differs on every element that makes an activity a bet: the player pays to <i>perform</i> an activity, not to predict someone else’s; there are no odds; ChartVolt has no exposure to the result; and the result is produced by the player’s own measurable performance.</p>
+<div class="box warn"><b class="lbl">Two cautions</b>
+Peer-to-peer formats with an operator commission and no house risk are not automatically outside gambling law (Malta, for example, regulates commission-based peer-to-peer chance games). And counsel must confirm which other Cyprus provisions apply to online games that are not bets — the 2019 Law is generally understood to prohibit online casino-type games. ChartVolt’s position is that none of its formats is a casino game; that must be stated and confirmed, not assumed.
+</div>
+
+<h3>3.2 Skill versus chance — what the facts support</h3>
+<p>The test that matters in most jurisdictions is whether chance <i>materially decides the winner</i>, not whether any randomness exists. The UK Gambling Commission’s guidance (persuasive, not binding in Cyprus) says a game with an appreciable element of chance can be a game of chance even where skill matters, but that unpredictable elements a player must overcome can be part of a test of skill.</p>
+<div class="box ok"><b class="lbl">ChartVolt’s strongest fact is engineered, not argued</b>
+In a ranked contest, every competitor receives identical content. The games service refuses to create a ranked round without the contest’s shared seed, and deterministically generates from it the same puzzles (Circuit Sprint), the same piece sequence (Volt Stack) or the same track, pickups and hazards (Volt Velocity). Two players in one contest face the same problem; the difference between their scores comes from how they played it.
+</div>
+<p>Combined with no paid advantages, a two-player minimum, no house exposure and a published fixed score rule, this is the core of the skill argument for Circuit Sprint and Volt Stack.</p>
+
+<h3>3.3 Where the skill argument is weak: Volt Velocity</h3>
+<div class="box risk"><b class="lbl">Highest gambling-classification risk</b>
+Volt Velocity paid races run in combat mode. The code confirms three features a regulator could treat as chance or as outcome-affecting factors outside the player’s control:
+<ol style="margin-top:2mm">
+  <li><b>Player-versus-player items.</b> Some pickups act on other racers — a shockwave blasts nearby racers sideways, an oil slick spins out a chaser, missiles and seekers can be fired. The pickup layout is identical, but who collects which item depends on race position, and the effect on a racer depends on what others do.</li>
+  <li><b>Starting grid.</b> Grid order is a shuffle from the contest seed — fair because nobody chooses it, but luck for the individual racer.</li>
+  <li><b>Real-time conditions.</b> A live networked race is exposed to latency and connection quality, which are not skill.</li>
+</ol>
+None of these makes the race a lottery, but it is the format a regulator is most likely to question, and the only one where the identical-content argument does not fully answer the objection.
+</div>
+<div class="box key"><b class="lbl">Update, 13 October 2026 — controls built</b>
+The three points above describe the format as first reviewed. All rooms, including solo races, now run as follows:
+<ol style="margin-top:2mm">
+  <li><b>No player-versus-player items.</b> EMP, shockwave, mines, oil slick, cloak and the blaster have been removed. Missiles and seekers lock only onto towers on the track. Shields, repairs, energy, overdrive, countermeasure and magnet affect only the pilot who collects them. Every pilot collects every pickup for themselves. Ships that touch bounce apart without damage.</li>
+  <li><b>Starting grid by standing, not shuffle.</b> The grid is ordered by each racer’s settled Volt Velocity points (from competitions and challenges), highest first, then by time of entry. The game reads these from the platform before the countdown. If the platform cannot be reached, it falls back to entry order. A race in progress cannot move anyone up the grid. This is a ranking by prior results rather than a per-race qualifying lap; counsel should confirm that it meets the “qualifying” control.</li>
+  <li><b>Published disconnection rule.</b> If a racer disconnects, the ship stops and the clock keeps running. The racer has 30 seconds to reconnect; after that they are out with no score, and dropping out does not return the entry fee. A race cancelled before it starts is refunded in full. If a fault on ChartVolt’s side stops a race, the contest’s stated rule for unfinished rounds applies. The rule appears in the game’s rules, on the race start screen and on the Help page.</li>
+</ol>
+Real-time network conditions remain inherent to any live race. The disconnection rule makes their consequence known in advance; it does not remove them. Whether paid races can now move from Category B to Category A is for counsel to decide. This update records the facts and does not decide that question.
+</div>
+
+<h3>3.4 Recommended controls, by game</h3>
+<table>
+  <tr><th>Game</th><th>Status of control</th><th>Further step recommended</th></tr>
+  <tr><td>Circuit Sprint</td><td>Identical seeded puzzles <span class="built">BUILT</span></td><td>Skill evidence: repeat players’ scores are stable and better players win more often</td></tr>
+  <tr><td>Volt Stack</td><td>Identical seeded sequence <span class="built">BUILT</span>; hold cannot change it <span class="built">BUILT</span></td><td>Same skill evidence; publish the identical-sequence rule</td></tr>
+  <tr><td>Volt Velocity</td><td>Identical track, pickups, hazards <span class="built">BUILT</span></td><td>Non-combat mode <span class="built">BUILT</span>; grid by settled points <span class="built">BUILT</span>; disconnection rule published <span class="built">BUILT</span> (13 Oct 2026, see 3.3). Category B until counsel confirms reclassification</td></tr>
+  <tr><td>Simulated trading</td><td>Same live feed and capital <span class="built">BUILT</span></td><td>Keep scoring tied to rank, never to cash-equivalent P&amp;L</td></tr>
+  <tr><td>Any future title</td><td>Contest-seed requirement enforced platform-wide</td><td>Classify A/B/C before paid entry is enabled</td></tr>
+</table>
+<div class="box key"><b class="lbl">Cyprus conclusion</b>
+A strong, evidence-backed exclusion argument exists for Circuit Sprint, Volt Stack and simulated trading. Paid cash-prize Volt Velocity races should not be relied on under that argument until the combat and grid controls exist, or counsel has specifically approved the current format.
+</div>
+
+<h2 class="sec">4. MiFID II — simulated trading stays outside investment services</h2>
+<p>Directive 2014/65/EU, Annex I Section A, lists the regulated investment services — reception and transmission of orders, execution of orders, dealing on own account, portfolio management, investment advice and others — all in relation to the financial instruments in Annex I Section C. ChartVolt provides none of them.</p>
+<table>
+  <tr><th>MiFID II-relevant activity</th><th>ChartVolt activity</th></tr>
+  <tr><td>Receiving or executing orders in financial instruments</td><td>Recording fictional trades against live prices; nothing routed to a market</td></tr>
+  <tr><td>Managing client assets</td><td>Fictional capital that cannot be withdrawn</td></tr>
+  <tr><td>Paying investment returns</td><td>Paying a competition prize from the entry-fee pool, by rank</td></tr>
+  <tr><td>Personal investment recommendations</td><td>None; each participant decides for themselves</td></tr>
+</table>
+<p>A participant who turns 100,000 of fictional capital into 125,000 is owed nothing for the 25,000. They obtain a ranking, and the prize for that rank comes from the pool funded by entry fees.</p>
+<p><b>Conditions that must stay true (and are true today):</b> never pay the cash equivalent of simulated profit; never describe accounts as real or funded; never route real orders; no personalised investment advice; no return calculated from a participant’s own stake. A product paying out according to price movements rather than rank could start to resemble a derivative under Annex I Section C — a line not to cross.</p>
+<div class="box ok"><b class="lbl">Conclusion</b>Substantial grounds to conclude that the simulated-trading competitions do not require Cyprus Investment Firm authorisation. This does not decide the gambling or payments questions.</div>
+
+<h2 class="sec">5. Electronic money and payment services</h2>
+<h3>5.1 Electronic money</h3>
+<p>Article 2(2) of Directive 2009/110/EC (EMD2) defines electronic money as electronically stored monetary value representing a claim on the issuer, issued on receipt of funds for making payment transactions, <b>and accepted by a person other than the issuer</b>. Volts are accepted only by ChartVolt, for ChartVolt’s own services — a credible argument that the third-party-acceptance element is missing.</p>
+<h3>5.2 The weakness: purchased Volts can be cashed out unused</h3>
+<p>The withdrawal path treats purchased and won Volts identically. A user can buy Volts and, subject to the configurable controls, withdraw them without entering anything. In substance that makes the wallet a store of redeemable monetary value — the point a payments regulator would focus on, and the main anti-money-laundering concern (buy, wait, withdraw).</p>
+<h3>5.3 The second weakness: Game Masters</h3>
+<p>Game Masters are independent persons credited with a share of referred players’ entry fees, in Volts, which they can withdraw. This is a commission paid by ChartVolt from its own fee rather than a user-to-user transfer, and should be documented as such — but it undermines the simple statement that Volts never reach anyone other than the issuer and its customers. The same applies to any white-label operator.</p>
+<h3>5.4 Payment services and the limited-network exclusion</h3>
+<p>Directive (EU) 2015/2366 (PSD2) regulates payment services separately from e-money; Annex I includes operating payment accounts, executing payment transactions and money remittance. The relevant exclusion is <b>Article 3(k)</b> — instruments usable only to acquire goods or services in the issuer’s premises or within a limited network of service providers under direct commercial agreement with the issuer. Volts fit its purpose well.</p>
+<div class="box warn"><b class="lbl">Two cautions</b>
+Under <b>Article 37(2)</b>, a provider relying on this exclusion must notify the competent authority (in Cyprus, the Central Bank) if payment transactions over the previous 12 months exceed EUR 1 million; the authority then assesses whether the exclusion applies. And the exclusion protects an instrument used to buy services — it sits uneasily with one that can be filled and emptied for cash without buying anything. A licensed payment provider helps only for what that provider actually does; it does not exempt ChartVolt’s own ledger.
+</div>
+<p>The Central Bank of Cyprus introduced a pre-application exploratory stage for payment-institution and e-money-institution authorisation from 3 August 2026 — the route if the assessment concludes authorisation is needed.</p>
+<div class="box key"><b class="lbl">Conclusion</b>Under the current model, a no-e-money-licence position is arguable and a no-payment-institution-licence position is conditional. The single change that most strengthens both is separating purchased Volts from prize Volts (section 9, step 2).</div>
+
+<h2 class="sec">6. EU-wide position</h2>
+<p>The European Commission treats gambling as unharmonised. A Cyprus conclusion authorises nothing in Germany, France, Spain, Italy or elsewhere. Some Member States ask whether skill predominates; others weigh any material element of chance, and some restrict paid skill games with cash prizes specifically. Each target market needs its own check before paid entry is switched on.</p>
+<table>
+  <tr><th>Category</th><th>Meaning</th><th>Current titles</th><th>Treatment</th></tr>
+  <tr><td><b>A</b></td><td>Deterministic or identical-content skill games</td><td>Circuit Sprint, Volt Stack</td><td>Eligible for paid entry, market by market</td></tr>
+  <tr><td><b>B</b></td><td>Skill games where chance or opponent interaction may affect results</td><td>Volt Velocity (combat race)</td><td>Free or practice only for cash prizes until controls exist or local approval is obtained</td></tr>
+  <tr><td><b>C</b></td><td>Simulated trading</td><td>Trading competitions</td><td>Assess under competition/gambling rules and MiFID II</td></tr>
+</table>
+<p><b>Geo-blocking.</b> Enable paid entry only in individually reviewed markets, checking location and residence at registration and on withdrawal.</p>
+
+<h2 class="sec">7. Other issues the opinion must cover</h2>
+<ul>
+  <li><b>Contracting party.</b> For every transaction, identify which legal entity sells Volts, runs the contest, owes the prize and pays the Game Master.</li>
+  <li><b>Prize-pool rules.</b> Already in the code; must appear verbatim in the terms — minimum players and refund, cancellation and failure refunds, the per-contest no-score rule, ties, disqualification.</li>
+  <li><b>AML.</b> If ChartVolt is not a gambling operator it may fall outside the gambling-sector duties of Directive (EU) 2015/849, but withdrawal controls against fraud, chargebacks and laundering are still needed.</li>
+  <li><b>Consumer terms.</b> Redemption rate, fees, processing time, refund rights and dormant balances stated clearly. The label “Volts” does not change the money rights granted.</li>
+  <li><b>Market data.</b> The price-feed licence must permit use in public competitions and display to participants.</li>
+  <li><b>Responsible play.</b> Deposit limits and self-exclusion strengthen the position with any regulator and cost little.</li>
+</ul>
+
+<h2 class="sec">8. Proposed formal conclusion</h2>
+<p class="small">For Cyprus counsel to adopt or amend.</p>
+<div class="opinion">
+  <p><b>Re: Regulatory classification of ChartVolt’s skill-competition and simulated-trading platform</b></p>
+  <h3>Investment services</h3>
+  <p>ChartVolt’s simulated-trading competitions are distinguishable from investment services within Annex I Section A of Directive 2014/65/EU. Participants acquire no financial instruments, place no executable orders, entrust no assets and receive no payment representing an investment return; prizes are allocated by rank from a pool funded by entry fees. There are substantial grounds to conclude that these competitions do not require investment-firm authorisation.</p>
+  <h3>Betting</h3>
+  <p>ChartVolt’s competitions are distinguishable from betting under Law 37(I)/2019: participants pay to perform an activity rather than to wager on an event, no odds are offered, the operator has no exposure to the outcome, and prizes are determined by the participant’s measured performance.</p>
+  <h3>Games of chance</h3>
+  <p>For titles in which every competitor in a contest receives identical, deterministically generated content and no advantage can be purchased (currently Circuit Sprint and Volt Stack), there are strong grounds to conclude that the outcome is determined predominantly by skill. For titles in which opponents’ actions, start positions or real-time conditions may materially affect results (currently Volt Velocity in combat mode), classification is not resolved by this opinion, and such titles should not be offered for cash-redeemable prizes until it is.</p>
+  <h3>Electronic money and payment services</h3>
+  <p>Volts are issued and accepted exclusively by ChartVolt for its own services and cannot be transferred between users. There are reasonable grounds to argue that they do not meet the third-party-acceptance element of Article 2(2) of Directive 2009/110/EC, and that they fall within the limited-network exclusion in Article 3(k) of Directive (EU) 2015/2366. However, the redemption of purchased Volts without any service having been consumed, and the crediting of commissions to independent Game Masters, require separate examination, and the Article 37(2) notification threshold must be monitored.</p>
+  <h3>Overall</h3>
+  <p>ChartVolt has a sound basis for classification as a provider of skill-based competitive entertainment and simulated performance assessment, not of investment, betting or e-money services. This conclusion is limited to the titles and markets identified. A comprehensive opinion that no authorisation is required anywhere cannot be given until the matters in section 9 are resolved.</p>
+</div>
+
+<h2 class="sec">9. How to strengthen the case — ordered by impact</h2>
+<ol>
+  <li><b>Make paid Volt Velocity skill-only, or take it out of cash prizes.</b> A ranked non-combat mode (pickups affect only the collector), grid order by qualifying time instead of shuffle, and a published disconnection rule. Until then, paid races only where counsel approves, or for non-redeemable prizes. <i>Removes the biggest gambling risk.</i> <span class="built">BUILT</span> 13 Oct 2026: combat removed in every room, grid ordered by settled Volt Velocity points then entry time, 30-second disconnection rule published (see 3.3). The remaining step is counsel’s confirmation.</li>
+  <li><b>Split purchased Volts from prize Volts.</b> Purchased Volts are spent on entries and refundable only under consumer refund rules; only prize Volts are withdrawable. <i>Removes the deposit-and-withdraw stored-value pattern — the largest payments and AML weakness.</i> This changes the current redemption policy, so the terms must change with it.</li>
+  <li><b>Paper the Game Master model</b> as a commission paid by ChartVolt from its own fee under a written agreement — a commercial payment by the issuer, not third-party acceptance of Volts.</li>
+  <li><b>Produce skill evidence</b> for each Category A title from real data: score stability for repeat players, correlation between experience and winning, spread of winners. Cheap from ChartVolt’s own logs, and it is what regulators actually ask for.</li>
+  <li><b>Publish the fairness rules</b> players already benefit from: identical content for every entrant, no paid advantages, no mystery packs, minimum two players, refunds. True, enforced in code, and part of the defence.</li>
+  <li><b>Switch on the withdrawal controls already built</b> in every live market — KYC, hold period, refund to original payment method — and monitor PSD2 Article 37(2) volumes.</li>
+  <li><b>Geo-gate paid entry</b> to reviewed markets only.</li>
+  <li><b>Obtain the signed Cyprus opinion</b>, using the Central Bank of Cyprus pre-application stage to raise the Volts question informally if needed.</li>
+</ol>
+
+<h2 class="sec">Primary legal references</h2>
+<ul class="refs">
+  <li>Cyprus Betting Law, Law 37(I)/2019</li>
+  <li>Directive 2014/65/EU (MiFID II), Annex I Sections A and C</li>
+  <li>Directive 2009/110/EC (EMD2), Article 2(2)</li>
+  <li>Directive (EU) 2015/2366 (PSD2), Annex I, Article 3(k), Article 37(2)</li>
+  <li>Directive (EU) 2015/849 (Anti-Money-Laundering Directive), as amended</li>
+  <li>UK Gambling Commission guidance on prize competitions and games of skill (persuasive only)</li>
+  <li>Malta Gaming Authority — skill games and peer-to-peer gaming framework (comparative only)</li>
+  <li>Central Bank of Cyprus — licensing process changes effective 3 August 2026</li>
+</ul>
+
+<div class="final">
+  <b>Final assessment.</b> The truthful position is not “ChartVolt needs no licence of any kind”. ChartVolt has a strong case that its simulated trading is not an investment service, that it is not a betting operator, and that its deterministic skill games are games of skill. It has an arguable case that Volts are not e-money. It has two concrete weaknesses — paid combat racing and the cash-out of purchased Volts — both removable by product decisions within ChartVolt’s control. Once they are removed, the remaining risk is mainly about which countries to enter, managed market by market.
+</div>
+
+</div>
+</body>
+</html>

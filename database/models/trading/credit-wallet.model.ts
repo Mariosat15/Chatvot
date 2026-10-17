@@ -1,17 +1,34 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Credit Wallet for users to buy credits and enter competitions/challenges
 export interface ICreditWallet extends Document {
   userId: string; // Reference to Better Auth user ID
   creditBalance: number; // Current credit balance (1 credit = 1 EUR)
+  // Credits already moved OUT of creditBalance and held for Free Private Competitions this
+  // wallet funds. Display and reconciliation only - see the schema comment.
+  reservedBalance: number;
   totalDeposited: number; // Lifetime deposits
   totalWithdrawn: number; // Lifetime withdrawals
   totalSpentOnCompetitions: number; // Total spent on competition entries
   totalWonFromCompetitions: number; // Total winnings from competitions
   totalSpentOnChallenges: number; // Total spent on 1v1 challenges
   totalWonFromChallenges: number; // Total winnings from 1v1 challenges
+  totalSpentOnMarketplace: number; // Total spent on marketplace purchases
+  totalAdminCredits: number; // Total credits added by admin (positive adjustments)
+  totalAdminDebits: number; // Total credits removed by admin (negative adjustments)
+  totalIncidentCompensation: number; // Total credits from incident compensations
+  totalGmEarnings: number; // Total Game Master earnings (referral commissions)
+  totalRefunded: number; // Total credits refunded (competition/challenge/withdrawal refunds)
   isActive: boolean; // Wallet status
+
+  // KYC Fields
   kycVerified: boolean; // KYC verification status (required for withdrawals)
+  kycStatus: "none" | "pending" | "approved" | "declined" | "expired";
+  kycVerifiedAt?: Date;
+  kycExpiresAt?: Date;
+  kycAttempts: number;
+  lastKYCSessionId?: string;
+
   withdrawalEnabled: boolean; // Can user withdraw?
   createdAt: Date;
   updatedAt: Date;
@@ -27,6 +44,17 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
     creditBalance: {
       type: Number,
       required: true,
+      default: 0,
+      min: 0,
+    },
+    // Free Private Competition reserve (owner, 2 Oct 2026). The reserve is DEBITED from
+    // creditBalance when the contest is created and tracked here, so creditBalance is
+    // always the spendable figure. Reason for escrow rather than a hold beside an untouched
+    // balance: a hold would have to be honoured by every debit path in both apps (entry,
+    // challenges, marketplace, withdrawals, subscriptions), and the one that forgot it is a
+    // double spend. Escrow makes every existing path correct by construction.
+    reservedBalance: {
+      type: Number,
       default: 0,
       min: 0,
     },
@@ -66,6 +94,37 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
       default: 0,
       min: 0,
     },
+    totalSpentOnMarketplace: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
+    totalAdminCredits: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalAdminDebits: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalIncidentCompensation: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalGmEarnings: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalRefunded: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     isActive: {
       type: Boolean,
       required: true,
@@ -76,28 +135,48 @@ const CreditWalletSchema = new Schema<ICreditWallet>(
       required: true,
       default: false,
     },
+    kycStatus: {
+      type: String,
+      enum: ["none", "pending", "approved", "declined", "expired"],
+      default: "none",
+    },
+    kycVerifiedAt: {
+      type: Date,
+    },
+    kycExpiresAt: {
+      type: Date,
+    },
+    kycAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lastKYCSessionId: {
+      type: String,
+    },
     withdrawalEnabled: {
       type: Boolean,
       required: true,
-      default: false,
+      default: true, // Enable by default - admin settings control actual eligibility
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
 // Note: userId already has unique index from schema definition (unique: true)
 CreditWalletSchema.index({ isActive: 1 });
+// PERFORMANCE: Speeds up KYC expiry check job
+CreditWalletSchema.index({ kycVerified: 1, kycExpiresAt: 1 });
 
 // Virtual for total profit/loss
-CreditWalletSchema.virtual('totalProfitLoss').get(function () {
+CreditWalletSchema.virtual("totalProfitLoss").get(function () {
   return this.totalWonFromCompetitions - this.totalSpentOnCompetitions;
 });
 
 // Virtual for ROI
-CreditWalletSchema.virtual('roi').get(function () {
+CreditWalletSchema.virtual("roi").get(function () {
   if (this.totalSpentOnCompetitions === 0) return 0;
   return (
     ((this.totalWonFromCompetitions - this.totalSpentOnCompetitions) /
@@ -107,7 +186,7 @@ CreditWalletSchema.virtual('roi').get(function () {
 });
 
 const CreditWallet =
-  models?.CreditWallet || model<ICreditWallet>('CreditWallet', CreditWalletSchema);
+  models?.CreditWallet ||
+  model<ICreditWallet>("CreditWallet", CreditWalletSchema);
 
 export default CreditWallet;
-

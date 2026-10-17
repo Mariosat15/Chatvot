@@ -1,0 +1,642 @@
+# 03 - Competition and Challenge Flows
+
+The two contest formats end to end, the timing rules that make them fair, and the
+decisions that must be made per contest.
+
+---
+
+## 0. No contest is ever a solo activity
+
+Stated first because the phrase "independent play" elsewhere in these documents
+describes **how the gameplay works, not how many people are competing**, and the two
+have been confused.
+
+| Format | Players | Prize | Existing equivalent |
+|---|---|---|---|
+| **Competition** | **Two or more.** Many is the normal case | Winners share the pool by finishing position | A trading competition, exactly |
+| **Challenge** | **Exactly two.** One player challenges another | Winner takes the pot, minus the platform fee | A trading challenge, exactly |
+
+**There is no single-player paid format, and none is proposed.** A player alone is
+practising, not competing, and practice is free and unranked - see section 5.1.
+
+### Why "independent play" does not mean "playing alone"
+
+An independent-play game is one where each player plays **their own round** and receives
+their own score, rather than needing a live opponent in the same session. Every one of
+those players is still ranked against every other player in the contest, and they are
+still competing for the same pot.
+
+**Trading is itself an independent-play game.** Every trader in a ChartVolt competition
+trades their own account, on their own, at their own pace - and they are all ranked
+against each other for a share of the same prize pool. Nobody would call a trading
+competition a solo activity, and the same reasoning applies to a trivia or chess-puzzle
+competition.
+
+The distinction only exists because it decides **which contest formats a game can
+support**. It has nothing to do with contest size:
+
+| | Independent play | Head-to-head |
+|---|---|---|
+| Competition of 100 players | **Works today** | Needs a bracket engine |
+| Challenge, 1 v 1 | **Works today** | **Works today** |
+| Example | Trading, trivia, chess puzzles, word games, time-attacks | Full chess, checkers, backgammon |
+
+### The minimum-players rule already exists and is reused unchanged
+
+This is not new work. `Competition.minParticipants` is already on the model
+(`database/models/trading/competition.model.ts` line 12), and
+`lib/actions/trading/competition.actions.ts` already enforces it:
+
+- `minParticipants` **defaults to 2** at creation (line 290) and again at evaluation
+  (line 71)
+- If fewer than the minimum have joined when the competition should start, it is
+  **auto-cancelled and every entry fee refunded** (lines 79-92)
+- A competition that somehow became `active` below the minimum is cancelled and
+  refunded as well (lines 123-134)
+
+A provider-game competition inherits all of this, because it is the same competition
+model and the same code path. **Nothing in this plan may weaken it.**
+
+---
+
+## 1. Competition - many players, ranked
+
+The direct equivalent of a trading competition, and the primary format.
+
+### 1.1 Lifecycle
+
+| Phase | What happens | Who owns it |
+|---|---|---|
+| **Draft** | Admin picks provider, game, settings, entry fee, prize split, player limits, schedule | ChartVolt |
+| **Upcoming** | Players see it and pay to join. Entry fee goes to the prize pool | ChartVolt (existing) |
+| **Live** | Players open the contest and play their round(s). Scores arrive and the leaderboard updates | Provider plays, ChartVolt scores |
+| **Settling** | New rounds blocked. Outstanding results collected within the grace period | ChartVolt |
+| **Completed** | Ranked, prizes paid, fee taken, rewards awarded | ChartVolt (existing) |
+
+### 1.2 The three windows
+
+Getting these right is what stops most of the disputes.
+
+```
+   registration          play window                grace
+ |---------------|--------------------------|------------------|
+ opens        closes /                    closes            settle
+              play opens
+```
+
+| Window | Rule | Why |
+|---|---|---|
+| **Registration** | Closes at or before the play window opens | Late joiners must not see others' scores before choosing to enter |
+| **Play** | Rounds may only be **started** inside it | A round started at the last second must not run past settlement |
+| **Grace** | No new rounds. Only outstanding results collected. Default **10 minutes**, and at least `maxDurationSeconds` + 5 minutes | A player finishing on the buzzer must still be scored |
+
+**A round must be startable only if `now + maxDurationSeconds <= playWindowEnd`.**
+Without that rule a player starts a ten-minute game with thirty seconds left and
+either loses their attempt unfairly or delays everyone's prizes.
+
+**AMENDED 7 SEPTEMBER 2026: THIS IS NOW THE DEFAULT RATHER THAN THE LAW.** It is
+`roundStartPolicy: "reserve_full_round"`, and a contest may instead choose
+`until_window_closes`, where an attempt may start until the contest closes and
+`resolveExpiry`'s clamp shortens it. `External game plans/12` section 2.7 is the
+authoritative account of what was built.
+
+Two things about the amendment, because the rule above is still right as far as it goes.
+**The failure it prevents is real and the sentence understates when it fires:** the gate
+reserves the **catalogue ceiling**, not the length the operator configured, so a contest
+shorter than that ceiling refused every round *for its entire duration* rather than only
+near the end. Circuit Sprint's ceiling is 300 seconds, so any contest under five minutes
+was unplayable. The owner reported exactly that. **And its premise no longer holds
+universally:** "loses their attempt unfairly" assumes a cut-short round is worth nothing,
+which was true when a contest was won by finishing and is not now that partial performance
+is the basis for winning. Where a shortened round genuinely means nothing, the reserving
+default is still the correct answer - which is why it is the default and why it was kept
+rather than replaced.
+
+**What did NOT change:** a round can still never outlive its contest. `resolveExpiry`
+clamps `expiresAt` to `playWindowEnd` under both policies, and a contest whose window has
+actually **closed** refuses under both.
+
+**AMENDED AGAIN 8 SEPTEMBER 2026, AND THIS TIME THE ARITHMETIC ITSELF WAS WRONG.** The
+sentence above says the gate reserves the **catalogue ceiling**, and it did - that was a
+defect, not a specification. It is now `now + attemptSeconds <= playWindowEnd`, where
+`attemptSeconds` is **the playing time this contest actually grants.** `External game
+plans/12` section 2.9 is the authoritative account of what was built.
+
+Three things about this second amendment, because it changes the reading of the first.
+
+- **The rule is unchanged; only the number is.** Reserving the *whole* attempt is still
+  the law under `reserve_full_round`, and a test forbids reserving a fraction of it. What
+  changed is that the attempt being reserved is the one the player is going to be given.
+- **`reserve_full_round` is now the wizard's default for new drafts**, which it was not
+  while the reservation could be five times the configured length. **The schema default
+  is deliberately unchanged**, so a contest created before today keeps the rule its
+  entrants signed up under - a schema default fixes future rows only.
+- **The ceiling still decides `expiresAt`**, and that separation is load-bearing. The
+  gate asks *how much time must I reserve*, which is what this contest grants. Expiry
+  asks *how long may this round live*, which is the most the game will ever run. Reading
+  the configured attempt there would cut a player off mid-board with a score the provider
+  never sent.
+
+**How the platform learns which setting is the play clock, without learning a field
+name.** A title declares it: `format: "duration-seconds"` on the relevant property of
+its `configSchema`. Chapter `01` section 2.4 carries the provider-facing requirement.
+A title declaring none falls back to `maxDurationSeconds`, which is never shorter than
+the truth, so the fallback over-reserves and therefore still fails closed.
+
+**AND THE REGISTRATION ROW IS NOW WRONG TOO, BY OWNER DECISION OF 8 SEPTEMBER 2026.**
+"Closes at or before the play window opens" no longer describes a provider contest. The
+owner's instruction was that a player may join at any point before the contest ends, and
+`createProviderContest` was doing the opposite in its strictest possible form -
+`registrationDeadline: new Date(input.startTime)` - so arriving one minute into a
+one-hour contest meant not being able to join it at all. `External game plans/12`
+section 2.10 is the authoritative account of what was built.
+
+Four things about this third amendment, and the first is the one a summary will get wrong.
+
+- **Taken literally, the instruction sells a seat that cannot play.** Under
+  `reserve_full_round` the gate above refuses an attempt that would not fit in what
+  remains, so entry open to the final second means a player pays, is refused every
+  attempt, ranks on nothing, and - since R50 - is not even eligible for the
+  redistribution. The honest reading is **"for as long as playing is still possible"**,
+  so entry closes at the window end under the permissive policy and one whole attempt
+  before it under the reserving one. That is the same subtraction the gate performs, and
+  it is now performed in **one** place that both the gate's screen and the stored
+  deadline read.
+- **The "Why" in the table was a real concern and the owner overrode it knowingly**, so
+  do not record this as the concern having evaporated. A late joiner *can* now see the
+  leaderboard before deciding to pay. What makes that acceptable here rather than in
+  trading is that a game score is **not actionable intelligence**: knowing the leader
+  solved nine boards does not help anybody solve ten, where knowing which positions are
+  winning a trading contest plainly does. The residue is an informed *entry* decision,
+  not an informed *play* decision.
+- **A late joiner is not short-changed under the reserving policy**, which is the second
+  reason it is the right default. Everyone gets the same play budget whenever they arrive;
+  what a late joiner loses is the chance to use more than one attempt, which is a matter
+  for `attemptsPolicy` rather than for the clock.
+- **The deadline is recomputed, never carried.** Four values feed it - the window end, the
+  configured attempt, the policy and the start - and an edit may move any subset, so
+  computing it inside the start-time branch is wrong the moment the window moves instead,
+  with no error when it happens.
+
+> **FOURTH AMENDMENT, 8 September 2026 - a `scheduled` title closes entry at the START, and
+> the three amendments above describe the `anytime` case only.**
+>
+> A title may now declare `playMode: "scheduled"`, meaning everybody plays at one appointed
+> moment - a race, a live quiz. Such a contest closes entry at `startTime`, which is what the
+> **original** row in the table said and what the third amendment moved away from.
+> `External game plans/22` section 8 is the authoritative account of what was built.
+>
+> Four things about this fourth amendment, and the first is the one that reads like a
+> contradiction.
+>
+> - **It does not reverse the third amendment, it scopes it.** The third amendment's rule -
+>   entry stays open for as long as playing is still possible - is unchanged and still governs
+>   every title in the live catalogue, all of which are `anytime`. A scheduled contest is a
+>   different shape, not a change of mind about this one.
+> - **The reason is physical, not informational, and merging the two is the mistake `22`
+>   section 2.1 exists to prevent.** Entry closes at the gun because **you cannot join a race
+>   that has begun** - everyone runs one clock from one instant, so a seat sold afterwards can
+>   only ever record a worse result than the field. It is *not* because knowing the target is
+>   worth something. That question is separate, still open, still per-title, and still answered
+>   the way the third amendment answered it for `anytime` games.
+> - **It is decided by the title and never by the operator or the caller**, resolved by
+>   `resolvePlayShape` from the stored catalogue row. An operator- or client-supplied shape is
+>   a way to keep entry open after a race has started, which is the same rule as the
+>   market-hours gate and `maxRoundSeconds`.
+> - **A player who entered in time and presses Play late gets a shortened round, not a
+>   refusal.** `resolveExpiry` already clamps to `playWindowEnd`. They paid, starting late
+>   cannot help them, and refusing them buys nothing.
+
+> **FIFTH AMENDMENT, 12 September 2026 - the expiry safety net needed its slack stated, because
+> the slack was borrowed from a gap that closes.**
+>
+> Nothing above changes. This is about the *other* number - `expiresAt` rather than the
+> reservation - and about the sentence in `round.service.ts` that defends reading the catalogue
+> **ceiling** there while the round-start gate reserves the **configured** length. That defence is
+> correct and must not be tidied away: the gate asks *how much must I reserve*, where tight is
+> right, and expiry asks *by when is this round certainly over*, where generous is right.
+>
+> The fault was that the generosity had no source of its own. It came from the ceiling being
+> larger than the configured length, and **the two are equal for an operator who picks the longest
+> round a title allows** - at which point the expiry lands one round after the round was
+> **created** while the game's own clock runs one round from when the player pressed **Start**.
+> Every full-length round was therefore cut off by however long the frame took to load, and filed
+> as `expired`.
+>
+> Two things about it. **It is not a wrong payment** - a partial run counts since R48 - but it does
+> mean `lastSuccessfulRoundAt` never refreshes and every full-length round lands in the expiry
+> bucket on the screen that decides whether a title keeps running. And
+> **`ROUND_EXPIRY_HEADROOM_SECONDS` states the slack rather than inferring it**, still clamped to
+> `playWindowEnd`, so nothing here can let a round outlive its contest. See `12` s2.13 and R70.
+
+> **SIXTH AMENDMENT, 13 September 2026 - a CHALLENGE never reserves, and the reason is that none
+> of the three things standing behind the reservation exists on one.**
+>
+> Everything above is about a **competition** and is unchanged. A challenge is now permanently
+> `until_window_closes`: a player who presses Play late gets a round shortened by the clamp to
+> `playWindowEnd`, never a refusal. Owner decision, and **R73** is the defect that forced it -
+> a ten-minute challenge on a title whose ceiling is an hour refused **every** attempt for its
+> entire life, and the player was told they were too late with nine minutes on the clock.
+>
+> **The transferable part is why the same value is right on a competition and wrong here.** The
+> reservation reserves `maxDurationSeconds`, the catalogue ceiling, not the configured length -
+> deliberately, because it fails closed (see the second amendment and `12` s2.9). On a
+> competition three things make that safe: an **operator** chooses the policy per contest, a
+> **schema default** keeps a pre-existing contest under the rule its entrants signed up to, and
+> the **pre-flight** refuses a draft whose window cannot hold a full round. A challenge is
+> created by a player from a dialog with no such control, so the value was neither chosen nor
+> checked. **A gate is only as safe as the thing that gets to disagree with it.**
+>
+> Two implementation facts that a summary drops. `CHALLENGE_ROUND_START_POLICY` in
+> `challenge-round-config.ts` is the **one definition**, imported by the config resolver, the
+> pre-flight and the create route - written out three times, a challenge could be created under
+> one rule and played under another, and that disagreement reads as a clock problem rather than a
+> settings one. And **an absent value means PERMISSIVE on a challenge**, the opposite of
+> `contest-config.ts`'s reading of the same field name, because an unset competition policy is an
+> operator's choice with a default behind it while an unset challenge policy is a challenge
+> created before there was a rule. The field is still **stored**, so the per-title challenge
+> defaults the owner asked for in the same message can narrow it later without changing the rule
+> under challenges already in flight.
+>
+> **Amended later the same day, and one of those facts has moved.** The per-title defaults are
+> **built** (`12` s4.2d), so an operator *can* now reinstate the reservation on a title that can
+> honour it, and the one definition is **`resolveChallengeStartPolicy` in `challenge-defaults.ts`**,
+> not the constant in `challenge-round-config.ts` - that constant survives as the permissive answer
+> the helper falls back to, so a document naming it as the reader is stale while one naming it as
+> the value is right. The strict writer **refuses** a reservation the title cannot honour, with no
+> declared round length or a round as long as the whole challenge, which is what stops the new
+> control recreating R73.
+
+### 1.3 Attempts policy - a required per-contest setting
+
+| Policy | Behaviour | Best for |
+|---|---|---|
+| `single` | One round only | Highest tension, cheapest to run, easiest to explain |
+| `best_of_n` | Up to N rounds, best score counts | Rewards persistence, reduces bad luck. Costs N times as much if the provider charges per round |
+| `sum_of_n` | Exactly N rounds, scores summed | Endurance formats |
+| `unlimited_in_window` | Play as often as you like, best counts | **Not recommended** - favours whoever has the most free time, and costs are unbounded |
+
+Default: **`single`**, unless the game is very short.
+
+Two things must be enforced regardless of policy:
+
+- **Attempt consumption.** An attempt is consumed when the round is *created*, not
+  when it completes. Otherwise a player quits any bad round and retries forever.
+- **One live round at a time**, per player per contest. Two open rounds is how
+  duplicate scores and race conditions appear.
+
+### 1.4 Minimum participation
+
+Two separate rules, often conflated. Both are needed.
+
+**Minimum players, to run at all.** `minParticipants`, default 2, enforced already -
+see section 0. Below it the competition is cancelled and everyone refunded. No
+provider-specific behaviour.
+
+**Minimum play, to win a prize.** Mirrors the minimum-trades rule in trading
+competitions: a player who joins and never plays must not take a prize on a tie-break.
+Players with no completed round are **excluded from prizes** but still count toward the
+prize pool, exactly as disqualified traders are handled today.
+
+The second rule creates an edge case the first does not cover: **three players join,
+only one actually plays.** The competition met its minimum and ran legitimately, but
+only one participant is prize-eligible. Options, to be decided per contest:
+
+| Policy | Behaviour | When to use |
+|---|---|---|
+| `award_anyway` | The single qualified player takes the winning share | Default. They did what was asked |
+| `refund_all` | Cancel and refund everyone | Very small contests where one player winning a pot funded by non-players reads badly |
+
+Whichever is chosen, the remainder of the pool follows the existing rules - it is
+either distributed by the prize split or moved to the unclaimed pool. **No new money
+path.**
+
+### 1.5 Ranking
+
+1. Rank by `rawScore`, respecting the game's `scoreDirection`
+2. Tie-break by shorter `durationMs`
+3. Then by earlier `completedAt` - first to achieve the score
+4. Any remaining tie: **share the combined prize for those positions equally**
+
+Ties will be common in games with small integer score ranges, so shared positions
+are the default rather than an edge case.
+
+---
+
+## 2. Challenge - one against one
+
+### 2.1 Independent-play games (Family A)
+
+Both players play the **same content** independently, higher score wins.
+
+```
+Challenger picks game + stake -> pays entry
+        |
+Opponent invited or matched -> accepts, pays entry
+        |
+Both entries form the pot; both get the SAME contentSeed
+        |
+Each plays their round within the challenge window
+        |
+Both resolved -> compare -> winner takes the pot minus platform fee
+```
+
+**Both players must receive the same `contentSeed`.** A challenge where each player faced
+different questions is not a contest, it is two unrelated scores compared.
+
+| Situation | Resolution |
+|---|---|
+| Both complete | Higher score wins; standard tie-breaks |
+| One plays, one does not | The player who played wins |
+| Neither plays | Void - both fully refunded |
+| Exact tie after all tie-breaks | Pot split evenly, platform fee still applies |
+| One abandons mid-round | Scored as reported. Counts as played |
+
+### 2.2 Head-to-head games (Family B)
+
+Requires provider support for a match with two players. Both join a provider-hosted
+match; the provider reports a winner and per-player scores.
+
+Additional cases to handle:
+
+| Situation | Resolution |
+|---|---|
+| One player never joins the match | No-show forfeits after a countdown; opponent wins |
+| Both disconnect | Void and refund |
+| Provider reports a draw | Split the pot |
+| Match never reports | Reconciliation, then void and refund - see `07` |
+
+### 2.3 Challenge windows
+
+Challenges need an acceptance window as well as a play window:
+
+- **Acceptance window** - the challenge expires if unaccepted, e.g. 24 hours, and the
+  challenger's entry fee is refunded automatically
+- **Play window** - once accepted, both must play within it, e.g. 24 hours
+
+Without an expiry, credits sit locked in unaccepted challenges indefinitely and
+generate support tickets.
+
+**BUILT 13 SEPTEMBER 2026, and one rule about the play window is now settled.** Both windows are
+derived from a **single producer**, `deriveChallengeWindow` in `challenge-window.ts` (mirrored),
+rather than being stored as separate operator-chosen dates the way a competition's are - there is
+no operator on a challenge. And **a player may start a round for as long as the play window is
+open**: a late presser gets a round shortened by the clamp to `playWindowEnd`, never a refusal.
+That is the sixth amendment to section 1.2 above and **R73**, and it is the load-bearing
+difference from a competition, where the equivalent policy holds a whole round back from the end.
+Do not carry the competition's reservation over to a challenge on consistency grounds - it made
+every ten-minute challenge unplayable.
+
+### 2.4 Who the opponent is
+
+**Added 2 September 2026.** The flow above says "opponent invited or matched" and stops
+there. That single phrase was carrying the whole of opponent selection, and the owner's
+brief asks for something specific: *"challenges must be able to challenge any user and
+pick a game to create a challenge - now only for trading."*
+
+Two halves, and only one of them was designed.
+
+| Half | Status |
+|---|---|
+| **Pick a game** | Designed. Sections 2.1-2.3 above, plus `04` adding `gameKey` to `Challenge` |
+| **Challenge any user** | **Not designed.** Today `POST /api/challenges` requires a `challengedId` - every challenge is a direct invitation to one named player. There is no open challenge, and `GET /api/landing/challenges` is an anonymised marketing feed that nothing can be joined from |
+
+The full design, including opponent search, open challenges, interest-based matchmaking
+and the abuse controls that letting anyone challenge anyone requires, is **chapter `20`**.
+It is kept there rather than here because it is a player-preferences and matchmaking
+feature that happens to terminate in a challenge, not a change to the challenge flow -
+the money path, the windows and the resolution table above are all unaffected.
+
+**Three things to carry from `20` into any work on this flow**, because they constrain it:
+
+1. **`Challenge.challengedId` should stay required.** An open challenge has no opponent
+   until accepted, which tempts a nullable field on a model that sits on the money path
+   and is mirrored across both apps. `20` section 6 recommends a separate `OpenChallenge`
+   collection that materialises a `Challenge` on acceptance instead.
+2. **Willingness to be challenged is per game, not global.** `UserPresence.acceptingChallenges`
+   exists and is a single platform-wide boolean. It is kept as a master switch; per-game
+   opt-in is new.
+3. **Open question 15 is unanswered:** may anyone challenge anyone, only friends, or only
+   players who opted in for that game? It is an owner decision and it changes this flow's
+   entry conditions.
+
+#### 2.4a BUILT - open challenges, 14 September 2026
+
+> **This amends point 1 above rather than overriding it silently.** `challengedId`,
+> `challengedName` and `challengedEmail` are now **conditionally** required on both
+> `Challenge` copies, and there is **no `OpenChallenge` collection**. A document
+> proposing to build one is describing the plan, not the code.
+>
+> **Why the chapter's recommendation was not followed.** A second collection makes an
+> open challenge a different kind of object until the moment somebody takes it, so every
+> list, every notification, every cancellation and the whole entry-fee path would have
+> had to learn about a second shape - and the materialising step is a *second writer* of
+> a money document, which is the shape this programme has spent weeks removing (four
+> competition entry paths, ten finalize sites, two settlement copies). Conditional
+> requirement keeps one collection, one writer and one lifecycle, and costs one
+> predicate. The predicate is not `required: false`: a **directed** challenge with no
+> opponent is still a bug, and the schema is the only thing that catches it.
+>
+> **Openness is an explicit stored flag (`openToAnyone`), never inferred from
+> `challengedId` being absent**, and the direction of failure is the whole argument.
+> Inferred, a bug that drops the opponent from a *directed* challenge turns it into one
+> anybody may claim - a stranger takes a seat offered to a named friend and a real entry
+> fee is debited. With the flag, the same bug produces a challenge nobody can accept,
+> which is visible, refundable and complained about. The flag **stays true after the seat
+> is claimed**, because it is how the challenge was created rather than what state it is
+> in, which is what lets a screen explain why a stranger is in it.
+>
+> **The claim is atomic and that is the money-critical part.** Accept does a single
+> `findOneAndUpdate` filtered on `status: "pending"`, `openToAnyone: true` and an empty
+> seat, then continues from the **returned** document - so a simultaneous second accepter
+> matches nothing and is refused before any wallet is read. Continuing from the
+> pre-claim copy is the natural spelling and would debit both players. "Empty" is matched
+> in **all three** of its shapes - absent, `null` and `""` - because only the first is
+> what the create path writes and the other two are what a bad edit or a half-run
+> migration leaves behind, and both look correct in a document dump.
+>
+> **The create route refuses a request carrying both facts** rather than letting one win:
+> a precedence rule stated in the browser and again on the server is one rule in two
+> copies, and the browser's is the one nobody tests. The three opponent fields are
+> **omitted**, never stored empty. **No notification is sent**, because there is nobody
+> to notify - and **declining is impossible by construction**, the decline route already
+> requiring the caller to be the named opponent.
+>
+> **Answering open question 15 for this slice only:** an open challenge may be claimed by
+> **any signed-in player except its creator**, subject to the same standing, balance and
+> fraud gates a directed accept passes. ~~Per-game willingness is still outstanding.~~
+> **Per-game willingness shipped 14 September 2026 (`20` s1.1a), so that clause is correct
+> as history and stale as a present fact - say which.** It deliberately does **not** apply
+> to an open challenge, for the reason this very paragraph gives about notifications and
+> declining: there is nobody to ask. The create route withholds the read entirely when
+> `openToAnyone` is set, because asking would answer from the **creator's own**
+> declarations, and opting out of a game would then stop you offering it. What a claimer
+> passes is the standing, balance and fraud gates above, exactly as written.
+>
+> Six screens assumed two named players and were swept: the card, the challenges list
+> (a new **Open** tab), the detail page, the provider lobby, the entry actions and the
+> public landing feed, which invented a "Player 2" for a seat nobody had taken. The
+> shared answer is `lib/utils/open-challenge.ts`, which is **model-free by requirement**
+> rather than by preference - its callers are `"use client"` (**R58**).
+
+> **AMENDED 14 September 2026.** Two sentences above are correct as history and stale as
+> present facts, and **say which**. "No notification is sent" was written about
+> *creating* an open challenge and was defended on the grounds that there is nobody to
+> notify - true of the *recipient*, and **wrong about the event**, because an open seat is
+> the one challenge that needs an audience rather than an addressee. The creator is now
+> told the moment somebody claims the seat, told again if nobody ever does, and **every
+> player accepting challenges is told when the seat goes up**. And an open challenge no
+> longer inherits `acceptDeadlineMinutes`; it has a lifetime of its own. See **s2.4b**
+> below and `13` **s11.1c**.
+
+### 2.4b How long an open seat stays up, and who is told - BUILT 14 September 2026
+
+Two gaps left by s2.4a, both reported by the owner in the same instruction.
+
+**The lifetime.** Every challenge carries an `acceptDeadline` computed at creation from
+`ChallengeSettings.acceptDeadlineMinutes`. An open challenge reused that number, and
+**nobody chose it with a public notice board in mind** - it answers "how long do I hold a
+seat for one specific person who has been told about it", which is not the same question
+as "how long do I leave a notice up for any passer-by". They were forced to be equal.
+
+`ChallengeSettings` gains `openChallengeExpiryMinutes` and
+`lib/services/challenges/accept-deadline.ts` (mirrored) is the one place either number is
+resolved. Three things about it are load-bearing.
+
+- ~~**The open fallback is its own default (24 hours), never the directed one.** Every
+  existing platform holds no configured value for a field that did not exist yesterday,
+  so a fallback onto `acceptDeadlineMinutes` would make the whole change invisible on
+  every deployment that has not been reconfigured - with every structural test still
+  green, because the branch is there and merely answers the same thing.~~
+  **REVERSED by the owner later the same day - see the amendment at the foot of this
+  section. An unset open expiry now falls back to the Accept Deadline, and the
+  pinning test was flipped rather than deleted.**
+- **A non-positive or non-finite stored value reads as unset.** These arrive from
+  `parseFloat` on an admin form, so a `0` or a `NaN` is one keystroke away, and either
+  one expires an open challenge on creation or never. Same rule as R31.
+- **It is resolved once, at every writer.** Two copies of the arithmetic let a challenge
+  be created under one rule and expired under the other, and a probe aimed at either
+  copy stays green.
+
+The admin control sends `null` when cleared rather than omitting the field, because
+`JSON.stringify` drops `undefined` and an omitted field cannot unset a stored one - so
+without that an operator could raise the number and never lower it back to the default.
+The player-facing settings route exposes the **resolved** figure rather than the stored
+one, so the dialog cannot show a blank where the platform has a real answer.
+
+**Who is told.** The full lifecycle now reports itself - see `13` **s11.1a** for the push
+seam, the banners and the click targets. Two templates exist because of this section
+specifically. `challenge_seat_taken` is sent when an open seat is claimed, deliberately
+not `challenge_accepted`, whose stored message says the opponent "accepted your
+challenge" and implies the creator invited them. `challenge_open_expired` is sent when
+nobody came, deliberately not `challenge_expired`, whose stored message says a named
+opponent "did not respond in time" - **a false statement about a challenge nobody was
+invited to**, and one that rewording could not fix afterwards, because seeding is
+`$setOnInsert` and never reaches a row that already exists.
+
+Expiry is written in **three** places - the main app's server action, the worker job and
+the admin action - so the notification is a shared helper,
+`lib/services/challenges/expiry-notifications.ts`, rather than three copies. The worker
+is the one that runs in production, which is why leaving it out is the version where
+nothing fires and every test about the other two passes.
+
+> **AMENDED 14 September 2026, same day, owner decision.** The hidden 24-hour constant is
+> gone: **an unset `openChallengeExpiryMinutes` now falls back to `acceptDeadlineMinutes`**,
+> and only then to `DEFAULT_ACCEPT_DEADLINE_MINUTES`. The owner's words were that an open
+> challenge should take its expiry from the same Duration Settings card as a directed one
+> unless told otherwise.
+>
+> **The argument the original rule made was about visibility and it stopped holding the
+> moment the control existed.** A separate constant was defensible while the number was
+> invisible; with `Open Challenge Expiry (mins)` sitting on Settings -> 1v1 Challenges
+> beside `Accept Deadline (mins)`, it is a third number nobody configured wedged between
+> two they did - so an operator lowering the Accept Deadline to five minutes gets an open
+> seat that outlives it by a day, with nothing on the screen saying so.
+>
+> **What did not change is the part that makes the two questions separate:** a *saved*
+> open expiry still always wins, so the two numbers are free to differ and the field is
+> not a merge. Only the unchosen case moved. The test pinning the old constant was
+> **flipped rather than deleted**, because the reason a separate lifetime exists is the
+> most valuable thing in it, and the admin hint now reads "Leave blank to use the Accept
+> Deadline" rather than naming 1440 minutes.
+
+---
+
+## 3. Where the money moves
+
+Unchanged from today, and worth restating because it is what keeps this project low
+risk.
+
+| Event | Money |
+|---|---|
+| Player joins | Entry fee debited from credits, added to the prize pool, ledger entry written |
+| Player plays | **Nothing.** No money moves during gameplay, ever |
+| Contest settles | Platform fee taken, prizes credited by finishing position, ledger entries written |
+| Contest cancelled | Every entry fee refunded, pool zeroed |
+| Challenge expires unaccepted | Challenger refunded in full |
+| Round voided by provider | **No money moves.** The attempt is returned, not the fee |
+
+The provider never appears in this table. That is the whole point.
+
+---
+
+## 4. Per-contest settings the admin must choose
+
+Rendered dynamically from the provider's `configSchema`, plus these ChartVolt-level
+settings:
+
+| Setting | Default | Notes |
+|---|---|---|
+| Provider and game | - | Locked once anyone has joined |
+| Game settings | From `configSchema` defaults | Validated against the schema before saving |
+| **Minimum players** | **2** | Existing `minParticipants`. Below it, auto-cancel and refund |
+| **Maximum players** | Game Master tier limit, or admin choice | Existing `maxParticipants` |
+| Attempts policy | `single` | See 1.3 |
+| Content seed strategy | `per_contest` | `per_contest` = everyone identical (required for fairness). `per_player` only for casual, unranked modes |
+| Registration close | Play window start | Cannot be later |
+| Play window | - | Must be at least `maxDurationSeconds` long |
+| Grace period | 10 minutes | Minimum `maxDurationSeconds` + 5 min |
+| Minimum participation | 1 completed round | Below this, no prize |
+| Unresolved-round policy | `score_zero` | See `07-failure-modes-and-edge-cases.md` |
+
+### 4.1 Validation before a contest can be created
+
+These checks prevent the most common operator mistakes:
+
+- The chosen game supports the chosen format (`supportsCompetition` / `supportsOneVsOne`)
+- **`minParticipants` is at least 2** for a competition, and exactly 2 for a challenge
+- The game is `active`, not `deprecated` or in `maintenance`
+- Settings validate against the current `configSchema`
+- Play window >= `maxDurationSeconds`
+- Grace period >= `maxDurationSeconds` + 5 minutes
+- `attemptsPolicy` other than `single` has an explicit cost acknowledgement if the
+  provider bills per round
+- A **live sandbox round** succeeded for this game and configuration in the last 24
+  hours
+
+That last check is worth the effort. It catches a broken or withdrawn game *before*
+players pay to enter, rather than after.
+
+---
+
+## 5. What the player sees
+
+| Screen | Content |
+|---|---|
+| **Browse** | Contest cards showing the game thumbnail, name, entry fee, pot, players, time left |
+| **Lobby** | Rules, how scoring works, attempts allowed, play window, prize split, current leaderboard, Play button |
+| **Play** | The iframe, plus a slim ChartVolt header with attempts remaining and time left |
+| **Result** | Their score with breakdown, current position, attempts left, replay link |
+| **Final** | Final standings, prize won, credits added, points/XP/badges earned |
+
+Everything except the Play screen is shared with trading contests. Only the middle
+step differs - the same principle as the `New games plan`.
+
+### 5.1 Practice
+
+If the provider supports it, offer a free practice round from the lobby. Players
+will not pay to enter a game they have never seen, and a practice round costs
+nothing but a provider call.
+
+Practice rounds are marked `mode: practice`, are never scored, never counted as
+attempts, and never appear on a leaderboard.

@@ -1,22 +1,22 @@
 /**
  * Recovery Script: Recalculate Participant Stats from Trade History
- * 
+ *
  * This script fixes participant statistics for competitions where the totalTrades
  * counter bug caused stats to remain at 0. It reconstructs accurate stats from
  * the TradeHistory records that were successfully saved.
- * 
+ *
  * Usage: ts-node scripts/fix-participant-stats.ts [competitionId]
  */
 
-import { connectToDatabase } from '@/database/mongoose';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import mongoose from 'mongoose';
+import { connectToDatabase } from "@/database/mongoose";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import mongoose from "mongoose";
 
 async function recalculateParticipantStats(competitionId?: string) {
   try {
     await connectToDatabase();
-    console.log('🔗 Connected to database');
+    console.log("🔗 Connected to database");
 
     // Find participants to fix
     const query = competitionId ? { competitionId } : { totalTrades: 0 };
@@ -25,7 +25,7 @@ async function recalculateParticipantStats(competitionId?: string) {
     console.log(`\n📊 Found ${participants.length} participants to fix`);
 
     if (participants.length === 0) {
-      console.log('✅ No participants need fixing!');
+      console.log("✅ No participants need fixing!");
       return;
     }
 
@@ -39,7 +39,9 @@ async function recalculateParticipantStats(competitionId?: string) {
       const trades = await TradeHistory.find({ participantId }).lean();
 
       if (trades.length === 0) {
-        console.log(`  ⚠️  ${participant.username}: No trade history found (skipping)`);
+        console.log(
+          `  ⚠️  ${participant.username}: No trade history found (skipping)`,
+        );
         skipped++;
         continue;
       }
@@ -95,10 +97,16 @@ async function recalculateParticipantStats(competitionId?: string) {
       });
 
       console.log(`  ✅ ${participant.username}:`);
-      console.log(`     Trades: ${totalTrades} (${winningTrades}W/${losingTrades}L)`);
-      console.log(`     P&L: $${totalPnL.toFixed(2)} (${pnlPercentage.toFixed(2)}%)`);
+      console.log(
+        `     Trades: ${totalTrades} (${winningTrades}W/${losingTrades}L)`,
+      );
+      console.log(
+        `     P&L: $${totalPnL.toFixed(2)} (${pnlPercentage.toFixed(2)}%)`,
+      );
       console.log(`     Win Rate: ${winRate.toFixed(1)}%`);
-      console.log(`     Capital: $${participant.startingCapital} → $${currentCapital.toFixed(2)}`);
+      console.log(
+        `     Capital: $${participant.startingCapital} → $${currentCapital.toFixed(2)}`,
+      );
 
       fixed++;
     }
@@ -107,7 +115,7 @@ async function recalculateParticipantStats(competitionId?: string) {
     console.log(`   Fixed: ${fixed} participants`);
     console.log(`   Skipped: ${skipped} participants (no trades)`);
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error("❌ Error:", error);
     throw error;
   } finally {
     await mongoose.disconnect();
@@ -125,11 +133,10 @@ if (competitionId) {
 
 recalculateParticipantStats(competitionId)
   .then(() => {
-    console.log('\n🎉 Done!');
+    console.log("\n🎉 Done!");
     process.exit(0);
   })
   .catch((error) => {
-    console.error('\n❌ Failed:', error);
+    console.error("\n❌ Failed:", error);
     process.exit(1);
   });
-

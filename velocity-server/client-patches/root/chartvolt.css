@@ -1,0 +1,268 @@
+/* ChartVolt patch layer (28 Sep 2026). Loaded LAST by tools/build.mjs, after style.css and ui-polish.css.
+   Reason: the vendor sheets stack many overlapping media-query overrides; rather than edit them, every
+   rule here is scoped with an id (and, for the race HUD, html body[data-state][data-mode]) so it wins
+   regardless of which vendor breakpoint also matches. See CHARTVOLT-PATCHES.md. */
+
+/* ---------- Start screen (hangar): never scrolls, launch always visible ---------- */
+html #hangar.cv-hangar{position:absolute;inset:0;display:grid;box-sizing:border-box;overflow:hidden;
+  grid-template-columns:minmax(280px,32%) minmax(0,1fr) minmax(260px,27%);
+  grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"intro stage ship" "dock dock dock";
+  gap:16px 22px;padding:var(--cv-hangar-top,110px) 28px 18px;align-items:start;
+  background:linear-gradient(90deg,#030914f0,#050e1dc4 24%,#05101c00 44%,#05101c00 66%,#050e1dcc 82%,#030914ee),
+    linear-gradient(0deg,#030914f5,#03091400 38%)}
+/* Reason (6 Oct 2026, owner): fullscreen / large viewports scale mute·pause·settings up to
+   68px while hangar top padding stayed 88px, so the buttons sat on the ship panel. Reserve
+   space from the header row (logo + actions) and keep hangar action buttons at a fixed size. */
+html body[data-state=hangar]{
+  --cv-hangar-top:max(110px,calc(24px + 70px + 20px));
+}
+@media (min-width:1100px) and (min-height:650px){
+  html body[data-state=hangar]{
+    --cv-hangar-top:max(128px,calc(2.4vh + 70px + 24px));
+  }
+}
+html body[data-state=hangar] header .actions button{
+  width:48px;height:48px;min-width:48px;
+}
+html body[data-state=hangar] header .actions button svg{width:22px;height:22px}
+#hangar .cv-intro{grid-area:intro;min-height:0;overflow:hidden}
+#hangar .cv-intro h1{font-size:clamp(30px,3.4vw,56px);line-height:.95;margin:10px 0 14px;white-space:normal}
+#hangar .cv-intro h1 em{display:block}
+#hangar .cv-intro .rule{margin:0 0 12px}
+#hangar .cv-intro .track-choice{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+#hangar .cv-intro .track-choice>div{flex:1 1 100%;min-width:0}
+#hangar .cv-intro .track-choice button{min-height:38px;padding:0 14px;border-radius:8px}
+
+#hangar .cv-ship{grid-area:ship;min-height:0;max-height:100%;overflow-y:auto;scrollbar-width:thin;box-sizing:border-box;
+  padding:16px 18px;border:1px solid var(--edge);border-radius:12px;background:#071524d6;backdrop-filter:blur(8px);
+  box-shadow:inset 0 1px 0 #b5eaff22,0 12px 32px #0006}
+#hangar .cv-ship .selection{display:grid;gap:4px;margin:0 0 8px}
+#hangar .cv-ship #shipName{font-size:26px;font-weight:800;letter-spacing:1.5px;color:#f1fdff}
+#hangar .cv-ship #shipDescription{margin:0 0 12px;font-size:12px;line-height:1.45;color:var(--muted)}
+#hangar .cv-ship #shipStats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;margin:0 0 12px}
+#hangar .cv-ship #shipTradeoffs{margin:0 0 10px}
+#hangar .cv-ship .personal-best{margin:0}
+
+/* Reason (6 Oct 2026, owner): eight 1fr columns squeezed names to "VANGU"/"TEMPE".
+   Two rows of four keep every ship label readable in the practice/arena frame. */
+#hangar .cv-dock{grid-area:dock;display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,240px);gap:14px 18px;align-items:end;
+  padding:14px 16px;border:1px solid var(--edge);border-radius:14px;background:#061321e0;backdrop-filter:blur(10px);
+  box-shadow:0 -10px 40px #0005}
+#hangar .cv-label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 0 8px;
+  font:10px ui-monospace,monospace;letter-spacing:2px;color:var(--muted)}
+#hangar .cv-label b{color:#e8fbff;font-weight:700}
+#hangar .cv-fleet .ship-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:3px 0 0}
+#hangar .ship-picker button{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;
+  min-height:68px;min-width:0;padding:10px 12px 10px 16px;margin:0;text-align:left;overflow:hidden;
+  font:800 12px/1.15 Arial,Helvetica,sans-serif;letter-spacing:.5px;color:#e8fbff;white-space:nowrap;text-overflow:ellipsis;
+  border:1px solid #6bcce945;border-radius:9px;cursor:pointer;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--paint) 26%,#0b1c2c),#06121f 78%);
+  transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+#hangar .ship-picker button i{position:absolute;left:0;top:8px;bottom:8px;width:4px;height:auto;margin:0;border-radius:0 3px 3px 0;
+  background:var(--paint);box-shadow:0 0 12px var(--paint)}
+#hangar .ship-picker button span{display:block;margin:0 0 4px;font:9px ui-monospace,monospace;letter-spacing:1px;color:var(--muted)}
+#hangar .ship-picker button:hover:not(:disabled){transform:translateY(-2px);border-color:#9fe8ffaa}
+#hangar .ship-picker button[aria-pressed=true]{transform:translateY(-3px);border-color:var(--paint);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--paint) 48%,#0b1c2c),#07162a 82%);
+  box-shadow:0 0 0 1px var(--paint),0 0 24px color-mix(in srgb,var(--paint) 50%,transparent)}
+#hangar .ship-picker button[aria-pressed=true] span{color:#f1fdff}
+#hangar .ship-picker button:disabled{opacity:.5;cursor:default}
+
+#hangar .cv-launch{display:grid;gap:8px}
+#hangar .cv-launch #play{width:100%;min-height:62px;margin:0;border:0;border-radius:11px;cursor:pointer;
+  font:800 16px/1 Arial,Helvetica,sans-serif;letter-spacing:2px;color:#03121d;
+  background:linear-gradient(90deg,#3de1ff,#7af0c8);box-shadow:0 0 30px #3de1ff66;animation:cv-launch-glow 2.4s ease-in-out infinite}
+#hangar .cv-launch #play:disabled{opacity:.55;animation:none;cursor:default}
+#hangar .cv-keys{font:10px/1.6 ui-monospace,monospace;color:var(--muted);text-align:center}
+#hangar .cv-keys b{color:#e8fbff}
+@keyframes cv-launch-glow{0%,100%{box-shadow:0 0 22px #3de1ff55}50%{box-shadow:0 0 40px #3de1ffaa}}
+
+/* CHARTVOLT PATCH (13 Oct 2026, owner: "the start menu needs better organisation, graphics and flow").
+   The hangar reads as three numbered steps - 01 circuit, 02 ship, 03 launch - so a first-time player
+   sees the order to work through. The circuit is a card with the track's own outline (cloned from
+   the picker by main.js); a race that fixes the circuit says so instead of showing two dead buttons. */
+#hangar .cv-step{margin:4px 0 0}
+#hangar .cv-step-head{display:flex;align-items:center;gap:8px;margin:0 0 8px;font:10px ui-monospace,monospace;letter-spacing:2px;color:var(--muted)}
+#hangar .cv-step-head b,#hangar .cv-label b em{display:inline-grid;place-items:center;min-width:22px;height:18px;padding:0 4px;margin-right:6px;
+  border-radius:5px;background:linear-gradient(90deg,#3de1ff,#7af0c8);color:#03121d;font:800 10px/1 Arial,Helvetica,sans-serif;letter-spacing:0;font-style:normal;
+  box-shadow:0 0 12px #3de1ff55}
+#hangar .cv-step-head b{margin-right:0}
+#hangar .cv-track-card{display:grid;grid-template-columns:104px minmax(0,1fr);gap:14px;align-items:center;padding:12px;
+  border:1px solid var(--edge);border-top:2px solid #5fe3f4b0;border-radius:12px;
+  background:linear-gradient(150deg,#0b2236ee,#050f1cee 75%);box-shadow:inset 0 1px 0 #d4f6ff14,0 12px 32px #0007}
+#hangar .cv-track-preview{display:grid;place-items:center;aspect-ratio:5/4;border-radius:9px;border:1px solid #86dcff22;
+  background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--track-color,#5fe3f4) 16%,#0b2131),#040b15 75%)}
+#hangar .cv-track-preview svg{width:88%;height:auto}
+#hangar .cv-track-preview polygon{fill:color-mix(in srgb,var(--track-color,#5fe3f4) 12%,transparent);stroke:var(--track-color,#5fe3f4);
+  stroke-width:2.6;stroke-linejoin:round;filter:drop-shadow(0 0 3px var(--track-color,#5fe3f4))}
+#hangar .cv-intro .track-choice{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0;padding:0;border:0;background:none}
+#hangar .cv-intro .track-choice>div{display:grid;gap:3px;flex:1 1 100%;min-width:0}
+#hangar .cv-intro #trackName{display:block;font:800 18px/1.1 Arial,Helvetica,sans-serif;letter-spacing:1px;color:#f1fdff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hangar .cv-intro #trackMeta{font:10px ui-monospace,monospace;letter-spacing:1.2px;color:#9fe8ff}
+#hangar .cv-intro #environmentName{margin:0}
+#hangar .cv-intro .track-choice button{flex:1 1 0;min-height:38px;padding:0 12px;border-radius:8px;white-space:nowrap}
+#hangar .cv-intro #chooseTrack{border:1px solid #5fe3f4;background:#0b2a3c;color:#e8fbff}
+#hangar .cv-track-locked{display:none;font:10px ui-monospace,monospace;letter-spacing:1px;color:var(--muted)}
+#hangar .track-choice:has(#chooseTrack:disabled) :is(#chooseTrack,#shuffle){display:none}
+#hangar .track-choice:has(#chooseTrack:disabled) .cv-track-locked{display:block}
+/* Owner, 14 Oct 2026 ("CALDERA IGNITI..."): the circuit name wraps to two lines instead of being cut,
+   and a smaller outline leaves the name and the two track buttons more of the card's width. */
+#hangar .cv-intro #trackName{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#hangar .cv-track-card{grid-template-columns:84px minmax(0,1fr)}
+#hangar .cv-launch .cv-label{margin:0}
+#hangar .cv-ship{border-top:2px solid #5fe3f4b0}
+
+/* Lobby list (multiplayer) sits over the empty centre of the hangar, not over the controls. */
+html body[data-state=hangar][data-mode] #liveStandings{left:50%;right:auto;top:calc(var(--cv-hangar-top,110px) + 8px);transform:translateX(-50%);
+  width:min(300px,30vw);max-height:calc(100dvh - 330px);overflow:auto}
+
+/* Tablet / narrow window: two columns, fleet above the launch button. */
+@media (max-width:900px){
+  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"intro ship" "dock dock";padding:var(--cv-hangar-top,110px) 22px 18px}
+  #hangar .cv-dock{grid-template-columns:minmax(0,1fr)}
+  html body[data-state=hangar][data-mode] #liveStandings{top:auto;bottom:calc(100% - var(--cv-hangar-top,110px));opacity:0;pointer-events:none}
+}
+@media (max-width:900px) and (min-height:900px){
+  html #hangar.cv-hangar{grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"intro ship" "stage stage" "dock dock"}
+  #hangar .cv-fleet .ship-picker{grid-template-columns:repeat(4,minmax(0,1fr))}
+  html body[data-state=hangar][data-mode] #liveStandings{top:auto;bottom:auto;opacity:1;pointer-events:auto}
+}
+
+/* Phone portrait: one column; ships become a swipe strip.
+   CHARTVOLT PATCH (14 Oct 2026, owner: "The menu is squeezed i cant see the ships on mobile").
+   Reason: the camera centres the ship on screen, and the stacked title, step heads, ship name,
+   description, trade-offs and personal best left the "stage" row with no height, so the stats
+   panel sat on top of the ship. The carousel already names the ship, so the panel keeps only
+   the four stats in one row and the stage is guaranteed a quarter of the screen. */
+@media (max-width:600px){
+  html body[data-state=hangar]{--cv-hangar-top:max(74px,calc(12px + 44px + 14px))}
+  html #hangar.cv-hangar{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(24dvh,1fr) auto auto;
+    grid-template-areas:"intro" "stage" "ship" "dock";gap:8px;padding:var(--cv-hangar-top,74px) 10px max(10px,env(safe-area-inset-bottom))}
+  #hangar .cv-intro :is(.eyebrow,h1,.rule,.cv-step-head,#environmentName),
+  #hangar .cv-ship :is(.selection,#shipDescription,#shipTradeoffs,.personal-best),
+  #hangar .cv-keys,#hangar .cv-dock .cv-label{display:none}
+  #hangar .cv-step{margin:0}
+  #hangar .cv-ship{padding:8px 10px;max-height:none;overflow:visible}
+  #hangar .cv-ship #shipStats{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 8px;margin:0}
+  #hangar .cv-dock{padding:8px 10px;gap:6px}
+  #hangar .cv-track-card{grid-template-columns:44px minmax(0,1fr);gap:8px;padding:6px 8px}
+  #hangar .cv-intro #trackName{font-size:13px;-webkit-line-clamp:1}
+  #hangar .cv-intro .track-choice{gap:6px}
+  #hangar .cv-intro .track-choice button{min-height:32px;padding:0 6px}
+}
+/* Ship carousel (owner's HUD spec s25): desktop keeps the 4x2 grid; phones get ‹ name › plus dots and swipe. */
+#hangar .cv-carousel,#hangar .cv-dots,#hangar .cv-browse-swipe{display:none}
+@media (max-width:600px),(max-height:500px){
+  #hangar.cv-hangar{touch-action:pan-y}
+  #hangar .cv-fleet .ship-picker,#hangar .cv-browse-keys{display:none}
+  #hangar .cv-browse-swipe{display:inline}
+  #hangar .cv-carousel{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:8px;margin:6px 0 0}
+  #hangar .cv-carousel>div{display:grid;justify-items:center;gap:2px;min-width:0}
+  #hangar .cv-carousel small{font:600 11px/1 system-ui,sans-serif;letter-spacing:.14em;color:var(--muted)}
+  #hangar .cv-carousel b{font:800 18px/1.1 system-ui,sans-serif;letter-spacing:.06em;color:#e8fbff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  #hangar .cv-carousel button{min-height:48px;border:1px solid #9fe8ff55;border-radius:10px;background:#0b1a2acc;color:#9fe8ff;font:700 26px/1 system-ui,sans-serif;cursor:pointer}
+  #hangar .cv-carousel button:active{background:#13304acc}
+  #hangar .cv-fleet:has([data-ship]:disabled) .cv-carousel button{opacity:.35;pointer-events:none}
+  #hangar .cv-dots{display:flex;justify-content:center;gap:7px;margin:8px 0 0}
+  #hangar .cv-dots i{width:7px;height:7px;border-radius:50%;background:#ffffff33;transition:transform .15s,background .15s}
+  #hangar .cv-dots i.on{background:var(--paint,#9fe8ff);transform:scale(1.35)}
+  #hangar .cv-launch #play{min-height:52px;font-size:14px}
+  /* Reason: 9-10px thin monospace over backdrop-filter glass renders soft on phone GPUs; the owner reported it as blurry. Larger, heavier type on a solid panel. */
+  #hangar .cv-ship,#hangar .cv-dock{backdrop-filter:none;-webkit-backdrop-filter:none;background-color:#07111ef2}
+  #hangar .cv-label,#hangar .cv-step-head,#hangar .cv-intro #trackMeta,#hangar .cv-track-locked,#hangar #trackStatus{font:600 11px/1.35 system-ui,sans-serif;letter-spacing:.08em}
+  #hangar .cv-intro .track-choice button{font:700 12px/1 system-ui,sans-serif;letter-spacing:.06em}
+  #hangar #shipStats span{font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.06em}
+  #hangar #shipStats strong{font-size:14px}
+  #hangar{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+}
+
+/* Phone landscape / very short windows.
+   CHARTVOLT PATCH (14 Oct 2026, owner: the ship panel overlapped the circuit card, the dock covered
+   the bottom and there was no room for the 3D ship). Reason: in a wide viewport scene.js shifts the
+   orbit target so the ship renders right of centre - exactly under the old right-hand ship panel and
+   above the full-width dock. Everything now stacks in one left column and the right side is the stage. */
+@media (max-height:500px){
+  html body[data-state=hangar]{--cv-hangar-top:max(52px,calc(8px + 44px))}
+  html #hangar.cv-hangar{grid-template-columns:min(300px,44vw) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"intro stage" "ship stage" "dock stage";gap:6px 14px;
+    padding:var(--cv-hangar-top,52px) 14px max(8px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+  #hangar .cv-intro :is(.eyebrow,h1,.rule,.cv-step-head,#environmentName),
+  #hangar .cv-ship :is(.selection,#shipDescription,#shipTradeoffs,.personal-best),
+  #hangar .cv-keys,#hangar .cv-dock .cv-label{display:none}
+  #hangar .cv-step{margin:0}
+  #hangar .cv-track-card{grid-template-columns:44px minmax(0,1fr);gap:8px;padding:6px 8px}
+  #hangar .cv-intro #trackName{font-size:13px;-webkit-line-clamp:1}
+  #hangar .cv-intro .track-choice{gap:6px}
+  #hangar .cv-intro .track-choice button{min-height:30px;padding:0 6px}
+  #hangar .cv-ship{align-self:start;padding:7px 10px}
+  #hangar .cv-ship #shipStats{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;margin:0}
+  #hangar .cv-dock{grid-template-columns:minmax(0,1fr);padding:6px 8px;gap:6px}
+}
+/* Phone hangar, both orientations: tighter stats and carousel (after the carousel block so these win). */
+@media (max-width:600px),(max-height:500px){
+  #hangar #shipStats span{font-size:9.5px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #hangar #shipStats strong{font-size:12.5px}
+  #hangar .cv-carousel{grid-template-columns:40px minmax(0,1fr) 40px;margin:0}
+  #hangar .cv-carousel button{min-height:40px;font-size:22px}
+  #hangar .cv-carousel b{font-size:16px}
+  #hangar .cv-dots{margin:4px 0 0}
+  #hangar .cv-launch #play{min-height:44px}
+}
+@media (max-height:500px){#hangar .cv-launch #play{min-height:40px}}
+
+/* CHARTVOLT PATCH (14 Oct 2026, owner: show the pre-race tips on the ship screen - camera, connection,
+   graphics, device). Most screens have no room for four lines beside the ship (a 768px laptop puts the ship
+   dock straight over them), so the default is ONE tip at a time, rotating every 4s, next to the Settings
+   button. Only a tall screen (900px+) has the space to list all four at once. */
+#hangar .cv-tips{margin:10px 0 0;padding:7px 9px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;
+  border:1px solid var(--edge);border-left:2px solid #7af0c8b0;border-radius:12px;background:linear-gradient(150deg,#0a1f30e6,#050f1ce6 75%)}
+#hangar .cv-tips-head{display:contents}
+#hangar .cv-tips-head b,#hangar .cv-tips small{display:none}
+#hangar #cvTipsSettings{grid-column:2;grid-row:1;min-height:30px;padding:0 9px;border:1px solid #5fe3f4;border-radius:7px;background:#0b2a3c;
+  color:#e8fbff;font:700 10px/1 system-ui,sans-serif;letter-spacing:.08em;cursor:pointer;white-space:nowrap}
+#hangar .cv-tips ul{grid-column:1;grid-row:1;display:grid;margin:0;padding:0;list-style:none}
+#hangar .cv-tips li b{font:700 10px ui-monospace,monospace;letter-spacing:1.5px;color:#9fe8ff}
+/* Every tip shares one grid cell, so the box is as tall as the longest and nothing below it jumps. */
+#hangar .cv-tips li{grid-area:1/1;display:grid;grid-template-columns:minmax(0,1fr);gap:1px;font:11.5px/1.3 system-ui,sans-serif;color:#cfe9f2;
+  opacity:0;animation:cv-tip 16s infinite;animation-delay:calc(var(--i) * 4s)}
+@media (max-height:500px){#hangar .cv-tips{margin:6px 0 0;padding:5px 8px}#hangar .cv-tips li{font-size:10.5px;line-height:1.25}
+  #hangar .cv-tips li b{font-size:9px}#hangar #cvTipsSettings{min-height:28px}}
+@media (min-width:601px) and (min-height:900px){
+  #hangar .cv-tips{display:block;padding:10px 12px;margin:12px 0 0}
+  #hangar .cv-tips-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:0 0 6px}
+  #hangar .cv-tips-head b{display:inline;font:700 10px ui-monospace,monospace;letter-spacing:2px;color:#7af0c8}
+  #hangar .cv-tips ul{gap:5px}
+  #hangar .cv-tips li{grid-area:auto;grid-template-columns:92px minmax(0,1fr);gap:8px;align-items:baseline;font-size:12px;opacity:1;animation:none}
+  #hangar .cv-tips small{display:block;margin:6px 0 0;font:11px/1.3 system-ui,sans-serif;color:var(--muted)}
+}
+@keyframes cv-tip{0%{opacity:0}3%,22%{opacity:1}25%,100%{opacity:0}}
+
+/* ---------- Power-up pickup: banner + equipment-slot pulse ---------- */
+#pickupFlash{position:absolute;left:50%;top:22%;z-index:30;display:flex;align-items:center;gap:12px;padding:8px 22px 8px 8px;
+  border-radius:999px;border:1px solid var(--pickup,#65e7ff);pointer-events:none;visibility:hidden;opacity:0;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--pickup,#65e7ff) 42%,#061321),#061321e8);
+  box-shadow:0 0 30px color-mix(in srgb,var(--pickup,#65e7ff) 55%,transparent);
+  color:#effcff;font:800 13px/1 Arial,Helvetica,sans-serif;letter-spacing:2px;white-space:nowrap;transform:translateX(-50%)}
+#pickupFlash b{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--pickup,#65e7ff);color:#03121d;font-size:18px}
+#pickupFlash.show{visibility:visible;animation:cv-pickup 1.5s ease-out forwards}
+@keyframes cv-pickup{0%{opacity:0;transform:translate(-50%,10px) scale(.8)}12%{opacity:1;transform:translate(-50%,0) scale(1.08)}
+  24%{transform:translate(-50%,0) scale(1)}78%{opacity:1}100%{opacity:0;transform:translate(-50%,-14px) scale(.96)}}
+#useItem.got{animation:cv-slot .9s ease-out}
+@keyframes cv-slot{0%{box-shadow:0 0 0 0 var(--pickup-slot,#65e7ff)}30%{scale:1.06;box-shadow:0 0 0 3px var(--pickup-slot,#65e7ff),0 0 34px var(--pickup-slot,#65e7ff)}
+  100%{scale:1}}
+@media (prefers-reduced-motion:reduce){
+  #pickupFlash.show{animation:cv-pickup-still 1.5s linear forwards}
+  #useItem.got{animation:none;outline:2px solid var(--pickup-slot,#65e7ff)}
+  #hangar .cv-launch #play{animation:none}
+}
+@keyframes cv-pickup-still{0%,85%{opacity:1}100%{opacity:0}}
+/* CHARTVOLT PATCH (14 Oct 2026): the race HUD layout - zones, cards, controls, menu - lives in root/cv-hud.css. */
+
+/* CHARTVOLT PATCH (13 Oct 2026, owner: scrolling to the end during a race crashed the game): the frame never scrolls or rubber-bands, and during a race no touch gesture is handed to the browser at all. */
+html,body{overscroll-behavior:none}
+body[data-state]:not([data-state=hangar]){touch-action:none;overflow:hidden}
+
+/* CHARTVOLT PATCH (13 Oct 2026, owner: "move the leave race and put it into the settings for both versions"): the vendor pins #leaveRace to a corner of the race screen; inside Settings it is an ordinary full-width button above DONE. Display is left to .hidden, so the button still only appears in a live race. */
+#settingsDialog #leaveRace{position:static;inset:auto;width:100%;margin:14px 0 8px;padding:12px;font-size:13px;font-weight:700;letter-spacing:.08em;border:1px solid #ff94867a;background:#291721;color:#ffd4ce;border-radius:8px;cursor:pointer}
+#settingsDialog #leaveRace.hidden{display:none}

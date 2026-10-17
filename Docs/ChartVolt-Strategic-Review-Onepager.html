@@ -1,0 +1,289 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ChartVolt &mdash; Strategic Review: Overview &amp; Action Steps</title>
+<style>
+  :root {
+    --navy: #0f2a43;
+    --navy-2: #16395c;
+    --gold: #b8912f;
+    --ink: #1c2733;
+    --muted: #5b6b7b;
+    --green: #1d6b46;
+    --green-bg: #eef7f1;
+    --amber: #8f6208;
+    --amber-bg: #fdf6e6;
+    --red: #8c2f39;
+    --red-bg: #faeef0;
+    --blue-bg: #eef3f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4; margin: 0; }
+  body {
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+    color: var(--ink);
+    font-size: 6.15pt;
+    line-height: 1.235;
+  }
+  .page {
+    width: 210mm; height: 297mm;
+    padding: 7mm 8.5mm 5mm 8.5mm;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* header */
+  .head {
+    border-bottom: 1.6px solid var(--gold);
+    padding-bottom: 1.9mm; margin-bottom: 2.2mm;
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .head h1 { font-size: 13pt; color: var(--navy); font-weight: 700; letter-spacing: -0.2px; }
+  .head .sub { font-size: 7.1pt; color: var(--muted); margin-top: 0.5mm; }
+  .head .right { text-align: right; font-size: 6.3pt; color: var(--muted); line-height: 1.45; }
+  .head .right b { color: var(--navy); }
+
+  /* thesis banner */
+  .thesis {
+    background: var(--navy); color: #fff;
+    border-radius: 1.4mm; padding: 1.8mm 3mm; margin-bottom: 1.9mm;
+    display: flex; align-items: center; gap: 3.4mm;
+  }
+  .thesis .q { font-size: 8.2pt; font-style: italic; flex: 1; }
+  .thesis .a {
+    font-size: 6.9pt; font-weight: 700; color: #ffd979;
+    border-left: 1px solid rgba(255,217,121,.45); padding-left: 3.4mm; width: 60mm;
+  }
+
+  /* columns */
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 2.8mm; flex: 1; }
+  .col { display: flex; flex-direction: column; gap: 1.6mm; }
+
+  .card { border: 0.5px solid #d5dce3; border-radius: 1.2mm; overflow: hidden; }
+  .card > .t {
+    background: #eef2f6; color: var(--navy);
+    font-size: 6.6pt; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    padding: 1mm 2mm; border-bottom: 0.5px solid #d5dce3;
+  }
+  .card > .b { padding: 1.3mm 2mm; }
+  .card.g > .t { background: var(--green-bg); color: var(--green); }
+  .card.a > .t { background: var(--amber-bg); color: var(--amber); }
+  .card.r > .t { background: var(--red-bg); color: var(--red); }
+  .card.n > .t { background: var(--blue-bg); color: var(--navy-2); }
+
+  ul { margin-left: 2.9mm; }
+  li { margin-bottom: 0.7mm; }
+  li:last-child { margin-bottom: 0; }
+  b, strong { color: var(--navy); }
+  .m { color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 5.8pt; text-transform: uppercase; letter-spacing: .04em;
+       color: #fff; background: var(--navy-2); padding: 0.7mm 1.3mm; text-align: left; }
+  td { font-size: 6.1pt; padding: 0.55mm 1.3mm; border-bottom: 0.4px solid #e3e8ed; }
+  tr:nth-child(even) td { background: #f7f9fb; }
+  .tag { font-size: 5.8pt; font-weight: 700; padding: 0.2mm 1.2mm; border-radius: 2mm; white-space: nowrap; }
+  .tag.go { background: var(--green-bg); color: var(--green); border: .4px solid #bcdccb; }
+  .tag.mid { background: var(--amber-bg); color: var(--amber); border: .4px solid #ecd9a8; }
+  .tag.no { background: var(--red-bg); color: var(--red); border: .4px solid #e6c2c7; }
+
+  .flow {
+    background: #f7f4ec; border-left: 2px solid var(--gold);
+    padding: 1.3mm 2mm; font-size: 6.4pt; margin-top: 1.1mm;
+  }
+  .flow code { font-family: Consolas, monospace; font-size: 6.2pt; color: var(--navy); }
+
+  /* actions */
+  .actions { margin-top: 1.9mm; }
+  .actions .t {
+    background: var(--navy); color: #fff; font-size: 7pt; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase; padding: 1.3mm 2.6mm;
+    border-radius: 1.2mm 1.2mm 0 0;
+  }
+  .agrid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    border: 0.5px solid #d5dce3; border-top: none; border-radius: 0 0 1.4mm 1.4mm;
+  }
+  .act { padding: 1.3mm 2mm; border-right: 0.5px solid #e3e8ed; border-bottom: 0.5px solid #e3e8ed; }
+  .act:nth-child(3n) { border-right: none; }
+  .act:nth-child(n+4) { border-bottom: none; }
+  .act .n {
+    display: inline-block; width: 3.3mm; height: 3.3mm; border-radius: 50%;
+    background: var(--gold); color: #fff; font-size: 6pt; font-weight: 700;
+    text-align: center; line-height: 3.3mm; margin-right: 1.2mm;
+  }
+  .act .h { font-size: 6.9pt; font-weight: 700; color: var(--navy); display: inline; }
+  .act .meta { font-size: 5.9pt; color: var(--gold); font-weight: 700; margin: 0.6mm 0 0.4mm 0; text-transform: uppercase; letter-spacing: .03em; }
+  .act .d { font-size: 6.3pt; }
+
+  .foot {
+    margin-top: 1.4mm; border-top: 0.5px solid #d5dce3; padding-top: 0.9mm;
+    display: flex; justify-content: space-between; font-size: 5.9pt; color: #8a97a5;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="head">
+    <div>
+      <h1>ChartVolt &mdash; Strategic Review: Overview &amp; Action Steps</h1>
+      <div class="sub">Group-level audit of the business plan, presentation, whitepaper and regulatory defence pack &mdash; summarised for founder response</div>
+    </div>
+    <div class="right"><b>Source</b> Murad (Group) + AI strategic audit<br/><b>Legal architecture</b> Lambros<br/><b>Horizon</b> Next 90 days</div>
+  </div>
+
+  <div class="thesis">
+    <div class="q">&ldquo;Did we build a trading game &mdash; or did we actually build the operating system for competitive skill?&rdquo;</div>
+    <div class="a">PRELIMINARY ANSWER: THE SECOND.<br/>
+      <span style="font-weight:400;color:#dbe4ee;">Forex-only = 6.5&ndash;7/10 (&euro;10&ndash;30M). Skill platform = 8.5/10 (&euro;100M+).</span></div>
+  </div>
+
+  <div class="cols">
+    <!-- LEFT -->
+    <div class="col">
+
+      <div class="card n">
+        <div class="t">1 &middot; The Repositioning (not a pivot)</div>
+        <div class="b">
+          <ul>
+            <li>Reframe from <em>&ldquo;gamified forex platform&rdquo;</em> to <b>infrastructure for real-money skill competitions</b>, trading being the first and highest-ARPU vertical.</li>
+            <li><b>Do NOT change direction or build many games now.</b> Trading stays the first product: launch, validate behaviour, establish real unit economics.</li>
+            <li>The single ask: ensure <b>architecture, legal structure and roadmap do not lock us into being only a Forex company</b>.</li>
+            <li>Positioning is commercial, not cosmetic: &ldquo;pay &euro;500 to simulate leveraged forex&rdquo; reads as prop-trading/gambling to banks, Visa, Google/Meta and investors &mdash; even if legally neither. Chess is a <b>portability + regulatory test</b>, not a new business.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card g">
+        <div class="t">2 &middot; What is already validated</div>
+        <div class="b">
+          <ul>
+            <li><b>Much of a Skill Competition OS already exists</b> and is not trading-specific: ELO matchmaking, tournaments, leaderboards, achievements, social layer, creator/Game Master mechanics, anti-cheat, escrow, prize distribution, wallet, KYC, fraud detection, marketplace, XP/levels, white-label.</li>
+            <li><b>Defence-pack architecture is correct</b> and must be preserved:</li>
+          </ul>
+          <div class="flow"><code>market performance &rarr; score &rarr; rank &rarr; fixed prize</code> &nbsp;<span class="m">not <code>market movement &rarr; monetary return</code>. ESMA&rsquo;s Feb 2026 economic-substance statement makes preserving the absence of leveraged exposure critical.</span></div>
+          <ul style="margin-top:1.1mm;">
+            <li><b>Category proof &mdash; Skillz (2025):</b> ~$542M GMV &middot; ~658K MAU &middot; ~141K paying MAU &middot; ~400K paid tournaments/day &middot; $37M+ prizes/month.</li>
+            <li><b>Equal warning:</b> ~$104.5M revenue but ~$70M loss (Adj. EBITDA &asymp; &minus;$50.5M). The market is real, but a high take rate alone is not a business &mdash; CAC, incentives, compliance and fraud can consume it.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card r">
+        <div class="t">3 &middot; Where the plan is challenged</div>
+        <div class="b">
+          <ul>
+            <li><b>Financial model too optimistic.</b> 500 users &rarr; &euro;560K Yr-1 = &euro;1,120/user. Competitions alone &euro;280K at a <b>30% rake</b> on &euro;500 average entry (4 comps/wk &times; 8 traders &times; &euro;500 &times; 30%). Skillz retains only <b>16&ndash;20%</b>, part shared with developers.</li>
+            <li><b>LTV &euro;1,516 and LTV:CAC 10.5&times; (Yr 1) &rarr; 39.9&times; (Yr 3) are hypotheses, not unit economics.</b> Rebuild as:
+              <div class="flow" style="margin:0.8mm 0 0 0;"><code>MAU &rarr; participation &rarr; paid conversion &rarr; entries/player/month &rarr; avg entry &rarr; GMV &rarr; take rate &rarr; net revenue</code></div>
+            </li>
+            <li><b>Game Master structure carries risk.</b> Drop the <em>&ldquo;&euro;0 CAC for GM-referred users&rdquo;</em> claim &mdash; 2&ndash;15% participation is a variable acquisition cost. &euro;1,000/mo &ldquo;Legend&rdquo; + 15% referral resembles an affiliate/gambling acquisition network. <b>Rename to Hosts / Captains / Tournament Creators</b>; base rewards on <b>tournament GMV share</b>, not pay-to-earn-from-recruits.</li>
+            <li><b>Regulatory question not closed.</b> EU gambling law is not harmonised &rarr; no single &ldquo;EU exemption&rdquo;; commission a master opinion + country-by-country matrix.</li>
+            <li><b>legal &ne; easy to acquire.</b> MCC 5816 (skilled-game wagering, incl. DFS) vs 7995 (games of chance): counsel must reconfirm, and schemes may still treat us as high-risk despite a strong opinion.</li>
+            <li><b>Re-price white-label</b> from &euro;6,000/mo + &euro;10,000 setup to <b>platform fee + SaaS + % of competition GMV</b>.</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col">
+
+      <div class="card">
+        <div class="t">4 &middot; Vertical strategy &mdash; three deliberate first games</div>
+        <div class="b">
+          <table>
+            <tr><th style="width:27%">Vertical</th><th style="width:13%">Skill</th><th style="width:15%">Monet.</th><th style="width:18%">Reg. load</th><th>Call</th></tr>
+            <tr><td><b>Simulated Trading</b><br/><span class="m">the wedge</span></td><td>8/10</td><td>10/10</td><td>High</td><td><span class="tag go">LAUNCH</span></td></tr>
+            <tr><td><b>Chess</b><br/><span class="m">regulatory + brand anchor</span></td><td>10/10</td><td>6/10</td><td>Low</td><td><span class="tag go">LAUNCH</span></td></tr>
+            <tr><td><b>Trivia / Puzzles</b><br/><span class="m">mass acquisition, &euro;1&ndash;10 entry</span></td><td>8&ndash;10/10</td><td>6&ndash;7/10</td><td>Low&ndash;Med</td><td><span class="tag go">CANDIDATE</span></td></tr>
+            <tr><td>Esports skill challenges</td><td>8/10</td><td>8/10</td><td>Medium</td><td><span class="tag mid">PHASE II</span></td></tr>
+            <tr><td>Fantasy sports &middot; Backgammon</td><td>6&ndash;7/10</td><td>7&ndash;9/10</td><td>Med&ndash;High</td><td><span class="tag mid">LATER</span></td></tr>
+            <tr><td>Coding competitions</td><td>10/10</td><td>5/10</td><td>Low</td><td><span class="tag mid">B2B</span></td></tr>
+            <tr><td>Poker &middot; Prediction markets</td><td>4&ndash;6/10</td><td>10/10</td><td>Extreme</td><td><span class="tag no">AVOID</span></td></tr>
+          </table>
+          <ul style="margin-top:1.1mm;">
+            <li><b>Identical economics prove the thesis:</b> Chess &euro;20 &times; 100 = &euro;2,000 pool (&euro;600 fee / &euro;1,400 prizes) vs Trading &euro;100 &times; 100 = &euro;10,000 pool (&euro;3,000 fee / &euro;7,000 prizes) &mdash; we monetise <em>competitive skill</em>, not financial exposure.</li>
+            <li>One account, wallet, identity and reputation &mdash; <b>ChartVolt Rating</b> per vertical (Trading 1840 &middot; Chess 1610 &middot; Logic 2015). Do <b>not</b> launch 30 games.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="t">5 &middot; The bigger model: B2B2C infrastructure &amp; moat</div>
+        <div class="b">
+          <ul>
+            <li><b>ChartVolt Competition SDK / API</b> &mdash; developers bring the game; we provide payments, KYC, wallet, escrow, matchmaking, ELO, tournaments, prize engine, fraud prevention, geo-eligibility, leaderboards, creator tools, disputes. In short: <b>Stripe + Skillz + Tournament OS</b>. Upside then stops depending on us acquiring millions of players ourselves &mdash; and white-label becomes platform strategy, not side revenue.</li>
+            <li><b>The moat is not software.</b> It is four things: <b>(1) Regulatory Passport</b> &mdash; opinion library + jurisdiction engine; <b>(2) Liquidity</b> &mdash; tournaments that fill fast; <b>(3) Universal Skill Identity</b>; <b>(4) Creator Network</b>.</li>
+          </ul>
+          <div class="flow"><code>players &rarr; liquidity &rarr; creators &rarr; more tournaments &rarr; developers &rarr; more games &rarr; more players</code></div>
+        </div>
+      </div>
+
+      <div class="card a">
+        <div class="t">6 &middot; Regulatory architecture (Lambros workstream)</div>
+        <div class="b">
+          <ul>
+            <li><b>Separate the layers:</b> ChartVolt <b>Platform</b> (tech/SDK/identity/matchmaking/scoring/white-label) &rarr; ChartVolt <b>Competitions</b> (tournament operator) &rarr; individual <b>Game Modules</b> (Trading &middot; Chess &middot; Trivia).</li>
+            <li><b>Change the legal question.</b> Not &ldquo;ChartVolt is not gambling,&rdquo; but: <em>&ldquo;ChartVolt operates paid competitive skill tournaments; each game is admitted only after demonstrating predominance of skill under the applicable jurisdictional test.&rdquo;</em></li>
+            <li>Every module needs its own <b>Skill Determination Memo, Jurisdiction Matrix, permitted countries, entry limits, age rules, marketing rules</b> &mdash; via a defined <b>Game Admission Procedure</b>.</li>
+            <li><b>Policies to create:</b> regulatory classification &middot; new-game approval &middot; country access &amp; geo-blocking &middot; payments/wallet &amp; prize-pool &middot; KYC/AML &amp; fraud &middot; responsible participation &middot; marketing &middot; complaints &amp; disputes &middot; change management (legal review on any change to game mechanics or payout structure).</li>
+            <li><b>Two non-negotiables:</b> the platform must <b>technically enforce</b> the matrix (not merely document it), and a <b>periodic compliance &amp; product audit</b> must verify the live platform still matches the assumptions the opinions were issued on.</li>
+          </ul>
+          <div class="flow"><b>Target deliverable &mdash; Regulatory &amp; Acquirer Defence Pack:</b>
+          <code>Master Legal Opinion &rarr; Jurisdiction Matrix &rarr; Game Admission Files &rarr; Policies &amp; Procedures &rarr; Technical Controls &rarr; Audit &amp; Monitoring Evidence</code>
+          <span class="m">Shifts the story from &ldquo;our lawyers believe we need no licence&rdquo; to &ldquo;we run a formal governance system that decides and enforces what we offer, where and under what conditions&rdquo; &mdash; becoming part of the product, and an advantage when licensing the SDK.</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions">
+    <div class="t">Action Steps &mdash; Next 90 Days (run trading launch and platform thesis in parallel)</div>
+    <div class="agrid">
+      <div class="act">
+        <span class="n">1</span><span class="h">Launch ChartVolt Trading beta</span>
+        <div class="meta">Product / Founder &middot; Now</div>
+        <div class="d">Controlled beta for <b>real cohort economics</b>: deposits, paid conversion, entry frequency, GMV/player, rake tolerance, retention, fraud, chargebacks. The priority, and the evidence base for everything else.</div>
+      </div>
+      <div class="act">
+        <span class="n">2</span><span class="h">Build a Chess module in parallel</span>
+        <div class="meta">Engineering &middot; 4&ndash;6 weeks</div>
+        <div class="d">On top of the existing competition engine. Build <b>only the board engine + tournament scoring layer</b> &mdash; <em>not</em> another Chess.com. Proves portability and anchors the regulatory thesis.</div>
+      </div>
+      <div class="act">
+        <span class="n">3</span><span class="h">Keep core infrastructure common</span>
+        <div class="meta">Architecture &middot; Continuous</div>
+        <div class="d"><b>One</b> wallet, identity, ELO architecture, tournament engine and prize engine across all verticals &mdash; the guard against locking the company into Forex-only.</div>
+      </div>
+      <div class="act">
+        <span class="n">4</span><span class="h">Commission the broader legal framework</span>
+        <div class="meta">Lambros / Legal &middot; Start now</div>
+        <div class="d">Not a Forex-only opinion: a <b>&ldquo;ChartVolt Skill Competition Regulatory Framework&rdquo;</b> + living <b>EU / UK / US / GCC jurisdiction matrix</b>, with per-game admission files and the &sect;6 policy set.</div>
+      </div>
+      <div class="act">
+        <span class="n">5</span><span class="h">Secure written acquirer position</span>
+        <div class="meta">Finance / Payments &middot; Before scale</div>
+        <div class="d">A <b>written preliminary underwriting position</b> from Nuvei and/or an alternative acquirer covering the specific mechanics of <b>Trading + Chess</b>. Do not scale-launch before this.</div>
+      </div>
+      <div class="act">
+        <span class="n">6</span><span class="h">Rebuild investor story &amp; model</span>
+        <div class="meta">Founder / Finance &middot; With beta data</div>
+        <div class="d">Rebuild around <b>Competition GMV</b>, not &ldquo;number of traders&rdquo; &mdash; using the &sect;3 funnel, a defensible take rate, and Game-Master economics restated as a real variable cost.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span><b>Founder response requested on one question:</b> did we build a trading game, or the beginnings of an operating system for competitive skill? &mdash; challenge the report where you disagree; no predetermined answer.</span>
+    <span>ChartVolt &mdash; Strategic Review Summary &middot; v1.0</span>
+  </div>
+
+</div>
+</body>
+</html>

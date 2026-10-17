@@ -1,0 +1,396 @@
+/* CHARTVOLT PATCH (14 Oct 2026, owner's "velocity fix" spec): the race HUD, recomposed per device.
+
+   html[data-layout] is desktop | tablet | landscape | portrait (set by hud-layout.js from the short
+   side and the orientation) and html[data-touch] says whether the touch pads are wanted. Nothing is
+   scaled: each layout has its own grid, card sizes and control sizes, all from clamp() variables.
+
+   The HUD is six edge zones on one grid (TL TC TR / BL BC BR). The middle of the screen is never a
+   zone, so no card can land on the road ahead. The vendor's stylesheets position several kept ids
+   (#liveStandings, #networkStatus, #warning, #cornerHint, #combatFeed) absolutely with dozens of
+   media queries; every rule here that targets one of them is prefixed `html body[data-state]
+   [data-mode]` so it outranks the strongest vendor selector, (1,2,1), at (1,2,2) or more. */
+
+:root{
+  --cv-pad:clamp(8px,1.6vmin,22px);
+  --cv-glass:linear-gradient(160deg,rgba(4,22,39,.90),rgba(3,14,28,.76));
+  --cv-edge:rgba(31,214,255,.45);
+  --cv-cyan:#5fe8ff;--cv-ink:#e9fbff;--cv-dim:#8fb9c9;
+  --cv-accel:#21e3b4;--cv-brake:#ff6a5c;--cv-boost:#59d8ff;
+  --cv-util:clamp(40px,3vw,44px);
+  --cv-label:clamp(10px,.75vw,11px);--cv-sub:clamp(12px,.9vw,13px);
+  --cv-value:clamp(20px,1.9vw,32px);--cv-pos:clamp(30px,2.6vw,40px);--cv-spd:clamp(25px,2.2vw,34px);
+}
+html[data-layout=portrait],html[data-layout=landscape]{
+  --cv-pad:8px;--cv-util:40px;--cv-label:10px;--cv-sub:12px;--cv-value:20px;--cv-pos:30px;--cv-spd:25px;
+}
+
+/* ---------- The HUD frame: safe areas pad the HUD only, never the canvas ---------- */
+html body[data-state][data-mode] #hud.cv-hud{
+  position:fixed;inset:0;z-index:12;display:grid;pointer-events:none;
+  padding:max(var(--cv-pad),env(safe-area-inset-top,0px)) max(var(--cv-pad),env(safe-area-inset-right,0px))
+    max(var(--cv-pad),env(safe-area-inset-bottom,0px)) max(var(--cv-pad),env(safe-area-inset-left,0px));
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"tl tc tr" ". . ." "bl bc br";gap:var(--cv-pad);
+  font-family:Arial,Helvetica,sans-serif;color:var(--cv-ink)}
+.cv-zone{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cv-tl{grid-area:tl;align-items:flex-start}
+.cv-tc{grid-area:tc;align-items:center;padding-top:var(--cv-brand-h,0px)}
+.cv-tr{grid-area:tr;align-items:flex-end;padding-top:calc(var(--cv-util) + 8px)}
+.cv-bl{grid-area:bl;align-items:flex-start;justify-content:flex-end}
+
+/* One glass card style, never nested. */
+.cv-card{background:var(--cv-glass);border:1px solid var(--cv-edge);border-radius:12px;
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.cv-hud small{font-size:var(--cv-label);letter-spacing:.14em;color:var(--cv-dim);font-weight:700}
+.cv-meter{position:relative;height:5px;border-radius:3px;background:rgba(143,185,201,.18);overflow:hidden;flex:1}
+.cv-meter i{position:absolute;inset:0 auto 0 0;width:100%;border-radius:inherit;background:var(--cv-cyan);transition:width .15s linear}
+
+/* ---------- TL: the race card (lap, time, total, hull) ---------- */
+.cv-race{width:clamp(190px,15vw,220px);padding:10px 12px;display:grid;gap:7px}
+.cv-race-top{display:flex;align-items:flex-end;gap:12px}
+.cv-lap strong{display:block;font-size:var(--cv-value);line-height:1;font-weight:800;color:var(--cv-ink)}
+.cv-lap strong span{font-size:.55em;color:var(--cv-dim)}
+.cv-clock{display:grid;gap:2px;min-width:0}
+.cv-clock b{font:800 var(--cv-sub)/1.1 ui-monospace,Consolas,monospace;font-size:clamp(14px,1.15vw,17px);color:var(--cv-ink)}
+.cv-best{font-size:var(--cv-label)}
+.cv-best span{color:var(--cv-ink);font-family:ui-monospace,Consolas,monospace;letter-spacing:0}
+.cv-lapbar{height:3px;border-radius:2px;background:rgba(143,185,201,.18);overflow:hidden}
+.cv-lapbar i{display:block;height:100%;background:var(--cv-cyan)}
+.cv-hull{display:flex;align-items:center;gap:8px}
+/* Vendor race-assist.js calls hullLabel.closest('.integrity') and crashes boot without it; neutralise the vendor panel styling that class carries. */
+html body .cv-hull.integrity{position:static;left:auto;top:auto;bottom:auto;width:auto;height:auto;padding:0;background:none;border:0;border-radius:0;box-shadow:none}
+html body .cv-hull.integrity small{font-size:var(--cv-label);letter-spacing:.08em}
+/* Owner, 14 Oct 2026 ("in mobile landscape i cant see the hull health anymore, only in portrait"): the vendor sheet
+   hides .integrity with body[data-mode=multiplayer] .integrity{display:none} inside @media (max-height:360px) and
+   (orientation:landscape) - every real phone held sideways. This card is ours, so it is shown at (0,3,2), above it. */
+html body[data-state][data-mode] .cv-hull.integrity{display:flex}
+/* Beside the HP figure on a narrow phone card the meter shrank to a dot; it keeps a readable width. */
+html body[data-state][data-mode] .cv-hull .cv-meter{min-width:44px}
+html body .cv-hull.integrity.critical #hull{background:#ff806e}
+html body .cv-hull.integrity.critical #hullLabel{color:#ff806e}
+.cv-hull b{font-size:var(--cv-sub);min-width:4ch;text-align:right}
+.cv-hull .cv-meter i{background:linear-gradient(90deg,#28e0a9,var(--cv-cyan))}
+.cv-race-foot{display:flex;justify-content:space-between;gap:6px;font-size:var(--cv-label);color:var(--cv-dim);letter-spacing:.08em}
+html body[data-state][data-mode] .cv-race-foot #sectorSplit{position:static;font-size:var(--cv-label);margin:0;color:var(--cv-dim)}
+html body[data-state][data-mode] .cv-race-foot #sectorSplit[data-pace=faster]{color:#58f0a8}
+html body[data-state][data-mode] .cv-race-foot #sectorSplit[data-pace=slower]{color:#ff9a8a}
+.cv-buffs{font-size:var(--cv-label);color:#ffd782;letter-spacing:.1em}
+.cv-buffs:empty{display:none}
+
+/* The LIVE dot beside the timer: full strength on a change, 40% three seconds later. */
+html body[data-state][data-mode] .cv-clock #networkStatus{position:static;transform:none;display:inline-flex;align-items:center;gap:4px;
+  margin-left:6px;padding:0;width:auto;background:none;font-size:0;color:transparent;opacity:.4;transition:opacity .6s}
+html body[data-state][data-mode] .cv-clock #networkStatus.hidden{display:none}
+html body[data-state][data-mode] .cv-clock #networkStatus.fresh{opacity:1}
+.cv-clock #networkStatus::before{content:"";width:7px;height:7px;border-radius:50%;background:#33f0a0;box-shadow:0 0 6px #33f0a0}
+.cv-clock #networkStatus::after{content:attr(data-short);font-size:var(--cv-label);letter-spacing:.12em;color:#8fffd5}
+.cv-clock #networkStatus[data-state=alert]::before{background:#ffb347;box-shadow:0 0 6px #ffb347}
+.cv-clock #networkStatus[data-state=alert]::after{color:#ffd29a}
+
+/* ---------- TC: logo, style chain and the race messages ---------- */
+.cv-brand{position:fixed;z-index:13;line-height:0;pointer-events:none;
+  top:max(var(--cv-pad),env(safe-area-inset-top,0px));left:max(var(--cv-pad),env(safe-area-inset-left,0px))}
+.cv-brand img{display:block;width:clamp(130px,11vw,160px);height:auto;filter:drop-shadow(0 6px 14px #000b)}
+body:not([data-state=hangar]) .cv-brand{left:50%;transform:translateX(-50%);opacity:.55}
+html[data-layout=portrait] .cv-brand img,html[data-layout=landscape] .cv-brand img{width:clamp(80px,22vw,110px)}
+html{--cv-brand-h:clamp(58px,4.8vw,70px)}
+html[data-layout=portrait],html[data-layout=landscape]{--cv-brand-h:44px}
+.cv-skill{display:flex;align-items:center;gap:8px;padding:4px 12px;border-radius:999px;background:rgba(3,14,28,.55);border:1px solid rgba(31,214,255,.25)}
+.cv-skill strong{font-size:var(--cv-sub);min-width:3ch}
+.cv-skill .cv-meter{width:60px;flex:none}
+html body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning,#combatFeed){position:static;transform:none;top:auto;left:auto;
+  width:auto;max-width:min(46vw,420px);margin:0;font-size:var(--cv-sub)}
+html body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning):empty{display:none}
+
+/* ---------- TR: utility cluster, position + speed card, minimap ---------- */
+.cv-util{position:fixed;z-index:30;display:flex;gap:6px;
+  top:max(var(--cv-pad),env(safe-area-inset-top,0px));right:max(var(--cv-pad),env(safe-area-inset-right,0px))}
+.cv-u{width:var(--cv-util);height:var(--cv-util);display:grid;place-items:center;padding:0;border-radius:10px;cursor:pointer;
+  background:var(--cv-glass);border:1px solid var(--cv-edge);color:var(--cv-ink)}
+.cv-u svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.cv-u:hover{border-color:var(--cv-cyan)}
+.cv-u:focus-visible{outline:2px solid var(--cv-cyan);outline-offset:2px}
+.cv-u[hidden],.cv-fs[hidden]{display:none!important}
+.cv-ico-menu{display:none}
+body[data-state=hangar] #pause{display:none}
+html[data-layout=tablet] .cv-u-desk{display:none}
+html[data-layout=portrait] :is(.cv-u-desk,.cv-u-tab),html[data-layout=landscape] :is(.cv-u-desk,.cv-u-tab){display:none}
+body[data-state=hangar] .cv-util .cv-u{display:grid}
+html[data-layout=portrait] body:not([data-state=hangar]) .cv-ico-pause,html[data-layout=landscape] body:not([data-state=hangar]) .cv-ico-pause{display:none}
+html[data-layout=portrait] body:not([data-state=hangar]) .cv-ico-menu,html[data-layout=landscape] body:not([data-state=hangar]) .cv-ico-menu{display:block}
+
+.cv-pace{width:clamp(150px,12vw,190px);padding:10px 12px;display:grid;gap:8px;pointer-events:none}
+html body[data-state][data-mode] .cv-pace #liveStandings{position:static;inset:auto;width:auto;min-height:0;max-height:none;margin:0;padding:0;
+  border:0;background:none;box-shadow:none;overflow:hidden;pointer-events:none}
+html body[data-state][data-mode] .cv-pace #liveStandings.hidden{display:none}
+html body[data-state][data-mode] .cv-pace .position-head{display:flex;align-items:baseline;gap:6px;flex-wrap:nowrap}
+html body[data-state][data-mode] .cv-pace .position-head small{width:auto;font-size:var(--cv-label)}
+html body[data-state][data-mode] .cv-pace .position-head strong{font-size:var(--cv-pos);color:var(--cv-cyan);line-height:1;margin-left:auto}
+html body[data-state][data-mode] .cv-pace .position-head span{font-size:var(--cv-sub)}
+html body[data-state][data-mode] .cv-pace #raceOrder{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:2px}
+html body[data-state][data-mode] .cv-pace #raceOrder li{font-size:var(--cv-label);padding:3px 5px;background:rgba(6,22,35,.6)}
+html body[data-state][data-mode] .cv-pace #raceOrder li:nth-child(n+5){display:none}
+html body[data-state][data-mode] .cv-pace #combatStats{display:none}
+.cv-speed{display:flex;align-items:baseline;gap:6px}
+.cv-speed small{margin-right:auto}
+.cv-speed strong{font-size:var(--cv-spd);line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.cv-speed span{font-size:var(--cv-label);color:var(--cv-dim)}
+.cv-energy{display:flex;align-items:center;gap:8px}
+.cv-energy b{font-size:var(--cv-label);min-width:4ch;text-align:right}
+.cv-energy .cv-meter i{background:linear-gradient(90deg,#2b8cff,var(--cv-boost))}
+
+.cv-map{display:grid;justify-items:end;gap:3px;opacity:.82}
+.cv-map-toggle{pointer-events:auto;display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:8px;cursor:pointer;
+  background:rgba(3,14,28,.6);border:1px solid rgba(31,214,255,.25);color:var(--cv-dim);font:700 var(--cv-label)/1 Arial,sans-serif;letter-spacing:.12em}
+.cv-map-toggle svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8}
+.cv-map canvas{width:clamp(130px,10vw,150px);height:auto;aspect-ratio:320/230;border-radius:10px;
+  background:rgba(3,14,28,.45);border:1px solid rgba(31,214,255,.22)}
+.cv-map small{font-size:var(--cv-label)}
+html[data-map=off] .cv-map :is(canvas,small){display:none}
+html[data-map=off] .cv-map-toggle span{display:none}
+
+/* ---------- BL: keyboard hint strip (desktop only) ---------- */
+.cv-keys{pointer-events:auto;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:10px;
+  background:rgba(3,14,28,.6);border:1px solid rgba(31,214,255,.22);font-size:var(--cv-label);color:var(--cv-dim);letter-spacing:.06em}
+.cv-keys b{display:inline-block;padding:2px 5px;margin-right:3px;border-radius:4px;border:1px solid rgba(143,185,201,.4);color:var(--cv-ink);font-size:var(--cv-label)}
+.cv-keys button{border:0;background:none;color:var(--cv-dim);font-size:15px;cursor:pointer;padding:0 2px}
+.cv-keys[data-open="0"] span{display:none}
+.cv-keys[hidden]{display:none}
+html:not([data-layout=desktop]) .cv-keys,html[data-touch="1"] .cv-keys{display:none}
+
+/* ---------- Controls ---------- */
+.cv-controls{position:fixed;z-index:14;left:0;right:0;bottom:0;display:none;pointer-events:none;--cv-k:1;
+  padding:0 max(var(--cv-pad),env(safe-area-inset-right,0px)) max(var(--cv-pad),env(safe-area-inset-bottom,0px)) max(var(--cv-pad),env(safe-area-inset-left,0px))}
+body:not([data-state=hangar]):not([data-state=finished]) .cv-controls{display:grid}
+body[data-control-size=small] .cv-controls{--cv-k:.88}
+body[data-control-size=large] .cv-controls{--cv-k:1.12}
+.cv-controls button{pointer-events:auto;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  font:800 clamp(13px,1.2vw,16px)/1 Arial,Helvetica,sans-serif;letter-spacing:.08em;color:var(--cv-ink)}
+
+/* ITEM chip: "◇ EMPTY" or "⚡ EMP READY". */
+.cv-item{grid-area:item;justify-self:start;display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:6px 12px;border-radius:999px;
+  background:var(--cv-glass);border:1px solid rgba(143,185,201,.35);transition:border-color .2s,box-shadow .2s}
+.cv-item span{font-size:18px;line-height:1}
+.cv-item b{font-size:clamp(12px,1vw,13px);letter-spacing:.1em;white-space:nowrap}
+.cv-item small{font-size:10px;color:var(--cv-dim);letter-spacing:.1em}
+.cv-item small:empty{display:none}
+.cv-item[data-item=empty]{color:var(--cv-dim)}
+.cv-item[data-item=ready]{border-color:#ffd65c;box-shadow:0 0 14px rgba(255,214,92,.35)}
+.cv-item:disabled{cursor:default}
+
+/* BOOST: an energy ring, dim when empty, pulsing when ready. */
+.cv-boost{grid-area:boost;justify-self:end;position:relative;width:calc(64px * var(--cv-k));height:calc(64px * var(--cv-k));border-radius:50%;
+  display:grid;place-items:center;align-content:center;gap:1px;border:0;
+  background:radial-gradient(circle,rgba(4,22,39,.94) 58%,transparent 60%),conic-gradient(var(--cv-boost) var(--boost,100%),rgba(89,216,255,.16) 0)}
+.cv-boost span{font-size:11px;letter-spacing:.12em}
+.cv-boost small{font-size:16px;color:var(--cv-boost)}
+.cv-boost[data-ready=none]{opacity:.45}
+.cv-boost[data-ready=ready]{animation:cv-boost-pulse 1.8s ease-in-out infinite}
+.cv-boost.pressed{transform:scale(.94)}
+@keyframes cv-boost-pulse{0%,100%{box-shadow:0 0 0 0 rgba(89,216,255,.0)}50%{box-shadow:0 0 18px 2px rgba(89,216,255,.45)}}
+
+/* STEER: the analog pad, or two buttons when the player chose buttons. */
+.cv-steer{grid-area:steer;justify-self:start;align-self:end}
+html body[data-state][data-mode] .cv-steer #steeringPad{display:none;position:relative;width:calc(var(--cv-steer-w) * var(--cv-k));height:calc(var(--cv-steer-h) * var(--cv-k));
+  min-height:72px;border-radius:999px;border:1px solid rgba(95,232,255,.55);
+  background:radial-gradient(ellipse at center,rgba(35,80,101,.55),rgba(4,18,30,.82) 72%);box-shadow:0 0 18px rgba(95,232,255,.18),inset 0 0 18px rgba(95,232,255,.08)}
+html body[data-controls=analog][data-state][data-mode] .cv-steer #steeringPad{display:block}
+html body[data-state][data-mode] .cv-steer #steeringPad>span{top:8px;font-size:10px}
+html body[data-state][data-mode] .cv-steer #steeringPad>b{top:50%;transform:translateY(-50%);font-size:24px;color:#9fd8e6}
+html body[data-state][data-mode] .cv-steer #steeringPad i{top:50%;width:calc(46px * var(--cv-k));height:calc(46px * var(--cv-k));
+  border-color:var(--cv-cyan);box-shadow:0 0 14px rgba(95,232,255,.55),inset 0 0 10px rgba(157,245,255,.25)}
+html body[data-state][data-mode] .cv-steer #steeringPad.pressed{border-color:var(--cv-cyan);box-shadow:0 0 26px rgba(95,232,255,.4)}
+.cv-steer-buttons{display:flex;gap:8px}
+body[data-controls=analog] .cv-steer-buttons{display:none}
+.cv-steer-buttons button{width:calc(var(--cv-pedal) * var(--cv-k));height:calc(var(--cv-pedal) * var(--cv-k));border-radius:16px;font-size:26px;
+  background:var(--cv-glass);border:1px solid rgba(95,232,255,.45)}
+
+/* PEDALS: ACCEL is the strongest control, BRAKE the same size in red. */
+.cv-pedals{grid-area:pedals;justify-self:end;align-self:end;display:flex;gap:10px;align-items:flex-end}
+.cv-pedals button{width:calc(var(--cv-pedal) * var(--cv-k));height:calc(var(--cv-pedal) * 1.18 * var(--cv-k));border-radius:16px;
+  display:grid;place-items:center;align-content:center;gap:4px;border:1px solid}
+.cv-pedals small{font-size:16px}
+.cv-brake{background:linear-gradient(180deg,rgba(255,106,92,.30),rgba(60,14,16,.86));border-color:rgba(255,106,92,.7)!important}
+.cv-accel{background:linear-gradient(180deg,rgba(33,227,180,.42),rgba(4,50,44,.9));border-color:rgba(33,227,180,.9)!important;
+  box-shadow:0 0 16px rgba(33,227,180,.32)}
+.cv-pedals button.pressed,.cv-steer-buttons button.pressed{transform:scale(.95);filter:brightness(1.25)}
+
+/* Desktop without touch: only the item chip, bottom centre. */
+html[data-touch="0"] .cv-controls{grid-template-columns:1fr;grid-template-areas:"item";justify-items:center}
+html[data-touch="0"] .cv-controls :is(.cv-boost,.cv-steer,.cv-pedals){display:none}
+html[data-touch="0"] .cv-item{justify-self:center}
+
+/* Touch layouts share one grid: ITEM above-left, BOOST above-right, STEER bottom-left, pedals bottom-right. */
+/* Owner, 14 Oct 2026 (portrait, BOOST and the pedals cut off on the right): the item chip shared
+   the steer column, which is `auto`, so a long name like COUNTERMEASURE READY widened that column
+   and pushed the pedals off the screen. The chip now spans into the flexible middle column, and an
+   item spanning a flexible track does not grow the auto tracks it touches. */
+html[data-touch="1"] .cv-controls{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"item item boost" "steer . pedals";
+  align-items:end;row-gap:10px}
+html[data-touch="1"] body[data-hand=left] .cv-controls{grid-template-areas:"boost item item" "pedals . steer"}
+html[data-touch="1"] .cv-item{min-width:0;max-width:100%;overflow:hidden}
+html[data-touch="1"] .cv-item b{overflow:hidden;text-overflow:ellipsis}
+html[data-touch="1"] body[data-hand=left] :is(.cv-item,.cv-steer){justify-self:end}
+html[data-touch="1"] body[data-hand=left] :is(.cv-boost,.cv-pedals){justify-self:start}
+html[data-layout=desktop],html[data-layout=tablet]{--cv-steer-w:clamp(150px,14vw,200px);--cv-steer-h:96px;--cv-pedal:clamp(76px,7vw,96px)}
+html[data-layout=portrait]{--cv-steer-w:clamp(130px,40vw,160px);--cv-steer-h:clamp(72px,10dvh,88px);--cv-pedal:clamp(68px,20vw,88px)}
+html[data-layout=landscape]{--cv-steer-w:clamp(145px,22vw,190px);--cv-steer-h:clamp(72px,22dvh,96px);--cv-pedal:clamp(72px,11vw,96px)}
+/* Portrait: the bottom 26-30% of the screen is the control zone and nothing else lives there. */
+html[data-layout=portrait] .cv-controls{max-height:30dvh}
+html[data-layout=landscape] .cv-controls{row-gap:6px}
+html[data-layout=landscape] .cv-pedals{gap:8px}
+
+/* ---------- Phones: fewer, smaller cards ---------- */
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-race{width:auto;min-width:138px;padding:7px 9px;gap:5px}
+html:is([data-layout=portrait],[data-layout=landscape]) :is(.cv-race-foot,.cv-lapbar,.cv-skill,#combatFeed){display:none}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-race-top{gap:9px}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-pace{width:auto;min-width:112px;padding:7px 9px;gap:5px}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] .cv-pace #raceOrder{display:none}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-speed small{display:none}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-map canvas{width:84px}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-tr{padding-top:calc(var(--cv-util) + 6px)}
+/* Sideways the top cards hug their corners and the logo stays out of the sky. */
+html[data-layout=landscape] .cv-tr{padding-top:0;padding-right:calc(var(--cv-util) + 6px);flex-direction:row;align-items:flex-start}
+html[data-layout=landscape] body:not([data-state=hangar]) .cv-brand{opacity:.35}
+html[data-layout=portrait] body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning){max-width:calc(100vw - 32px)}
+html[data-layout=portrait] .cv-tc{grid-column:1/-1;grid-row:2;align-self:start;padding-top:0}
+/* Owner, 14 Oct 2026 ("the wordings in mobile take too much space ... make them not disturb the
+   view, like transparent back"): on a phone every in-race message is one short see-through line -
+   no glow, no blur, a thin border - so the track stays readable behind it. The text is unchanged. */
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning){
+  font-size:10.5px;line-height:1.25;letter-spacing:.08em;padding:3px 9px;border-radius:999px;min-height:0;
+  background:rgba(3,12,24,.32);border:1px solid rgba(143,185,201,.18);box-shadow:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none;text-shadow:0 1px 2px rgba(0,0,0,.85);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(78vw,340px)}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] .cv-tc #warning{background:rgba(40,8,12,.34);border-color:rgba(255,120,110,.28)}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] #callout{font-size:clamp(13px,4vw,18px);letter-spacing:.1em;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-item{min-height:30px;padding:3px 10px;gap:5px;background:rgba(3,12,24,.32);
+  border-color:rgba(143,185,201,.2);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+html:is([data-layout=portrait],[data-layout=landscape]) .cv-item b{font-size:10.5px;letter-spacing:.08em;text-shadow:0 1px 2px rgba(0,0,0,.85)}
+/* The key letter (E) means nothing on a touch screen; the chip itself is the button. */
+html[data-touch="1"] .cv-item small{display:none}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] #pickupFlash{font-size:10.5px;letter-spacing:.1em;gap:6px;padding:3px 10px 3px 3px;
+  background:rgba(3,12,24,.35);box-shadow:none;text-shadow:0 1px 2px rgba(0,0,0,.85);top:16%}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode] #pickupFlash b{width:20px;height:20px;font-size:11px}
+html[data-layout=tablet] .cv-race{width:clamp(190px,24vw,220px)}
+
+/* ---------- Multiplayer lobby: the hangar shows the standings card and nothing else ---------- */
+html body[data-mode=multiplayer][data-state=hangar] #hud{opacity:1}
+html body[data-mode=multiplayer][data-state=hangar] #hud :is(.cv-tl,.cv-tc,.cv-bl,.cv-map,.cv-speed,.cv-energy){display:none}
+body[data-state=hangar] #hud .cv-pace:not(:has(#liveStandings:not(.hidden))){display:none}
+/* Owner, 14 Oct 2026 ("RACE LOBBY" card on top of the ship panel): in the hangar the lobby card leaves
+   the top-right zone, which is the ship panel's column, for the empty centre above the ship. */
+html body[data-mode=multiplayer][data-state=hangar] #hud .cv-pace{position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(var(--cv-hangar-top,110px) + 8px);width:min(300px,28vw);max-height:calc(100dvh - var(--cv-hangar-top,110px) - 300px);overflow:auto}
+@media (max-width:900px){html body[data-mode=multiplayer][data-state=hangar] #hud .cv-pace{display:none}}
+
+/* ---------- Pause: dark, blurred, one centre card ---------- */
+html body[data-state] #paused.cv-pause{background:rgba(1,6,12,.68);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.cv-pause-card{width:min(92vw,380px);display:grid;gap:10px;text-align:center;background:var(--cv-glass);border:1px solid var(--cv-edge);border-radius:16px;
+  padding:clamp(16px,3vw,26px)}
+.cv-pause-card h2{margin:0 0 4px;font-size:clamp(22px,3vw,30px);letter-spacing:.08em}
+.cv-pause-card>button{width:100%}
+.cv-pause-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cv-pause-grid button{width:100%;min-height:44px;margin:0;font-size:13px;letter-spacing:.08em}
+.cv-pause-grid button[hidden]{display:none}
+#pauseLeave{min-height:44px;border-radius:8px;border:1px solid #ff94867a;background:#291721;color:#ffd4ce;font-weight:700;letter-spacing:.08em;cursor:pointer}
+#pauseLeave.hidden{display:none}
+
+/* ---------- Owner, 14 Oct 2026: "the joystick is not working" ----------
+   .cv-controls is pointer-events:none so the HUD never blocks the road, and only <button>s turned it
+   back on. The analog pad is a <div>, so it inherited none and never received a pointerdown. */
+html body[data-state][data-mode] .cv-steer #steeringPad{pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+
+/* ---------- Owner, 14 Oct 2026: "too much info, repeating" - the race HUD is the target's two cards ----------
+   Left: LAP, TIME, BEST, HULL. Right: POSITION, SPEED. Checkpoint/sector line, the standings list, the
+   style meter and the minimap captions are gone during a race (results still report all of them); the
+   card's BOOST bar is withheld where the BOOST button already shows the same energy as a ring. */
+html body[data-state][data-mode] .cv-race :is(.cv-race-foot,.cv-lapbar){display:none}
+html body[data-state][data-mode] .cv-tc .cv-skill{display:none}
+html body[data-state]:not([data-state=hangar])[data-mode] .cv-pace #raceOrder{display:none}
+html[data-touch="1"] body[data-state][data-mode] .cv-pace .cv-energy{display:none}
+html body[data-state][data-mode] .cv-map>small,html body[data-state][data-mode] .cv-map-toggle span{display:none}
+
+/* ---------- Owner, 14 Oct 2026: "the wordings ... in front of the track, put them between the buttons" ----------
+   On a phone, the race callouts (FINAL LAP, sector and position messages) and the pickup flash leave the middle
+   of the road for the bottom gap between the steering buttons and BRAKE/ACCEL. That gap is too narrow in
+   portrait, so there they sit just above the control zone. */
+/* Owner, 14 Oct 2026 (second pass, "move these kind of wording to the place the red box is"): the coach line
+   (STRAIGHT · BOOST AVAILABLE), the hull warning and the combat feed leave the top centre too. The zone sits on
+   the floor of the gap, newest line at the bottom; the callout and pickup flash stack above it. */
+html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] .cv-tc{position:fixed;left:50%;top:auto;transform:translateX(-50%);
+  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * .04);padding-top:0;margin:0;
+  flex-direction:column-reverse;justify-content:flex-start;gap:3px;z-index:15;pointer-events:none;
+  max-width:max(120px,calc(100vw - var(--cv-pedal) * 4.9 - 48px))}
+html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] .cv-tc :is(#cornerHint,#warning,#combatFeed){max-width:100%}
+html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] #callout{position:fixed;top:auto;left:50%;transform:translateX(-50%);
+  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * .52);width:auto;
+  max-width:max(120px,calc(100vw - var(--cv-pedal) * 4.9 - 48px));z-index:15;pointer-events:none;
+  font-size:clamp(11px,1.7vw,14px);letter-spacing:.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 3px rgba(0,0,0,.85)}
+html[data-touch="1"][data-layout=landscape] body[data-state][data-mode] #pickupFlash{position:fixed;top:auto;left:50%;
+  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * .95);z-index:15;pointer-events:none;
+  max-width:max(120px,calc(100vw - var(--cv-pedal) * 4.9 - 48px))}
+html[data-touch="1"][data-layout=portrait] body[data-state][data-mode] #callout{position:fixed;top:auto;left:50%;transform:translateX(-50%);
+  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * 1.18 + 82px);width:auto;max-width:86vw;z-index:15;
+  pointer-events:none;font-size:clamp(12px,3.6vw,15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html[data-touch="1"][data-layout=portrait] body[data-state][data-mode] #pickupFlash{position:fixed;top:auto;left:50%;
+  bottom:calc(max(var(--cv-pad),env(safe-area-inset-bottom,0px)) + var(--cv-pedal) * 1.18 + 112px);z-index:15;pointer-events:none}
+
+/* ---------- Owner, 14 Oct 2026: "no way to scroll the menu ... no way to go out of the menu" ----------
+   The menu scrolls inside the screen (touch-controls.js no longer cancels its touchmove), and a close
+   button stays pinned to its top so leaving never depends on reaching DONE at the bottom. */
+html body #settingsDialog[open]{max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 16px);
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+#settingsDialog>form{position:relative}
+#settingsDialog .cv-dialog-close{position:sticky;top:0;float:right;z-index:2;width:40px;height:40px;margin:-8px -8px 0 8px;padding:0;
+  display:grid;place-items:center;border-radius:10px;border:1px solid var(--cv-edge,#6acbdf55);background:#172d42;color:#fff;
+  font-size:18px;line-height:1;cursor:pointer}
+
+/* ---------- Owner, 14 Oct 2026: "the wording must be a bit elevated so it is not in the view" ----------
+   On a phone in portrait the corner coach line (STRAIGHT · BOOST AVAILABLE, CORNER AHEAD) and the race
+   warning hug the underside of the top cards instead of sitting a grid gap lower, over the road. */
+html[data-layout=portrait] .cv-tc{margin-top:calc(var(--cv-pad) * -1 - 2px);gap:4px}
+
+/* ---------- Owner, 14 Oct 2026: "the buttons don't have press animation and take time" ----------
+   touch-action:manipulation removes the browser's double-tap-zoom wait before a click fires; :active
+   gives the finger an immediate visible answer. */
+#settingsDialog button,#settingsDialog select,#paused button,.cv-u,#hangar button,#results button{touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;transition:transform .08s ease,filter .08s ease}
+#settingsDialog button:active,#paused button:active,.cv-u:active,#hangar button:active,#results button:active{transform:scale(.95);filter:brightness(1.25)}
+
+@media (prefers-reduced-motion:reduce){
+  #settingsDialog button,#paused button,.cv-u,#hangar button,#results button{transition:none}
+  .cv-boost[data-ready=ready]{animation:none;box-shadow:0 0 0 2px rgba(89,216,255,.6)}
+  .cv-meter i,.cv-clock #networkStatus{transition:none}
+}
+
+/* ---------- Owner, 14 Oct 2026: in-game camera button + slim phone strip ----------
+   ("is it possible that a user can select also the cameras from the game not only in the menu ... easy to
+   select ... work for mobile ... without disrupting view"; "remove the logo from top also the box that shows
+   the info there is too big for all modes in mobile make it the same shape and on the place that the red box is")
+   The camera button sits in the corner toolbar every layout already has, so it covers no new part of the
+   track. It is hidden in the hangar, where the camera orbits the ship and a view does nothing. */
+body[data-state=hangar] .cv-util #cameraCycle{display:none}
+html[data-layout=landscape] body:not([data-state=hangar]) .cv-tr{padding-right:calc(var(--cv-util) * 2 + 12px)}
+/* Phones, both orientations, during a race: no logo, and position + speed become one thin see-through strip
+   just under the top edge, centred. Same treatment as the in-race messages: no blur, no glow, thin border. */
+html:is([data-layout=portrait],[data-layout=landscape]) body:not([data-state=hangar]) .cv-brand{display:none}
+html:is([data-layout=portrait],[data-layout=landscape]) body:not([data-state=hangar]) .cv-pace{
+  position:fixed;z-index:14;top:max(6px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  width:auto;min-width:clamp(150px,40vw,340px);max-width:calc(100vw - var(--cv-util) * 2 - 44px);height:24px;padding:0 14px;
+  border-radius:999px;background:rgba(3,12,24,.38);border:1px solid rgba(95,232,255,.28);box-shadow:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none;text-shadow:0 1px 2px rgba(0,0,0,.85)}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode]:not([data-state=hangar]) .cv-pace .position-head{gap:3px;align-items:baseline}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode]:not([data-state=hangar]) .cv-pace .position-head small{display:none}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode]:not([data-state=hangar]) .cv-pace .position-head strong{font-size:15px;margin-left:0}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode]:not([data-state=hangar]) .cv-pace .position-head span{font-size:10px}
+html:is([data-layout=portrait],[data-layout=landscape]) body:not([data-state=hangar]) .cv-pace .cv-speed{gap:3px}
+html:is([data-layout=portrait],[data-layout=landscape]) body:not([data-state=hangar]) .cv-pace .cv-speed strong{font-size:15px}
+html:is([data-layout=portrait],[data-layout=landscape]) body:not([data-state=hangar]) .cv-pace .cv-speed span{font-size:9px}
+html:is([data-layout=portrait],[data-layout=landscape]) body[data-state][data-mode]:not([data-state=hangar]) .cv-pace #liveStandings:not(.hidden)+.cv-speed{border-left:1px solid rgba(143,185,201,.3);padding-left:12px}
+html:is([data-layout=portrait],[data-layout=landscape]) body:not([data-state=hangar]) .cv-pace .cv-energy{min-width:64px}
+/* Reason: a portrait phone is ~390px wide, so a centred strip would overlap the lap card in the top-left corner;
+   the card steps down by the strip's height instead. Sideways there is room for both on one line. */
+html[data-layout=portrait] body:not([data-state=hangar]) .cv-tl{padding-top:30px}
+/* The cockpit view (cockpit-interior.js) has its own sheet: cv-cockpit.css, concatenated after this one. */

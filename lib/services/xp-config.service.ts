@@ -1,8 +1,13 @@
-'use server';
+"use server";
 
-import { connectToDatabase } from '@/database/mongoose';
-import XPConfig from '@/database/models/xp-config.model';
-import { BADGE_XP_VALUES, TITLE_LEVELS, TitleLevel } from '@/lib/constants/levels';
+import { connectToDatabase } from "@/database/mongoose";
+import XPConfig from "@/database/models/xp-config.model";
+import {
+  BADGE_XP_VALUES,
+  TITLE_LEVELS,
+  TitleLevel,
+  levelEntryForXP,
+} from "@/lib/constants/levels";
 
 /**
  * Get Badge XP Values from database
@@ -10,17 +15,25 @@ import { BADGE_XP_VALUES, TITLE_LEVELS, TitleLevel } from '@/lib/constants/level
 export async function getBadgeXPValues() {
   try {
     await connectToDatabase();
-    
-    const config = await XPConfig.findOne({ configType: 'badge_xp', isActive: true }).lean();
-    
+
+    const config = await XPConfig.findOne({
+      configType: "badge_xp",
+      isActive: true,
+    }).lean();
+
     if (config && config.data) {
-      return config.data as { common: number; rare: number; epic: number; legendary: number };
+      return config.data as {
+        common: number;
+        rare: number;
+        epic: number;
+        legendary: number;
+      };
     }
-    
+
     // Fallback to constants
     return BADGE_XP_VALUES;
   } catch (error) {
-    console.error('Error fetching badge XP values, using defaults:', error);
+    console.error("Error fetching badge XP values, using defaults:", error);
     return BADGE_XP_VALUES;
   }
 }
@@ -31,17 +44,20 @@ export async function getBadgeXPValues() {
 export async function getTitleLevels(): Promise<TitleLevel[]> {
   try {
     await connectToDatabase();
-    
-    const config = await XPConfig.findOne({ configType: 'level_progression', isActive: true }).lean();
-    
+
+    const config = await XPConfig.findOne({
+      configType: "level_progression",
+      isActive: true,
+    }).lean();
+
     if (config && config.data && config.data.levels) {
       return config.data.levels as TitleLevel[];
     }
-    
+
     // Fallback to constants
     return TITLE_LEVELS;
   } catch (error) {
-    console.error('Error fetching title levels, using defaults:', error);
+    console.error("Error fetching title levels, using defaults:", error);
     return TITLE_LEVELS;
   }
 }
@@ -50,22 +66,20 @@ export async function getTitleLevels(): Promise<TitleLevel[]> {
  * Get title level by XP amount (from database)
  */
 export async function getTitleByXP(xp: number): Promise<TitleLevel> {
-  const levels = await getTitleLevels();
-  
-  for (let i = levels.length - 1; i >= 0; i--) {
-    if (xp >= levels[i].minXP) {
-      return levels[i];
-    }
-  }
-  return levels[0];
+  // Reason: the XP -> level scan has one definition, in `lib/constants/levels.ts`.
+  // This copy also read `levels[0]` unguarded, so an operator saving an empty ladder
+  // took down every caller of this function (R88).
+  return levelEntryForXP(xp, await getTitleLevels());
 }
 
 /**
  * Get next title level (from database)
  */
-export async function getNextTitle(currentLevel: number): Promise<TitleLevel | null> {
+export async function getNextTitle(
+  currentLevel: number,
+): Promise<TitleLevel | null> {
   const levels = await getTitleLevels();
-  
+
   if (currentLevel >= levels.length) return null;
   return levels[currentLevel]; // currentLevel is 1-based, array is 0-based
 }
@@ -93,7 +107,10 @@ export async function calculateXPProgress(currentXP: number): Promise<{
 
   const xpInCurrentLevel = currentXP - currentLevel.minXP;
   const xpNeededForNextLevel = nextLevel.minXP - currentLevel.minXP;
-  const progressPercent = Math.min(100, (xpInCurrentLevel / xpNeededForNextLevel) * 100);
+  const progressPercent = Math.min(
+    100,
+    (xpInCurrentLevel / xpNeededForNextLevel) * 100,
+  );
   const xpToNext = nextLevel.minXP - currentXP;
 
   return {
@@ -107,8 +124,9 @@ export async function calculateXPProgress(currentXP: number): Promise<{
 /**
  * Get XP value for a badge rarity (from database)
  */
-export async function getXPForBadge(rarity: 'common' | 'rare' | 'epic' | 'legendary'): Promise<number> {
+export async function getXPForBadge(
+  rarity: "common" | "rare" | "epic" | "legendary",
+): Promise<number> {
   const xpValues = await getBadgeXPValues();
   return xpValues[rarity];
 }
-

@@ -1,0 +1,70 @@
+---
+alwaysApply: true
+---
+
+# Development Workflow — ChartVolt
+
+## 🔍 Before Any Change
+
+1. **Study first, code second.** Read relevant files, trace symbols to definitions, and verify behavior from code — never assume.
+2. **Use vector-database docs and All MCP Avaliable Including MCP Context7** as primary context when available.
+3. **Confirm file paths and module names exist** before referencing them.
+
+## 🧩 Structured Approach
+
+### Phase 1 — Analysis
+
+- Identify bugs, inconsistencies, code smells, and architectural weaknesses.
+- Provide **root cause analysis** with evidence (file paths, function names, logic).
+- Confirm reproducibility conditions for detected bugs.
+- Detect performance bottlenecks (CPU, memory, I/O, rendering, network, DB).
+- Do **not** speculate — be precise and evidence-based.
+
+### Phase 2 — Plan
+
+For each issue:
+
+1. Explain root cause clearly.
+2. Propose the **minimal effective fix**.
+3. Suggest refactoring improvements (if applicable).
+4. Suggest performance improvements (if measurable).
+5. List trade-offs and risks.
+6. Highlight edge cases.
+
+Prefer the **simplest robust solution**. Avoid overengineering.
+
+### Phase 3 — Implementation
+
+- Implement fixes **carefully and incrementally**.
+- Preserve existing functionality unless change is justified.
+- Maintain backward compatibility where possible.
+- Optimize only where **measurable gains** exist.
+- Avoid speculative optimizations and breaking changes.
+
+## 📐 Code Structure & Modularity
+
+- **Max 500 lines per file.** If approaching this limit, split into modules or helpers.
+- Organize code into **clearly separated modules** grouped by feature or responsibility.
+- Use **clear, consistent imports** (prefer relative imports within packages).
+- Follow **Clean Architecture**, **SOLID principles**, and modern stable technologies.
+
+## 📚 Documentation & Explainability
+
+- **Update `README.md`** when features are added, dependencies change, or setup steps are modified.
+- **Comment non-obvious code** — target a mid-level developer's comprehension.
+- For complex logic, add an inline `// Reason:` comment explaining **why**, not just what.
+
+## 🛡️ AI Behavior Rules
+
+- **Never assume missing context** — search the codebase or ask if uncertain.
+- **Never hallucinate libraries or functions** — only use verified, existing packages.
+- **Never delete or overwrite existing code** unless explicitly instructed or required by the task.
+- **Never introduce unnecessary complexity.**
+- If architectural-level changes are required, **justify them before implementing**.
+
+## ✅ Quality Checklist
+
+- Code is clean, readable, and scalable.
+- Solutions are simple and production-ready.
+- Best coding practices are followed.
+- Latest stable technologies are used where appropriate.

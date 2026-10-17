@@ -1,0 +1,550 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "@/database/mongoose";
+import { requireSectionAccess } from "@/lib/admin/auth";
+import { buildReferralLink } from "@/lib/services/gamemaster/referral-link";
+import {
+  validateLimitsUpdate,
+  validateOverrideUpdate,
+} from "@/lib/admin/gamemaster-limits-update";
+import {
+  resolveCreationLimits,
+  type StoredPackageConfig,
+} from "@/lib/services/gamemaster/game-permissions";
+import {
+  countGameMasterActiveCompetitions,
+  remainingActiveCompetitionSlots,
+} from "@/lib/services/gamemaster/active-competitions";
+import { readReferredPlayers } from "@/lib/services/gamemaster/referral-read-model";
+import { disableAllContactUsPackagesForUser } from "@/lib/services/gamemaster/package-unlocks.service";
+import {
+  readAdminAwaitingClaims,
+  readAdminTermsStates,
+} from "@/lib/services/gamemaster/admin-terms-reminder.service";
+import { MAX_PAGE_LIMIT } from "@/lib/services/gamemaster/referral-report-filter";
+import mongoose from "mongoose";
+import { ObjectId } from "mongodb";
+
+/**
+ * GET /api/gamemasters/[id]
+ * Get detailed info about a specific game master
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireSectionAccess("gamemaster-management");
+
+    const { id } = await params;
+
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+
+    if (!db) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    // Get game master subscription
+    const subscription = await db
+      .collection("gamemastersubscriptions")
+      .findOne({
+        _id: new ObjectId(id),
+      });
+
+    if (!subscription) {
+      return NextResponse.json(
+        { error: "Game master not found" },
+        { status: 404 },
+      );
+    }
+
+    // Get referred users from user collection (via referredByGameMasterId field)
+    const referredUsersFromUserCollection = await db
+      .collection("user")
+      .find({
+        referredByGameMasterId: subscription.userId,
+      })
+      .project({
+        _id: 1,
+        id: 1,
+        name: 1,
+        email: 1,
+        createdAt: 1,
+        referredAt: 1,
+      })
+      .sort({ referredAt: -1 })
+      .limit(50)
+      .toArray();
+
+    // ALSO get referrals from userreferrals collection (source of truth)
+    const referralsFromCollection = await db
+      .collection("userreferrals")
+      .find({
+        gameMasterId: subscription.userId,
+      })
+      .sort({ referredAt: -1 })
+      .limit(50)
+      .toArray();
+
+    // Diagnostic: Check data consistency
+    const referralDiagnostics = {
+      counterValue: subscription.totalReferredUsers || 0,
+      usersWithReferredByField: referredUsersFromUserCollection.length,
+      userReferralRecords: referralsFromCollection.length,
+      isConsistent:
+        (subscription.totalReferredUsers || 0) ===
+          referredUsersFromUserCollection.length &&
+        referredUsersFromUserCollection.length ===
+          referralsFromCollection.length,
+    };
+
+    // Use referrals from collection if user collection is empty but referrals exist
+    const referredUsers =
+      referredUsersFromUserCollection.length > 0
+        ? referredUsersFromUserCollection
+        : referralsFromCollection.map((r) => ({
+            _id: r.userId,
+            id: r.userId,
+            name: r.userName || "Unknown",
+            email: r.userEmail,
+            createdAt: r.createdAt,
+            referredAt: r.referredAt,
+          }));
+
+    // Reason: the Referrals tab needs Own/External, phone, country and status. Those come from
+    // the same read model the referred-players report and its CSV use, so the tab cannot
+    // disagree with them. `referredUsers` above is kept unchanged for existing consumers.
+    const referredPlayers = await readReferredPlayers(
+      db,
+      { gameMasterIds: [String(subscription.userId)] },
+      { page: 1, limit: MAX_PAGE_LIMIT },
+    );
+    // Reason: "referred" and "assigned" are separate facts (`24` s5.6). The rows above are the
+    // assigned players; link sign-ups still waiting on the terms are referred but NOT assigned,
+    // so they arrive as their own list rather than being mixed into the assigned rows.
+    const [termsStates, awaitingTerms] = await Promise.all([
+      readAdminTermsStates(db, referredPlayers.rows),
+      readAdminAwaitingClaims(db, String(subscription.userId)),
+    ]);
+
+    // Get competitions created
+    const competitions = await db
+      .collection("competitions")
+      .find({
+        gameMasterId: subscription.userId,
+      })
+      .project({
+        _id: 1,
+        name: 1,
+        status: 1,
+        currentParticipants: 1,
+        minParticipants: 1,
+        prizePool: 1,
+        startTime: 1,
+        endTime: 1,
+      })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .toArray();
+
+    const activeCompetitions = await countGameMasterActiveCompetitions(
+      db,
+      subscription.userId,
+    );
+
+    // Get earnings history
+    const earnings = await db
+      .collection("gamemasterearnings")
+      .find({
+        gameMasterId: subscription.userId,
+      })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .toArray();
+
+    // Calculate actual pending earnings from gamemasterearnings (source of truth)
+    const pendingEarningsAgg = await db
+      .collection("gamemasterearnings")
+      .aggregate([
+        { $match: { gameMasterId: subscription.userId, status: "pending" } },
+        { $group: { _id: null, total: { $sum: "$netEarning" } } },
+      ])
+      .toArray();
+    const actualPendingEarnings = pendingEarningsAgg[0]?.total || 0;
+
+    // Get CURRENT package settings (not cached subscription limits)
+    let packageConfig: StoredPackageConfig | null = null;
+
+    if (subscription.packageId) {
+      try {
+        const currentPackage = await db.collection("marketplaceitems").findOne({
+          _id: new ObjectId(subscription.packageId),
+        });
+        if (currentPackage?.gameMasterConfig) {
+          packageConfig = currentPackage.gameMasterConfig;
+        }
+      } catch (e) {
+        console.error("Error fetching package:", e);
+      }
+    }
+
+    // Reason this screen resolves through `resolveCreationLimits` rather than reading the
+    // package itself: it used to build a four-field object from the package, which meant it
+    // (a) ignored `competitionCreationOverride` entirely, so an administrator's explicit deny
+    // rendered as "Comps: ON", and (b) dropped `allowedGameTypes`, so the screen could not
+    // show which games the Game Master may create. Both creation routes decide with this
+    // function, so the badge and the gate now cannot disagree.
+    const currentLimits = resolveCreationLimits({
+      limits: subscription.limits,
+      packageConfig,
+      override: subscription.competitionCreationOverride ?? null,
+      overrideLimits: subscription.overrideLimits ?? null,
+    });
+
+    return NextResponse.json({
+      subscription: {
+        id: subscription._id.toString(),
+        userId: subscription.userId,
+        userEmail: subscription.userEmail,
+        userName: subscription.userName,
+        packageId: subscription.packageId,
+        packageName: subscription.packageName,
+        status: subscription.status,
+        activatedAt: subscription.activatedAt,
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        nextRenewalDate: subscription.nextRenewalDate,
+        autoRenew: subscription.autoRenew,
+        renewalPrice: subscription.renewalPrice,
+        referralCode: subscription.referralCode,
+        referralLink: buildReferralLink(subscription.referralCode),
+        limits: currentLimits,
+        // Returned separately from the resolved limits so the screen can show BOTH what
+        // applies and whether an administrator set it by hand. Without the raw value a
+        // cleared override and an override that agrees with the package look identical.
+        competitionCreationOverride:
+          subscription.competitionCreationOverride ?? null,
+        overrideLimits: subscription.overrideLimits ?? null,
+        currentPeriodCompetitionsCreated:
+          subscription.currentPeriodCompetitionsCreated,
+        totalCompetitionsCreated: subscription.totalCompetitionsCreated,
+        activeCompetitions,
+        maxActiveCompetitions: currentLimits.maxActiveCompetitions,
+        remainingActiveSlots: remainingActiveCompetitionSlots(
+          activeCompetitions,
+          currentLimits.maxActiveCompetitions,
+        ),
+        totalEarnings: subscription.totalEarnings,
+        // Use calculated pending earnings from gamemasterearnings (source of truth)
+        pendingEarnings: actualPendingEarnings,
+        totalReferredUsers: subscription.totalReferredUsers,
+        activeReferredUsers: subscription.activeReferredUsers,
+        renewalHistory: subscription.renewalHistory,
+        suspendedAt: subscription.suspendedAt,
+        suspendedReason: subscription.suspendedReason,
+        createdAt: subscription.createdAt,
+      },
+      referredUsers: referredUsers.map((u) => ({
+        id: (u.id || u._id).toString(),
+        name: u.name,
+        email: u.email,
+        createdAt: u.createdAt,
+        referredAt: u.referredAt,
+      })),
+      referredPlayers: referredPlayers.rows.map((row) => ({
+        ...row,
+        termsState: termsStates.get(row.referralId) ?? null,
+      })),
+      referredPlayersTotal: referredPlayers.total,
+      awaitingTerms,
+      // Diagnostic info to help debug referral data inconsistencies
+      referralDiagnostics,
+      competitions: competitions.map((c) => ({
+        id: c._id.toString(),
+        name: c.name,
+        status: c.status,
+        participants: c.currentParticipants,
+        minParticipants: c.minParticipants ?? 2,
+        prizePool: c.prizePool,
+        startTime: c.startTime,
+        endTime: c.endTime,
+      })),
+      earnings: earnings.map((e) => ({
+        id: e._id.toString(),
+        sourceType: e.sourceType,
+        sourceId: e.sourceId ? String(e.sourceId) : null,
+        sourceName: e.sourceName,
+        referredUserName: e.referredUserName,
+        entryFeeAmount: e.entryFeeAmount,
+        netEarning: e.netEarning,
+        status: e.status,
+        createdAt: e.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching game master details:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unauthorized" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * PATCH /api/gamemasters/[id]
+ * Update a game master (suspend, change limits, etc.)
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireSectionAccess("gamemaster-management");
+
+    const { id } = await params;
+    const body = await request.json();
+    const { action, reason, limits } = body;
+
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+
+    if (!db) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    const subscription = await db
+      .collection("gamemastersubscriptions")
+      .findOne({
+        _id: new ObjectId(id),
+      });
+
+    if (!subscription) {
+      return NextResponse.json(
+        { error: "Game master not found" },
+        { status: 404 },
+      );
+    }
+
+    const now = new Date();
+    let updateData: Record<string, unknown> = { updatedAt: now };
+
+    switch (action) {
+      case "suspend":
+        updateData = {
+          ...updateData,
+          status: "suspended",
+          suspendedAt: now,
+          suspendedReason: reason || "Suspended by admin",
+        };
+        break;
+
+      case "reactivate":
+        if (subscription.status !== "suspended") {
+          return NextResponse.json(
+            { error: "Only a suspended Game Master can be reactivated" },
+            { status: 400 },
+          );
+        }
+        if (new Date(subscription.endDate) < now) {
+          // Reason: a suspension does not pause the pack's clock, and the renewal worker only
+          // expires `active` rows - so a pack that ran out while suspended used to be stuck: this
+          // route refused it, and the player's renew/delete/activate refuse a suspended pack. Lift
+          // the suspension into the state the worker would have written, and end the player's
+          // Contact-us permissions as the worker does, so buying again goes through support.
+          // To give the time back instead, Extend first and then Reactivate.
+          await db.collection("gamemastersubscriptions").updateOne(
+            { _id: new ObjectId(id), status: "suspended" },
+            {
+              $set: {
+                status: "expired",
+                suspendedAt: null,
+                suspendedReason: null,
+                updatedAt: now,
+              },
+            },
+          );
+          await disableAllContactUsPackagesForUser(String(subscription.userId));
+          return NextResponse.json({
+            success: true,
+            message:
+              "Suspension lifted. The pack's end date passed while suspended, so it is now expired. Use Extend before Reactivate if you want to give the time back.",
+          });
+        }
+        updateData = {
+          ...updateData,
+          status: "active",
+          suspendedAt: null,
+          suspendedReason: null,
+        };
+        break;
+
+      case "update_limits": {
+        if (!limits) break;
+        // Reason this is validated rather than spread: the previous
+        // `{ ...subscription.limits, ...limits }` wrote every key the browser sent onto the
+        // document that decides how many contests a Game Master may create, what share they
+        // earn, and which games they may create at all - and a raw-driver `updateOne` runs no
+        // Mongoose validation, so the schema's own bounds never applied on this path.
+        const validated = validateLimitsUpdate(subscription.limits, limits);
+        if (!validated.ok) {
+          return NextResponse.json({ error: validated.error }, { status: 400 });
+        }
+        updateData = { ...updateData, limits: validated.limits };
+        break;
+      }
+
+      case "toggleCompetitionCreation": {
+        // The per-Game-Master creation override. `competitionCreationOverride` and
+        // `overrideLimits` have been on the schema since long before this project with a
+        // Mongoose virtual reading them, and until now nothing wrote them, nothing read them,
+        // and no control sent this action - see `validateOverrideUpdate` for why it is
+        // implemented rather than deleted.
+        const validated = validateOverrideUpdate(body);
+        if (!validated.ok) {
+          return NextResponse.json({ error: validated.error }, { status: 400 });
+        }
+        updateData = {
+          ...updateData,
+          competitionCreationOverride: validated.override,
+          // Written unconditionally, including as `{}` when the override is cleared or set to
+          // `disabled`. Reason: leaving a stale `overrideLimits` behind means clearing an
+          // override and setting it again later silently restores caps an operator set weeks
+          // ago and has no way to see.
+          overrideLimits: validated.overrideLimits,
+        };
+        break;
+      }
+
+      case "extend":
+        const extensionDays = body.extensionDays || 30;
+        const newEndDate = new Date(subscription.endDate);
+        newEndDate.setDate(newEndDate.getDate() + extensionDays);
+        updateData = {
+          ...updateData,
+          endDate: newEndDate,
+          nextRenewalDate: newEndDate,
+        };
+        break;
+
+      default:
+        return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
+
+    await db
+      .collection("gamemastersubscriptions")
+      .updateOne({ _id: new ObjectId(id) }, { $set: updateData });
+
+    return NextResponse.json({
+      success: true,
+      message: `Game master ${action} successful`,
+    });
+  } catch (error) {
+    console.error("Error updating game master:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unauthorized" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * DELETE /api/gamemasters/[id]
+ * Revoke a game master subscription
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    await requireSectionAccess("gamemaster-management");
+
+    const { id } = await params;
+
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+
+    if (!db) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 },
+      );
+    }
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Game master not found" },
+        { status: 404 },
+      );
+    }
+
+    const subscriptions = db.collection("gamemastersubscriptions");
+    const existing = await subscriptions.findOne(
+      { _id: new ObjectId(id) },
+      { projection: { userId: 1 } },
+    );
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Game master not found" },
+        { status: 404 },
+      );
+    }
+
+    // Reason: a revoke ends the subscription NOW. Setting only the status left the old
+    // future endDate in place, so screens that test "endDate > now" kept calling it
+    // active, and autoRenew/pause/deletion flags lingered into the next purchase.
+    const now = new Date();
+    await subscriptions.updateOne(
+      { _id: existing._id },
+      {
+        $set: {
+          status: "cancelled",
+          cancelledAt: now,
+          cancellationReason: "Revoked by admin",
+          endDate: now,
+          nextRenewalDate: now,
+          autoRenew: false,
+          isPaused: false,
+          scheduledForDeletion: false,
+          updatedAt: now,
+        },
+      },
+    );
+
+    // Reason: the player's purchase route refuses "You already own this item", so the
+    // leftover purchase row would stop them buying the same package again. The
+    // subscription is what grants Game Master rights; the purchase row grants nothing.
+    if (existing.userId) {
+      const gmItemIds = await db
+        .collection("marketplaceitems")
+        .find({ category: "gamemaster" }, { projection: { _id: 1 } })
+        .map((item) => item._id)
+        .toArray();
+      if (gmItemIds.length > 0) {
+        await db.collection("userpurchases").deleteMany({
+          userId: String(existing.userId),
+          itemId: { $in: gmItemIds },
+        });
+      }
+      // Reason: a revoked Game Master must ask support again before buying a Contact-us
+      // package, so every package an admin had enabled for them is switched off here.
+      await disableAllContactUsPackagesForUser(String(existing.userId));
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Game master subscription revoked",
+    });
+  } catch (error) {
+    console.error("Error revoking game master:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unauthorized" },
+      { status: 500 },
+    );
+  }
+}
