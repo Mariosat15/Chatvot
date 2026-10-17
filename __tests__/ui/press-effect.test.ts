@@ -7,12 +7,14 @@ import { ART_BUTTON_HOVER, PRESS_EFFECT } from "@/components/ui/press-effect";
 const ROOT = join(__dirname, "..", "..");
 const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
-describe("one press effect for every player-side button (owner, 3 Oct 2026)", () => {
-  it("is the competition entry button's small press, and never scales on hover", () => {
+describe("one press effect for every player-side button (owner, 3 Oct 2026; hand 17 Oct)", () => {
+  it("is the small press plus hand cursor, and never scales on hover", () => {
+    expect(PRESS_EFFECT).toMatch(/\bcursor-pointer\b/);
     expect(PRESS_EFFECT).toMatch(/\bduration-150\b/);
     expect(PRESS_EFFECT).toMatch(/\bactive:scale-95\b/);
     expect(PRESS_EFFECT).not.toMatch(/hover:scale/);
     expect(ART_BUTTON_HOVER).not.toMatch(/scale/);
+    // Competition entry still documents the same numbers inline on a few Buttons.
     const entry = read("components/trading/CompetitionEntryButton.tsx");
     expect(entry).toMatch(/active:scale-95 transition-all duration-150/);
   });
@@ -21,6 +23,23 @@ describe("one press effect for every player-side button (owner, 3 Oct 2026)", ()
     expect(read("components/ui/button.tsx")).toMatch(/\$\{PRESS_EFFECT\}/);
     const neon = read("components/neon/Buttons.tsx");
     expect(neon.match(/\$\{PRESS_EFFECT\}/g)?.length).toBe(2);
+  });
+
+  it("lobby join art and tab chrome use PRESS_EFFECT, not a one-off hover lift", () => {
+    const join = read("components/competitions/lobby/LobbyJoinArtworkButton.tsx");
+    expect(join).toMatch(/PRESS_EFFECT/);
+    expect(join).not.toMatch(/hover:-translate-y/);
+    const tabs = read("components/competitions/detail/TradingDetailTabs.tsx");
+    expect(tabs).toMatch(/PRESS_EFFECT/);
+  });
+
+  it("globals apply the same press + hand to native buttons (player and admin)", () => {
+    for (const path of ["app/globals.css", "apps/admin/app/globals.css"]) {
+      const css = read(path);
+      expect(css).toMatch(/button:enabled:not\(\[aria-disabled="true"\]\)/);
+      expect(css).toMatch(/cursor:\s*pointer/);
+      expect(css).toMatch(/scale\(0\.95\)/);
+    }
   });
 
   it("no <Button>, <button> or <Link> opening tag scales on hover", () => {

@@ -139,6 +139,33 @@
   body {
     @apply bg-gray-900 text-foreground;
   }
+
+  /*
+   * ONE press + hand for every native button (owner, 17 Oct 2026). Same contract as the
+   * player app `globals.css` / `PRESS_EFFECT` — hand on hover, 5% shrink on press, no
+   * motion when reduced-motion is on. Links styled as buttons still need the class.
+   */
+  button:enabled:not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+    cursor: pointer;
+    transition-property: transform, color, background-color, border-color, opacity,
+      box-shadow, filter, brightness;
+    transition-duration: 150ms;
+  }
+  button:enabled:not([aria-disabled="true"]):active,
+  [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
+    transform: scale(0.95);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button:enabled:not([aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+      transition: none;
+    }
+    button:enabled:not([aria-disabled="true"]):active,
+    [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
+      transform: none;
+    }
+  }
 }
 
 @layer utilities {

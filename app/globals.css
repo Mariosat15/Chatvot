@@ -161,6 +161,35 @@ body {
   body {
     @apply bg-gray-900 text-foreground;
   }
+
+  /*
+   * ONE press + hand for every native button (owner, 17 Oct 2026). Tailwind v4's preflight
+   * left `<button>` on the arrow cursor; hand-rolled controls also forgot `active:scale-95`.
+   * Match `PRESS_EFFECT` in `components/ui/press-effect.ts`. Disabled / aria-disabled keep
+   * the default cursor and do not shrink. Prefer the shared class on Links styled as buttons
+   * — anchors are not covered here on purpose (not every link should press).
+   */
+  button:enabled:not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+    cursor: pointer;
+    transition-property: transform, color, background-color, border-color, opacity,
+      box-shadow, filter, brightness;
+    transition-duration: 150ms;
+  }
+  button:enabled:not([aria-disabled="true"]):active,
+  [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
+    transform: scale(0.95);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button:enabled:not([aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]):not([disabled]) {
+      transition: none;
+    }
+    button:enabled:not([aria-disabled="true"]):active,
+    [role="button"]:not([aria-disabled="true"]):not([disabled]):active {
+      transform: none;
+    }
+  }
 }
 
 @layer utilities {

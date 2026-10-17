@@ -6,6 +6,7 @@ import {
   resolveCtaAsset,
 } from "@/lib/competitions/game-artwork";
 import type { CtaVariant } from "@/lib/competitions/types";
+import { ART_BUTTON_HOVER, PRESS_EFFECT } from "@/components/ui/press-effect";
 
 /**
  * Menuitems join / reserve / already-in artwork as a real clickable button.
@@ -13,6 +14,8 @@ import type { CtaVariant } from "@/lib/competitions/types";
  * WHY NOT `CompetitionCTA`. That component is a `<Link>` for the competitions
  * browser. The lobby's entry control POSTs (and may open terms), so it must be
  * a `<button>` with a handler — same asset family, different element.
+ *
+ * Press + hand: `PRESS_EFFECT` (owner, 17 Oct 2026 — same on every control).
  */
 
 export function LobbyJoinArtworkButton({
@@ -41,7 +44,7 @@ export function LobbyJoinArtworkButton({
       className={`competitionCta relative mx-auto block w-full max-w-[320px] aspect-[3/1] ${
         greyed
           ? "cursor-not-allowed opacity-45 grayscale"
-          : "cursor-pointer transition hover:-translate-y-px hover:brightness-110"
+          : `${PRESS_EFFECT} ${ART_BUTTON_HOVER}`
       }`}
     >
       <Image

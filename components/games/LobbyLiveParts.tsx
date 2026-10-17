@@ -1,6 +1,6 @@
 "use client";
 
-import { Gift, Trophy } from "lucide-react";
+import { Gift } from "lucide-react";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
@@ -8,6 +8,7 @@ import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
 import { useArenaLive } from "@/components/games/arena/ArenaLiveStandings";
 import { formatVolts } from "@/lib/utils/format-volts";
 import { formatGameScore } from "@/lib/utils/format-game-score";
+import { NEON_ICON } from "@/lib/services/games/overview-assets";
 import type { ComponentProps } from "react";
 
 /**
@@ -104,12 +105,23 @@ export function LobbyLiveLeaderboard({
   scoreLabel: string;
   title: string;
 }) {
-  const { rows, activity, currentUserId, scoreType } = useArenaLive();
+  const { rows, activity, currentUserId, scoreType, contest } = useArenaLive();
+  const prizeDistribution = Array.isArray(contest.prizeDistribution)
+    ? contest.prizeDistribution.map((p, i) => ({
+        rank: typeof p.rank === "number" ? p.rank : i + 1,
+        percentage: p.percentage,
+      }))
+    : [];
+  /*
+    Reason (owner, 17 Oct 2026): same NeonPanel chrome as DesktopTradingLobby — blue trophy
+    asset, size lg, count pill — so the game lobby leaderboard is not a different product.
+  */
   return (
     <NeonPanel
-      icon={Trophy}
+      iconSrc={NEON_ICON("trophy-blue")}
       accent="prize"
       title={title}
+      size="lg"
       action={<NeonCountPill>{rows.length} players</NeonCountPill>}
       className="min-w-0"
     >
@@ -119,6 +131,7 @@ export function LobbyLiveLeaderboard({
         scoreLabel={scoreLabel}
         scoreType={scoreType}
         activity={activity}
+        prizeDistribution={prizeDistribution}
       />
     </NeonPanel>
   );

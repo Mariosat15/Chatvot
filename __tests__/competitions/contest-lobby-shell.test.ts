@@ -233,12 +233,23 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     expect(tradingTabs).not.toContain("<ContestHowItWorks");
     // Amended the same day: the owner's next reference brought back tiles beside a "Battle
     // plan", drawn by `TradingOverview` from one builder - still not the shared timeline.
+    // Amended 17 Oct 2026: About + each feature tile are full-width stacked bands (owner
+    // red-box mark-up), not About beside a two-column tile grid.
     expect(tradingTabs).toContain(
       "<TradingOverview about={about} overview={overview} />",
     );
     expect(tradingOverview).not.toContain("<ContestHowItWorks");
     expect(tradingOverview).toContain("overview.features.map(");
     expect(tradingOverview).toContain("overview.steps.map(");
+    expect(tradingOverview).not.toContain("xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]");
+    expect(tradingOverview).not.toContain('grid grid-cols-2 gap-3');
+    // Amended 17 Oct 2026: Battle plan steps fill the card (cols = step count) and
+    // centre number + title + detail — not a left-packed 4-column row with a dead gap.
+    expect(tradingOverview).toContain('sm:grid-cols-3');
+    expect(tradingOverview).toContain("items-center text-center");
+    expect(tradingOverview).not.toContain(
+      "grid-cols-[36px_minmax(0,1fr)]",
+    );
   });
 
   it("fills the tab panel instead of pushing rule cards to the left", () => {
@@ -313,6 +324,26 @@ describe("competition detail shell (Cursor Spec hierarchy)", () => {
     const entry = readCode("components/trading/CompetitionEntryButton.tsx");
     expect(entry).toContain("LobbyJoinArtworkButton");
     expect(entry).toContain('variant={isUpcoming ? "reserve" : "join"}');
+  });
+
+  it("Play / Start Trading use the gold ArenaPlayPlate on both lobbies", () => {
+    // Owner, 17 Oct 2026: replace the plain blue Trophy button with the chevron plate;
+    // wording still depends on game vs trading.
+    const entry = readCode("components/trading/CompetitionEntryButton.tsx");
+    expect(entry).toContain("<ArenaPlayPlate");
+    expect(entry).toContain('label={isProviderGame ? "PLAY" : "START TRADING"}');
+    expect(entry).not.toMatch(/bg-blue-500[\s\S]{0,80}Start Trading/);
+    expect(entry).not.toMatch(/<Trophy\b/);
+  });
+
+  it("merges catalogue how-to-play into the How you play tab", () => {
+    // Owner, 17 Oct 2026: two swords tabs ("How you play" + "How to play") → one.
+    const sections = readCode("components/games/lobby/game-lobby-sections.tsx");
+    expect(sections).toContain("howMerged");
+    expect(sections).toContain('section.title === "How you play"');
+    expect(sections).toContain("howToPlayCard(how)");
+    // A second tab titled "How to play" must not return.
+    expect(sections).not.toMatch(/title:\s*"How to play"/);
   });
 });
 

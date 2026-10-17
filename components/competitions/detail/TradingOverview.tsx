@@ -18,12 +18,14 @@ import type {
 } from "@/components/competitions/lobby/trading-overview-copy";
 
 /**
- * The trading Overview tab (owner reference, 12 Oct 2026): "About this competition" with two
- * centred fact tiles (market and how you win - seats and the pot already sit in the summary above) (each with up to two small icon rows), above a "Battle plan" of numbered steps in one row.
+ * The trading / game Overview tab: "About this competition", then each fact tile, then the
+ * "Battle plan" — all full-width stacked bands (owner, 17 Oct 2026: red-box mark-up; was a
+ * side-by-side About + two tiles that cramped the copy).
  *
- * Every word comes from `buildTradingOverviewCopy`; this file only draws it. Headings sit on one
- * line with their icon (`items-center`, `leading-none`), each step's title shares the height of
- * its number circle so the two line up, and nothing truncates - long text wraps instead.
+ * Every word comes from `buildTradingOverviewCopy` / `buildGameOverviewCopy`; this file only
+ * draws it. Headings sit on one line with their icon (`items-center`, `leading-none`), each
+ * step's title shares the height of its number circle so the two line up, and nothing
+ * truncates - long text wraps instead.
  *
  * Rendered inside the client tab bar, so the icons are imported here rather than passed in (R39).
  */
@@ -103,56 +105,56 @@ export function TradingOverview({
   overview: TradingOverviewCopy;
 }) {
   return (
-    // Reason: TWO FULL-WIDTH BANDS (owner, 15 Oct 2026). Side by side, the Battle plan's four
-    // steps ran taller than the About card and spilled below it; stacked, each band reads
-    // across - About's text beside its tiles, then the four steps in one row.
+    // Reason (owner, 17 Oct 2026): About, How you play / market tile, and How you win each
+    // get their own full-width band — not three columns. Side-by-side cramped the About
+    // copy and put How-you-play beside How-you-win; stacked matches the red-box mark-up on
+    // both the game and trading lobbies. Battle plan stays a fourth band below.
     <div className="flex flex-col gap-5">
-      <section
-        className={`${CARD} grid grid-cols-1 items-center gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]`}
-      >
-        <div className="min-w-0">
-          <CardHeading
-            icon={<Info className="h-7 w-7 shrink-0 text-cyan-300" />}
-            lead="About this"
-            accent="competition"
-          />
-          <p className="mt-4 text-base leading-relaxed text-gray-300">{about}</p>
-        </div>
-        <ul className="grid grid-cols-2 gap-3">
-          {overview.features.map((feature, index) => {
-            const tone = TILE_TONES[index % TILE_TONES.length];
-            return (
-              <li
-                key={feature.iconSrc}
-                className={`flex min-w-0 flex-col items-center rounded-xl border bg-[#0A1024]/80 px-3.5 pb-4 pt-5 text-center ${tone.frame}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
-                <img
-                  src={feature.iconSrc}
-                  alt=""
-                  draggable={false}
-                  className="h-16 w-16 shrink-0 object-contain"
-                />
-                <p className="mt-3 text-lg font-bold leading-tight text-white">
-                  {feature.title}
-                </p>
-                <span
-                  className={`mt-2.5 h-0.5 w-8 shrink-0 rounded-full ${tone.bar}`}
-                />
-                <ul className="mt-4 w-full divide-y divide-white/10 border-t border-white/10 pt-3">
-                  {feature.facts.map((fact) => (
-                    <FactRow
-                      key={`${fact.icon}-${fact.strong}`}
-                      fact={fact}
-                      dot={tone.dot}
-                    />
-                  ))}
-                </ul>
-              </li>
-            );
-          })}
-        </ul>
+      <section className={CARD}>
+        <CardHeading
+          icon={<Info className="h-7 w-7 shrink-0 text-cyan-300" />}
+          lead="About this"
+          accent="competition"
+        />
+        <p className="mt-4 text-base leading-relaxed text-gray-300">{about}</p>
       </section>
+
+      {overview.features.map((feature, index) => {
+        const tone = TILE_TONES[index % TILE_TONES.length];
+        return (
+          <section
+            key={`${feature.title}-${feature.iconSrc}`}
+            className={`${CARD} flex flex-col gap-5 sm:flex-row sm:items-start`}
+          >
+            <div className="flex shrink-0 flex-col items-center sm:w-40">
+              {/* eslint-disable-next-line @next/next/no-img-element -- fixed local icon art */}
+              <img
+                src={feature.iconSrc}
+                alt=""
+                draggable={false}
+                className="h-16 w-16 object-contain"
+              />
+              <p className="mt-3 text-center text-lg font-bold leading-tight text-white">
+                {feature.title}
+              </p>
+              <span
+                className={`mt-2.5 h-0.5 w-8 shrink-0 rounded-full ${tone.bar}`}
+              />
+            </div>
+            <ul
+              className={`min-w-0 flex-1 divide-y divide-white/10 rounded-xl border bg-[#0A1024]/80 px-4 py-2 ${tone.frame}`}
+            >
+              {feature.facts.map((fact) => (
+                <FactRow
+                  key={`${fact.icon}-${fact.strong}`}
+                  fact={fact}
+                  dot={tone.dot}
+                />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
 
       <section className={CARD}>
         <CardHeading
@@ -160,23 +162,36 @@ export function TradingOverview({
           lead="Battle"
           accent="plan"
         />
-        <ol className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {/*
+          Reason (owner, 17 Oct 2026): three steps on a 4-column grid left a dead gap on
+          the right. Column count follows the step count so the row fills the card; each
+          step is centred (number above title above detail).
+        */}
+        <ol
+          className={`mt-6 grid grid-cols-1 gap-6 ${
+            overview.steps.length <= 1
+              ? ""
+              : overview.steps.length === 2
+                ? "sm:grid-cols-2"
+                : overview.steps.length === 3
+                  ? "sm:grid-cols-3"
+                  : "sm:grid-cols-2 xl:grid-cols-4"
+          }`}
+        >
           {overview.steps.map((step, index) => (
             <li
               key={step.title}
-              className="relative grid grid-cols-[36px_minmax(0,1fr)] gap-x-3"
+              className="flex min-w-0 flex-col items-center text-center"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-sky-400 bg-[#060A18] text-sm font-bold text-white shadow-[0_0_12px_rgba(56,189,248,0.45)]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-sky-400 bg-[#060A18] text-sm font-bold text-white shadow-[0_0_12px_rgba(56,189,248,0.45)]">
                 {index + 1}
               </span>
-              <div className="min-w-0">
-                <p className="text-lg font-bold leading-9 text-white">
-                  {step.title}
-                </p>
-                <p className="text-sm leading-relaxed text-gray-400">
-                  {step.detail}
-                </p>
-              </div>
+              <p className="mt-3 text-lg font-bold leading-tight text-white">
+                {step.title}
+              </p>
+              <p className="mt-1.5 max-w-[16rem] text-sm leading-relaxed text-gray-400">
+                {step.detail}
+              </p>
             </li>
           ))}
         </ol>

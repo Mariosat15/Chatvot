@@ -137,12 +137,49 @@ function slugId(title: string): string {
     .slice(0, 40);
 }
 
+function howToPlayCard(how: string) {
+  const lines = how
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return (
+    <RuleCard
+      iconSrc={NEON_ICON("swords")}
+      accent="sky"
+      title="How to play"
+      subtitle="Step by step"
+    >
+      {lines.length > 1 ? (
+        <ol className="space-y-2">
+          {lines.map((line, i) => (
+            <RuleRow
+              key={`${i}-${line.slice(0, 24)}`}
+              icon={Gamepad2}
+              label={`${i + 1}`}
+              value={line}
+              tone="cyan"
+            />
+          ))}
+        </ol>
+      ) : (
+        <p className="text-sm leading-relaxed text-gray-300 whitespace-pre-wrap">{how}</p>
+      )}
+    </RuleCard>
+  );
+}
+
 export function buildGameLobbySections(input: {
   eventSections: GameEventSection[];
   rulesSummary?: string | null;
   howToPlay?: string | null;
 }): NeonAccordionSection[] {
   const sections: NeonAccordionSection[] = [];
+  // Reason (owner, 17 Oct 2026): catalogue `howToPlay` used to add a second swords tab
+  // ("How to play") beside the event tab ("How you play") — same topic, two menu entries,
+  // and a trailing icon with no readable label on a narrow strip. Merge into one tab.
+  const how =
+    typeof input.howToPlay === "string" ? input.howToPlay.trim() : "";
+  let howMerged = false;
 
   for (const section of input.eventSections) {
     const hasRow = section.rows.some((r) => {
@@ -151,11 +188,21 @@ export function buildGameLobbySections(input: {
       return true;
     });
     if (!hasRow) continue;
+    const isHowYouPlay = section.title === "How you play";
+    const mergeHow = isHowYouPlay && how.length > 0;
+    if (mergeHow) howMerged = true;
     sections.push({
       id: slugId(section.title) || `event-${sections.length}`,
       icon: iconImg(section.iconSrc),
       title: section.title,
-      content: <GameEventDetails sections={[section]} />,
+      content: mergeHow ? (
+        <div className="flex flex-col gap-4">
+          <GameEventDetails sections={[section]} />
+          {howToPlayCard(how)}
+        </div>
+      ) : (
+        <GameEventDetails sections={[section]} />
+      ),
     });
   }
 
@@ -178,40 +225,12 @@ export function buildGameLobbySections(input: {
     });
   }
 
-  const how = typeof input.howToPlay === "string" ? input.howToPlay.trim() : "";
-  if (how) {
-    const lines = how
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
+  if (how && !howMerged) {
     sections.push({
-      id: "how-to-play",
+      id: "how-you-play",
       icon: iconImg(NEON_ICON("swords")),
-      title: "How to play",
-      content: (
-        <RuleCard
-          iconSrc={NEON_ICON("swords")}
-          accent="sky"
-          title="How to play"
-          subtitle="Step by step"
-        >
-          {lines.length > 1 ? (
-            <ol className="space-y-2">
-              {lines.map((line, i) => (
-                <RuleRow
-                  key={`${i}-${line.slice(0, 24)}`}
-                  icon={Gamepad2}
-                  label={`${i + 1}`}
-                  value={line}
-                  tone="cyan"
-                />
-              ))}
-            </ol>
-          ) : (
-            <p className="text-sm leading-relaxed text-gray-300 whitespace-pre-wrap">{how}</p>
-          )}
-        </RuleCard>
-      ),
+      title: "How you play",
+      content: howToPlayCard(how),
     });
   }
 

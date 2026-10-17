@@ -35,10 +35,12 @@ export function ArenaPlayPlate({
     <span className="group flex w-full items-center justify-center gap-2 sm:gap-3">
       <ChevronsRight aria-hidden className={chevron} />
       <span
-        className={`relative block min-w-0 flex-1 transition-transform duration-150 ${
+        className={`relative block min-w-0 flex-1 transition-transform duration-150 motion-reduce:transition-none ${
           disabled
             ? ""
-            : "drop-shadow-[0_0_18px_rgba(251,191,36,0.6)] group-hover:scale-[1.02] group-active:scale-[0.98]"
+            : // Reason (17 Oct 2026): same press as PRESS_EFFECT — shrink on active only.
+              // Hover used to scale up (1.02); that disagreed with every other button.
+              "drop-shadow-[0_0_18px_rgba(251,191,36,0.6)] group-active:scale-95 motion-reduce:group-active:scale-100"
         }`}
       >
         {/* Bevel: a darker gold rim the face sits inside (slate when refused). */}

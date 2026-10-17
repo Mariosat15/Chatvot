@@ -2161,112 +2161,56 @@ describe("the arena puts the board first at every width", () => {
 
 describe("the standings board fits the column it is given", () => {
   /*
-    It is rendered in two places whose widths are nothing like each other - the lobby's main
-    column and the arena's standings rail - and it used to force a fixed minimum width inside a
-    horizontal scroller. On the rail that pushed the score column out of sight, so the one number
-    the board exists to show was the one thing a player could not see without dragging sideways.
+    AMENDED 17 OCTOBER 2026 (owner: reuse trading lobby leaderboard style on the game lobby).
+    The LOBBY (`detailed`) path now matches CompetitionLeaderboard — min-width card rows,
+    sideways drag, pager, prize footer. The ARENA (`ranking`) path keeps the compact fluid
+    rail that must not scroll sideways. Assertions are sliced per path so one cannot cover
+    for the other.
   */
   const board = readCode(PROVIDER_BOARD);
+  const rankingAt = board.indexOf("function RankingBoard");
+  expect(rankingAt).toBeGreaterThan(0);
+  const lobbySlice = board.slice(0, rankingAt);
+  const rankingSlice = board.slice(rankingAt);
 
-  it("declares no fixed width and no sideways scroll", () => {
-    expect(board).not.toMatch(/min-w-\[\d+px\]/);
-    expect(board).not.toMatch(/overflow-x-auto/);
+  it("lobby matches trading chrome; ranking rail stays fluid with no sideways scroll", () => {
+    expect(lobbySlice).toMatch(/min-w-\[560px\]/);
+    expect(lobbySlice).toMatch(/overflow-x-auto/);
+    expect(lobbySlice).toMatch(/useDragScroll/);
+    expect(lobbySlice).toMatch(/LeaderboardPager/);
+    expect(lobbySlice).toMatch(/Prize position/);
+    expect(lobbySlice).toMatch(/LOBBY_GRID/);
+    expect(rankingSlice).not.toMatch(/min-w-\[\d+px\]/);
+    expect(rankingSlice).not.toMatch(/overflow-x-auto/);
   });
 
-  it("truncates the name rather than wrapping the row", () => {
-    /*
-      `minmax(0,1fr)` and not `1fr`: a bare `1fr` is floored by its content's minimum size, so a
-      long name widens the grid instead of truncating inside it and the row overflows again -
-      with no `min-w-` anywhere, which is why the assertion above cannot see it.
-
-      COUNTED, not merely found. The column template is written twice, once for the heading row
-      and once for the player rows, so `toMatch` is satisfied by either - a probe restoring the
-      bare `1fr` on the heading alone came back green until this counted them.
-
-      THE TEMPLATE GAINED A FOURTH COLUMN on 11 September 2026 when the board grew the
-      reference's Time column. The claim is unchanged and only the shape moved, so the
-      assertion was re-pointed rather than relaxed: the name column is still the only flexible
-      one and it is still `minmax(0,1fr)`.
-
-      A FIFTH `auto` COLUMN since 15 October 2026: the Game Master crown moved off the name
-      line to the end of the row (owner: "move the gm icon to end so the name can be shown").
-      Re-pointed again with the claim unchanged.
-    */
+  it("ranking rail still uses the compact five-column template twice", () => {
     const template =
-      board.match(
-        /grid-cols-\[[\w.]+_minmax\(0,1fr\)_minmax\([\d.]+rem,auto\)_minmax\([\d.]+rem,auto\)_auto\]/g,
+      rankingSlice.match(
+        /grid-cols-\[1\.75rem_minmax\(0,1fr\)_minmax\(2\.5rem,auto\)_minmax\(2\.25rem,auto\)_auto\]/g,
       ) ?? [];
     expect(template).toHaveLength(2);
-    expect(board).not.toMatch(/grid-cols-\[[\w.]+_1fr_/);
-    expect(board).not.toMatch(/\bflex-wrap\b/);
+    expect(rankingSlice).not.toMatch(/grid-cols-\[[\w.]+_1fr_/);
+    expect(rankingSlice).not.toMatch(/\bflex-wrap\b/);
   });
 
-  it("keeps the name line to the name and the you marker", () => {
-    /*
-      THE OWNER REPORTED TRUNCATED NAMES TWICE, and the second time the rail had already been
-      widened to 360px. What was actually eating the line was its own furniture: a gold crown
-      drawn beside the name while `NeonRankBadge style="plates"` was already drawing one two
-      columns to the left, and a "= #1" tie chip repeating the rank that same plate states.
-
-      Both facts are still on the row - the crown in the plate, the tie beside the score it is
-      a statement about - so this asserts WHERE they are rather than that they are gone.
-
-      The tie marker is COUNTED. A second copy left on the name line satisfies any positional
-      check aimed at the first, which is the shape that has defeated four structural tests in
-      this repository.
-    */
-    expect(board).not.toMatch(/isLeader/);
-
-    const scoreCellAt = board.indexOf("row.score === undefined");
-    expect(scoreCellAt).toBeGreaterThan(0);
-
-    const nameAt = board.indexOf("<NeonPlayerName");
+  it("keeps the ranking name line to the name and the you marker", () => {
+    expect(rankingSlice).not.toMatch(/isLeader/);
+    const nameAt = rankingSlice.indexOf("<NeonPlayerName");
     expect(nameAt).toBeGreaterThan(0);
-    const nameBlock = board.slice(nameAt, scoreCellAt);
-    expect(nameBlock.length).toBeGreaterThan(0);
-    expect(nameBlock).not.toMatch(/row\.isTied/);
-
-    // Two since 15 Oct 2026: the rank badge carries the trading board's gold tie ring
-    // (owner: "style and icons must match image 1"), BEFORE the name; the "=" stays
-    // beside the score. Neither may sit on the name line.
-    expect(board.match(/row\.isTied/g) ?? []).toHaveLength(2);
-    expect(board.indexOf("row.isTied")).toBeLessThan(nameAt);
-    expect(board.lastIndexOf("row.isTied")).toBeGreaterThan(scoreCellAt);
+    expect(rankingSlice).toMatch(/showYouMarker=\{!ranking\}/);
+    expect(rankingSlice).toMatch(/row\.isTied && !ranking/);
+    // Tie ring on the rank badge sits before the name; score-side "=" stays behind !ranking.
+    expect(rankingSlice.indexOf("row.isTied")).toBeLessThan(nameAt);
   });
 
-  it("spends the rail on the name rather than on the numeric columns", () => {
-    /*
-      Every fixed floor here is space the name cannot have, and the name is the only column
-      whose content has no upper bound. Counted rather than found, because the template is
-      written twice - once for the heading and once for the rows - and a widening applied to
-      one of them silently misaligns the two.
-
-      Floors rather than fixed `w-12`/`w-10` since 26 Sep 2026: a five-figure score in a
-      48px cell overflowed the lobby column and `overflow-x-hidden` clipped the row's right
-      border (owner screenshot). `minmax` grows when needed and still counts twice.
-      Floors trimmed to 2.5rem/2.25rem 15 Oct 2026 (owner: "show the usernames in a single
-      line") - the empty columns were holding width the name needed.
-    */
-    expect(
-      board.match(
-        /grid-cols-\[1\.75rem_minmax\(0,1fr\)_minmax\(2\.5rem,auto\)_minmax\(2\.25rem,auto\)_auto\]/g,
-      ) ?? [],
-    ).toHaveLength(2);
-    // 15 Oct 2026: the GM crown is the LAST cell, never on the name line.
-    const nameAt = board.indexOf("<NeonPlayerName");
-    const clockAt = board.indexOf("{clock ??");
-    const gmAt = board.indexOf("<GameMasterBadge");
-    expect(nameAt).toBeGreaterThan(0);
-    expect(gmAt).toBeGreaterThan(clockAt);
-    expect(board.match(/<GameMasterBadge/g) ?? []).toHaveLength(1);
-    // 15 Oct 2026: withheld on the narrow ranking rail, where it took the time's place.
-    expect(board).toMatch(/\{!ranking && \(\s*<div className="flex items-center justify-end">\s*<GameMasterBadge/);
-    expect(board.match(/gap-x-1\.5/g) ?? []).toHaveLength(2);
-    // One line, never a second: the name is fitted, not wrapped.
-    expect(board).toMatch(/<NeonPlayerName[\s\S]*?\bfit\b[\s\S]*?\/>/);
-    expect(board).not.toMatch(/<NeonPlayerName[^>]*\bwrap\b/);
-    // Inset so gold rims survive overflow-clipping parents (lobby page + arena rail).
-    expect(board).toMatch(/flex min-w-0 flex-col gap-1\.5 px-1/);
+  it("lobby puts GM beside the name like trading; ranking withholds it", () => {
+    expect(lobbySlice.match(/<GameMasterBadge/g) ?? []).toHaveLength(1);
+    expect(rankingSlice).not.toMatch(/<GameMasterBadge/);
+    expect(rankingSlice).toMatch(/<NeonPlayerName[\s\S]*?\bfit\b[\s\S]*?\/>/);
+    expect(rankingSlice).not.toMatch(/<NeonPlayerName[^>]*\bwrap\b/);
+    expect(rankingSlice).toMatch(/flex min-w-0 flex-col gap-1\.5 px-1/);
+    expect(rankingSlice.match(/gap-x-1\.5/g) ?? []).toHaveLength(2);
   });
 });
 

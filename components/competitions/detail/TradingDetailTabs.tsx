@@ -12,6 +12,7 @@ import {
 } from "@/components/competitions/lobby/contest-lobby-copy";
 import { TradingOverview } from "@/components/competitions/detail/TradingOverview";
 import type { TradingOverviewCopy } from "@/components/competitions/lobby/trading-overview-copy";
+import { PRESS_EFFECT } from "@/components/ui/press-effect";
 
 /**
  * The trading main column's tab bar, at the TOP of the main column directly under the summary
@@ -220,7 +221,7 @@ function ArrowButton({
       aria-label={direction === "previous" ? "Previous tab" : "Next tab"}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 text-sky-200 transition hover:bg-sky-500/20 hover:shadow-[0_0_14px_rgba(56,189,248,0.35)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-sky-500/10 disabled:hover:shadow-none"
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-sky-400/40 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20 hover:shadow-[0_0_14px_rgba(56,189,248,0.35)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-sky-500/10 disabled:hover:shadow-none ${PRESS_EFFECT}`}
     >
       <Icon className="h-5 w-5" />
     </button>
@@ -248,7 +249,7 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       draggable={false}
-      className={`inline-flex min-w-fit flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 py-2.5 text-sm font-semibold transition ${
+      className={`inline-flex min-w-fit flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 py-2.5 text-sm font-semibold ${PRESS_EFFECT} ${
         active
           ? "border-sky-400/70 bg-sky-500/15 text-sky-100 shadow-[0_0_18px_rgba(56,189,248,0.25)]"
           : "border-transparent text-gray-400 hover:bg-white/5 hover:text-gray-200"

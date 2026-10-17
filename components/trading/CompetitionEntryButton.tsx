@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Trophy,
   CheckCircle,
   AlertCircle,
   History,
@@ -535,15 +534,16 @@ export default function CompetitionEntryButton({
                       ? `/competitions/${competition._id}/play`
                       : `/competitions/${competition._id}/trade`
                   }
+                  className="group block w-full cursor-pointer"
                 >
-                  {arena && isProviderGame ? (
-                    <ArenaPlayPlate />
-                  ) : (
-                    <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
-                      <Trophy className="mr-2 h-4 w-4" />
-                      {isProviderGame ? "Play" : "Start Trading"}
-                    </Button>
-                  )}
+                  {/*
+                    Reason (owner, 17 Oct 2026): gold chevron plate (ArenaPlayPlate) for
+                    BOTH lobbies — the plain blue Trophy button looked like a different
+                    product next to the game lobby. Wording still depends on the page.
+                  */}
+                  <ArenaPlayPlate
+                    label={isProviderGame ? "PLAY" : "START TRADING"}
+                  />
                 </Link>
               ) : isUpcoming ? (
                 <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">

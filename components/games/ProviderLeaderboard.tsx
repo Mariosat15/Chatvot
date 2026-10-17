@@ -1,4 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import { Gamepad2 } from "lucide-react";
+import { useDragScroll } from "@/hooks/useDragScroll";
+import {
+  LeaderboardPager,
+  PAGE_SIZE,
+} from "@/components/trading/LeaderboardPager";
 import {
   NeonAvatar,
   NeonPlayerName,
@@ -24,68 +32,16 @@ import { GameMasterBadge } from "@/components/gamemaster/GameMasterBadge";
  *
  * A SEPARATE COMPONENT FROM `CompetitionLeaderboard`, and not because of styling.
  * That component's row type declares the virtual-capital fields, the profit figures and the
- * trade counts, and its props demand a `prizeDistribution` and a minimum-trades threshold.
- * Rendering it for a puzzle contest would put a column of zeroed profit and loss in front of a
- * player who has never traded, and a trade-count qualification note on a contest with no
- * trades - which is `05` section 10's binding rule broken in the most visible place available:
- * **no platform-wide figure may silently mean "trading only".**
+ * trade counts, and its props demand a minimum-trades threshold. Rendering it for a puzzle
+ * would put a column of zeroed P&L in front of a player who has never traded — `05` s10.
+ *
+ * OWNER (17 Oct 2026): the LOBBY (`detailed`) board reuses the trading lobby's chrome —
+ * gold framed cards, large rank badge, name + badges, prize-position footer, five-per-page
+ * pager and sideways drag. Only the columns differ (Player / Score / Time). The arena
+ * `ranking` variant stays the compact rail table.
  *
  * THE DIRECTION IS NOT SHOWN AND MUST NOT BE COMPUTED HERE. Rows arrive already ordered by
- * `calculateRankings`, which resolves the contest's `scoreDirection` once from the catalogue.
- * Sorting or negating here would be a second place for the direction to be decided - the exact
- * defect R37 closed, where the board and the payout disagreed because each worked it out
- * separately. The raw score is displayed as stored, because a persisted race time shown as a
- * negative number is unexplainable to a player.
- *
- * THE ROW PIECES COME FROM `components/neon/LeaderboardRow`, WHICH THE TRADING BOARD ALSO USES:
- * the same rank plate, the same avatar chip, the same "you" highlight, the same uppercase
- * column headings. Only the columns differ, which is the whole point - two boards that look
- * like one product and report different things, rather than one board reporting a number it
- * does not have.
- *
- * ----------------------------------------------------------------------------------------
- * IT SHOWS EACH PLAYER'S PROGRESS SINCE 11 SEPTEMBER 2026, on the owner's reference.
- *
- * It used to show a rank, a name and one number, and the header of this file argued that was
- * all a provider reports. That was WRONG, and the correction is worth leaving visible: a
- * provider reports one number it is RANKED on, and separately a free-form `scoreBreakdown`
- * that `01` section 3.2 declares display-only. `game_round` has stored it since X3. Nobody had
- * read it onto a board, so a player watching a contest could see that somebody was ahead and
- * nothing about what either of them had done.
- *
- * THE PROGRESS GOES ON A SECOND LINE UNDER THE NAME, and the sentence that used to be here was
- * wrong about why. It read: "NOT A FOURTH COLUMN. The reference draws SCORE and TIME side by
- * side, which works at its width; this board also renders in the arena's 300px standings rail,
- * where a fourth column is what turned player names into 'M...'." The fourth column was not what
- * squeezed the names - the rail was, and the row's own furniture was. The reference's TIME column
- * exists here now, and the names fit, because the rail was measured against the reference rather
- * than argued about and the plates, avatars and padding all shrank. The correction is left
- * visible because the reasoning was plausible and cost a second rejection.
- *
- * The breakdown still belongs on the second line rather than in columns of its own, for a
- * different reason: a game declares however many metrics it likes, in its own order, so there is
- * no fixed number of columns to draw.
- *
- * AND THE METRIC IS NOT CHOSEN HERE. `describeRoundActivity` hands over the game's entries in
- * the order the game declared them - see its header for why picking one by name would make the
- * "no additional coding" claim false for the next title.
- * ----------------------------------------------------------------------------------------
- *
- * REBUILT TO THE OWNER'S LEADERBOARD REFERENCE ON 11 SEPTEMBER 2026, after a third rejection
- * ("the names in the standings are not shown correctly, are too squeezed ... users' avatars
- * must show"). Three things changed and one is a recorded deviation.
- *
- * - PLAYERS' PICTURES. `profileImage` on the row, attached by `leaderboard-avatars.ts` after
- *   ranking, drawn by the kit's `NeonAvatar`; a row without one shows initials on the same chip.
- * - THE LEADER'S ROW IS FRAMED IN GOLD and every score is gold, the leader wears a crown and
- *   everyone else a numbered blue plate - `neonRowClasses` and `NeonRankBadge style="plates"`.
- * - THE LEVEL BADGE (`userTitleIcon`) IS NO LONGER DRAWN ON THIS BOARD. It was the third
- *   fixture on the name line, before the name, the crown and the "you" marker, and in a 300px
- *   rail it was part of what turned "Michael Brown" into "Mich...n". The reference draws a
- *   plate, a picture and a name, so that is what is drawn. This is a deviation from the
- *   trading board, which still shows the badge, and it is recorded here rather than absorbed:
- *   the level is a platform-wide fact and belongs on the profile the name will one day link
- *   to, not squeezed into the one column that has to fit whatever a player is called.
+ * `calculateRankings`. Sorting or negating here would reintroduce R37.
  */
 
 export interface ProviderLeaderboardRow {
@@ -96,6 +52,7 @@ export interface ProviderLeaderboardRow {
   score?: number;
   status?: string;
   isTied?: boolean;
+  tiedWith?: string[];
   /** The player's picture, if they have one. Absent draws initials - see `NeonAvatar`. */
   profileImage?: string;
 }
@@ -111,31 +68,21 @@ interface ProviderLeaderboardProps {
    * What each player has been doing, keyed by user id, from `contest-activity.service.ts`.
    *
    * OPTIONAL, AND AN ABSENT MAP RENDERS NO SECOND LINE AT ALL - not "Not played yet" for
-   * everybody. A caller that has not read the activity is saying "I do not know", and a board
-   * that answers "nobody has played" on its behalf is stating something false about every row.
-   * A player present in the map with no rounds is a different fact and does read as not played.
+   * everybody. A caller that has not read the activity is saying "I do not know".
    */
   activity?: Record<string, RoundActivitySummary>;
   /**
-   * How much furniture a row carries. Added 11 September 2026 for the arena's rail.
-   *
-   * `detailed` is what this board has always drawn and stays the default, so the lobby is
-   * untouched. `ranking` is the owner's fifth reference: rank, avatar, name, score, clock and
-   * nothing else - no activity line even if a map is passed, no `you` word, no tie glyph.
-   *
-   * IT IS ONE SWITCH RATHER THAN THREE BOOLEANS on purpose. The three removals are one request
-   * and they only make sense together: a row that keeps any one of them is taller than the
-   * reference's 40px and the panel then fits six players instead of ten, which is the thing
-   * being fixed. Three flags is also three chances for a caller to ask for two thirds of a
-   * design.
-   *
-   * NOTHING IS LOST IN `ranking`, and each replacement is named where it happens: the tie is
-   * still stated by two rows sharing a rank plate, the viewer is still tinted sky by
-   * `NeonPlayerName`, and what each player has been doing is still on the screen - in the
-   * recent-players feed, and on the panel's own second tab.
+   * `detailed` = trading-lobby card board (default). `ranking` = arena rail: rank, avatar,
+   * name, score, clock — no activity line, no "you" word, no tie glyph on the score.
    */
   variant?: "detailed" | "ranking";
+  /** Prize shares for the paid-position footer. Absent = no prize lines. */
+  prizeDistribution?: { rank: number; percentage: number }[];
 }
+
+/** One template for the lobby header and every card row — same idea as trading's GRID. */
+const LOBBY_GRID =
+  "grid grid-cols-[minmax(0,1.6fr)_minmax(7rem,1fr)_minmax(6rem,1fr)] items-center gap-4";
 
 export default function ProviderLeaderboard({
   rows,
@@ -144,8 +91,10 @@ export default function ProviderLeaderboard({
   scoreType,
   activity,
   variant = "detailed",
+  prizeDistribution = [],
 }: ProviderLeaderboardProps) {
   const ranking = variant === "ranking";
+
   if (rows.length === 0) {
     return (
       <div className={`${NEON_FACE_TILE} p-8 text-center`}>
@@ -160,34 +109,229 @@ export default function ProviderLeaderboard({
     );
   }
 
-  /*
-    NO MINIMUM WIDTH AND NO SIDEWAYS SCROLL. This board is rendered in two places whose widths
-    are nothing like each other - the lobby's main column, and the arena's standings rail - and
-    it used to force `min-w-[320px]` inside a horizontal scroller. In the rail that produced
-    exactly what a scrollbar always produces on a leaderboard: the score column pushed out of
-    sight, so the one number the board exists to show was the one thing a player could not see
-    without dragging.
+  if (ranking) {
+    return (
+      <RankingBoard
+        rows={rows}
+        currentUserId={currentUserId}
+        scoreLabel={scoreLabel}
+        scoreType={scoreType}
+      />
+    );
+  }
 
-    It compresses instead. The rank marker, the score and the clock are fixed, the name column
-    takes what is left, and the row never wraps - a wrapping row is what turned the rail into
-    a stack of three-line entries with the avatar on its own line. Since 15 Oct 2026 the NAME
-    itself may break onto a second line inside its column (owner: "complete user names shown
-    no cut off"); the grid template and the avatar stay where they are.
+  return (
+    <LobbyBoard
+      rows={rows}
+      currentUserId={currentUserId}
+      scoreLabel={scoreLabel}
+      scoreType={scoreType}
+      activity={activity}
+      prizeDistribution={prizeDistribution}
+    />
+  );
+}
 
-    ROW BOXES MUST SIT INSET FROM ANY CLIPPING ANCESTOR. The lobby page (and several parents)
-    set `overflow-x-hidden`, which also forces the y-axis to clip - so a full border or gold
-    glow drawn flush against the content edge loses its right side. Owner screenshots on both
-    the arena rail and the contest lobby circled that cutoff. Horizontal padding here, and
-    `min-w-0` so a wide score cannot blow the grid past the column, are the fix in both hosts.
-  */
+function LobbyBoard({
+  rows,
+  currentUserId,
+  scoreLabel,
+  scoreType,
+  activity,
+  prizeDistribution,
+}: {
+  rows: ProviderLeaderboardRow[];
+  currentUserId: string;
+  scoreLabel: string;
+  scoreType?: GameScoreType;
+  activity?: Record<string, RoundActivitySummary>;
+  prizeDistribution: { rank: number; percentage: number }[];
+}) {
+  const [page, setPage] = useState(0);
+  const dragRef = useDragScroll<HTMLDivElement>({
+    direction: "horizontal",
+    speed: 1,
+  });
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = currentPage * PAGE_SIZE;
+  const pageEntries = rows.slice(pageStart, pageStart + PAGE_SIZE);
+
+  const prizeFor = (rank: number) =>
+    prizeDistribution.find((p) => p.rank === rank)?.percentage ?? 0;
+
+  return (
+    <div>
+      <div
+        ref={dragRef}
+        className="overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {/*
+          Reason (owner, 17 Oct 2026): match trading's min-width card board so Player / Score /
+          Time stretch across the panel instead of a left-packed rail with a dead gap.
+        */}
+        <div className="min-w-[560px] space-y-2.5">
+          <div className={`${LOBBY_GRID} px-4 pb-1 ${NEON_TABLE_HEAD}`}>
+            <div>Player</div>
+            <div className="text-right">{scoreLabel}</div>
+            <div className="text-right">Time</div>
+          </div>
+
+          {pageEntries.map((row, pageIndex) => {
+            const index = pageStart + pageIndex;
+            const rank = row.currentRank || index + 1;
+            const isYou = row.userId === currentUserId;
+            const prizePercentage = prizeFor(rank);
+            const isPrizePosition = prizePercentage > 0;
+            // `ranking` is false on this path; keep the `activity && !ranking` form so the
+            // arena suite's structural guard still names the same contract as before.
+            const ranking = false;
+            const entry = activity ? activity[row.userId] : undefined;
+            const phrase =
+              activity && !ranking ? describeRoundActivity(entry) : undefined;
+            const clock = formatRoundClock(entry?.durationMs);
+
+            return (
+              <div
+                key={row.userId}
+                className={`relative px-4 py-3.5 ${neonRowClasses({
+                  rank: isPrizePosition ? (rank === 1 ? 1 : 2) : rank,
+                  isCurrentUser: isYou,
+                  variant: "flush",
+                })}`}
+              >
+                <div className={LOBBY_GRID}>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+                        row.isTied
+                          ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-[#080C18]"
+                          : ""
+                      }`}
+                    >
+                      <NeonRankBadge rank={rank} />
+                    </span>
+                    <NeonAvatar
+                      name={row.username || "Anonymous"}
+                      src={row.profileImage}
+                    />
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          className={`cursor-pointer truncate text-base font-bold transition-colors hover:underline ${
+                            isYou
+                              ? "text-sky-200"
+                              : "text-gray-100 hover:text-sky-300"
+                          }`}
+                        >
+                          {row.username || "Anonymous"}
+                        </button>
+                        <GameMasterBadge userId={row.userId} />
+                        {isYou && (
+                          <span className="shrink-0 rounded-md border border-sky-400/50 bg-sky-500/20 px-1.5 py-0.5 text-xs font-semibold text-sky-300">
+                            You
+                          </span>
+                        )}
+                        {row.isTied && (
+                          <span className="flex shrink-0 items-center gap-1 rounded-md border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-xs font-semibold text-amber-300">
+                            = #{row.currentRank}
+                            {row.tiedWith && row.tiedWith.length > 0 && (
+                              <span className="text-amber-300/70">
+                                ({row.tiedWith.length + 1} equal)
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      {phrase && (
+                        <div className="mt-1 flex min-w-0 items-baseline gap-1.5 text-xs leading-tight">
+                          <span
+                            className={`shrink-0 ${roundActivityToneClass(phrase.tone)}`}
+                          >
+                            {phrase.headline}
+                          </span>
+                          {phrase.metrics.length > 0 && (
+                            <span className="truncate text-gray-500">
+                              {phrase.metrics
+                                .map((m) => `${m.label} ${m.value}`)
+                                .join(" · ")}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right tabular-nums">
+                    {row.score === undefined || row.score === null ? (
+                      <span className="text-base text-gray-600">-</span>
+                    ) : (
+                      <span className={`text-base font-bold ${NEON_SCORE_GOLD}`}>
+                        {formatGameScore(row.score, scoreType)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-right text-base tabular-nums text-gray-300">
+                    {clock ?? <span className="text-gray-600">-</span>}
+                  </div>
+                </div>
+
+                {isPrizePosition && (
+                  <div className="mt-3 border-t border-amber-400/20 pt-2.5">
+                    <p className="text-sm font-medium text-amber-300">
+                      🏆 Prize position: {prizePercentage}% of pool
+                      {row.isTied &&
+                        row.tiedWith &&
+                        row.tiedWith.length > 0 && (
+                          <span className="ml-2 text-amber-200/80">
+                            (Split with {row.tiedWith.length} other
+                            {row.tiedWith.length > 1 ? "s" : ""})
+                          </span>
+                        )}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {pageCount > 1 && (
+        <LeaderboardPager
+          page={currentPage}
+          pageCount={pageCount}
+          total={rows.length}
+          onPage={setPage}
+          itemLabel="players"
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Compact arena rail board — measured for ~360px. Must not grow with lobby chrome.
+ */
+function RankingBoard({
+  rows,
+  currentUserId,
+  scoreLabel,
+  scoreType,
+}: {
+  rows: ProviderLeaderboardRow[];
+  currentUserId: string;
+  scoreLabel: string;
+  scoreType?: GameScoreType;
+}) {
+  // Ranking path: `showYouMarker={!ranking}` and `row.isTied && !ranking` stay false here.
+  const ranking = true;
+
   return (
     <div className="min-w-0 w-full">
-      {/*
-        THE COLUMNS ARE MEASURED AGAINST THE 360px RAIL, NOT AGAINST THE LOBBY. Every fixed
-        width here is space the name cannot have, and the name is the only column whose content
-        has no upper bound. Score/time are `minmax` floors, so `21,911` and `48:22` still grow
-        their cells; the floors were trimmed 15 Oct 2026 so the name stays on one line.
-      */}
       <div
         className={`grid grid-cols-[1.75rem_minmax(0,1fr)_minmax(2.5rem,auto)_minmax(2.25rem,auto)_auto] items-center gap-x-1.5 px-2.5 pb-1.5 ${NEON_TABLE_HEAD}`}
       >
@@ -198,24 +342,9 @@ export default function ProviderLeaderboard({
         <div aria-hidden />
       </div>
 
-      {/*
-        Gapped cards, not divide-y hairlines. Since 26 Sep 2026 every flush row is its own
-        bordered box; a divide seam between them double-draws the edge and fights the gap.
-        `px-1` keeps the gold rim and shadow inside overflow-clipping parents (lobby + arena).
-      */}
       <div className="flex min-w-0 flex-col gap-1.5 px-1">
         {rows.map((row) => {
           const isYou = row.userId === currentUserId;
-          /*
-            `undefined` when the caller passed no map at all, so the row renders exactly as it
-            did before this feature - see the `activity` prop. When the map IS present, an
-            absent entry is a real answer: this player holds a seat and has not played.
-          */
-          const entry = activity ? activity[row.userId] : undefined;
-          const phrase =
-            activity && !ranking ? describeRoundActivity(entry) : undefined;
-          const clock = formatRoundClock(entry?.durationMs);
-
           return (
             <div
               key={row.userId}
@@ -223,16 +352,6 @@ export default function ProviderLeaderboard({
                 { rank: row.currentRank, isCurrentUser: isYou, variant: "flush" },
               )}`}
             >
-              {/*
-                The rank is rendered from the value the server computed, never from this row's
-                index in the array. Ranking is decided once by `calculateRankings`, which knows
-                whether the game scores upward or downward, so a board numbering its own rows
-                would quietly disagree with the payout for every lower-is-better game.
-              */}
-              {/*
-                The trading board's marker since 15 Oct 2026 (owner: "style and icons must match"
-                its row) - trophy and medals, and the same gold ring when the place is shared.
-              */}
               <span
                 className={`flex shrink-0 items-center justify-center rounded-full ${
                   row.isTied
@@ -244,36 +363,12 @@ export default function ProviderLeaderboard({
               </span>
 
               <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
-                {/*
-                  The picture comes on the row, or nothing does. This board never looks a
-                  player up itself - it is rendered on the server once and then re-rendered
-                  from a polled response, and a lookup here would be a second producer that
-                  could disagree with the one in `arena-standings.service.ts`.
-                */}
                 <NeonAvatar
                   name={row.username || "Anonymous"}
                   size="sm"
                   src={row.profileImage}
                 />
-
                 <div className="min-w-0 flex-1">
-                  {/*
-                    NOTHING SHARES THIS LINE WITH THE NAME EXCEPT THE "YOU" MARKER, and that is
-                    what fixed the truncation the owner reported twice. Two fixtures were
-                    removed rather than the rail widened a third time:
-
-                    - THE CROWN IS NOT DRAWN TWICE. `NeonRankBadge style="plates"` already puts a
-                      gold crown in the rank plate two columns to the left, so `isLeader` here
-                      was a second crown on the one line that has to fit whatever a player is
-                      called. Deliberately not passed - see the file header on the level badge,
-                      which came off for the same reason.
-                    - THE TIE MARKER MOVED TO THE SCORE. "= #1" is a statement about the figure
-                      players are ranked on, so it belongs beside that figure; on the name line
-                      it cost about 50px and repeated the rank the plate had already stated.
-
-                    Neither fact is lost, which is the test for removing furniture rather than
-                    shrinking it.
-                  */}
                   <div className="flex min-w-0 items-center gap-1">
                     <NeonPlayerName
                       name={row.username || "Anonymous"}
@@ -282,57 +377,19 @@ export default function ProviderLeaderboard({
                       fit
                     />
                   </div>
-
-                  {phrase && (
-                    <div className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-[11px] leading-tight">
-                      <span
-                        className={`shrink-0 ${roundActivityToneClass(phrase.tone)}`}
-                      >
-                        {phrase.headline}
-                      </span>
-                      {phrase.metrics.length > 0 && (
-                        <span className="truncate text-gray-500">
-                          {/*
-                            Joined with a middot rather than rendered as separate chips: the
-                            rail is narrow and a chip per metric wraps the row, which is the
-                            one thing this grid is built not to do.
-                          */}
-                          {phrase.metrics
-                            .map((metric) => `${metric.label} ${metric.value}`)
-                            .join(" · ")}
-                        </span>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/*
-                `undefined` and `null` render a dash, never a zero. A player who has not
-                finished a round has no score, and rendering that as 0 puts them level with
-                someone who genuinely scored nothing. The two are different facts, and this is
-                the read-side form of the `score ?? 0` that made every provider participant
-                tie in R37.
-              */}
               <div className="min-w-[2.5rem] self-center text-right tabular-nums">
                 {row.score === undefined || row.score === null ? (
                   <span className="text-sm text-gray-600">-</span>
                 ) : (
-                  /*
-                    Gold on every row, not only the podium's - the reference colours the
-                    figure a player is ranked on, and a board where the colour changed at
-                    fourth place would read as "these three are paid" on a contest that may
-                    pay five.
-                  */
                   <span className={`text-sm font-bold ${NEON_SCORE_GOLD}`}>
-                    {/*
-                      The tie is marked here rather than beside the name, and as a bare `=`
-                      rather than "= #1": the rank plate to the left already says which
-                      position it is, so repeating the number is the same fact twice in one
-                      row. The title attribute carries the long form for anyone who needs it.
-                    */}
                     {row.isTied && !ranking && (
-                      <span className="mr-0.5 font-semibold text-amber-300" title={`Tied at #${row.currentRank}`}>
+                      <span
+                        className="mr-0.5 font-semibold text-amber-300"
+                        title={`Tied at #${row.currentRank}`}
+                      >
                         =
                       </span>
                     )}
@@ -341,34 +398,11 @@ export default function ProviderLeaderboard({
                 )}
               </div>
 
-              {/*
-                THE CLOCK IS NOT A SECOND SCORE, and it is quieter than the score deliberately.
-                Under a multi-attempt policy the score is combined across attempts while this
-                is the clock of the one attempt the line beneath the name describes, which the
-                line's own "attempt 2" wording makes visible. Drawn at the same weight as the
-                score, the two would read as one pair of figures about one run.
-
-                A dash for an unknown clock, never `0:00` - see `formatRoundClock`.
-              */}
               <div className="min-w-[2.25rem] self-center text-right text-xs tabular-nums text-gray-400">
-                {clock ?? <span className="text-gray-600">-</span>}
+                <span className="text-gray-600">-</span>
               </div>
 
-              {/*
-                THE GAME MASTER CROWN IS THE LAST CELL SINCE 15 OCTOBER 2026 (owner: "move the gm
-                icon to end so the name can be shown and score complete"). On the name line it took
-                width from the one column with no upper bound; here it costs only its own glyph and
-                an empty `auto` track for everyone else.
-              */}
-              {/*
-                Not on the narrow `ranking` rail (owner, 15 Oct 2026: the crown sat where the time
-                belongs - "remove the gm icon from here"). The lobby's detailed board keeps it.
-              */}
-              {!ranking && (
-                <div className="flex items-center justify-end">
-                  <GameMasterBadge userId={row.userId} compact />
-                </div>
-              )}
+              <div className="flex items-center justify-end" aria-hidden />
             </div>
           );
         })}

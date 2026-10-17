@@ -13,11 +13,14 @@ export function LeaderboardPager({
   pageCount,
   total,
   onPage,
+  itemLabel = "traders",
 }: {
   page: number;
   pageCount: number;
   total: number;
   onPage: (page: number) => void;
+  /** "traders" on the trading board; "players" on the game board. */
+  itemLabel?: string;
 }) {
   const first = page * PAGE_SIZE + 1;
   const last = Math.min(total, first + PAGE_SIZE - 1);
@@ -34,7 +37,7 @@ export function LeaderboardPager({
         <span className="font-semibold text-gray-200">
           {first}-{last}
         </span>{" "}
-        of <span className="font-semibold text-gray-200">{total}</span> traders
+        of <span className="font-semibold text-gray-200">{total}</span> {itemLabel}
       </p>
       <div className="flex items-center gap-1.5">
         <button

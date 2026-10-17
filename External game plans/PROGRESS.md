@@ -325,6 +325,7 @@ project low risk.
 
 ## START HERE NEXT
 
+- **Lobby Overview stack + Play plate CODE-COMPLETE 17 Oct (eng)** — owner mark-up: Overview About / How you play / How you win are **full-width stacked bands** on game **and** trading (`TradingOverview`); tab strip no longer doubles "How you play" + catalogue "How to play" (merged in `buildGameLobbySections`); in-contest Play / Start Trading both use gold `ArenaPlayPlate` (wording by page). **Never verified by eye.**
 - **Game competition lobby LAYOUT PARITY CODE-COMPLETE 16 Oct (eng)** — owner: desktop Game lobby must match Trading lobby layout exactly, with games data. Desktop returns to `CompetitionDetailShell` via `DesktopGameLobby` (hero → KPI summary → tabs + leaderboard + your-run | sidebar: entry → `ContestCountdown` showcase → Schedule UTC → level → prizes → fair play). Overview/rules from `buildGameOverviewCopy` + `buildGameLobbySections`. Phone `MobileGameCompetitionLobby` unchanged. Trading untouched. **Supersedes the 15 Oct three-column `GameCompetitionArenaShell` path — say which.** Tests: lobby suites 205 green. **Never verified by eye.**
 - **Game competition lobby ARENA redesign CODE-COMPLETE 15 Oct (eng)** — **superseded same day+1 by layout parity above — say which.** Was: three-column arena shell. Phone tree from that day still lives.
 - **Join after unplayable CLOSED 15 Oct (eng)** — paid entry refuses when the contest clock has ended, a together-start race has finished/cancelled, the contest is paused, or the title is unavailable; Play maps permanent `race_unjoinable`; lobby/card Join hidden where the same facts apply. Tests: `contest-playability.test.ts`. **Never verified by eye.**
@@ -996,6 +997,18 @@ remains outstanding is the **opponent** half listed above, not the game half.
 ---
 
 ## WORK LOG
+
+### 17 October 2026 - Game lobby leaderboard matches trading lobby chrome
+
+Owner screenshots (game board left-packed with a dead gap vs trading gold cards): lobby `ProviderLeaderboard` `detailed` path now reuses trading's card shell — large rank badge, avatar, name + You/GM/tie badges, Score/Time columns on a shared `LOBBY_GRID`, prize-position footer, five-per-page `LeaderboardPager`, sideways drag. `LobbyLiveLeaderboard` uses the same `NeonPanel` chrome as trading (`trophy-blue`, `size="lg"`). Arena `ranking` variant stays the compact fluid rail. Guards flipped in `provider-play-ui.test.ts`. **Never verified by eye.**
+
+### 17 October 2026 - Battle plan centred; one press + hand for every button
+
+Owner screenshot (Battle plan dead gap on the right): Overview steps now use a column count that matches the step count (`sm:grid-cols-3` for three) with number / title / detail centred per column — no left-packed 4-col row. Sitewide press: `PRESS_EFFECT` includes `cursor-pointer`; `@layer base` in player and admin `globals.css` applies hand + `scale(0.95)` on press to native `<button>` / `[role="button"]`; join artwork, lobby tabs, and Play plate drop hover-scale / translate lifts. Cursor rule `.cursor/rules/button-press-cursor.mdc` (`alwaysApply`). Guards: `press-effect.test.ts`, `contest-lobby-shell.test.ts`. **Never verified by eye.**
+
+### 17 October 2026 - Overview stacked bands, one How you play tab, gold Play plate
+
+Owner screenshots (red boxes + tab strip + Play vs JOIN LATE plate): (1) Overview About / How you play / How you win stacked full-width on game and trading — `TradingOverview` no longer puts About beside a two-column tile grid. (2) Catalogue `howToPlay` merges into the event "How you play" tab in `buildGameLobbySections` (no second swords tab). (3) In-contest CTA uses `ArenaPlayPlate` for both lobbies (`PLAY` / `START TRADING`); join still uses Menuitems artwork. Guards in `contest-lobby-shell.test.ts`. **Never verified by eye.**
 
 ### 16 October 2026 - Game Competition Lobby desktop matches Trading layout
 

@@ -1,0 +1,49 @@
+---
+description: Every button uses the same press animation and hand cursor on hover (mobile + desktop).
+alwaysApply: true
+---
+
+# Button press + hand cursor — ChartVolt
+
+Owner rule (17 Oct 2026): **every clickable button** on player and admin surfaces must
+use the **same** press feedback and a **hand cursor** on hover, on mobile and desktop.
+
+## The one effect
+
+| Piece | Value |
+|---|---|
+| Cursor on hover | `cursor-pointer` (hand) |
+| Press | `active:scale-95` with `transition-all duration-150` |
+| Reduced motion | no transition, no scale |
+| Hover must **not** | `hover:scale-*` (colour / brightness only) |
+
+**Source of truth (player app):** `components/ui/press-effect.ts` → `PRESS_EFFECT`
+(and `ART_BUTTON_HOVER` for image CTAs).
+
+**Native `<button>` fallback:** the same press + hand is also in `@layer base` of
+`app/globals.css` and `apps/admin/app/globals.css`, so a hand-rolled `<button>` that
+forgets the class still behaves. **`<Link>` / `<a>` styled as buttons are not covered
+by the CSS** — they must take `PRESS_EFFECT` (or at least `cursor-pointer` + the plate’s
+`group-active:scale-95` pattern).
+
+## Hard rules
+
+1. **New buttons** — use the shared `<Button>` from `components/ui/button.tsx` (or admin
+   equivalent), `NeonButton` / `NeonPill`, or append `${PRESS_EFFECT}` on a raw
+   `<button>` / button-like `<Link>`.
+2. **Do not invent a second press** — no `active:scale-90`, `hover:scale-105`,
+   `hover:-translate-y-*` on controls. Image join art uses `PRESS_EFFECT` +
+   `ART_BUTTON_HOVER` only.
+3. **Disabled** — `cursor-not-allowed` (or `disabled:pointer-events-none`); never show
+   a hand or press on a refused control.
+4. **Admin and player** — same contract. Prefer importing / mirroring `PRESS_EFFECT`
+   rather than a third string of classes.
+5. **Tests** — `__tests__/ui/press-effect.test.ts` pins the shared string and forbids
+   hover-scale on `<Button>` / `<button>` / `<Link>` openings.
+
+## Anti-patterns (refuse these)
+
+- A one-off “bounce” or grow-on-hover only on one screen
+- Relying on Tailwind preflight for the hand (v4 dropped `cursor-pointer` on buttons)
+- Putting press CSS only in one lobby while another uses a plain blue button
+- Claiming visual sign-off without owner review on a real device / browser
